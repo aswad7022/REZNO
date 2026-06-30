@@ -1,0 +1,32 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// =====================================================
+// IDENTITY
+// =====================================================
+
+enum AccountStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  BLOCKED
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+  NOT_SPECIFIED
+}
+
+enum LanguageCode {
+  AR
+  EN
+  TR
+}
