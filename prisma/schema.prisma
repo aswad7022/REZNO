@@ -30,3 +30,178 @@ enum LanguageCode {
   EN
   TR
 }
+
+enum SystemRole {
+  OWNER
+  MANAGER
+  RECEPTIONIST
+  STAFF
+}
+
+enum BranchStatus {
+  ACTIVE
+  INACTIVE
+}
+
+// =====================================================
+// IDENTITY
+// =====================================================
+
+model Person {
+  id        String @id @default(uuid()) @db.Uuid
+
+  authUserId String @unique
+
+  firstName String
+  lastName  String?
+
+  displayName String?
+
+  phone String?
+
+  avatarUrl String?
+
+  gender Gender?
+
+  preferredLanguage LanguageCode @default(AR)
+
+  timezone String @default("Asia/Baghdad")
+
+  status AccountStatus @default(PENDING)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+  deletedAt DateTime? @db.Timestamptz(6)
+
+  memberships OrganizationMember[]
+
+  @@index([phone])
+}
+
+// =====================================================
+// ORGANIZATION
+// =====================================================
+
+model Organization {
+
+  id String @id @default(uuid()) @db.Uuid
+
+  name String
+
+  slug String @unique
+
+  logoUrl String?
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+  deletedAt DateTime? @db.Timestamptz(6)
+
+  members OrganizationMember[]
+  roles Role[]
+  branches Branch[]
+
+}
+
+model OrganizationMember {
+
+  id String @id @default(uuid()) @db.Uuid
+
+  personId String @db.Uuid
+
+  organizationId String @db.Uuid
+
+  roleId String @db.Uuid
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  person Person @relation(fields: [personId], references: [id])
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  role Role @relation(fields: [roleId], references: [id])
+
+  assignments BranchAssignment[]
+
+  @@unique([personId, organizationId])
+
+  @@index([organizationId])
+
+  @@index([roleId])
+
+}
+
+model Role {
+
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String @db.Uuid
+
+  name String
+
+  systemRole SystemRole?
+
+  isSystem Boolean @default(false)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  members OrganizationMember[]
+
+  @@unique([organizationId, name])
+
+}
+
+model Branch {
+
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String @db.Uuid
+
+  name String
+
+  slug String
+
+  phone String?
+
+  email String?
+
+  timezone String @default("Asia/Baghdad")
+
+  status BranchStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  deletedAt DateTime? @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  assignments BranchAssignment[]
+
+  @@unique([organizationId, slug])
+
+}
+
+model BranchAssignment {
+
+  id String @id @default(uuid()) @db.Uuid
+
+  memberId String @db.Uuid
+
+  branchId String @db.Uuid
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+
+  member OrganizationMember @relation(fields: [memberId], references: [id])
+
+  branch Branch @relation(fields: [branchId], references: [id])
+
+  @@unique([memberId, branchId])
+
+}
