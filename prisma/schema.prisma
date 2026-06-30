@@ -31,6 +31,12 @@ enum LanguageCode {
   TR
 }
 
+enum EntityStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
 enum SystemRole {
   OWNER
   MANAGER
@@ -38,7 +44,24 @@ enum SystemRole {
   STAFF
 }
 
-enum BranchStatus {
+enum StaffSelectionMode {
+  NONE
+  OPTIONAL
+  REQUIRED
+}
+
+enum BusinessType {
+  PHYSICAL
+  ONLINE
+  HYBRID
+}
+
+enum PricingType {
+  FIXED
+  STARTING_FROM
+}
+
+enum ServiceStatus {
   ACTIVE
   INACTIVE
 }
@@ -48,7 +71,7 @@ enum BranchStatus {
 // =====================================================
 
 model Person {
-  id        String @id @default(uuid()) @db.Uuid
+  id String @id @default(uuid()) @db.Uuid
 
   authUserId String @unique
 
@@ -67,10 +90,12 @@ model Person {
 
   timezone String @default("Asia/Baghdad")
 
-  status AccountStatus @default(PENDING)
+  status EntityStatus @default(ACTIVE)
 
-  createdAt DateTime @default(now()) @db.Timestamptz(6)
-  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+  isOnboarded Boolean @default(false)
+
+  createdAt DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(6)
   deletedAt DateTime? @db.Timestamptz(6)
 
   memberships OrganizationMember[]
@@ -83,27 +108,166 @@ model Person {
 // =====================================================
 
 model Organization {
-
   id String @id @default(uuid()) @db.Uuid
 
   name String
 
   slug String @unique
 
-  logoUrl String?
+  status EntityStatus @default(ACTIVE)
 
-  createdAt DateTime @default(now()) @db.Timestamptz(6)
-  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+  businessType BusinessType @default(PHYSICAL)
+
+  isVerified Boolean @default(false)
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(6)
   deletedAt DateTime? @db.Timestamptz(6)
 
-  members OrganizationMember[]
-  roles Role[]
-  branches Branch[]
+  profile             BusinessProfile?
+  settings            OrganizationSettings?
+  organizationMembers OrganizationMember[]
+  roles               Role[]
+  branches            Branch[]
+}
 
+model BusinessProfile {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String @unique @db.Uuid
+
+  legalName String?
+
+  description String?
+
+  website String?
+
+  logoUrl String?
+
+  coverImageUrl String?
+
+  businessEmail String?
+
+  businessPhone String?
+
+  facebookUrl String?
+
+  instagramUrl String?
+
+  tiktokUrl String?
+
+  youtubeUrl String?
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+}
+
+model OrganizationSettings {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String @unique @db.Uuid
+
+  bookingEnabled Boolean @default(true)
+
+  marketplaceVisible Boolean @default(true)
+
+  staffSelectionMode StaffSelectionMode @default(OPTIONAL)
+
+  allowOnlinePayments Boolean @default(false)
+
+  cancellationWindowHours Int @default(24)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+}
+
+model BusinessHour {
+  id String @id @default(uuid()) @db.Uuid
+
+  branchId String @db.Uuid
+
+  dayOfWeek Int
+
+  isOpen Boolean @default(true)
+
+  openTime String
+
+  closeTime String
+
+  branch Branch @relation(fields: [branchId], references: [id])
+
+  @@unique([branchId, dayOfWeek])
+}
+
+model Category {
+  id String @id @default(uuid()) @db.Uuid
+
+  name String
+
+  slug String @unique
+
+  icon String?
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  services Service[]
+}
+
+model Service {
+  id String @id @default(uuid()) @db.Uuid
+
+  categoryId String @db.Uuid
+
+  name String
+
+  description String?
+
+  imageUrl String?
+
+  status ServiceStatus @default(ACTIVE)
+
+  category Category @relation(fields: [categoryId], references: [id])
+
+  branchServices BranchService[]
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+}
+
+model BranchService {
+  id String @id @default(uuid()) @db.Uuid
+
+  branchId String @db.Uuid
+
+  serviceId String @db.Uuid
+
+  price Decimal @db.Decimal(10, 2)
+
+  pricingType PricingType @default(FIXED)
+
+  durationMinutes Int
+
+  isAvailable Boolean @default(true)
+
+  branch Branch @relation(fields: [branchId], references: [id])
+
+  service Service @relation(fields: [serviceId], references: [id])
+
+  @@unique([branchId, serviceId])
 }
 
 model OrganizationMember {
-
   id String @id @default(uuid()) @db.Uuid
 
   personId String @db.Uuid
@@ -125,20 +289,18 @@ model OrganizationMember {
   assignments BranchAssignment[]
 
   @@unique([personId, organizationId])
-
   @@index([organizationId])
-
   @@index([roleId])
-
 }
 
 model Role {
-
   id String @id @default(uuid()) @db.Uuid
 
   organizationId String @db.Uuid
 
   name String
+
+  description String?
 
   systemRole SystemRole?
 
@@ -150,14 +312,12 @@ model Role {
 
   organization Organization @relation(fields: [organizationId], references: [id])
 
-  members OrganizationMember[]
+  organizationMembers OrganizationMember[]
 
   @@unique([organizationId, name])
-
 }
 
 model Branch {
-
   id String @id @default(uuid()) @db.Uuid
 
   organizationId String @db.Uuid
@@ -172,7 +332,19 @@ model Branch {
 
   timezone String @default("Asia/Baghdad")
 
-  status BranchStatus @default(ACTIVE)
+  status EntityStatus @default(ACTIVE)
+
+  addressLine1 String?
+
+  addressLine2 String?
+
+  city String?
+
+  country String?
+
+  latitude Decimal? @db.Decimal(9, 6)
+
+  longitude Decimal? @db.Decimal(9, 6)
 
   createdAt DateTime @default(now()) @db.Timestamptz(6)
 
@@ -184,12 +356,14 @@ model Branch {
 
   assignments BranchAssignment[]
 
-  @@unique([organizationId, slug])
+  businessHours BusinessHour[]
 
+  branchServices BranchService[]
+
+  @@unique([organizationId, slug])
 }
 
 model BranchAssignment {
-
   id String @id @default(uuid()) @db.Uuid
 
   memberId String @db.Uuid
@@ -203,5 +377,4 @@ model BranchAssignment {
   branch Branch @relation(fields: [branchId], references: [id])
 
   @@unique([memberId, branchId])
-
 }
