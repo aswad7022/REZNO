@@ -28,13 +28,20 @@ const tiles: Array<{
   { vertical: "OTHER", icon: Sparkles },
 ];
 
-export async function MarketplaceCategoryTiles() {
+export async function MarketplaceCategoryTiles({
+  currentParams,
+}: {
+  currentParams?: Record<string, string | undefined>;
+}) {
   const t = await getTranslations("Marketplace.categoryTiles");
 
   return (
     <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
       {tiles.map((tile) => (
-        <Link key={tile.vertical} href={`/marketplace?vertical=${tile.vertical}`}>
+        <Link
+          key={tile.vertical}
+          href={marketplaceTileHref(currentParams, tile.vertical)}
+        >
           <Card className="h-full border-primary/10 transition hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-lg hover:shadow-primary/10">
             <CardContent className="flex flex-col items-center gap-2 p-4 text-center">
               <span className="grid size-11 place-items-center rounded-2xl bg-primary/10 text-primary">
@@ -52,4 +59,16 @@ export async function MarketplaceCategoryTiles() {
       ))}
     </div>
   );
+}
+
+function marketplaceTileHref(
+  currentParams: Record<string, string | undefined> | undefined,
+  vertical: BusinessVertical,
+): string {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(currentParams ?? {})) {
+    if (value && key !== "category") params.set(key, value);
+  }
+  params.set("vertical", vertical);
+  return `/marketplace?${params.toString()}`;
 }

@@ -13,6 +13,7 @@ import {
   getMarketplaceFilters,
   searchMarketplace,
 } from "@/features/marketplace/services/marketplace";
+import { MAX_SEARCH_QUERY_LENGTH } from "@/features/search/services/search-normalization";
 import { businessVerticals } from "@/features/businesses/config/verticals";
 import { MarketplaceCategoryTiles } from "@/features/marketplace/components/marketplace-category-tiles";
 import { NearbyBusinessMap } from "@/features/location/components/nearby-business-map";
@@ -43,6 +44,7 @@ export default async function MarketplacePage({
   }>;
 }) {
   const query = await searchParams;
+  const searchQuery = query.q?.trim().slice(0, MAX_SEARCH_QUERY_LENGTH);
   const vertical = businessVerticals.includes(query.vertical as BusinessVertical)
     ? (query.vertical as BusinessVertical)
     : undefined;
@@ -54,7 +56,7 @@ export default async function MarketplacePage({
     Number.isFinite(latitude) && Number.isFinite(longitude);
   const [businesses, filters, t] = await Promise.all([
     searchMarketplace({
-      query: query.q,
+      query: searchQuery,
       category: query.category,
       city: query.city,
       vertical,
@@ -100,7 +102,7 @@ export default async function MarketplacePage({
         <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[28rem] bg-[radial-gradient(circle_at_top_right,color-mix(in_oklch,var(--primary)_18%,transparent),transparent_32rem),radial-gradient(circle_at_top_left,color-mix(in_oklch,var(--accent)_16%,transparent),transparent_28rem)]" />
         <div className="mx-auto max-w-3xl text-center">
           <span className="inline-flex rounded-full border border-primary/15 bg-primary/8 px-3 py-1 text-sm font-semibold text-primary">
-            REZNO Marketplace
+            {t("searchDiscovery")}
           </span>
           <h1 className="mt-5 bg-gradient-to-l from-slate-950 via-primary to-violet-700 bg-clip-text text-4xl font-black tracking-tight text-transparent sm:text-5xl dark:from-white dark:via-violet-200 dark:to-indigo-200">
             {t("title")}
@@ -118,7 +120,7 @@ export default async function MarketplacePage({
               <Input
                 name="q"
                 type="search"
-                defaultValue={query.q}
+                defaultValue={searchQuery}
                 placeholder={t("searchPlaceholder")}
                 aria-label={t("searchLabel")}
                 className="h-11"
@@ -179,9 +181,23 @@ export default async function MarketplacePage({
                 {t("search")}
               </Button>
             </form>
+            {searchQuery ? (
+              <div className="mt-4 flex flex-col items-start justify-between gap-3 rounded-2xl bg-muted/60 px-4 py-3 text-sm text-muted-foreground sm:flex-row sm:items-center">
+                <span>{t("showingResultsFor", { query: searchQuery })}</span>
+                <Button asChild variant="ghost" size="sm">
+                  <a href={marketplaceHref(query, { q: undefined })}>
+                    {t("clearSearch")}
+                  </a>
+                </Button>
+              </div>
+            ) : (
+              <p className="mt-4 text-sm text-muted-foreground">
+                {t("searchHint")}
+              </p>
+            )}
           </CardContent>
         </Card>
-        <MarketplaceCategoryTiles />
+        <MarketplaceCategoryTiles currentParams={{ ...query, q: searchQuery }} />
         <div className="mt-4 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <LocationPermissionButton
             labels={{
@@ -237,8 +253,26 @@ export default async function MarketplacePage({
               </div>
               <h2 className="font-semibold">{t("emptyTitle")}</h2>
               <p className="mt-2 text-sm text-muted-foreground">
-                {t("emptyDescription")}
+                {hasCustomerLocation
+                  ? t("emptyNearbyDescription")
+                  : t("emptyDescription")}
               </p>
+              <div className="mt-5 flex flex-col justify-center gap-2 sm:flex-row">
+                {searchQuery ? (
+                  <Button asChild variant="secondary">
+                    <a href={marketplaceHref(query, { q: undefined })}>
+                      {t("tryAnotherSearch")}
+                    </a>
+                  </Button>
+                ) : null}
+                {hasCustomerLocation ? (
+                  <Button asChild variant="outline">
+                    <a href={marketplaceHref(query, { radius: "25" })}>
+                      {t("expandRadius")}
+                    </a>
+                  </Button>
+                ) : null}
+              </div>
             </CardContent>
           </Card>
         )}

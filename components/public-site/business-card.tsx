@@ -73,6 +73,11 @@ export async function BusinessCard({
                 {business.city}
               </p>
             ) : null}
+            {business.branchLocationLabel || business.branchNearbyLandmark ? (
+              <p className="mt-1 truncate text-xs text-muted-foreground">
+                {business.branchLocationLabel ?? business.branchNearbyLandmark}
+              </p>
+            ) : null}
             {business.distanceKm !== null ? (
               <p className="mt-1 text-xs text-primary">
                 {t("distanceKm", {

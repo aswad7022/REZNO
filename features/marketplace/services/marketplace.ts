@@ -1,12 +1,18 @@
 import "server-only";
 
 import { cache } from "react";
-import type { BusinessVertical } from "@prisma/client";
+import type { BusinessVertical, Prisma } from "@prisma/client";
 
 import type {
   MarketplaceBusiness,
   PublicBusinessProfile,
 } from "@/features/marketplace/types";
+import type { NormalizedSearchQuery } from "@/features/search/types";
+import {
+  getSearchTermVariants,
+  normalizeSearchQuery,
+  scoreSearchResult,
+} from "@/features/search/services/search-normalization";
 import { calculateDistanceKm } from "@/features/location/services/distance";
 import {
   getNearbyBranchWhere,
@@ -53,49 +59,33 @@ export async function searchMarketplace(options?: {
   radiusKm?: number;
   take?: number;
 }): Promise<MarketplaceBusiness[]> {
-  const query = options?.query?.trim();
-  const city = options?.city?.trim();
+  const searchQuery = normalizeSearchQuery(options?.query);
+  const query = searchQuery?.raw;
+  const searchTerms = searchQuery ? getSearchTermVariants(searchQuery) : [];
+  const city = normalizeShortFilter(options?.city);
+  const category = normalizeShortFilter(options?.category);
   const nearbyInput = normalizeNearbyInput({
     latitude: options?.latitude,
     longitude: options?.longitude,
     radiusKm: options?.radiusKm,
     query,
-    category: options?.category,
+    category,
     vertical: options?.vertical,
     take: options?.take,
   });
   const nearbyBranchWhere = nearbyInput
     ? getNearbyBranchWhere(nearbyInput)
     : null;
+  const candidateIds = searchQuery
+    ? await findMarketplaceSearchCandidateIds(searchQuery, searchTerms)
+    : null;
+
+  if (searchQuery && candidateIds?.length === 0) return [];
+
   const organizations = await prisma.organization.findMany({
     where: {
       ...publicOrganizationWhere,
-      ...(query
-        ? {
-            OR: [
-              { name: { contains: query, mode: "insensitive" as const } },
-              {
-                profile: {
-                  description: {
-                    contains: query,
-                    mode: "insensitive" as const,
-                  },
-                },
-              },
-              {
-                services: {
-                  some: {
-                    status: "ACTIVE" as const,
-                    name: {
-                      contains: query,
-                      mode: "insensitive" as const,
-                    },
-                  },
-                },
-              },
-            ],
-          }
-        : {}),
+      ...(candidateIds ? { id: { in: candidateIds } } : {}),
       ...(city
         ? {
             branches: {
@@ -114,12 +104,12 @@ export async function searchMarketplace(options?: {
             },
           }
         : {}),
-      ...(options?.category
+      ...(category
         ? {
             services: {
               some: {
                 status: "ACTIVE" as const,
-                category: { slug: options.category },
+                category: { slug: category },
               },
             },
           }
@@ -143,8 +133,8 @@ export async function searchMarketplace(options?: {
               isAvailable: true,
               service: {
                 status: "ACTIVE",
-                ...(options?.category
-                  ? { category: { slug: options.category } }
+                ...(category
+                  ? { category: { slug: category } }
                   : {}),
               },
             },
@@ -152,13 +142,17 @@ export async function searchMarketplace(options?: {
           },
         },
       },
+      services: {
+        where: { status: "ACTIVE" },
+        include: { category: true },
+      },
       restaurantTables: {
         where: { isActive: true },
         select: { id: true },
       },
       menuItems: {
         where: { isAvailable: true },
-        select: { id: true },
+        select: { id: true, name: true, description: true },
       },
     },
     orderBy: [{ isVerified: "desc" }, { name: "asc" }],
@@ -171,15 +165,12 @@ export async function searchMarketplace(options?: {
         (branch) => branch.branchServices,
       );
       const prices = offerings.map((offering) => Number(offering.price));
-      const matchingOffering = query
-        ? offerings.find((offering) =>
-            offering.service.name.toLocaleLowerCase().includes(
-              query.toLocaleLowerCase(),
-            ),
-          )
+      const matchingOffering = searchQuery
+        ? offerings.find((offering) => {
+            const serviceName = offering.service.name.toLocaleLowerCase();
+            return searchQuery.terms.some((term) => serviceName.includes(term));
+          })
         : undefined;
-      const normalizedQuery = query?.toLocaleLowerCase();
-      const normalizedName = organization.name.toLocaleLowerCase();
       const branchesWithDistance = nearbyInput
         ? organization.branches
             .filter((branch) => branch.latitude && branch.longitude)
@@ -230,6 +221,7 @@ export async function searchMarketplace(options?: {
         vertical: organization.vertical,
         hasMenu: organization.menuItems.length > 0,
         hasTables: organization.restaurantTables.length > 0,
+        hasActiveBranch: organization.branches.length > 0,
         distanceKm,
         branchLatitude: displayBranch?.latitude
           ? Number(displayBranch.latitude)
@@ -246,24 +238,39 @@ export async function searchMarketplace(options?: {
         ).size,
         startingPrice:
           prices.length > 0 ? Math.min(...prices).toString() : null,
-        relevance:
-          normalizedQuery && normalizedName === normalizedQuery
-            ? 3
-            : normalizedQuery &&
-                offerings.some(
-                  (offering) =>
-                    offering.service.name.toLocaleLowerCase() ===
-                    normalizedQuery,
-                )
-              ? 2
-              : normalizedQuery
-                ? 1
-                : 0,
+        relevance: scoreSearchResult(searchQuery, {
+          name: organization.name,
+          slug: organization.slug,
+          description: organization.profile?.description ?? null,
+          categoryName:
+            organization.profile?.businessCategory ??
+            offerings[0]?.service.category.name ??
+            null,
+          vertical: organization.vertical,
+          branches: organization.branches.map((branch) => ({
+            name: branch.name,
+            addressLine1: branch.addressLine1,
+            addressLine2: branch.addressLine2,
+            city: branch.city,
+            locationLabel: branch.locationLabel,
+            nearbyLandmark: branch.nearbyLandmark,
+            locationInstructions: branch.locationInstructions,
+          })),
+          services: organization.services.map((service) => ({
+            name: service.name,
+            description: service.description,
+            categoryName: service.category.name,
+          })),
+          menuItems: organization.menuItems.map((item) => ({
+            name: item.name,
+            description: item.description,
+          })),
+        }),
         updatedAt: organization.updatedAt,
       };
     })
     .filter((business) =>
-      nearbyInput && business.distanceKm === null
+      !business.hasActiveBranch || (nearbyInput && business.distanceKm === null)
         ? false
         : business.vertical === "RESTAURANT" || business.vertical === "CAFE"
           ? business.hasMenu || business.hasTables
@@ -274,6 +281,8 @@ export async function searchMarketplace(options?: {
         right.relevance - left.relevance ||
         (left.distanceKm ?? Number.POSITIVE_INFINITY) -
           (right.distanceKm ?? Number.POSITIVE_INFINITY) ||
+        (left.distanceKm !== null ? -10 : 0) -
+          (right.distanceKm !== null ? -10 : 0) ||
         right.updatedAt.getTime() - left.updatedAt.getTime(),
     )
     .map((business) => ({
@@ -574,3 +583,108 @@ export const getPublicBusiness = cache(
     };
   },
 );
+
+function normalizeShortFilter(value: string | null | undefined): string | undefined {
+  const normalized = value?.trim().slice(0, 80);
+  return normalized || undefined;
+}
+
+async function findMarketplaceSearchCandidateIds(
+  searchQuery: NormalizedSearchQuery,
+  searchTerms: string[],
+): Promise<string[]> {
+  const organizationMatches: Prisma.OrganizationWhereInput[] = [
+    ...searchTerms.flatMap((term) => [
+      { name: { contains: term, mode: "insensitive" as const } },
+      { slug: { contains: term, mode: "insensitive" as const } },
+      {
+        profile: {
+          description: { contains: term, mode: "insensitive" as const },
+        },
+      },
+      {
+        profile: {
+          businessCategory: { contains: term, mode: "insensitive" as const },
+        },
+      },
+    ]),
+    ...searchQuery.inferredVerticals.map((vertical) => ({ vertical })),
+  ];
+  const branchMatches: Prisma.BranchWhereInput[] = searchTerms.flatMap(
+    (term) => [
+      { name: { contains: term, mode: "insensitive" as const } },
+      { city: { contains: term, mode: "insensitive" as const } },
+      { addressLine1: { contains: term, mode: "insensitive" as const } },
+      { addressLine2: { contains: term, mode: "insensitive" as const } },
+      { locationLabel: { contains: term, mode: "insensitive" as const } },
+      { nearbyLandmark: { contains: term, mode: "insensitive" as const } },
+      {
+        locationInstructions: {
+          contains: term,
+          mode: "insensitive" as const,
+        },
+      },
+    ],
+  );
+  const serviceMatches: Prisma.ServiceWhereInput[] = searchTerms.flatMap(
+    (term) => [
+      { name: { contains: term, mode: "insensitive" as const } },
+      { description: { contains: term, mode: "insensitive" as const } },
+      { category: { name: { contains: term, mode: "insensitive" as const } } },
+    ],
+  );
+  const menuItemMatches: Prisma.MenuItemWhereInput[] = searchTerms.flatMap(
+    (term) => [
+      { name: { contains: term, mode: "insensitive" as const } },
+      { description: { contains: term, mode: "insensitive" as const } },
+    ],
+  );
+
+  const [organizations, branches, services, menuItems] = await Promise.all([
+    prisma.organization.findMany({
+      where: {
+        ...publicOrganizationWhere,
+        OR: organizationMatches,
+      },
+      select: { id: true },
+      take: 100,
+    }),
+    prisma.branch.findMany({
+      where: {
+        deletedAt: null,
+        status: "ACTIVE",
+        organization: publicOrganizationWhere,
+        OR: branchMatches,
+      },
+      select: { organizationId: true },
+      take: 100,
+    }),
+    prisma.service.findMany({
+      where: {
+        status: "ACTIVE",
+        organization: publicOrganizationWhere,
+        OR: serviceMatches,
+      },
+      select: { organizationId: true },
+      take: 100,
+    }),
+    prisma.menuItem.findMany({
+      where: {
+        isAvailable: true,
+        business: publicOrganizationWhere,
+        OR: menuItemMatches,
+      },
+      select: { businessId: true },
+      take: 100,
+    }),
+  ]);
+
+  return Array.from(
+    new Set([
+      ...organizations.map((organization) => organization.id),
+      ...branches.map((branch) => branch.organizationId),
+      ...services.map((service) => service.organizationId),
+      ...menuItems.map((item) => item.businessId),
+    ]),
+  );
+}
