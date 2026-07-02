@@ -1,0 +1,1248 @@
+{
+  "Metadata": {
+    "title": "REZNO",
+    "description": "Manage bookings and grow your business with REZNO."
+  },
+  "Common": {
+    "language": "Language",
+    "languages": {
+      "ar": "العربية",
+      "ckb": "کوردی",
+      "en": "English"
+    },
+    "saveChanges": "Save changes",
+    "saving": "Saving…",
+    "readOnly": "Read only",
+    "backHome": "Back home"
+  },
+  "BusinessManagement": {
+    "title": "Business profile",
+    "description": "Update your business identity and customer-facing contact information.",
+    "generalTitle": "General information",
+    "generalDescription": "The primary details for your business.",
+    "contactTitle": "Contact and online presence",
+    "contactDescription": "Help customers contact your business and find it online.",
+    "visualTitle": "Logo and cover image",
+    "visualDescription": "Add clear image links to give your public page a professional identity.",
+    "previewTitle": "Live preview",
+    "previewDescription": "Preview the core identity before saving changes.",
+    "previewNameFallback": "Business name",
+    "previewDescriptionFallback": "Your business description will appear here.",
+    "galleryTitle": "Photo gallery",
+    "galleryDescription": "Add one image URL per line.",
+    "publicInfoTitle": "Public booking information",
+    "publicInfoDescription": "Add the location, policies, and answers customers need.",
+    "seoTitle": "Search appearance",
+    "seoDescription": "Customize the page title, description, and sharing image.",
+    "openPublicPage": "Open public page",
+    "copyPublicLink": "Copy link",
+    "copiedPublicLink": "Copied",
+    "slugHelp": "Choose a unique English name for your public URL: rezno.net/{slug}",
+    "restrictedTitle": "Read-only access",
+    "restrictedDescription": "Only owners and managers can update business information.",
+    "fields": {
+      "name": "Business name",
+      "slug": "Business URL",
+      "businessType": "Business type",
+      "businessCategory": "Business category",
+      "legalName": "Legal name",
+      "description": "Description",
+      "businessEmail": "Business email",
+      "businessPhone": "Business phone",
+      "whatsappPhone": "WhatsApp number",
+      "googleMapsUrl": "Google Maps URL",
+      "bookingPolicy": "Booking policies",
+      "galleryUrls": "Gallery image URLs",
+      "faqItems": "Frequently asked questions",
+      "seoTitle": "SEO title",
+      "seoDescription": "SEO description",
+      "ogImageUrl": "Open Graph image URL",
+      "visibility": "Publishing status",
+      "website": "Website",
+      "logoUrl": "Logo URL",
+      "coverImageUrl": "Cover image URL",
+      "facebookUrl": "Facebook URL",
+      "instagramUrl": "Instagram URL",
+      "tiktokUrl": "TikTok URL",
+      "youtubeUrl": "YouTube URL"
+    },
+    "placeholders": {
+      "legalName": "Legally registered name",
+      "businessCategory": "For example: salon, clinic, beauty center",
+      "description": "Tell customers about your business",
+      "email": "business@example.com",
+      "phone": "+964 7XX XXX XXXX",
+      "website": "https://example.com",
+      "social": "https://",
+      "faq": "Should I arrive early? | Please arrive ten minutes before your appointment."
+    },
+    "businessTypes": {
+      "PHYSICAL": "In person",
+      "ONLINE": "Online",
+      "HYBRID": "In person and online"
+    },
+    "visibility": {
+      "PUBLISHED": "Published",
+      "HIDDEN": "Hidden"
+    },
+    "status": {
+      "verified": "Verified",
+      "unverified": "Unverified",
+      "slug": "Identifier",
+      "role": "Your role"
+    },
+    "messages": {
+      "success": "Business information updated.",
+      "invalid": "Check the highlighted fields and try again.",
+      "forbidden": "You don't have permission to update this business.",
+      "failure": "We couldn't save the business information. Try again.",
+      "slugTaken": "That URL is already in use. Choose another.",
+      "slugReserved": "That URL is reserved. Choose another."
+    }
+  },
+  "PublicProfileManagement": {
+    "title": "Manage public page",
+    "description": "Control how your business identity, information, and images appear to customers.",
+    "open": "Open public page",
+    "share": "Share",
+    "copy": "Copy link",
+    "copied": "Copied",
+    "qr": "QR code",
+    "qrDescription": "Scan the code to open your public business page.",
+    "locationTitle": "Location and address",
+    "locationMissing": "No address has been added.",
+    "editLocation": "Edit address and city",
+    "noLocations": "No locations have been added.",
+    "hoursTitle": "Working hours and closures",
+    "editHours": "Edit working hours",
+    "specialClosures": "Special closing days",
+    "closureBranch": "Location",
+    "closureReason": "Closure reason",
+    "closureStart": "Starts",
+    "closureEnd": "Ends",
+    "addClosure": "Add closing day",
+    "removeClosure": "Remove",
+    "closureError": "Check the closure details.",
+    "serviceImagesTitle": "Service images",
+    "imageAdded": "Image added",
+    "imageMissing": "No image",
+    "editServiceImage": "Edit service image",
+    "noServices": "No services yet."
+  },
+  "Availability": {
+    "title": "Staff availability",
+    "description": "Set recurring availability for {member}.",
+    "branchTitle": "{branch} availability",
+    "manage": "Availability",
+    "messages": {
+      "success": "Availability updated.",
+      "invalid": "Check the highlighted times and try again.",
+      "forbidden": "You don't have permission to manage availability.",
+      "notFound": "This staff assignment is no longer available.",
+      "failure": "We couldn't save availability. Try again."
+    }
+  },
+  "BlockedTime": {
+    "title": "Blocked time",
+    "description": "Add one-time leave, breaks, or unavailable periods.",
+    "add": "Block time",
+    "startsAt": "Starts",
+    "endsAt": "Ends",
+    "reason": "Reason",
+    "branch": "Location",
+    "remove": "Remove",
+    "empty": "No upcoming blocked time.",
+    "messages": {
+      "success": "Blocked time added.",
+      "invalid": "Check the blocked-time details.",
+      "forbidden": "You don't have permission to block time.",
+      "notFound": "This staff assignment is unavailable.",
+      "rangeInvalid": "End time must be later than start time.",
+      "failure": "We couldn't add blocked time. Try again."
+    }
+  },
+  "WorkingHours": {
+    "title": "Working hours",
+    "description": "Set the regular weekly schedule for {branch}.",
+    "open": "Open",
+    "closed": "Closed",
+    "opensAt": "Opens",
+    "closesAt": "Closes",
+    "days": {
+      "0": "Sunday",
+      "1": "Monday",
+      "2": "Tuesday",
+      "3": "Wednesday",
+      "4": "Thursday",
+      "5": "Friday",
+      "6": "Saturday"
+    },
+    "messages": {
+      "success": "Working hours updated.",
+      "invalid": "Check the highlighted hours and try again.",
+      "forbidden": "You don't have permission to update working hours.",
+      "notFound": "This location is no longer available.",
+      "failure": "We couldn't save the working hours. Try again."
+    }
+  },
+  "BusinessSettings": {
+    "title": "Business settings",
+    "description": "Control how customers discover and book your business.",
+    "bookingTitle": "Booking preferences",
+    "bookingDescription": "Configure the core rules used by future booking flows.",
+    "fields": {
+      "bookingEnabled": "Accept new bookings",
+      "bookingEnabledHelp": "Customers can create new appointments when enabled.",
+      "marketplaceVisible": "Show in marketplace",
+      "marketplaceVisibleHelp": "Allow customers to discover your public business profile.",
+      "staffSelectionMode": "Staff selection",
+      "cancellationWindowHours": "Cancellation window (hours)",
+      "vertical": "Business vertical",
+      "verticalHelp": "Choose the vertical so REZNO can show the right business experience."
+    },
+    "staffModes": {
+      "NONE": "Customers cannot choose staff",
+      "OPTIONAL": "Staff selection is optional",
+      "REQUIRED": "Customers must choose staff"
+    },
+    "messages": {
+      "success": "Business settings updated.",
+      "invalid": "Check the highlighted fields and try again.",
+      "forbidden": "You don't have permission to change business settings.",
+      "failure": "We couldn't save the business settings. Try again."
+    },
+    "verticals": {
+      "BARBER": "Barber",
+      "BEAUTY": "Beauty",
+      "CLINIC": "Clinic",
+      "DENTIST": "Dentist",
+      "SPA": "Spa",
+      "GYM": "Gym",
+      "CONSULTANT": "Consultant",
+      "RESTAURANT": "Restaurant",
+      "CAFE": "Cafe",
+      "OTHER": "Other"
+    }
+  },
+  "Services": {
+    "title": "Services",
+    "description": "Create the services customers can book at your locations.",
+    "add": "Add service",
+    "emptyTitle": "No services yet",
+    "emptyDescription": "Create your first service to begin accepting bookings.",
+    "fields": {
+      "name": "Service name",
+      "description": "Description",
+      "imageUrl": "Service image URL",
+      "category": "Category",
+      "price": "Price (IQD)",
+      "duration": "Duration (minutes)",
+      "pricingType": "Pricing type",
+      "branches": "Available at",
+      "staffSelectionMode": "Employee selection",
+      "assignedEmployees": "Service providers",
+      "status": "Service status"
+    },
+    "pricingTypes": {
+      "FIXED": "Fixed price",
+      "STARTING_FROM": "Starting from"
+    },
+    "statuses": {
+      "ACTIVE": "Active",
+      "INACTIVE": "Inactive"
+    },
+    "staffModes": {
+      "NONE": "No employee needed",
+      "OPTIONAL": "Employee selection is optional",
+      "REQUIRED": "Employee selection is required"
+    },
+    "imageUrlHelp": "Use a direct image URL until file uploads are enabled.",
+    "assignedEmployeesHelp": "Optional mode assigns an available employee automatically. Required mode lets the customer choose from selected employees; one selected employee becomes fixed.",
+    "noEmployees": "Add team members first if this service needs a provider.",
+    "availability": {
+      "title": "Service availability",
+      "branchBased": "This service uses branch working hours and the availability of its selected providers.",
+      "editBranch": "{branch} hours",
+      "editEmployee": "Edit employee availability",
+      "editBranches": "Edit service locations"
+    },
+    "edit": {
+      "title": "Edit service",
+      "save": "Save service",
+      "actions": {
+        "service": "Edit service",
+        "price": "Edit price",
+        "branches": "Edit branches",
+        "availability": "Edit availability"
+      }
+    },
+    "categories": {
+      "general": "General"
+    },
+    "offering": "{price} IQD · {duration} min",
+    "readiness": {
+      "HOURS": {
+        "description": "This service cannot receive bookings until the location's working hours are configured.",
+        "selectionWarning": "This location has no working hours, so customers will not see service times.",
+        "action": "Set hours"
+      },
+      "STAFF": {
+        "description": "Staff selection is required, but no assigned staff member has availability at this location.",
+        "action": "Manage team"
+      }
+    },
+    "messages": {
+      "created": "Service created.",
+      "updated": "Service updated.",
+      "invalid": "Check the highlighted fields and try again.",
+      "forbidden": "You don't have permission to manage services.",
+      "invalidReferences": "The selected category or location is unavailable.",
+      "failure": "We couldn't save this service. Try again.",
+      "notFound": "This service is no longer available."
+    }
+  },
+  "Team": {
+    "title": "Team",
+    "description": "Manage organization members, roles, and location assignments.",
+    "add": "Add team member",
+    "edit": "Edit member",
+    "availability": "Availability",
+    "emptyTitle": "No team members yet",
+    "emptyDescription": "Add a registered REZNO user to your organization.",
+    "fields": {
+      "email": "REZNO account email",
+      "role": "Role",
+      "branches": "Assigned locations",
+      "photoUrl": "Employee photo URL",
+      "bio": "Employee bio",
+      "specialties": "Specialties"
+    },
+    "placeholders": {
+      "specialties": "Haircut, styling, color"
+    },
+    "roles": {
+      "OWNER": "Owner",
+      "MANAGER": "Manager",
+      "RECEPTIONIST": "Receptionist",
+      "STAFF": "Staff",
+      "CUSTOM": "Custom role"
+    },
+    "noBranches": "All locations / no specific assignment",
+    "joined": "Joined {date}",
+    "messages": {
+      "added": "Team member added.",
+      "updated": "Team member updated.",
+      "invalid": "Check the highlighted fields and try again.",
+      "forbidden": "You don't have permission to manage the team.",
+      "userNotFound": "No registered REZNO account was found for this email.",
+      "alreadyMember": "This person is already a member of the organization.",
+      "invalidBranches": "One or more selected locations are unavailable.",
+      "ownerProtected": "The owner membership cannot be changed here.",
+      "notFound": "This team member is no longer available.",
+      "failure": "We couldn't save this team member. Try again."
+    }
+  },
+  "Branches": {
+    "title": "Locations",
+    "description": "Manage the branches where your business operates.",
+    "add": "Add location",
+    "edit": "Edit location",
+    "hours": "Working hours",
+    "hoursConfigured": "Working hours configured",
+    "hoursMissing": "Working hours missing",
+    "editHours": "Edit working hours",
+    "nextWorkingDay": "Next working day: {day}",
+    "locationSet": "Location set",
+    "locationNotSet": "Location not set",
+    "chooseOnMap": "Choose on map",
+    "movePin": "Move the pin or enter coordinates manually.",
+    "mapData": "Map data © OpenStreetMap contributors.",
+    "openInWaze": "Open in Waze",
+    "emptyTitle": "No locations yet",
+    "emptyDescription": "Create your first location to start configuring services and availability.",
+    "fields": {
+      "name": "Location name",
+      "phone": "Phone",
+      "email": "Email",
+      "timezone": "Timezone",
+      "addressLine1": "Address line 1",
+      "addressLine2": "Address line 2",
+      "city": "City",
+      "country": "Country",
+      "latitude": "Latitude",
+      "longitude": "Longitude",
+      "locationLabel": "Location label",
+      "nearbyLandmark": "Nearby landmark",
+      "locationInstructions": "Location instructions",
+      "status": "Status"
+    },
+    "statuses": {
+      "ACTIVE": "Active",
+      "INACTIVE": "Inactive",
+      "ARCHIVED": "Archived"
+    },
+    "placeholders": {
+      "name": "Main branch",
+      "city": "Baghdad",
+      "country": "Iraq",
+      "locationLabel": "Baghdad - Mansour",
+      "nearbyLandmark": "Near Mall of Iraq",
+      "locationInstructions": "Second floor, opposite gate 3"
+    },
+    "messages": {
+      "created": "Location created.",
+      "updated": "Location updated.",
+      "invalid": "Check the highlighted fields and try again.",
+      "forbidden": "You don't have permission to manage locations.",
+      "failure": "We couldn't save this location. Try again.",
+      "lastActive": "At least one location must remain active.",
+      "notFound": "This location is no longer available."
+    }
+  },
+  "Bookings": {
+    "customerTitle": "My bookings",
+    "customerDescription": "Track upcoming appointments and your booking history.",
+    "upcomingTitle": "Upcoming bookings",
+    "historyTitle": "Booking history",
+    "businessTitle": "Bookings",
+    "businessDescription": "Review customer bookings and update their status.",
+    "calendarTitle": "Business calendar",
+    "calendarDescription": "Your booking schedule for the next 30 days.",
+    "newTitle": "Book an appointment",
+    "newDescription": "Choose a service and date, then reserve a suitable time.",
+    "newBooking": "New booking",
+    "chooseService": "Service and date",
+    "chooseServiceDescription": "Only services currently available online are shown.",
+    "service": "Service",
+    "selectService": "Select a service",
+    "date": "Date",
+    "findTimes": "Find times",
+    "availableTimes": "Available times",
+    "staffAndTime": "Staff and time",
+    "confirmBooking": "Confirm booking",
+    "serviceDefaultDescription": "A bookable service from this business.",
+    "durationShort": "{count} min",
+    "priceShort": "IQD {price}",
+    "steps": {
+      "service": "Service",
+      "staff": "Staff",
+      "time": "Time",
+      "confirm": "Confirm"
+    },
+    "periods": {
+      "morning": "Morning",
+      "afternoon": "Afternoon",
+      "evening": "Evening"
+    },
+    "offeringSummary": "{service} at {business} — {branch} · {duration} min · IQD {price}",
+    "automaticStaff": "Assigned automatically",
+    "employee": {
+      "label": "Choose an employee",
+      "placeholder": "Choose an available employee",
+      "any": "Any available employee",
+      "optionalHelp": "Choose a specific employee or let the business assign any available employee.",
+      "requiredHelp": "Choose an available employee to continue.",
+      "recommended": "Recommended for the fastest booking.",
+      "availableHint": "Available times will update for this staff member.",
+      "fixed": "Service provider: {name}",
+      "chooseTitle": "Choose an employee first",
+      "chooseDescription": "Select your preferred employee to see their available times."
+    },
+    "book": "Book",
+    "created": "Your booking has been confirmed.",
+    "rescheduled": "Your booking has been rescheduled.",
+    "rescheduleTitle": "Reschedule booking",
+    "rescheduleDescription": "Choose a new time for {service} at {branch}.",
+    "chooseNewDate": "Choose a new date",
+    "confirmReschedule": "Confirm new time",
+    "rescheduleNotAllowedTitle": "This booking cannot be rescheduled",
+    "rescheduleNotAllowedDescription": "The change window has passed or the booking status does not allow changes.",
+    "rescheduleErrors": {
+      "invalid": "Check the selected time and try again.",
+      "unavailable": "That time is no longer available. Choose another one.",
+      "notAllowed": "The booking change window no longer allows rescheduling."
+    },
+    "changeRequest": {
+      "title": "Propose a new time",
+      "description": "Choose a new time for {customer}'s {service} booking. It will not change before customer approval.",
+      "propose": "Propose new time",
+      "customerTitle": "A new time was proposed for your booking",
+      "accept": "Accept new time",
+      "reject": "Reject change",
+      "waiting": "Waiting for customer approval"
+    },
+    "customer": "Customer",
+    "staff": "Staff",
+    "cancel": "Cancel booking",
+    "reschedule": "Reschedule",
+    "business": "Business",
+    "price": "Price",
+    "contactBusiness": "Call business",
+    "reviewSubmitted": "Your review",
+    "emptyTitle": "No bookings",
+    "emptyDescription": "Your booking details will appear here after your first appointment.",
+    "businessEmptyTitle": "No bookings yet",
+    "businessEmptyDescription": "Customer bookings will appear here when they arrive.",
+    "noTimesTitle": "No available times",
+    "noTimesDescription": "Try another date or choose a different service.",
+    "slotReasons": {
+      "AVAILABLE": "Choose a suitable time.",
+      "INVALID_DATE": "Choose a valid date.",
+      "SERVICE_NOT_ASSIGNED": "This service is not assigned to a location available for booking.",
+      "SERVICE_INACTIVE": "This service is inactive or currently unavailable to book.",
+      "OFFERING_UNAVAILABLE": "This service is no longer available to book.",
+      "HOURS_NOT_CONFIGURED": "The business has not configured working hours for this location yet.",
+      "CLOSED_ON_DATE": "This location is closed on that day. Try another date.",
+      "STAFF_NOT_CONFIGURED": "This service requires staff, but team availability has not been configured.",
+      "STAFF_UNAVAILABLE": "No staff member is available that day. Try another date.",
+      "NO_SLOTS": "There are no open times that day. Try another date."
+    },
+    "noServicesTitle": "No available services",
+    "noServicesDescription": "No services are currently published for booking.",
+    "statuses": {
+      "PENDING": "Pending",
+      "CONFIRMED": "Confirmed",
+      "CANCELLED": "Cancelled",
+      "COMPLETED": "Completed",
+      "NO_SHOW": "No-show"
+    },
+    "actions": {
+      "CONFIRMED": "Confirm",
+      "CANCELLED": "Cancel",
+      "COMPLETED": "Complete",
+      "NO_SHOW": "No-show"
+    },
+    "errors": {
+      "invalid": "The booking details are invalid. Try again.",
+      "unavailable": "That time is no longer available. Choose another time.",
+      "rateLimited": "Too many booking attempts in a short time. Please wait a moment and try again.",
+      "failed": "Could not create the booking right now. Please try again shortly."
+    },
+    "restaurant": {
+      "table": "Table",
+      "guests": "Guests",
+      "preorder": "Pre-order items"
+    },
+    "messageBusiness": "Message business",
+    "messageCustomer": "Message customer"
+  },
+  "Public": {
+    "marketplace": "Explore services",
+    "forBusiness": "For businesses",
+    "signIn": "Sign in",
+    "footer": "REZNO — easier booking, clearer management."
+  },
+  "Landing": {
+    "eyebrow": "An Arabic-first booking platform",
+    "title": "Your next service is closer than you think",
+    "description": "Discover nearby businesses and services, compare available times, and book in minutes from one place.",
+    "explore": "Explore marketplace",
+    "listBusiness": "List your business",
+    "searchFeature": {
+      "title": "Simple discovery",
+      "description": "Search by service or city and find the right option."
+    },
+    "bookingFeature": {
+      "title": "Real availability",
+      "description": "Choose an available time and receive instant confirmation."
+    },
+    "manageFeature": {
+      "title": "Reliable management",
+      "description": "Customer and business bookings stay organized in one place."
+    },
+    "featuredTitle": "Businesses you can book now",
+    "featuredDescription": "Available services from businesses published on REZNO.",
+    "viewAll": "View all",
+    "featuredEmpty": "Published businesses will appear here soon.",
+    "trendingServicesTitle": "Popular services",
+    "trendingServicesDescription": "Explore services currently available from businesses on REZNO.",
+    "minutes": "min",
+    "price": "IQD {price}",
+    "bookNow": "Book now",
+    "servicesEmpty": "No services are currently available to book."
+  },
+  "Marketplace": {
+    "title": "Service marketplace",
+    "description": "Find businesses and services available to book through REZNO.",
+    "searchPlaceholder": "Business or service name",
+    "searchLabel": "Search marketplace",
+    "category": "Category",
+    "city": "City",
+    "allCategories": "All categories",
+    "allCities": "All cities",
+    "search": "Search",
+    "results": "{count} results",
+    "emptyTitle": "No results found",
+    "emptyDescription": "Try a shorter search or change the category or city.",
+    "defaultDescription": "Services and appointments available to book.",
+    "serviceCount": "{count} services",
+    "startingPrice": "From IQD {price}",
+    "matchingPrice": "IQD {price}",
+    "restaurant": "Restaurant",
+    "cafe": "Cafe",
+    "businessType": "Business type",
+    "allBusinessTypes": "All business types",
+    "menuAvailable": "Menu available",
+    "tablesAvailable": "Tables available",
+    "reserveTable": "Reserve a table",
+    "nearMe": "Near me",
+    "useMyLocation": "Use my location",
+    "locationLoading": "Locating…",
+    "locationPermissionDenied": "Location permission denied",
+    "locationUnavailable": "Location unavailable",
+    "usingCurrentLocation": "Using your current location",
+    "nearbyBusinesses": "Nearby businesses",
+    "showingNearYou": "Showing businesses near you",
+    "noNearbyBusinesses": "No nearby businesses found",
+    "radius": "Radius",
+    "radiusKm": "{count} km",
+    "listView": "List view",
+    "mapView": "Map view",
+    "viewBusiness": "View business",
+    "distanceKm": "{distance} km away",
+    "categoryTiles": {
+      "RESTAURANT": {
+        "title": "Restaurants",
+        "description": "Reserve a table and browse menus."
+      },
+      "CAFE": {
+        "title": "Cafes",
+        "description": "Coffee, seating, and easy reservations."
+      },
+      "BARBER": {
+        "title": "Barbers",
+        "description": "Haircuts and fast appointments."
+      },
+      "BEAUTY": {
+        "title": "Beauty",
+        "description": "Salons and care services."
+      },
+      "CLINIC": {
+        "title": "Clinics",
+        "description": "Organized healthcare appointments."
+      },
+      "DENTIST": {
+        "title": "Dentists",
+        "description": "Dental visits and follow-ups."
+      },
+      "SPA": {
+        "title": "Spa",
+        "description": "Wellness and relaxation."
+      },
+      "GYM": {
+        "title": "Fitness",
+        "description": "Training sessions and gym services."
+      },
+      "CONSULTANT": {
+        "title": "Consultants",
+        "description": "Expert and advisor appointments."
+      },
+      "OTHER": {
+        "title": "Other",
+        "description": "More businesses and services."
+      }
+    }
+  },
+  "BusinessPublic": {
+    "defaultDescription": "Browse available services and book a suitable time.",
+    "duration": "{count} min",
+    "price": "IQD {price}",
+    "book": "Book this service",
+    "bookNow": "Book now",
+    "call": "Call",
+    "whatsapp": "WhatsApp",
+    "providers": "Service providers: {names}",
+    "gallery": "Photo gallery",
+    "galleryImage": "Gallery image {index}",
+    "workingHours": "Working hours",
+    "specialClosures": "Special closing days",
+    "openMap": "Open in Google Maps",
+    "openInWaze": "Open in Waze",
+    "team": "Our team",
+    "bookingPolicy": "Booking policies",
+    "faq": "Frequently asked questions",
+    "actions": {
+      "share": "Share page",
+      "copy": "Copy link",
+      "copied": "Link copied",
+      "qr": "QR code",
+      "qrDescription": "Scan the code to open this business page."
+    },
+    "contact": "Contact information",
+    "website": "Visit website",
+    "noContact": "No public contact information is currently available.",
+    "reserveTable": "Reserve a table",
+    "menu": "Menu",
+    "seating": "Seating",
+    "available": "Available",
+    "unavailable": "Unavailable",
+    "preparationMinutes": "{count} min prep",
+    "reservationComingSoon": "Table reservation checkout will be enabled in the next phase. You can view the menu and contact the business now.",
+    "viewMenu": "View menu",
+    "reserveTableDescription": "Choose a time, guest count, and table. You can optionally add menu items before arrival."
+  },
+  "Notifications": {
+    "title": "Notifications",
+    "description": "Your latest important booking updates.",
+    "open": "Open notifications",
+    "viewAll": "View all notifications",
+    "emptyTitle": "You're all caught up",
+    "emptyDescription": "New booking updates will appear here.",
+    "changeRequest": "A new time was proposed for {service}. Review and accept or reject it.",
+    "reviewRequest": "How was your {service} experience? Leave a review.",
+    "statuses": {
+      "PENDING": "{service} is awaiting confirmation.",
+      "CONFIRMED": "{service} has been confirmed.",
+      "CANCELLED": "{service} has been cancelled.",
+      "COMPLETED": "{service} has been completed.",
+      "NO_SHOW": "A no-show was recorded for {service}."
+    }
+  },
+  "Reviews": {
+    "title": "Rate your experience",
+    "question": "How was your service?",
+    "rating": "Rating",
+    "stars": "{count} stars",
+    "comment": "Your comment (optional)",
+    "commentPlaceholder": "Share an optional comment",
+    "submit": "Submit review",
+    "customerReviews": "Customer reviews",
+    "summary": "{rating} out of 5 · {count} reviews",
+    "empty": "No reviews yet."
+  },
+  "DashboardHome": {
+    "welcome": "Welcome back, {name}",
+    "businessDescription": "A quick view of your business and upcoming schedule.",
+    "customerDescription": "Manage your appointments and discover your next visit.",
+    "openCalendar": "Open calendar",
+    "bookAppointment": "Book appointment",
+    "hero": {
+      "navigationLabel": "Business management tips",
+      "hours": {
+        "title": "Complete your working hours so customers can see appointments",
+        "description": "Review each location's hours so REZNO can show accurate availability."
+      },
+      "images": {
+        "title": "Add clear images to your services",
+        "description": "A good image explains your service quickly and builds confidence before booking."
+      },
+      "calendar": {
+        "title": "Stay on top of your day from the booking calendar",
+        "description": "Review upcoming appointments and their statuses in one place."
+      }
+    },
+    "metrics": {
+      "upcoming": "Upcoming bookings",
+      "services": "Active services",
+      "history": "Booking history",
+      "menuItems": "Menu items"
+    },
+    "nearestTitle": "Nearest bookings",
+    "nearestDescription": "Your next appointments in order.",
+    "viewAll": "View all",
+    "emptyTitle": "No upcoming bookings",
+    "businessEmptyDescription": "New customer bookings will appear here.",
+    "customerEmptyDescription": "Choose a service and book your first appointment.",
+    "manageServices": "Manage services",
+    "findService": "Explore services",
+    "discovery": {
+      "placesTitle": "Suggested places to visit",
+      "placesDescription": "Suggestions from businesses published on REZNO. Location-based ranking is not used yet.",
+      "servicesTitle": "Popular services",
+      "servicesDescription": "Services currently available to book from different businesses.",
+      "emptyTitle": "No suggestions yet",
+      "emptyDescription": "Published businesses and services will appear here.",
+      "categoriesTitle": "Browse by business type",
+      "categoriesDescription": "Start quickly with restaurants, cafes, salons, clinics, and more."
+    },
+    "commandCenter": {
+      "eyebrow": "Command center",
+      "title": "Today at a glance",
+      "description": "The most important booking signals and actions in one place.",
+      "quickActions": "Quick actions",
+      "metrics": {
+        "todayBookings": "Today's bookings",
+        "upcomingBookings": "Upcoming bookings",
+        "pendingReviews": "Pending reviews",
+        "unreadNotifications": "Unread notifications"
+      },
+      "actions": {
+        "addService": "Add service",
+        "addEmployee": "Add employee",
+        "publicProfile": "Public profile",
+        "calendar": "Calendar",
+        "bookings": "Bookings",
+        "openPublic": "Open public page"
+      }
+    }
+  },
+  "BusinessSetup": {
+    "title": "Business setup progress",
+    "score": "{score}% of your public profile is complete",
+    "progressTitle": "Business setup",
+    "copy": "Copy business link",
+    "manage": "Manage public page",
+    "copied": "Link copied",
+    "fixNow": "Fix now",
+    "missingTitle": "What is blocking bookings?",
+    "missingDescription": "Complete these items so customers can confidently discover and book your business.",
+    "readyTitle": "Your business is ready to receive bookings.",
+    "readyDescription": "Keep your calendar, services, and profile up to date as bookings arrive.",
+    "states": {
+      "ready": {
+        "label": "Ready for bookings",
+        "description": "Customers can discover your business and book available services."
+      },
+      "almost": {
+        "label": "Almost ready",
+        "description": "Your setup is close. Fix the remaining items before promoting your page."
+      },
+      "notReady": {
+        "label": "Not ready",
+        "description": "Customers may not be able to book yet. Complete the missing setup items first."
+      }
+    },
+    "items": {
+      "businessInfo": "Complete business information",
+      "coverImage": "Add a cover image",
+      "logo": "Add a logo",
+      "branch": "Add a location",
+      "hours": "Set working hours",
+      "service": "Add a service",
+      "employee": "Add an employee if needed",
+      "published": "Publish public profile",
+      "table": "Add an active table",
+      "menuItem": "Add a menu item",
+      "menuCategory": "Add a menu category"
+    },
+    "explanations": {
+      "businessInfo": "Customers need a category, description, and phone number before they trust the listing.",
+      "coverImage": "A cover image makes the public page feel complete and professional.",
+      "logo": "A logo helps customers recognize your business across REZNO.",
+      "branch": "Bookings need at least one active location.",
+      "hours": "REZNO cannot generate bookable times until working hours are configured.",
+      "service": "Customers need at least one active service to book.",
+      "employee": "One or more services require a staff member, so add a team member first.",
+      "published": "Hidden profiles are not discoverable by customers.",
+      "table": "Restaurants and cafes need active tables before the upcoming reservation experience is enabled.",
+      "menuItem": "Add at least one available menu item so customers can see the menu.",
+      "menuCategory": "Organize the menu into sections like drinks or main dishes so customers can browse it easily."
+    },
+    "quick": {
+      "addService": "Add service",
+      "addEmployee": "Add employee",
+      "bookings": "View bookings",
+      "openPublic": "Open public page"
+    }
+  },
+  "CommandPalette": {
+    "title": "Command palette",
+    "description": "Search for a page or action and open it instantly.",
+    "open": "Quick search",
+    "placeholder": "Search pages and commands…",
+    "empty": "No matching results.",
+    "groups": {
+      "recent": "Recent commands",
+      "navigation": "Navigation",
+      "actions": "Quick actions"
+    },
+    "business": {
+      "dashboard": "Dashboard",
+      "bookings": "Bookings",
+      "calendar": "Calendar",
+      "services": "Services",
+      "team": "Team",
+      "publicProfile": "Public profile",
+      "profile": "Business profile",
+      "notifications": "Notifications",
+      "settings": "Settings"
+    },
+    "customer": {
+      "dashboard": "Dashboard",
+      "marketplace": "Marketplace",
+      "bookings": "My bookings",
+      "notifications": "Notifications"
+    },
+    "actions": {
+      "addService": "Add service",
+      "addEmployee": "Add employee",
+      "openPublic": "Open public page",
+      "copyPublic": "Copy public page link",
+      "createBooking": "Create booking"
+    },
+    "hintNavigate": "↑ ↓ to navigate · Enter to select",
+    "hintClose": "Esc to close"
+  },
+  "Dashboard": {
+    "navigation": {
+      "label": "Dashboard navigation",
+      "groups": {
+        "workspace": "Workspace",
+        "account": "Account",
+        "insights": "Insights"
+      },
+      "items": {
+        "dashboard": "Dashboard",
+        "overview": "Overview",
+        "myBookings": "My bookings",
+        "bookings": "Bookings",
+        "upcoming": "Upcoming",
+        "history": "History",
+        "favorites": "Favorites",
+        "notifications": "Notifications",
+        "profile": "Profile",
+        "publicProfile": "Public page",
+        "calendar": "Calendar",
+        "services": "Services",
+        "team": "Team",
+        "business": "Business",
+        "locations": "Locations",
+        "settings": "Settings",
+        "analytics": "Analytics",
+        "messages": "Messages",
+        "admin": "Admin",
+        "reservations": "Reservations",
+        "tables": "Tables",
+        "menu": "Menu",
+        "assistant": "Assistant"
+      }
+    },
+    "openMenu": "Open navigation menu",
+    "expandSidebar": "Expand sidebar",
+    "collapseSidebar": "Collapse sidebar",
+    "searchPlaceholder": "Search…",
+    "searchLabel": "Search dashboard",
+    "openUserMenu": "Open user menu",
+    "signOut": "Sign out",
+    "adminDashboard": "Admin Dashboard",
+    "superAdminDashboard": "Super Admin Dashboard",
+    "lightTheme": "Use light theme",
+    "darkTheme": "Use dark theme"
+  },
+  "Pwa": {
+    "offlineTitle": "You're offline",
+    "offlineDescription": "Check your internet connection and try again.",
+    "tryAgain": "Try again"
+  },
+  "Auth": {
+    "title": "Create an account",
+    "description": "Create your account to book or manage your business.",
+    "signInTitle": "Sign in",
+    "signInDescription": "Access your bookings or business workspace.",
+    "signUpTab": "Create account",
+    "signInTab": "Sign in",
+    "name": "Full name",
+    "email": "Email",
+    "password": "Password",
+    "submit": "Create account",
+    "signInSubmit": "Sign in",
+    "creating": "Creating account…",
+    "signingIn": "Signing in…",
+    "failure": "We couldn't create your account. Try again.",
+    "signInFailure": "The email or password is incorrect."
+  },
+  "Onboarding": {
+    "title": "Get started",
+    "welcome": "Welcome to REZNO",
+    "description": "Choose how to start. The same account works for bookings and business management.",
+    "customerTitle": "Book appointments",
+    "customerDescription": "Discover businesses, manage appointments, and keep your booking history in one place.",
+    "continueCustomer": "Continue as customer",
+    "businessTitle": "Manage a business",
+    "businessDescription": "Create your business workspace and first location. You will be the owner.",
+    "businessName": "Business name",
+    "businessNamePlaceholder": "Your business name",
+    "businessSlug": "Business URL",
+    "businessSlugHelp": "Choose a unique English name with at least 5 characters.",
+    "slugInvalid": "Use lowercase English letters, numbers, and hyphens only, with at least 5 characters.",
+    "slugTaken": "This URL is already in use. Choose another.",
+    "slugReserved": "This URL is reserved by the platform. Choose another.",
+    "branchName": "First location",
+    "branchNamePlaceholder": "Main branch",
+    "createBusiness": "Create business workspace",
+    "creatingBusiness": "Creating business…",
+    "businessNameMin": "Business name must be at least 2 characters.",
+    "businessNameMax": "Business name must be 120 characters or fewer.",
+    "branchNameMin": "Location name must be at least 2 characters.",
+    "branchNameMax": "Location name must be 120 characters or fewer.",
+    "invalid": "Check the highlighted fields and try again.",
+    "failure": "We couldn't create your business. Try again.",
+    "businessVerticalRequired": "Select a business type.",
+    "businessType": {
+      "title": "Business type",
+      "description": "Choose your business type so REZNO can prepare the right dashboard and readiness flow.",
+      "options": {
+        "BARBER": {
+          "label": "Barber",
+          "description": "Best for services, appointments, and staff."
+        },
+        "BEAUTY": {
+          "label": "Beauty Salon",
+          "description": "Best for services, appointments, and staff."
+        },
+        "CLINIC": {
+          "label": "Clinic",
+          "description": "Best for services, appointments, and staff."
+        },
+        "DENTIST": {
+          "label": "Dentist",
+          "description": "Best for services, appointments, and staff."
+        },
+        "SPA": {
+          "label": "Spa",
+          "description": "Best for services, appointments, and staff."
+        },
+        "GYM": {
+          "label": "Gym",
+          "description": "Best for services, appointments, and staff."
+        },
+        "CONSULTANT": {
+          "label": "Consultant",
+          "description": "Best for consultations and appointments without requiring a large team."
+        },
+        "RESTAURANT": {
+          "label": "Restaurant",
+          "description": "Supports tables, menu, and the upcoming table reservation experience."
+        },
+        "CAFE": {
+          "label": "Cafe",
+          "description": "Supports tables, menu, and the upcoming table reservation experience."
+        },
+        "OTHER": {
+          "label": "Other",
+          "description": "A safe default that can evolve later."
+        }
+      }
+    }
+  },
+  "Profile": {
+    "title": "Profile",
+    "description": "Keep your personal details accurate and up to date.",
+    "personalTitle": "Personal information",
+    "personalDescription": "These details are used for your REZNO account and bookings.",
+    "emptyTitle": "Sign in to manage your profile",
+    "emptyDescription": "Your profile is connected to your REZNO account.",
+    "createAccount": "Create account",
+    "fields": {
+      "firstName": "First name",
+      "lastName": "Last name",
+      "displayName": "Display name",
+      "email": "Email",
+      "phone": "Phone number",
+      "avatarUrl": "Profile photo URL"
+    },
+    "displayNameHelp": "This is the name other people will see across REZNO.",
+    "emailHelp": "Email changes require account verification.",
+    "save": "Save changes",
+    "saving": "Saving…",
+    "messages": {
+      "invalid": "Check the highlighted fields and try again.",
+      "failure": "We couldn't save your profile. Try again.",
+      "success": "Your profile has been updated."
+    },
+    "validation": {
+      "firstNameMin": "First name must be at least 2 characters.",
+      "firstNameMax": "First name must be 50 characters or fewer.",
+      "optionalTextMax": "This field must be 100 characters or fewer.",
+      "phoneMax": "Phone number must be 30 characters or fewer.",
+      "phoneInvalid": "Enter a valid phone number.",
+      "imageUrlInvalid": "Enter a valid image URL."
+    },
+    "avatarUrlHelp": "Enter an optional image URL. If empty, initials are used."
+  },
+  "Errors": {
+    "title": "Something went wrong",
+    "description": "We couldn't load this page. Try again and contact support if the problem continues.",
+    "publicDescription": "We couldn't load the content. Check your connection and try again.",
+    "reference": "Reference: {value}",
+    "retry": "Try again"
+  },
+  "NotFound": {
+    "title": "Page not found",
+    "description": "The page may have moved or the link may be incorrect.",
+    "home": "Back to home"
+  },
+  "Validation": {
+    "businessNameMin": "Business name must be at least 2 characters.",
+    "businessNameMax": "Business name must be 120 characters or fewer.",
+    "legalNameMax": "Legal name must be 160 characters or fewer.",
+    "descriptionMax": "Description must be 2,000 characters or fewer.",
+    "emailInvalid": "Enter a valid email address.",
+    "phoneInvalid": "Enter a valid phone number.",
+    "urlInvalid": "Enter a valid URL beginning with http:// or https://.",
+    "slugInvalid": "Use 5–80 lowercase English letters or numbers, separated by hyphens if needed.",
+    "branchNameMin": "Location name must be at least 2 characters.",
+    "branchNameMax": "Location name must be 120 characters or fewer.",
+    "timezoneInvalid": "Enter a valid timezone.",
+    "addressMax": "This field must be 160 characters or fewer.",
+    "invalidLatitude": "Latitude must be between -90 and 90.",
+    "invalidLongitude": "Longitude must be between -180 and 180.",
+    "roleInvalid": "Select a valid team role.",
+    "branchSelectionInvalid": "Select valid business locations.",
+    "serviceNameMin": "Service name must be at least 2 characters.",
+    "serviceNameMax": "Service name must be 120 characters or fewer.",
+    "categoryInvalid": "Select a valid category.",
+    "priceInvalid": "Enter a valid price greater than zero.",
+    "durationInvalid": "Duration must be between 5 and 1,440 minutes.",
+    "branchRequired": "Select at least one location.",
+    "cancellationWindowInvalid": "Cancellation window must be between 0 and 720 hours.",
+    "staffModeInvalid": "Select a valid staff-selection mode.",
+    "staffRequired": "Select at least one employee for this service.",
+    "timeInvalid": "Enter a valid time.",
+    "timeRangeInvalid": "Closing time must be later than opening time.",
+    "dateTimeInvalid": "Enter a valid date and time.",
+    "businessVerticalInvalid": "Choose a valid business vertical."
+  },
+  "Admin": {
+    "unauthorized": "Unauthorized",
+    "accessDenied": "Your account does not have access to the admin panel.",
+    "notConfigured": "Admin access is not configured.",
+    "notConfiguredDescription": "The admin panel is protected, but administrator accounts must be configured before it can be used.",
+    "superAdminDashboard": "Super Admin Dashboard",
+    "admin": "Admin",
+    "adminDashboard": "Admin Dashboard",
+    "adminAccess": "Admin access",
+    "adminAccessDescription": "Grant limited platform admin access with fixed permissions while keeping REZNO_ADMIN_EMAILS as the root Super Admin bootstrap.",
+    "rootSuperAdminHelp": "These accounts come from REZNO_ADMIN_EMAILS and cannot be locked out from this screen.",
+    "addNewAdmin": "Add new admin",
+    "enterUserEmail": "Enter user email",
+    "searchUser": "Search user",
+    "noUserFoundWithEmail": "No user found with this email.",
+    "selectUser": "Select user",
+    "grantAdminAccess": "Grant admin access",
+    "manageAdminAccess": "Manage admin access",
+    "makeAdmin": "Make admin",
+    "revokeAdminAccess": "Revoke admin access",
+    "suspendAdminAccess": "Suspend admin access",
+    "reactivateAdminAccess": "Reactivate admin access",
+    "adminPermissions": "Admin permissions",
+    "choosePermissions": "Choose permissions",
+    "permission": "Permission",
+    "permissions": "Permissions",
+    "currentAdmins": "Current admins",
+    "grantedBy": "Granted by",
+    "noAdminAccess": "No admin access",
+    "adminAccessGranted": "Admin access granted",
+    "adminAccessUpdated": "Admin access updated",
+    "adminAccessSuspended": "Admin access suspended",
+    "adminAccessReactivated": "Admin access reactivated",
+    "adminAccessRevoked": "Admin access revoked",
+    "userAlreadyHasAdminAccess": "User already has admin access",
+    "backToSite": "Back to site",
+    "cannotEditOwnAdminAccess": "You cannot edit your own admin access.",
+    "invalidPermissionSelected": "Invalid permission selected.",
+    "noPermission": "You do not have permission",
+    "manageBusinesses": "Manage businesses",
+    "manageUsers": "Manage users",
+    "editBusiness": "Edit business",
+    "editUser": "Edit user",
+    "suspendBusiness": "Suspend business",
+    "reactivateBusiness": "Reactivate business",
+    "suspendUser": "Suspend user",
+    "reactivateUser": "Reactivate user",
+    "freezeAccount": "Freeze account",
+    "accountSuspended": "Account suspended",
+    "businessSuspended": "Business suspended",
+    "businessReactivated": "Business reactivated",
+    "userSuspended": "User suspended",
+    "userReactivated": "User reactivated",
+    "verificationStatus": "Verification status",
+    "verifyBusiness": "Verify business",
+    "unverifyBusiness": "Unverify business",
+    "actionCompleted": "Admin action completed",
+    "actionFailed": "Admin action failed",
+    "permissionsLabels": {
+      "ADMIN_DASHBOARD_VIEW": "View admin dashboard",
+      "BUSINESSES_VIEW": "View businesses",
+      "BUSINESSES_MANAGE": "Manage businesses",
+      "USERS_VIEW": "View users",
+      "USERS_MANAGE": "Manage users",
+      "MESSAGES_VIEW": "View messages",
+      "MESSAGES_SEND": "Send messages",
+      "NOTIFICATIONS_SEND": "Send notifications",
+      "SETTINGS_VIEW": "View settings",
+      "SETTINGS_MANAGE": "Manage settings",
+      "AUDIT_LOG_VIEW": "View audit log"
+    }
+  },
+  "Messages": {
+    "title": "Messages",
+    "adminMessages": "Admin messages",
+    "messages": "Messages",
+    "messageBusiness": "Message business",
+    "messageCustomer": "Message customer",
+    "conversation": "Conversation",
+    "conversations": "Conversations",
+    "sendMessage": "Send message",
+    "typeYourMessage": "Type your message",
+    "noMessagesYet": "No messages yet",
+    "startConversation": "Start conversation",
+    "newMessage": "New message",
+    "messageSent": "Message sent",
+    "couldNotSendMessage": "Could not send message",
+    "tooQuickly": "You are sending messages too quickly",
+    "unavailable": "This conversation is unavailable",
+    "notAllowed": "You are not allowed to access this conversation",
+    "relatedBooking": "Related booking",
+    "relatedReservation": "Related reservation",
+    "lastMessage": "Last message",
+    "customerMessages": "Customer messages",
+    "businessMessages": "Business messages",
+    "viewAllMessages": "View all messages",
+    "recentMessages": "Recent messages",
+    "noRecentMessages": "No recent messages",
+    "unreadMessages": "{count} unread messages"
+  },
+  "RestaurantReservations": {
+    "restaurant": "Restaurant",
+    "cafe": "Cafe",
+    "title": "Reserve a table at {business}",
+    "description": "Choose the date, time, and guest count, then select a table and optional menu items.",
+    "duration": "Approximate reservation duration: {count} minutes",
+    "guestCount": "Guest count",
+    "updateSearch": "Update",
+    "previousDay": "Previous day",
+    "tomorrow": "Tomorrow",
+    "steps": {
+      "time": "Choose time",
+      "table": "Choose table",
+      "menu": "Optional menu items",
+      "confirm": "Confirm reservation"
+    },
+    "periods": {
+      "morning": "Morning",
+      "afternoon": "Afternoon",
+      "evening": "Evening"
+    },
+    "empty": {
+      "NO_BRANCH": "This business has no active branch yet.",
+      "NO_HOURS": "No working hours are configured for this day. Choose another day or contact the business.",
+      "NO_TABLES": "No suitable tables are available for this guest count.",
+      "NO_SLOTS": "No times are available on this day. Try another date or guest count.",
+      "NO_BRANCH_SELECTED": "Select a branch first to view available times and tables."
+    },
+    "errors": {
+      "invalid": "Reservation details could not be read. Try again.",
+      "table": "The selected table is not available for this reservation.",
+      "table-unavailable": "This table was just reserved. Choose another table or time.",
+      "time": "The selected time is outside working hours or during a special closure.",
+      "rateLimited": "Too many reservation attempts in a short time. Please wait a moment and try again.",
+      "failed": "Could not confirm the table reservation right now. Please try again shortly."
+    },
+    "tableCapacity": "Seats {count} guests",
+    "menuOptional": "Leave quantities at zero to reserve without a pre-order.",
+    "itemQuantity": "{item} quantity",
+    "notePlaceholder": "Optional note for the restaurant",
+    "confirm": "Confirm table reservation",
+    "summary": "Reservation summary",
+    "business": "Business",
+    "guests": "Guests",
+    "time": "Time",
+    "location": "Location",
+    "backToProfile": "Back to profile",
+    "continue": "Continue",
+    "branch": "Branch",
+    "selectBranch": "Select branch",
+    "chooseBranch": "Choose branch"
+  }
+}

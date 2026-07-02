@@ -1,0 +1,1248 @@
+{
+  "Metadata": {
+    "title": "ريزنو",
+    "description": "أدر حجوزاتك وطوّر أعمالك مع ريزنو."
+  },
+  "Common": {
+    "language": "اللغة",
+    "languages": {
+      "ar": "العربية",
+      "ckb": "کوردی",
+      "en": "English"
+    },
+    "saveChanges": "حفظ التغييرات",
+    "saving": "جارٍ الحفظ…",
+    "readOnly": "للقراءة فقط",
+    "backHome": "العودة للرئيسية"
+  },
+  "BusinessManagement": {
+    "title": "بيانات النشاط التجاري",
+    "description": "حدّث هوية نشاطك ومعلومات التواصل التي يراها العملاء.",
+    "generalTitle": "المعلومات الأساسية",
+    "generalDescription": "المعلومات الرئيسية الخاصة بنشاطك التجاري.",
+    "contactTitle": "التواصل والحضور الرقمي",
+    "contactDescription": "ساعد العملاء على التواصل مع نشاطك والعثور عليه عبر الإنترنت.",
+    "visualTitle": "الشعار وصورة الغلاف",
+    "visualDescription": "أضف روابط صور واضحة تمنح صفحتك العامة هوية احترافية.",
+    "previewTitle": "معاينة مباشرة",
+    "previewDescription": "شاهد شكل الهوية الأساسية قبل حفظ التغييرات.",
+    "previewNameFallback": "اسم النشاط",
+    "previewDescriptionFallback": "سيظهر وصف النشاط هنا.",
+    "galleryTitle": "معرض الصور",
+    "galleryDescription": "أضف رابط صورة واحدًا في كل سطر.",
+    "publicInfoTitle": "معلومات الحجز العامة",
+    "publicInfoDescription": "أضف الموقع والسياسات والأسئلة التي يحتاجها العميل.",
+    "seoTitle": "إعدادات الظهور في محركات البحث",
+    "seoDescription": "خصص عنوان الصفحة ووصفها وصورة المشاركة.",
+    "openPublicPage": "فتح الصفحة العامة",
+    "copyPublicLink": "نسخ الرابط",
+    "copiedPublicLink": "تم النسخ",
+    "slugHelp": "اختر اسمًا إنكليزيًا فريدًا ليظهر رابط نشاطك بهذا الشكل: rezno.net/{slug}",
+    "restrictedTitle": "صلاحية العرض فقط",
+    "restrictedDescription": "يمكن للمالكين والمديرين فقط تعديل بيانات النشاط التجاري.",
+    "fields": {
+      "name": "اسم النشاط التجاري",
+      "slug": "رابط النشاط",
+      "businessType": "نوع النشاط",
+      "businessCategory": "فئة النشاط",
+      "legalName": "الاسم القانوني",
+      "description": "الوصف",
+      "businessEmail": "البريد الإلكتروني للنشاط",
+      "businessPhone": "رقم هاتف النشاط",
+      "whatsappPhone": "رقم واتساب",
+      "googleMapsUrl": "رابط الموقع على خرائط Google",
+      "bookingPolicy": "سياسات الحجز",
+      "galleryUrls": "روابط صور المعرض",
+      "faqItems": "الأسئلة الشائعة",
+      "seoTitle": "عنوان SEO",
+      "seoDescription": "وصف SEO",
+      "ogImageUrl": "رابط صورة Open Graph",
+      "visibility": "حالة النشر",
+      "website": "الموقع الإلكتروني",
+      "logoUrl": "رابط الشعار",
+      "coverImageUrl": "رابط صورة الغلاف",
+      "facebookUrl": "رابط فيسبوك",
+      "instagramUrl": "رابط إنستغرام",
+      "tiktokUrl": "رابط تيك توك",
+      "youtubeUrl": "رابط يوتيوب"
+    },
+    "placeholders": {
+      "legalName": "الاسم المسجل قانونيًا",
+      "businessCategory": "مثال: صالون، عيادة، مركز تجميل",
+      "description": "عرّف العملاء بنشاطك التجاري",
+      "email": "business@example.com",
+      "phone": "+964 7XX XXX XXXX",
+      "website": "https://example.com",
+      "social": "https://",
+      "faq": "هل يلزم الحضور مبكرًا؟ | يُفضّل الحضور قبل الموعد بعشر دقائق."
+    },
+    "businessTypes": {
+      "PHYSICAL": "حضوري",
+      "ONLINE": "عبر الإنترنت",
+      "HYBRID": "حضوري وعبر الإنترنت"
+    },
+    "visibility": {
+      "PUBLISHED": "منشور",
+      "HIDDEN": "مخفي"
+    },
+    "status": {
+      "verified": "موثّق",
+      "unverified": "غير موثّق",
+      "slug": "المعرّف",
+      "role": "دورك"
+    },
+    "messages": {
+      "success": "تم تحديث بيانات النشاط التجاري.",
+      "invalid": "تحقق من الحقول المبيّنة ثم حاول مجددًا.",
+      "forbidden": "لا تملك صلاحية تعديل بيانات هذا النشاط.",
+      "failure": "تعذّر حفظ بيانات النشاط التجاري. حاول مجددًا.",
+      "slugTaken": "هذا الرابط مستخدم بالفعل. اختر رابطًا آخر.",
+      "slugReserved": "هذا الرابط محجوز للنظام. اختر رابطًا آخر."
+    }
+  },
+  "PublicProfileManagement": {
+    "title": "إدارة الصفحة العامة",
+    "description": "تحكم في هوية نشاطك ومعلوماته وصوره كما تظهر للعملاء.",
+    "open": "فتح الصفحة العامة",
+    "share": "مشاركة",
+    "copy": "نسخ الرابط",
+    "copied": "تم النسخ",
+    "qr": "رمز QR",
+    "qrDescription": "امسح الرمز لفتح صفحة نشاطك العامة.",
+    "locationTitle": "الموقع والعنوان",
+    "locationMissing": "لم يُضف عنوان بعد.",
+    "editLocation": "تعديل العنوان والمدينة",
+    "noLocations": "لا توجد مواقع مضافة.",
+    "hoursTitle": "ساعات العمل والإغلاقات",
+    "editHours": "تعديل ساعات العمل",
+    "specialClosures": "أيام الإغلاق الخاصة",
+    "closureBranch": "الموقع",
+    "closureReason": "سبب الإغلاق",
+    "closureStart": "يبدأ",
+    "closureEnd": "ينتهي",
+    "addClosure": "إضافة يوم إغلاق",
+    "removeClosure": "إزالة",
+    "closureError": "تحقق من بيانات الإغلاق.",
+    "serviceImagesTitle": "صور الخدمات",
+    "imageAdded": "صورة مضافة",
+    "imageMissing": "بلا صورة",
+    "editServiceImage": "تعديل صورة الخدمة",
+    "noServices": "لا توجد خدمات بعد."
+  },
+  "Availability": {
+    "title": "توفر الموظف",
+    "description": "حدد التوفر الأسبوعي المتكرر للموظف {member}.",
+    "branchTitle": "التوفر في {branch}",
+    "manage": "التوفر",
+    "messages": {
+      "success": "تم تحديث أوقات التوفر.",
+      "invalid": "تحقق من الأوقات المبيّنة ثم حاول مجددًا.",
+      "forbidden": "لا تملك صلاحية إدارة أوقات التوفر.",
+      "notFound": "تعيين الموظف هذا لم يعد متاحًا.",
+      "failure": "تعذّر حفظ أوقات التوفر. حاول مجددًا."
+    }
+  },
+  "BlockedTime": {
+    "title": "الأوقات المحظورة",
+    "description": "أضف إجازة أو استراحة أو فترة عدم توفر لمرة واحدة.",
+    "add": "حظر وقت",
+    "startsAt": "يبدأ",
+    "endsAt": "ينتهي",
+    "reason": "السبب",
+    "branch": "الموقع",
+    "remove": "إزالة",
+    "empty": "لا توجد أوقات محظورة قادمة.",
+    "messages": {
+      "success": "تمت إضافة الوقت المحظور.",
+      "invalid": "تحقق من تفاصيل الوقت المحظور.",
+      "forbidden": "لا تملك صلاحية حظر الوقت.",
+      "notFound": "تعيين الموظف هذا غير متاح.",
+      "rangeInvalid": "يجب أن يكون وقت الانتهاء بعد وقت البدء.",
+      "failure": "تعذّرت إضافة الوقت المحظور. حاول مجددًا."
+    }
+  },
+  "WorkingHours": {
+    "title": "ساعات العمل",
+    "description": "حدد جدول العمل الأسبوعي المعتاد لموقع {branch}.",
+    "open": "مفتوح",
+    "closed": "مغلق",
+    "opensAt": "يفتح",
+    "closesAt": "يغلق",
+    "days": {
+      "0": "الأحد",
+      "1": "الاثنين",
+      "2": "الثلاثاء",
+      "3": "الأربعاء",
+      "4": "الخميس",
+      "5": "الجمعة",
+      "6": "السبت"
+    },
+    "messages": {
+      "success": "تم تحديث ساعات العمل.",
+      "invalid": "تحقق من الساعات المبيّنة ثم حاول مجددًا.",
+      "forbidden": "لا تملك صلاحية تحديث ساعات العمل.",
+      "notFound": "هذا الموقع لم يعد متاحًا.",
+      "failure": "تعذّر حفظ ساعات العمل. حاول مجددًا."
+    }
+  },
+  "BusinessSettings": {
+    "title": "إعدادات النشاط",
+    "description": "تحكّم في كيفية اكتشاف العملاء لنشاطك وحجز خدماته.",
+    "bookingTitle": "تفضيلات الحجز",
+    "bookingDescription": "اضبط القواعد الأساسية التي ستستخدمها عمليات الحجز.",
+    "fields": {
+      "bookingEnabled": "قبول حجوزات جديدة",
+      "bookingEnabledHelp": "يمكن للعملاء إنشاء مواعيد جديدة عند التفعيل.",
+      "marketplaceVisible": "الظهور في السوق",
+      "marketplaceVisibleHelp": "اسمح للعملاء باكتشاف الملف العام لنشاطك.",
+      "staffSelectionMode": "اختيار الموظف",
+      "cancellationWindowHours": "مهلة الإلغاء (ساعة)",
+      "vertical": "قطاع النشاط",
+      "verticalHelp": "اختر القطاع حتى يعرض ريزنو تجربة مناسبة لنشاطك."
+    },
+    "staffModes": {
+      "NONE": "لا يمكن للعملاء اختيار الموظف",
+      "OPTIONAL": "اختيار الموظف اختياري",
+      "REQUIRED": "يجب على العملاء اختيار الموظف"
+    },
+    "messages": {
+      "success": "تم تحديث إعدادات النشاط.",
+      "invalid": "تحقق من الحقول المبيّنة ثم حاول مجددًا.",
+      "forbidden": "لا تملك صلاحية تغيير إعدادات النشاط.",
+      "failure": "تعذّر حفظ إعدادات النشاط. حاول مجددًا."
+    },
+    "verticals": {
+      "BARBER": "حلاقة",
+      "BEAUTY": "تجميل",
+      "CLINIC": "عيادة",
+      "DENTIST": "طبيب أسنان",
+      "SPA": "سبا",
+      "GYM": "نادي رياضي",
+      "CONSULTANT": "استشارات",
+      "RESTAURANT": "مطعم",
+      "CAFE": "كافيه",
+      "OTHER": "أخرى"
+    }
+  },
+  "Services": {
+    "title": "الخدمات",
+    "description": "أنشئ الخدمات التي يمكن للعملاء حجزها في مواقعك.",
+    "add": "إضافة خدمة",
+    "emptyTitle": "لا توجد خدمات بعد",
+    "emptyDescription": "أنشئ خدمتك الأولى لبدء استقبال الحجوزات.",
+    "fields": {
+      "name": "اسم الخدمة",
+      "description": "الوصف",
+      "imageUrl": "رابط صورة الخدمة",
+      "category": "الفئة",
+      "price": "السعر (د.ع)",
+      "duration": "المدة (دقيقة)",
+      "pricingType": "نوع التسعير",
+      "branches": "متاحة في",
+      "staffSelectionMode": "اختيار الموظف",
+      "assignedEmployees": "مقدمو الخدمة",
+      "status": "حالة الخدمة"
+    },
+    "pricingTypes": {
+      "FIXED": "سعر ثابت",
+      "STARTING_FROM": "يبدأ من"
+    },
+    "statuses": {
+      "ACTIVE": "نشطة",
+      "INACTIVE": "غير نشطة"
+    },
+    "staffModes": {
+      "NONE": "لا تحتاج موظفًا",
+      "OPTIONAL": "اختيار الموظف اختياري",
+      "REQUIRED": "اختيار الموظف إلزامي"
+    },
+    "imageUrlHelp": "استخدم رابط صورة مباشرًا مؤقتًا إلى حين تفعيل رفع الصور.",
+    "assignedEmployeesHelp": "مع «اختياري» يعيّن النظام موظفًا متاحًا تلقائيًا. ومع «إلزامي» يختار العميل من المحددين، وإذا حددت موظفًا واحدًا يصبح مقدم الخدمة ثابتًا.",
+    "noEmployees": "أضف أعضاء الفريق أولًا إذا كانت الخدمة تحتاج مقدم خدمة.",
+    "availability": {
+      "title": "أوقات توفر الخدمة",
+      "branchBased": "تعتمد أوقات هذه الخدمة على ساعات عمل الفرع وتوفر مقدمي الخدمة المحددين.",
+      "editBranch": "ساعات {branch}",
+      "editEmployee": "تعديل توفر الموظف",
+      "editBranches": "تعديل فروع الخدمة"
+    },
+    "edit": {
+      "title": "تعديل الخدمة",
+      "save": "حفظ الخدمة",
+      "actions": {
+        "service": "تعديل الخدمة",
+        "price": "تعديل السعر",
+        "branches": "تعديل الفروع",
+        "availability": "تعديل التوفر"
+      }
+    },
+    "categories": {
+      "general": "عام"
+    },
+    "offering": "{price} د.ع · {duration} دقيقة",
+    "readiness": {
+      "HOURS": {
+        "description": "لن تظهر مواعيد لهذه الخدمة حتى تضبط ساعات عمل الموقع.",
+        "selectionWarning": "هذا الموقع بلا ساعات عمل؛ لن تظهر مواعيد الخدمة للعملاء.",
+        "action": "ضبط الساعات"
+      },
+      "STAFF": {
+        "description": "اختيار الموظف مطلوب، لكن لا يوجد موظف معيّن بتوفر صالح في هذا الموقع.",
+        "action": "إدارة الفريق"
+      }
+    },
+    "messages": {
+      "created": "تم إنشاء الخدمة.",
+      "updated": "تم تحديث الخدمة.",
+      "invalid": "تحقق من الحقول المبيّنة ثم حاول مجددًا.",
+      "forbidden": "لا تملك صلاحية إدارة الخدمات.",
+      "invalidReferences": "الفئة أو الموقع المحدد غير متاح.",
+      "failure": "تعذّر حفظ الخدمة. حاول مجددًا.",
+      "notFound": "لم تعد هذه الخدمة متاحة."
+    }
+  },
+  "Team": {
+    "title": "فريق العمل",
+    "description": "أدر أعضاء النشاط وأدوارهم وتعييناتهم في المواقع.",
+    "add": "إضافة عضو",
+    "edit": "تعديل العضو",
+    "availability": "التوفر",
+    "emptyTitle": "لا يوجد أعضاء بعد",
+    "emptyDescription": "أضف مستخدم ريزنو مسجلًا إلى نشاطك.",
+    "fields": {
+      "email": "بريد حساب ريزنو",
+      "role": "الدور",
+      "branches": "المواقع المعيّنة",
+      "photoUrl": "رابط صورة الموظف",
+      "bio": "نبذة عن الموظف",
+      "specialties": "التخصصات"
+    },
+    "placeholders": {
+      "specialties": "حلاقة، عناية بالشعر، صبغة"
+    },
+    "roles": {
+      "OWNER": "المالك",
+      "MANAGER": "مدير",
+      "RECEPTIONIST": "موظف استقبال",
+      "STAFF": "موظف",
+      "CUSTOM": "دور مخصص"
+    },
+    "noBranches": "جميع المواقع / دون تعيين محدد",
+    "joined": "انضم في {date}",
+    "messages": {
+      "added": "تمت إضافة عضو الفريق.",
+      "updated": "تم تحديث عضو الفريق.",
+      "invalid": "تحقق من الحقول المبيّنة ثم حاول مجددًا.",
+      "forbidden": "لا تملك صلاحية إدارة الفريق.",
+      "userNotFound": "لم يُعثر على حساب ريزنو مسجل بهذا البريد.",
+      "alreadyMember": "هذا الشخص عضو في النشاط بالفعل.",
+      "invalidBranches": "موقع واحد أو أكثر من المواقع المحددة غير متاح.",
+      "ownerProtected": "لا يمكن تغيير عضوية المالك من هنا.",
+      "notFound": "عضو الفريق هذا لم يعد متاحًا.",
+      "failure": "تعذّر حفظ عضو الفريق. حاول مجددًا."
+    }
+  },
+  "Branches": {
+    "title": "المواقع",
+    "description": "أدر فروع ومواقع نشاطك التجاري.",
+    "add": "إضافة موقع",
+    "edit": "تعديل الموقع",
+    "hours": "ساعات العمل",
+    "hoursConfigured": "ساعات العمل مضبوطة",
+    "hoursMissing": "ساعات العمل غير مضبوطة",
+    "editHours": "تعديل ساعات العمل",
+    "nextWorkingDay": "أقرب يوم عمل: {day}",
+    "locationSet": "الموقع محدد",
+    "locationNotSet": "الموقع غير محدد",
+    "chooseOnMap": "اختر على الخريطة",
+    "movePin": "حرّك الدبوس أو أدخل الإحداثيات يدويًا.",
+    "mapData": "بيانات الخريطة © مساهمو OpenStreetMap.",
+    "openInWaze": "فتح في Waze",
+    "emptyTitle": "لا توجد مواقع بعد",
+    "emptyDescription": "أنشئ موقعك الأول لبدء إعداد الخدمات وأوقات التوفر.",
+    "fields": {
+      "name": "اسم الموقع",
+      "phone": "الهاتف",
+      "email": "البريد الإلكتروني",
+      "timezone": "المنطقة الزمنية",
+      "addressLine1": "العنوان الأول",
+      "addressLine2": "العنوان الثاني",
+      "city": "المدينة",
+      "country": "الدولة",
+      "latitude": "خط العرض",
+      "longitude": "خط الطول",
+      "locationLabel": "وصف مختصر للموقع",
+      "nearbyLandmark": "معلم قريب",
+      "locationInstructions": "تعليمات الوصول",
+      "status": "الحالة"
+    },
+    "statuses": {
+      "ACTIVE": "نشط",
+      "INACTIVE": "غير نشط",
+      "ARCHIVED": "مؤرشف"
+    },
+    "placeholders": {
+      "name": "الفرع الرئيسي",
+      "city": "بغداد",
+      "country": "العراق",
+      "locationLabel": "بغداد - المنصور",
+      "nearbyLandmark": "قرب مول العراق",
+      "locationInstructions": "الطابق الثاني، مقابل البوابة 3"
+    },
+    "messages": {
+      "created": "تم إنشاء الموقع.",
+      "updated": "تم تحديث الموقع.",
+      "invalid": "تحقق من الحقول المبيّنة ثم حاول مجددًا.",
+      "forbidden": "لا تملك صلاحية إدارة المواقع.",
+      "failure": "تعذّر حفظ الموقع. حاول مجددًا.",
+      "lastActive": "يجب أن يبقى موقع واحد نشطًا على الأقل.",
+      "notFound": "هذا الموقع لم يعد متاحًا."
+    }
+  },
+  "Bookings": {
+    "customerTitle": "حجوزاتي",
+    "customerDescription": "تابع مواعيدك القادمة وسجل حجوزاتك.",
+    "upcomingTitle": "الحجوزات القادمة",
+    "historyTitle": "سجل الحجوزات",
+    "businessTitle": "الحجوزات",
+    "businessDescription": "راجع حجوزات العملاء وحدّث حالتها.",
+    "calendarTitle": "تقويم النشاط",
+    "calendarDescription": "جدول الحجوزات خلال الأيام الثلاثين القادمة.",
+    "newTitle": "حجز موعد",
+    "newDescription": "اختر الخدمة والتاريخ ثم احجز الوقت المناسب.",
+    "newBooking": "حجز جديد",
+    "chooseService": "الخدمة والتاريخ",
+    "chooseServiceDescription": "تظهر فقط الخدمات المتاحة للحجز عبر المنصة.",
+    "service": "الخدمة",
+    "selectService": "اختر خدمة",
+    "date": "التاريخ",
+    "findTimes": "عرض المواعيد",
+    "availableTimes": "المواعيد المتاحة",
+    "staffAndTime": "مقدم الخدمة والوقت",
+    "confirmBooking": "تأكيد الحجز",
+    "serviceDefaultDescription": "خدمة قابلة للحجز من هذا النشاط.",
+    "durationShort": "{count} دقيقة",
+    "priceShort": "{price} د.ع",
+    "steps": {
+      "service": "الخدمة",
+      "staff": "الموظف",
+      "time": "الوقت",
+      "confirm": "التأكيد"
+    },
+    "periods": {
+      "morning": "الصباح",
+      "afternoon": "بعد الظهر",
+      "evening": "المساء"
+    },
+    "offeringSummary": "{service} لدى {business} — {branch} · {duration} دقيقة · {price} د.ع",
+    "automaticStaff": "تعيين تلقائي",
+    "employee": {
+      "label": "اختر الموظف",
+      "placeholder": "اختر موظفًا متاحًا",
+      "any": "أي موظف متاح",
+      "optionalHelp": "يمكنك اختيار موظف محدد أو ترك التعيين لأقرب موظف متاح.",
+      "requiredHelp": "اختيار موظف متاح مطلوب لإكمال الحجز.",
+      "recommended": "الخيار الأسرع لإكمال الحجز.",
+      "availableHint": "ستتحدث المواعيد حسب هذا الموظف.",
+      "fixed": "مقدم الخدمة: {name}",
+      "chooseTitle": "اختر الموظف أولًا",
+      "chooseDescription": "حدد الموظف الذي تفضله لعرض مواعيده المتاحة."
+    },
+    "book": "احجز",
+    "created": "تم تأكيد حجزك بنجاح.",
+    "rescheduled": "تم تغيير موعد الحجز بنجاح.",
+    "rescheduleTitle": "تغيير موعد الحجز",
+    "rescheduleDescription": "اختر موعدًا جديدًا لخدمة {service} في {branch}.",
+    "chooseNewDate": "اختر التاريخ الجديد",
+    "confirmReschedule": "تأكيد الموعد الجديد",
+    "rescheduleNotAllowedTitle": "لا يمكن تغيير هذا الموعد",
+    "rescheduleNotAllowedDescription": "انتهت مهلة التعديل أو أن حالة الحجز لا تسمح بتغييره.",
+    "rescheduleErrors": {
+      "invalid": "تحقق من الموعد المختار ثم حاول مجددًا.",
+      "unavailable": "لم يعد هذا الموعد متاحًا. اختر وقتًا آخر.",
+      "notAllowed": "لا تسمح مهلة الحجز بتغيير الموعد الآن."
+    },
+    "changeRequest": {
+      "title": "اقتراح تغيير الموعد",
+      "description": "اختر موعدًا جديدًا لحجز {customer} لخدمة {service}. لن يتغير الحجز قبل موافقة العميل.",
+      "propose": "اقتراح تغيير الموعد",
+      "customerTitle": "تم اقتراح تغيير موعد حجزك",
+      "accept": "وافق على الموعد الجديد",
+      "reject": "رفض التغيير",
+      "waiting": "بانتظار موافقة العميل"
+    },
+    "customer": "العميل",
+    "staff": "الموظف",
+    "cancel": "إلغاء الحجز",
+    "reschedule": "تغيير الموعد",
+    "business": "النشاط",
+    "price": "السعر",
+    "contactBusiness": "الاتصال بالنشاط",
+    "reviewSubmitted": "تقييمك",
+    "emptyTitle": "لا توجد حجوزات",
+    "emptyDescription": "ستظهر تفاصيل حجوزاتك هنا بعد حجز أول موعد.",
+    "businessEmptyTitle": "لا توجد حجوزات بعد",
+    "businessEmptyDescription": "ستظهر حجوزات العملاء هنا عند وصولها.",
+    "noTimesTitle": "لا توجد مواعيد متاحة",
+    "noTimesDescription": "جرّب تاريخًا آخر أو اختر خدمة مختلفة.",
+    "slotReasons": {
+      "AVAILABLE": "اختر الموعد المناسب.",
+      "INVALID_DATE": "اختر تاريخًا صالحًا.",
+      "SERVICE_NOT_ASSIGNED": "هذه الخدمة غير مرتبطة بموقع متاح للحجز.",
+      "SERVICE_INACTIVE": "هذه الخدمة غير نشطة أو غير متاحة للحجز حاليًا.",
+      "OFFERING_UNAVAILABLE": "هذه الخدمة لم تعد متاحة للحجز.",
+      "HOURS_NOT_CONFIGURED": "لم يضبط النشاط ساعات عمل هذا الموقع بعد.",
+      "CLOSED_ON_DATE": "الموقع مغلق في هذا اليوم. جرّب تاريخًا آخر.",
+      "STAFF_NOT_CONFIGURED": "تتطلب الخدمة موظفًا، ولم يضبط النشاط توفر الفريق بعد.",
+      "STAFF_UNAVAILABLE": "لا يوجد موظف متاح في هذا اليوم. جرّب تاريخًا آخر.",
+      "NO_SLOTS": "لا توجد أوقات شاغرة في هذا اليوم. جرّب تاريخًا آخر."
+    },
+    "noServicesTitle": "لا توجد خدمات متاحة",
+    "noServicesDescription": "لا توجد خدمات منشورة للحجز حاليًا.",
+    "statuses": {
+      "PENDING": "بانتظار التأكيد",
+      "CONFIRMED": "مؤكد",
+      "CANCELLED": "ملغي",
+      "COMPLETED": "مكتمل",
+      "NO_SHOW": "لم يحضر"
+    },
+    "actions": {
+      "CONFIRMED": "تأكيد",
+      "CANCELLED": "إلغاء",
+      "COMPLETED": "إكمال",
+      "NO_SHOW": "لم يحضر"
+    },
+    "errors": {
+      "invalid": "بيانات الحجز غير صالحة. حاول مجددًا.",
+      "unavailable": "هذا الموعد لم يعد متاحًا. اختر موعدًا آخر.",
+      "rateLimited": "تم إرسال محاولات حجز كثيرة خلال وقت قصير. انتظر قليلًا ثم حاول مرة أخرى.",
+      "failed": "تعذر إنشاء الحجز الآن. حاول مرة أخرى بعد قليل."
+    },
+    "restaurant": {
+      "table": "الطاولة",
+      "guests": "عدد الضيوف",
+      "preorder": "طلبات مسبقة"
+    },
+    "messageBusiness": "مراسلة النشاط",
+    "messageCustomer": "مراسلة العميل"
+  },
+  "Public": {
+    "marketplace": "استكشف الخدمات",
+    "forBusiness": "لأصحاب الأعمال",
+    "signIn": "تسجيل الدخول",
+    "footer": "ريزنو — حجز أسهل، وإدارة أوضح."
+  },
+  "Landing": {
+    "eyebrow": "منصة حجز عربية أولًا",
+    "title": "خدمتك التالية أقرب مما تتوقع",
+    "description": "اكتشف الأنشطة والخدمات القريبة، قارن المواعيد المتاحة، واحجز خلال دقائق من مكان واحد.",
+    "explore": "استكشف السوق",
+    "listBusiness": "أضف نشاطك",
+    "searchFeature": {
+      "title": "اكتشاف بسيط",
+      "description": "ابحث حسب الخدمة أو المدينة واعثر على الخيار المناسب."
+    },
+    "bookingFeature": {
+      "title": "مواعيد فعلية",
+      "description": "اختر من الأوقات المتاحة واحصل على تأكيد فوري."
+    },
+    "manageFeature": {
+      "title": "إدارة موثوقة",
+      "description": "كل حجوزات العميل والنشاط منظّمة في مكان واحد."
+    },
+    "featuredTitle": "أنشطة يمكنك حجزها الآن",
+    "featuredDescription": "خدمات متاحة من أنشطة منشورة على ريزنو.",
+    "viewAll": "عرض الكل",
+    "featuredEmpty": "ستظهر الأنشطة المنشورة هنا قريبًا.",
+    "trendingServicesTitle": "خدمات رائجة",
+    "trendingServicesDescription": "استكشف خدمات متاحة الآن من أنشطة موثوقة على ريزنو.",
+    "minutes": "دقيقة",
+    "price": "{price} د.ع",
+    "bookNow": "احجز الآن",
+    "servicesEmpty": "لا توجد خدمات متاحة للحجز حاليًا."
+  },
+  "Marketplace": {
+    "title": "سوق الخدمات",
+    "description": "ابحث عن الأنشطة والخدمات المتاحة للحجز عبر ريزنو.",
+    "searchPlaceholder": "اسم النشاط أو الخدمة",
+    "searchLabel": "البحث في السوق",
+    "category": "الفئة",
+    "city": "المدينة",
+    "allCategories": "كل الفئات",
+    "allCities": "كل المدن",
+    "search": "بحث",
+    "results": "{count} نتيجة",
+    "emptyTitle": "لم نعثر على نتائج",
+    "emptyDescription": "جرّب عبارة بحث أقصر أو غيّر الفئة أو المدينة.",
+    "defaultDescription": "خدمات ومواعيد متاحة للحجز.",
+    "serviceCount": "{count} خدمة",
+    "startingPrice": "يبدأ من {price} د.ع",
+    "matchingPrice": "{price} د.ع",
+    "restaurant": "مطعم",
+    "cafe": "كافيه",
+    "businessType": "نوع النشاط",
+    "allBusinessTypes": "كل أنواع الأنشطة",
+    "menuAvailable": "القائمة متاحة",
+    "tablesAvailable": "طاولات متاحة",
+    "reserveTable": "احجز طاولة",
+    "nearMe": "بالقرب مني",
+    "useMyLocation": "استخدم موقعي",
+    "locationLoading": "جارٍ تحديد الموقع…",
+    "locationPermissionDenied": "تم رفض إذن الموقع",
+    "locationUnavailable": "الموقع غير متاح",
+    "usingCurrentLocation": "يتم استخدام موقعك الحالي",
+    "nearbyBusinesses": "أنشطة قريبة منك",
+    "showingNearYou": "نعرض الأنشطة القريبة منك",
+    "noNearbyBusinesses": "لا توجد أنشطة قريبة ضمن النطاق المحدد",
+    "radius": "النطاق",
+    "radiusKm": "{count} كم",
+    "listView": "عرض القائمة",
+    "mapView": "عرض الخريطة",
+    "viewBusiness": "عرض النشاط",
+    "distanceKm": "يبعد {distance} كم",
+    "categoryTiles": {
+      "RESTAURANT": {
+        "title": "مطاعم",
+        "description": "احجز طاولة واستعرض القوائم."
+      },
+      "CAFE": {
+        "title": "كافيهات",
+        "description": "جلسات وقهوة وحجوزات سهلة."
+      },
+      "BARBER": {
+        "title": "حلاقة",
+        "description": "خدمات حلاقة ومواعيد سريعة."
+      },
+      "BEAUTY": {
+        "title": "تجميل",
+        "description": "صالونات وخدمات عناية."
+      },
+      "CLINIC": {
+        "title": "عيادات",
+        "description": "مواعيد صحية منظمة."
+      },
+      "DENTIST": {
+        "title": "أسنان",
+        "description": "عيادات أسنان ومواعيد متابعة."
+      },
+      "SPA": {
+        "title": "سبا",
+        "description": "راحة وعناية واسترخاء."
+      },
+      "GYM": {
+        "title": "رياضة",
+        "description": "جلسات تدريب وخدمات لياقة."
+      },
+      "CONSULTANT": {
+        "title": "استشارات",
+        "description": "مواعيد خبراء ومستشارين."
+      },
+      "OTHER": {
+        "title": "أخرى",
+        "description": "أنشطة وخدمات متنوعة."
+      }
+    }
+  },
+  "BusinessPublic": {
+    "defaultDescription": "استعرض الخدمات المتاحة واحجز موعدك المناسب.",
+    "duration": "{count} دقيقة",
+    "price": "{price} د.ع",
+    "book": "احجز هذه الخدمة",
+    "bookNow": "احجز الآن",
+    "call": "اتصل",
+    "whatsapp": "واتساب",
+    "providers": "مقدمو الخدمة: {names}",
+    "gallery": "معرض الصور",
+    "galleryImage": "صورة من المعرض {index}",
+    "workingHours": "ساعات العمل",
+    "specialClosures": "أيام الإغلاق الخاصة",
+    "openMap": "فتح الموقع على الخريطة",
+    "openInWaze": "فتح في Waze",
+    "team": "فريق العمل",
+    "bookingPolicy": "سياسات الحجز",
+    "faq": "الأسئلة الشائعة",
+    "actions": {
+      "share": "مشاركة الصفحة",
+      "copy": "نسخ الرابط",
+      "copied": "تم نسخ الرابط",
+      "qr": "رمز QR",
+      "qrDescription": "امسح الرمز لفتح صفحة النشاط."
+    },
+    "contact": "معلومات التواصل",
+    "website": "زيارة الموقع",
+    "noContact": "لا توجد معلومات تواصل عامة حاليًا.",
+    "reserveTable": "احجز طاولة",
+    "menu": "القائمة",
+    "seating": "أماكن الجلوس",
+    "available": "متاح",
+    "unavailable": "غير متاح",
+    "preparationMinutes": "{count} دقيقة تحضير",
+    "reservationComingSoon": "تجربة حجز الطاولات ستُفعّل في المرحلة التالية. يمكنك استعراض القائمة والتواصل مع النشاط الآن.",
+    "viewMenu": "عرض القائمة",
+    "reserveTableDescription": "اختر الوقت وعدد الضيوف والطاولة المناسبة، ويمكنك إضافة طلبات من القائمة قبل الوصول."
+  },
+  "Notifications": {
+    "title": "الإشعارات",
+    "description": "آخر تحديثات الحجوزات المهمة.",
+    "open": "فتح الإشعارات",
+    "viewAll": "عرض كل الإشعارات",
+    "emptyTitle": "كل شيء محدّث",
+    "emptyDescription": "ستظهر تحديثات الحجوزات الجديدة هنا.",
+    "changeRequest": "تم اقتراح تغيير موعد حجز {service}. راجع الموعد الجديد ووافق عليه أو ارفضه.",
+    "reviewRequest": "كيف كانت خدمتك؟ قيّم تجربتك مع {service}.",
+    "statuses": {
+      "PENDING": "حجز {service} بانتظار التأكيد.",
+      "CONFIRMED": "تم تأكيد حجز {service}.",
+      "CANCELLED": "تم إلغاء حجز {service}.",
+      "COMPLETED": "اكتمل حجز {service}.",
+      "NO_SHOW": "تم تسجيل عدم الحضور لحجز {service}."
+    }
+  },
+  "Reviews": {
+    "title": "قيّم تجربتك",
+    "question": "كيف كانت خدمتك؟",
+    "rating": "التقييم",
+    "stars": "{count} نجوم",
+    "comment": "تعليقك (اختياري)",
+    "commentPlaceholder": "اكتب تعليقك اختياريًا",
+    "submit": "إرسال التقييم",
+    "customerReviews": "آراء العملاء",
+    "summary": "{rating} من 5 · {count} تقييم",
+    "empty": "لم تُضف تقييمات بعد."
+  },
+  "DashboardHome": {
+    "welcome": "مرحبًا بعودتك، {name}",
+    "businessDescription": "هذه نظرة سريعة على نشاطك ومواعيدك القادمة.",
+    "customerDescription": "أدر مواعيدك واكتشف زيارتك التالية.",
+    "openCalendar": "فتح التقويم",
+    "bookAppointment": "حجز موعد",
+    "hero": {
+      "navigationLabel": "إرشادات إدارة النشاط",
+      "hours": {
+        "title": "أكمل ساعات العمل حتى تظهر مواعيدك للعملاء",
+        "description": "راجع ساعات كل موقع وحدّثها لتتمكن ريزنو من عرض الأوقات المتاحة بدقة."
+      },
+      "images": {
+        "title": "أضف صورًا واضحة لخدماتك",
+        "description": "الصورة الجيدة تشرح خدمتك بسرعة وتمنح العملاء ثقة أكبر قبل الحجز."
+      },
+      "calendar": {
+        "title": "تابع يومك من تقويم الحجوزات",
+        "description": "راجع المواعيد القادمة وحالاتها من مكان واحد، وابقَ مستعدًا لكل عميل."
+      }
+    },
+    "metrics": {
+      "upcoming": "الحجوزات القادمة",
+      "services": "الخدمات النشطة",
+      "history": "سجل الحجوزات",
+      "menuItems": "أصناف القائمة"
+    },
+    "nearestTitle": "أقرب الحجوزات",
+    "nearestDescription": "المواعيد القادمة حسب الترتيب.",
+    "viewAll": "عرض الكل",
+    "emptyTitle": "لا توجد حجوزات قادمة",
+    "businessEmptyDescription": "ستظهر حجوزات العملاء الجديدة هنا.",
+    "customerEmptyDescription": "اختر خدمة واحجز أول موعد لك.",
+    "manageServices": "إدارة الخدمات",
+    "findService": "استكشف الخدمات",
+    "discovery": {
+      "placesTitle": "أماكن مقترحة يمكنك زيارتها",
+      "placesDescription": "اقتراحات من الأنشطة المنشورة على ريزنو. لا نعتمد على موقعك الجغرافي حاليًا.",
+      "servicesTitle": "خدمات رائجة",
+      "servicesDescription": "خدمات متاحة للحجز الآن من أنشطة مختلفة.",
+      "emptyTitle": "لا توجد اقتراحات حاليًا",
+      "emptyDescription": "ستظهر هنا الأنشطة والخدمات المنشورة عند توفرها.",
+      "categoriesTitle": "استكشف حسب نوع النشاط",
+      "categoriesDescription": "ابدأ بسرعة من المطاعم، الكافيهات، الصالونات، العيادات والمزيد."
+    },
+    "commandCenter": {
+      "eyebrow": "مركز القيادة",
+      "title": "نظرة اليوم",
+      "description": "أهم مؤشرات الحجز والإجراءات التشغيلية في مكان واحد.",
+      "quickActions": "إجراءات سريعة",
+      "metrics": {
+        "todayBookings": "حجوزات اليوم",
+        "upcomingBookings": "الحجوزات القادمة",
+        "pendingReviews": "تقييمات بانتظار العميل",
+        "unreadNotifications": "إشعارات غير مقروءة"
+      },
+      "actions": {
+        "addService": "إضافة خدمة",
+        "addEmployee": "إضافة موظف",
+        "publicProfile": "الصفحة العامة",
+        "calendar": "التقويم",
+        "bookings": "الحجوزات",
+        "openPublic": "فتح الصفحة العامة"
+      }
+    }
+  },
+  "BusinessSetup": {
+    "title": "اكتمال إعداد نشاطك",
+    "score": "اكتمل {score}% من الملف العام",
+    "progressTitle": "إعداد النشاط",
+    "copy": "نسخ رابط النشاط",
+    "manage": "إدارة الصفحة العامة",
+    "copied": "تم نسخ الرابط",
+    "fixNow": "إصلاح الآن",
+    "missingTitle": "ما الذي يمنع استقبال الحجوزات؟",
+    "missingDescription": "أكمل هذه العناصر حتى يتمكن العملاء من اكتشاف نشاطك والحجز بثقة.",
+    "readyTitle": "نشاطك جاهز لاستقبال الحجوزات.",
+    "readyDescription": "حافظ على تحديث التقويم والخدمات والصفحة العامة مع وصول الحجوزات.",
+    "states": {
+      "ready": {
+        "label": "جاهز لاستقبال الحجوزات",
+        "description": "يمكن للعملاء اكتشاف نشاطك وحجز الخدمات المتاحة."
+      },
+      "almost": {
+        "label": "جاهز تقريبًا",
+        "description": "إعدادك قريب من الاكتمال. أصلح العناصر المتبقية قبل نشر الرابط للعملاء."
+      },
+      "notReady": {
+        "label": "غير جاهز",
+        "description": "قد لا يتمكن العملاء من الحجز بعد. أكمل عناصر الإعداد الناقصة أولًا."
+      }
+    },
+    "items": {
+      "businessInfo": "أكمل معلومات النشاط",
+      "coverImage": "أضف صورة غلاف",
+      "logo": "أضف الشعار",
+      "branch": "أضف موقعًا",
+      "hours": "اضبط ساعات العمل",
+      "service": "أضف خدمة",
+      "employee": "أضف موظفًا عند الحاجة",
+      "published": "انشر الملف العام",
+      "table": "أضف طاولة نشطة",
+      "menuItem": "أضف صنفًا في القائمة",
+      "menuCategory": "أضف قسمًا في القائمة"
+    },
+    "explanations": {
+      "businessInfo": "يحتاج العملاء إلى فئة ووصف ورقم هاتف قبل الوثوق بصفحة النشاط.",
+      "coverImage": "صورة الغلاف تجعل الصفحة العامة مكتملة واحترافية.",
+      "logo": "الشعار يساعد العملاء على تمييز نشاطك داخل ريزنو.",
+      "branch": "لا يمكن إنشاء الحجوزات بدون موقع نشط واحد على الأقل.",
+      "hours": "لا يستطيع ريزنو توليد مواعيد قابلة للحجز قبل ضبط ساعات العمل.",
+      "service": "يحتاج العملاء إلى خدمة نشطة واحدة على الأقل للحجز.",
+      "employee": "بعض الخدمات تتطلب مقدم خدمة، لذلك أضف عضوًا في الفريق أولًا.",
+      "published": "الصفحات المخفية لا تظهر للعملاء في السوق.",
+      "table": "تحتاج المطاعم والكافيهات إلى طاولات نشطة قبل فتح تجربة الحجز القادمة.",
+      "menuItem": "أضف صنفًا متاحًا واحدًا على الأقل حتى تظهر القائمة للعملاء.",
+      "menuCategory": "قسّم القائمة إلى أقسام مثل المشروبات أو الأطباق الرئيسية حتى يسهل تصفحها."
+    },
+    "quick": {
+      "addService": "إضافة خدمة",
+      "addEmployee": "إضافة موظف",
+      "bookings": "عرض الحجوزات",
+      "openPublic": "فتح الصفحة العامة"
+    }
+  },
+  "CommandPalette": {
+    "title": "لوحة الأوامر",
+    "description": "ابحث عن صفحة أو إجراء وانتقل إليه فورًا.",
+    "open": "بحث سريع",
+    "placeholder": "ابحث في الصفحات والأوامر…",
+    "empty": "لا توجد نتائج مطابقة.",
+    "groups": {
+      "recent": "الأوامر الأخيرة",
+      "navigation": "التنقل",
+      "actions": "إجراءات سريعة"
+    },
+    "business": {
+      "dashboard": "لوحة التحكم",
+      "bookings": "الحجوزات",
+      "calendar": "التقويم",
+      "services": "الخدمات",
+      "team": "فريق العمل",
+      "publicProfile": "الصفحة العامة",
+      "profile": "بيانات النشاط",
+      "notifications": "الإشعارات",
+      "settings": "الإعدادات"
+    },
+    "customer": {
+      "dashboard": "لوحة التحكم",
+      "marketplace": "سوق الخدمات",
+      "bookings": "حجوزاتي",
+      "notifications": "الإشعارات"
+    },
+    "actions": {
+      "addService": "إضافة خدمة",
+      "addEmployee": "إضافة موظف",
+      "openPublic": "فتح الصفحة العامة",
+      "copyPublic": "نسخ رابط الصفحة العامة",
+      "createBooking": "إنشاء حجز"
+    },
+    "hintNavigate": "↑ ↓ للتنقل · Enter للاختيار",
+    "hintClose": "Esc للإغلاق"
+  },
+  "Dashboard": {
+    "navigation": {
+      "label": "تنقل لوحة التحكم",
+      "groups": {
+        "workspace": "مساحة العمل",
+        "account": "الحساب",
+        "insights": "المتابعة"
+      },
+      "items": {
+        "dashboard": "لوحة التحكم",
+        "overview": "نظرة عامة",
+        "myBookings": "حجوزاتي",
+        "bookings": "الحجوزات",
+        "upcoming": "القادمة",
+        "history": "السجل",
+        "favorites": "المفضلة",
+        "notifications": "الإشعارات",
+        "profile": "الملف الشخصي",
+        "publicProfile": "الصفحة العامة",
+        "calendar": "التقويم",
+        "services": "الخدمات",
+        "team": "الفريق",
+        "business": "النشاط",
+        "locations": "المواقع",
+        "settings": "الإعدادات",
+        "analytics": "التحليلات",
+        "messages": "الرسائل",
+        "admin": "الأدمن",
+        "reservations": "الحجوزات",
+        "tables": "الطاولات",
+        "menu": "القائمة",
+        "assistant": "المساعد"
+      }
+    },
+    "openMenu": "فتح قائمة التنقل",
+    "expandSidebar": "توسيع الشريط الجانبي",
+    "collapseSidebar": "طي الشريط الجانبي",
+    "searchPlaceholder": "بحث…",
+    "searchLabel": "البحث في لوحة التحكم",
+    "openUserMenu": "فتح قائمة المستخدم",
+    "signOut": "تسجيل الخروج",
+    "adminDashboard": "لوحة الأدمن",
+    "superAdminDashboard": "لوحة المدير العام",
+    "lightTheme": "استخدام المظهر الفاتح",
+    "darkTheme": "استخدام المظهر الداكن"
+  },
+  "Pwa": {
+    "offlineTitle": "أنت غير متصل الآن",
+    "offlineDescription": "تحقق من اتصال الإنترنت ثم حاول مرة أخرى.",
+    "tryAgain": "إعادة المحاولة"
+  },
+  "Auth": {
+    "title": "إنشاء حساب",
+    "description": "أنشئ حسابك وابدأ الحجز أو إدارة نشاطك.",
+    "signInTitle": "تسجيل الدخول",
+    "signInDescription": "ادخل إلى حجوزاتك أو مساحة نشاطك.",
+    "signUpTab": "حساب جديد",
+    "signInTab": "تسجيل الدخول",
+    "name": "الاسم الكامل",
+    "email": "البريد الإلكتروني",
+    "password": "كلمة المرور",
+    "submit": "إنشاء الحساب",
+    "signInSubmit": "الدخول",
+    "creating": "جارٍ إنشاء الحساب…",
+    "signingIn": "جارٍ تسجيل الدخول…",
+    "failure": "تعذّر إنشاء الحساب. حاول مجددًا.",
+    "signInFailure": "البريد الإلكتروني أو كلمة المرور غير صحيحة."
+  },
+  "Onboarding": {
+    "title": "البدء",
+    "welcome": "مرحبًا بك في ريزنو",
+    "description": "اختر طريقة البدء. يمكنك استخدام الحساب نفسه للحجز وإدارة النشاط.",
+    "customerTitle": "حجز المواعيد",
+    "customerDescription": "اكتشف الأنشطة وأدر مواعيدك وسجل حجوزاتك في مكان واحد.",
+    "continueCustomer": "المتابعة كعميل",
+    "businessTitle": "إدارة نشاط تجاري",
+    "businessDescription": "أنشئ مساحة نشاطك وموقعه الأول، وستكون مالك النشاط.",
+    "businessName": "اسم النشاط",
+    "businessNamePlaceholder": "اسم نشاطك التجاري",
+    "businessSlug": "رابط النشاط",
+    "businessSlugHelp": "اختر اسمًا إنكليزيًا فريدًا من 5 أحرف على الأقل.",
+    "slugInvalid": "استخدم أحرفًا إنكليزية صغيرة وأرقامًا وشرطات فقط، بحد أدنى 5 أحرف.",
+    "slugTaken": "هذا الرابط مستخدم بالفعل. اختر رابطًا آخر.",
+    "slugReserved": "هذا الرابط محجوز للمنصة. اختر رابطًا آخر.",
+    "branchName": "الموقع الأول",
+    "branchNamePlaceholder": "الفرع الرئيسي",
+    "createBusiness": "إنشاء مساحة النشاط",
+    "creatingBusiness": "جارٍ إنشاء النشاط…",
+    "businessNameMin": "يجب أن يتكون اسم النشاط من حرفين على الأقل.",
+    "businessNameMax": "يجب ألا يتجاوز اسم النشاط 120 حرفًا.",
+    "branchNameMin": "يجب أن يتكون اسم الموقع من حرفين على الأقل.",
+    "branchNameMax": "يجب ألا يتجاوز اسم الموقع 120 حرفًا.",
+    "invalid": "تحقق من الحقول المبيّنة ثم حاول مجددًا.",
+    "failure": "تعذّر إنشاء النشاط. حاول مجددًا.",
+    "businessVerticalRequired": "اختر نوع النشاط.",
+    "businessType": {
+      "title": "نوع النشاط",
+      "description": "اختر نوع نشاطك حتى نجهز لوحة التحكم والجاهزية المناسبة.",
+      "options": {
+        "BARBER": {
+          "label": "حلاقة",
+          "description": "مناسب للخدمات والمواعيد والموظفين."
+        },
+        "BEAUTY": {
+          "label": "صالون تجميل",
+          "description": "مناسب للخدمات والمواعيد والموظفين."
+        },
+        "CLINIC": {
+          "label": "عيادة",
+          "description": "مناسب للخدمات والمواعيد والموظفين."
+        },
+        "DENTIST": {
+          "label": "طبيب أسنان",
+          "description": "مناسب للخدمات والمواعيد والموظفين."
+        },
+        "SPA": {
+          "label": "سبا",
+          "description": "مناسب للخدمات والمواعيد والموظفين."
+        },
+        "GYM": {
+          "label": "نادي رياضي",
+          "description": "مناسب للخدمات والمواعيد والموظفين."
+        },
+        "CONSULTANT": {
+          "label": "استشارات",
+          "description": "مناسب للاستشارات والمواعيد بدون إلزام فريق كبير."
+        },
+        "RESTAURANT": {
+          "label": "مطعم",
+          "description": "يدعم الطاولات والقائمة وتجربة حجز الطاولات القادمة."
+        },
+        "CAFE": {
+          "label": "كافيه",
+          "description": "يدعم الطاولات والقائمة وتجربة حجز الطاولات القادمة."
+        },
+        "OTHER": {
+          "label": "أخرى",
+          "description": "اختيار آمن يمكن تطويره لاحقًا."
+        }
+      }
+    }
+  },
+  "Profile": {
+    "title": "الملف الشخصي",
+    "description": "حافظ على دقة بياناتك الشخصية وتحديثها.",
+    "personalTitle": "المعلومات الشخصية",
+    "personalDescription": "تُستخدم هذه البيانات لحسابك وحجوزاتك في ريزنو.",
+    "emptyTitle": "سجّل الدخول لإدارة ملفك",
+    "emptyDescription": "ملفك مرتبط بحساب ريزنو.",
+    "createAccount": "إنشاء حساب",
+    "fields": {
+      "firstName": "الاسم الأول",
+      "lastName": "اسم العائلة",
+      "displayName": "اسم العرض",
+      "email": "البريد الإلكتروني",
+      "phone": "رقم الهاتف",
+      "avatarUrl": "رابط صورة الملف الشخصي"
+    },
+    "displayNameHelp": "هذا هو الاسم الذي سيراه الآخرون في ريزنو.",
+    "emailHelp": "يتطلب تغيير البريد الإلكتروني التحقق من الحساب.",
+    "save": "حفظ التغييرات",
+    "saving": "جارٍ الحفظ…",
+    "messages": {
+      "invalid": "تحقق من الحقول المبيّنة ثم حاول مجددًا.",
+      "failure": "تعذّر حفظ ملفك. حاول مجددًا.",
+      "success": "تم تحديث ملفك الشخصي."
+    },
+    "validation": {
+      "firstNameMin": "يجب أن يتكون الاسم الأول من حرفين على الأقل.",
+      "firstNameMax": "يجب ألا يتجاوز الاسم الأول 50 حرفًا.",
+      "optionalTextMax": "يجب ألا يتجاوز هذا الحقل 100 حرف.",
+      "phoneMax": "يجب ألا يتجاوز رقم الهاتف 30 حرفًا.",
+      "phoneInvalid": "أدخل رقم هاتف صالحًا.",
+      "imageUrlInvalid": "أدخل رابط صورة صحيحًا."
+    },
+    "avatarUrlHelp": "أدخل رابط صورة اختياريًا. إذا تُرك فارغًا سنستخدم الأحرف الأولى."
+  },
+  "Errors": {
+    "title": "حدث خطأ غير متوقع",
+    "description": "تعذّر تحميل هذه الصفحة. حاول مجددًا، وتواصل مع الدعم إذا استمرت المشكلة.",
+    "publicDescription": "تعذّر تحميل المحتوى. تحقق من اتصالك وحاول مجددًا.",
+    "reference": "المرجع: {value}",
+    "retry": "إعادة المحاولة"
+  },
+  "NotFound": {
+    "title": "الصفحة غير موجودة",
+    "description": "ربما نُقلت الصفحة أو أن الرابط غير صحيح.",
+    "home": "العودة للرئيسية"
+  },
+  "Validation": {
+    "businessNameMin": "يجب أن يتكون اسم النشاط من حرفين على الأقل.",
+    "businessNameMax": "يجب ألا يتجاوز اسم النشاط 120 حرفًا.",
+    "legalNameMax": "يجب ألا يتجاوز الاسم القانوني 160 حرفًا.",
+    "descriptionMax": "يجب ألا يتجاوز الوصف 2000 حرف.",
+    "emailInvalid": "أدخل بريدًا إلكترونيًا صالحًا.",
+    "phoneInvalid": "أدخل رقم هاتف صالحًا.",
+    "urlInvalid": "أدخل رابطًا صالحًا يبدأ بـ http:// أو https://.",
+    "slugInvalid": "استخدم 5–80 حرفًا إنجليزيًا صغيرًا أو رقمًا، ويمكن الفصل بشرطة.",
+    "branchNameMin": "يجب أن يتكون اسم الموقع من حرفين على الأقل.",
+    "branchNameMax": "يجب ألا يتجاوز اسم الموقع 120 حرفًا.",
+    "timezoneInvalid": "أدخل منطقة زمنية صالحة.",
+    "addressMax": "يجب ألا يتجاوز هذا الحقل 160 حرفًا.",
+    "invalidLatitude": "يجب أن يكون خط العرض بين -90 و90.",
+    "invalidLongitude": "يجب أن يكون خط الطول بين -180 و180.",
+    "roleInvalid": "اختر دورًا صالحًا للفريق.",
+    "branchSelectionInvalid": "اختر مواقع صالحة للنشاط.",
+    "serviceNameMin": "يجب أن يتكون اسم الخدمة من حرفين على الأقل.",
+    "serviceNameMax": "يجب ألا يتجاوز اسم الخدمة 120 حرفًا.",
+    "categoryInvalid": "اختر فئة صالحة.",
+    "priceInvalid": "أدخل سعرًا صالحًا أكبر من صفر.",
+    "durationInvalid": "يجب أن تكون المدة بين 5 و1440 دقيقة.",
+    "branchRequired": "اختر موقعًا واحدًا على الأقل.",
+    "cancellationWindowInvalid": "يجب أن تكون مهلة الإلغاء بين 0 و720 ساعة.",
+    "staffModeInvalid": "اختر وضعًا صالحًا لاختيار الموظف.",
+    "staffRequired": "اختر موظفًا واحدًا على الأقل لهذه الخدمة.",
+    "timeInvalid": "أدخل وقتًا صالحًا.",
+    "timeRangeInvalid": "يجب أن يكون وقت الإغلاق بعد وقت الفتح.",
+    "dateTimeInvalid": "أدخل تاريخًا ووقتًا صالحين.",
+    "businessVerticalInvalid": "اختر قطاع نشاط صالحًا."
+  },
+  "Admin": {
+    "unauthorized": "غير مصرح",
+    "accessDenied": "حسابك لا يملك صلاحية دخول لوحة الإدارة.",
+    "notConfigured": "لم يتم تهيئة دخول الإدارة.",
+    "notConfiguredDescription": "لوحة الإدارة محمية، لكنها تحتاج إلى تهيئة حسابات المديرين قبل الاستخدام.",
+    "superAdminDashboard": "لوحة المدير العام",
+    "admin": "الأدمن",
+    "adminDashboard": "لوحة الأدمن",
+    "adminAccess": "وصول الأدمن",
+    "adminAccessDescription": "منح وصول إداري محدود بصلاحيات ثابتة مع بقاء Super Admin من متغيرات البيئة كصلاحية جذرية.",
+    "rootSuperAdminHelp": "هذه الحسابات تأتي من REZNO_ADMIN_EMAILS ولا يمكن قفلها من هذه الواجهة.",
+    "addNewAdmin": "إضافة أدمن جديد",
+    "enterUserEmail": "أدخل بريد المستخدم",
+    "searchUser": "بحث عن مستخدم",
+    "noUserFoundWithEmail": "لا يوجد مستخدم بهذا البريد الإلكتروني.",
+    "selectUser": "اختر المستخدم",
+    "grantAdminAccess": "منح وصول أدمن",
+    "manageAdminAccess": "إدارة وصول الأدمن",
+    "makeAdmin": "تعيين كأدمن",
+    "revokeAdminAccess": "سحب وصول الأدمن",
+    "suspendAdminAccess": "تعليق وصول الأدمن",
+    "reactivateAdminAccess": "إعادة تفعيل وصول الأدمن",
+    "adminPermissions": "صلاحيات الأدمن",
+    "choosePermissions": "اختر الصلاحيات",
+    "permission": "صلاحية",
+    "permissions": "الصلاحيات",
+    "currentAdmins": "الأدمن الحاليون",
+    "grantedBy": "منح بواسطة",
+    "noAdminAccess": "لا يوجد وصول أدمن",
+    "adminAccessGranted": "تم منح وصول الأدمن",
+    "adminAccessUpdated": "تم تحديث وصول الأدمن",
+    "adminAccessSuspended": "تم تعليق وصول الأدمن",
+    "adminAccessReactivated": "تمت إعادة تفعيل وصول الأدمن",
+    "adminAccessRevoked": "تم سحب وصول الأدمن",
+    "userAlreadyHasAdminAccess": "هذا المستخدم لديه وصول أدمن بالفعل",
+    "backToSite": "العودة للموقع",
+    "cannotEditOwnAdminAccess": "لا يمكنك تعديل وصول الأدمن الخاص بك.",
+    "invalidPermissionSelected": "تم اختيار صلاحية غير صالحة.",
+    "noPermission": "لا تملك هذه الصلاحية",
+    "manageBusinesses": "إدارة الأنشطة",
+    "manageUsers": "إدارة المستخدمين",
+    "editBusiness": "تعديل النشاط",
+    "editUser": "تعديل المستخدم",
+    "suspendBusiness": "تعليق النشاط",
+    "reactivateBusiness": "إعادة تفعيل النشاط",
+    "suspendUser": "تعليق المستخدم",
+    "reactivateUser": "إعادة تفعيل المستخدم",
+    "freezeAccount": "تجميد الحساب",
+    "accountSuspended": "تم تعليق الحساب",
+    "businessSuspended": "تم تعليق النشاط",
+    "businessReactivated": "تمت إعادة تفعيل النشاط",
+    "userSuspended": "تم تعليق المستخدم",
+    "userReactivated": "تمت إعادة تفعيل المستخدم",
+    "verificationStatus": "حالة التوثيق",
+    "verifyBusiness": "توثيق النشاط",
+    "unverifyBusiness": "إلغاء توثيق النشاط",
+    "actionCompleted": "تم تنفيذ إجراء الإدارة",
+    "actionFailed": "تعذر تنفيذ إجراء الإدارة",
+    "permissionsLabels": {
+      "ADMIN_DASHBOARD_VIEW": "عرض لوحة الأدمن",
+      "BUSINESSES_VIEW": "عرض الأنشطة",
+      "BUSINESSES_MANAGE": "إدارة الأنشطة",
+      "USERS_VIEW": "عرض المستخدمين",
+      "USERS_MANAGE": "إدارة المستخدمين",
+      "MESSAGES_VIEW": "عرض الرسائل",
+      "MESSAGES_SEND": "إرسال الرسائل",
+      "NOTIFICATIONS_SEND": "إرسال الإشعارات",
+      "SETTINGS_VIEW": "عرض الإعدادات",
+      "SETTINGS_MANAGE": "إدارة الإعدادات",
+      "AUDIT_LOG_VIEW": "عرض سجل التدقيق"
+    }
+  },
+  "Messages": {
+    "title": "الرسائل",
+    "adminMessages": "رسائل الإدارة",
+    "messages": "الرسائل",
+    "messageBusiness": "مراسلة النشاط",
+    "messageCustomer": "مراسلة العميل",
+    "conversation": "محادثة",
+    "conversations": "المحادثات",
+    "sendMessage": "إرسال الرسالة",
+    "typeYourMessage": "اكتب رسالتك",
+    "noMessagesYet": "لا توجد رسائل بعد",
+    "startConversation": "بدء محادثة",
+    "newMessage": "رسالة جديدة",
+    "messageSent": "تم إرسال الرسالة",
+    "couldNotSendMessage": "تعذر إرسال الرسالة",
+    "tooQuickly": "أنت ترسل الرسائل بسرعة كبيرة",
+    "unavailable": "هذه المحادثة غير متاحة",
+    "notAllowed": "لا تملك صلاحية الوصول لهذه المحادثة",
+    "relatedBooking": "حجز مرتبط",
+    "relatedReservation": "حجز طاولة مرتبط",
+    "lastMessage": "آخر رسالة",
+    "customerMessages": "رسائل العملاء",
+    "businessMessages": "رسائل النشاط",
+    "viewAllMessages": "عرض كل الرسائل",
+    "recentMessages": "آخر الرسائل",
+    "noRecentMessages": "لا توجد رسائل حديثة",
+    "unreadMessages": "{count} رسائل غير مقروءة"
+  },
+  "RestaurantReservations": {
+    "restaurant": "مطعم",
+    "cafe": "كافيه",
+    "title": "حجز طاولة في {business}",
+    "description": "اختر التاريخ والوقت وعدد الضيوف، ثم اختر الطاولة وأضف طلبات اختيارية من القائمة.",
+    "duration": "مدة الحجز التقريبية {count} دقيقة",
+    "guestCount": "عدد الضيوف",
+    "updateSearch": "تحديث",
+    "previousDay": "اليوم السابق",
+    "tomorrow": "غدًا",
+    "steps": {
+      "time": "اختيار الوقت",
+      "table": "اختيار الطاولة",
+      "menu": "طلبات اختيارية من القائمة",
+      "confirm": "تأكيد الحجز"
+    },
+    "periods": {
+      "morning": "الصباح",
+      "afternoon": "بعد الظهر",
+      "evening": "المساء"
+    },
+    "empty": {
+      "NO_BRANCH": "لا يوجد فرع نشط لهذا النشاط بعد.",
+      "NO_HOURS": "لا توجد ساعات عمل لهذا اليوم. اختر يومًا آخر أو تواصل مع النشاط.",
+      "NO_TABLES": "لا توجد طاولات مناسبة لعدد الضيوف المحدد.",
+      "NO_SLOTS": "لا توجد أوقات متاحة في هذا اليوم. جرّب يومًا أو عدد ضيوف مختلفًا.",
+      "NO_BRANCH_SELECTED": "اختر الفرع أولًا لعرض الأوقات والطاولات المتاحة."
+    },
+    "errors": {
+      "invalid": "تعذر قراءة بيانات الحجز. حاول مرة أخرى.",
+      "table": "الطاولة المحددة غير متاحة لهذا الحجز.",
+      "table-unavailable": "تم حجز هذه الطاولة للتو. اختر طاولة أو وقتًا آخر.",
+      "time": "الوقت المحدد خارج ساعات العمل أو ضمن وقت إغلاق خاص.",
+      "rateLimited": "تم إرسال محاولات حجز كثيرة خلال وقت قصير. انتظر قليلًا ثم حاول مرة أخرى.",
+      "failed": "تعذر تأكيد حجز الطاولة الآن. حاول مرة أخرى بعد قليل."
+    },
+    "tableCapacity": "تسع {count} ضيوف",
+    "menuOptional": "يمكنك ترك الكميات صفرًا والحجز بدون طلب مسبق.",
+    "itemQuantity": "كمية {item}",
+    "notePlaceholder": "ملاحظة اختيارية للمطعم",
+    "confirm": "تأكيد حجز الطاولة",
+    "summary": "ملخص الحجز",
+    "business": "النشاط",
+    "guests": "الضيوف",
+    "time": "الوقت",
+    "location": "الموقع",
+    "backToProfile": "العودة لصفحة النشاط",
+    "continue": "متابعة",
+    "branch": "الفرع",
+    "selectBranch": "اختر الفرع",
+    "chooseBranch": "اختيار الفرع"
+  }
+}
