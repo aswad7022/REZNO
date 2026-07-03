@@ -7,7 +7,10 @@ import { DashboardLanguageSwitcher } from "@/components/dashboard/dashboard-lang
 import { DashboardThemeToggle } from "@/components/dashboard/dashboard-theme-toggle";
 import { Button } from "@/components/ui/button";
 import { getCurrentAdminAccess } from "@/features/admin/services/admin-auth";
-import { getOptionalActiveIdentity } from "@/features/identity/server";
+import {
+  getAnyBusinessMembership,
+  getOptionalActiveIdentity,
+} from "@/features/identity/server";
 import { toDashboardUser } from "@/lib/auth/dashboard-user";
 
 export async function PublicHeader() {
@@ -16,8 +19,20 @@ export async function PublicHeader() {
     getTranslations("Dashboard.navigation.items"),
     getOptionalActiveIdentity(),
   ]);
-  const adminAccess = identity ? await getCurrentAdminAccess() : null;
-  const dashboardHref = identity?.person.isOnboarded ? "/customer" : "/onboarding";
+  const [adminAccess, membership] = identity
+    ? await Promise.all([
+        getCurrentAdminAccess(),
+        identity.person.isOnboarded
+          ? getAnyBusinessMembership(identity.person.id)
+          : Promise.resolve(null),
+      ])
+    : [null, null];
+  const dashboardHref = !identity?.person.isOnboarded
+    ? "/onboarding"
+    : membership
+      ? "/business"
+      : "/customer";
+  const dashboardRole = membership ? "business" : "customer";
 
   return (
     <header className="sticky top-0 z-40 border-b border-border/70 bg-background/82 shadow-sm shadow-slate-950/[0.03] backdrop-blur-xl">
@@ -50,7 +65,7 @@ export async function PublicHeader() {
                 </Link>
               </Button>
               <DashboardUserNav
-                role="customer"
+                role={dashboardRole}
                 user={toDashboardUser(identity.session.user)}
                 isSuperAdmin={adminAccess?.isSuperAdmin ?? false}
                 canAccessAdmin={Boolean(adminAccess)}

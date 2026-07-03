@@ -1,12 +1,14 @@
+import { getSafeInternalPath } from "@/lib/navigation/safe-redirect";
+
 export function getSafeBusinessReturnPath(value: string | null | undefined) {
-  if (!value || value.startsWith("//")) return "/business";
+  const path = getSafeInternalPath(value, "/business");
 
   if (
-    value === "/business" ||
-    value.startsWith("/business/") ||
-    value.startsWith("/business?")
+    path === "/business" ||
+    path.startsWith("/business/") ||
+    path.startsWith("/business?")
   ) {
-    return value;
+    return path;
   }
 
   return "/business";

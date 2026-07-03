@@ -9,6 +9,7 @@ import { provisionPerson } from "@/features/identity/services/provision-person";
 import { getSafeBusinessReturnPath } from "@/features/business-context/utils/return-path";
 import { auth } from "@/lib/auth/auth";
 import { prisma } from "@/lib/db/prisma";
+import { getSignInPath } from "@/lib/navigation/safe-redirect";
 
 export const ACTIVE_BUSINESS_COOKIE = "rezno-active-business-id";
 
@@ -18,11 +19,15 @@ export const getCurrentSession = cache(async () =>
   }),
 );
 
+async function getCurrentRequestPath() {
+  return (await headers()).get("x-rezno-current-path");
+}
+
 export async function requireSession() {
   const session = await getCurrentSession();
 
   if (!session) {
-    redirect("/register?mode=signin");
+    redirect(getSignInPath(await getCurrentRequestPath()));
   }
 
   return session;
@@ -48,7 +53,7 @@ export async function requireIdentity() {
   const identity = await getCurrentIdentity();
 
   if (!identity) {
-    redirect("/register?mode=signin");
+    redirect(getSignInPath(await getCurrentRequestPath()));
   }
 
   return identity;

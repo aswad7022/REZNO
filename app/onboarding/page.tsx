@@ -17,6 +17,7 @@ import {
 } from "@/features/identity/server";
 import { completeCustomerOnboarding } from "@/features/onboarding/actions/complete-onboarding";
 import { BusinessOnboardingForm } from "@/features/onboarding/components/business-onboarding-form";
+import { getSafeInternalPath } from "@/lib/navigation/safe-redirect";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("Onboarding");
@@ -35,10 +36,7 @@ export default async function OnboardingPage({
   ]);
 
   if (person.isOnboarded) {
-    const next =
-      query.next?.startsWith("/") && !query.next.startsWith("//")
-        ? query.next
-        : null;
+    const next = getSafeInternalPath(query.next, "");
     if (next) {
       redirect(next);
     }
