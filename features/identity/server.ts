@@ -2,7 +2,7 @@ import "server-only";
 
 import { cache } from "react";
 import { cookies, headers } from "next/headers";
-import { notFound, redirect } from "next/navigation";
+import { forbidden, redirect } from "next/navigation";
 import type { BusinessVertical } from "@prisma/client";
 
 import { provisionPerson } from "@/features/identity/services/provision-person";
@@ -58,7 +58,21 @@ export async function requireActiveIdentity() {
   const identity = await requireIdentity();
 
   if (identity.person.deletedAt || identity.person.status !== "ACTIVE") {
-    notFound();
+    forbidden();
+  }
+
+  return identity;
+}
+
+export async function getOptionalActiveIdentity() {
+  const identity = await getCurrentIdentity();
+
+  if (
+    !identity ||
+    identity.person.deletedAt ||
+    identity.person.status !== "ACTIVE"
+  ) {
+    return null;
   }
 
   return identity;

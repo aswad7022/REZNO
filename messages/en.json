@@ -1119,6 +1119,10 @@
     "description": "The page may have moved or the link may be incorrect.",
     "home": "Back to home"
   },
+  "RouteAccess": {
+    "forbiddenTitle": "Access unavailable",
+    "forbiddenDescription": "Your account cannot access this area right now. If you think this is a mistake, contact support."
+  },
   "Validation": {
     "businessNameMin": "Business name must be at least 2 characters.",
     "businessNameMax": "Business name must be 120 characters or fewer.",
