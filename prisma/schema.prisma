@@ -440,6 +440,7 @@ model Review {
   memberId       String?             @db.Uuid
   rating         Int
   comment        String?
+  status         ReviewStatus        @default(VISIBLE)
   createdAt      DateTime            @default(now()) @db.Timestamptz(6)
   updatedAt      DateTime            @updatedAt @db.Timestamptz(6)
   booking        Booking             @relation(fields: [bookingId], references: [id], onDelete: Cascade)
@@ -452,6 +453,7 @@ model Review {
   @@index([serviceId])
   @@index([memberId])
   @@index([customerId])
+  @@index([status, createdAt])
 }
 
 model RestaurantReservationDetails {
@@ -737,6 +739,12 @@ enum BookingStatus {
   CANCELLED
   COMPLETED
   NO_SHOW
+}
+
+enum ReviewStatus {
+  VISIBLE
+  HIDDEN
+  FLAGGED
 }
 
 enum BookingChangeRequestStatus {

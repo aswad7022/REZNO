@@ -23,6 +23,7 @@ export type DashboardNavigationItemKey =
   | "locations"
   | "settings"
   | "analytics"
+  | "reviews"
   | "messages"
   | "admin"
   | "assistant";

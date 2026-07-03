@@ -158,6 +158,29 @@ export async function searchMarketplace(options?: {
     orderBy: [{ isVerified: "desc" }, { name: "asc" }],
     take: nearbyInput?.take ?? options?.take ?? 24,
   });
+  const reviewAggregates =
+    organizations.length > 0
+      ? await prisma.review.groupBy({
+          by: ["organizationId"],
+          where: {
+            organizationId: {
+              in: organizations.map((organization) => organization.id),
+            },
+            status: "VISIBLE",
+          },
+          _avg: { rating: true },
+          _count: { _all: true },
+        })
+      : [];
+  const reviewStatsByOrganizationId = new Map(
+    reviewAggregates.map((aggregate) => [
+      aggregate.organizationId,
+      {
+        averageRating: aggregate._avg.rating ?? null,
+        reviewCount: aggregate._count._all,
+      },
+    ]),
+  );
 
   return organizations
     .map((organization) => {
@@ -203,6 +226,7 @@ export async function searchMarketplace(options?: {
             )
           : null);
       const displayBranch = closestBranch ?? organization.branches[0] ?? null;
+      const reviewStats = reviewStatsByOrganizationId.get(organization.id);
       return {
         id: organization.id,
         slug: organization.slug,
@@ -221,6 +245,8 @@ export async function searchMarketplace(options?: {
         vertical: organization.vertical,
         hasMenu: organization.menuItems.length > 0,
         hasTables: organization.restaurantTables.length > 0,
+        averageRating: reviewStats?.averageRating ?? null,
+        reviewCount: reviewStats?.reviewCount ?? 0,
         hasActiveBranch: organization.branches.length > 0,
         distanceKm,
         branchLatitude: displayBranch?.latitude
@@ -301,6 +327,8 @@ export async function searchMarketplace(options?: {
       vertical: business.vertical,
       hasMenu: business.hasMenu,
       hasTables: business.hasTables,
+      averageRating: business.averageRating,
+      reviewCount: business.reviewCount,
       distanceKm: business.distanceKm,
       branchLatitude: business.branchLatitude,
       branchLongitude: business.branchLongitude,
@@ -348,7 +376,7 @@ export const getPublicBusiness = cache(
       include: {
         profile: true,
         reviews: {
-          where: { comment: { not: null } },
+          where: { comment: { not: null }, status: "VISIBLE" },
           include: { customer: true },
           orderBy: { createdAt: "desc" },
           take: 6,
@@ -364,7 +392,6 @@ export const getPublicBusiness = cache(
           include: { person: true },
           orderBy: { createdAt: "asc" },
         },
-        _count: { select: { reviews: true } },
         restaurantTables: {
           where: { isActive: true },
           orderBy: [{ area: "asc" }, { name: "asc" }],
@@ -419,14 +446,13 @@ export const getPublicBusiness = cache(
       (branch) => branch.branchServices,
     );
     const prices = offerings.map((offering) => Number(offering.price));
-    const ratingAggregate =
-      organization._count.reviews > 0
-        ? await prisma.review.aggregate({
-            where: { organizationId: organization.id },
-            _avg: { rating: true },
-          })
-        : null;
-    const averageRating = ratingAggregate?._avg.rating ?? null;
+    const ratingAggregate = await prisma.review.aggregate({
+      where: { organizationId: organization.id, status: "VISIBLE" },
+      _avg: { rating: true },
+      _count: { _all: true },
+    });
+    const averageRating = ratingAggregate._avg.rating ?? null;
+    const reviewCount = ratingAggregate._count._all;
     return {
       id: organization.id,
       slug: organization.slug,
@@ -451,6 +477,8 @@ export const getPublicBusiness = cache(
         (category) => category.items.length > 0,
       ),
       hasTables: organization.restaurantTables.length > 0,
+      averageRating,
+      reviewCount,
       distanceKm: null,
       branchLatitude: organization.branches[0]?.latitude
         ? Number(organization.branches[0].latitude)
@@ -481,8 +509,6 @@ export const getPublicBusiness = cache(
       seoTitle: organization.profile?.seoTitle ?? null,
       seoDescription: organization.profile?.seoDescription ?? null,
       ogImageUrl: organization.profile?.ogImageUrl ?? null,
-      averageRating,
-      reviewCount: organization._count.reviews,
       menuCategories: organization.menuCategories.map((category) => ({
         id: category.id,
         name: category.name,

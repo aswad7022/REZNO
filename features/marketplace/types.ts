@@ -33,6 +33,8 @@ export interface MarketplaceBusiness {
   vertical: BusinessVertical;
   hasMenu: boolean;
   hasTables: boolean;
+  averageRating: number | null;
+  reviewCount: number;
   distanceKm: number | null;
   branchLatitude: number | null;
   branchLongitude: number | null;
@@ -55,8 +57,6 @@ export interface PublicBusinessProfile extends MarketplaceBusiness {
   seoTitle: string | null;
   seoDescription: string | null;
   ogImageUrl: string | null;
-  averageRating: number | null;
-  reviewCount: number;
   menuCategories: Array<{
     id: string;
     name: string;

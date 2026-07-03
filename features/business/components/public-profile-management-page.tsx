@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import {
   CalendarDays,
   ExternalLink,
@@ -24,13 +25,18 @@ import { PublicProfileActions } from "@/features/marketplace/components/public-p
 import { PublicProfileSection } from "@/features/marketplace/components/public-profile-motion";
 
 export async function PublicProfileManagementPage() {
-  const [profile, data, t, hoursT, format] = await Promise.all([
+  const [profile, data, t, hoursT, format, headerList] = await Promise.all([
     getCurrentBusinessProfile(),
     getPublicProfileManagementData(),
     getTranslations("PublicProfileManagement"),
     getTranslations("WorkingHours"),
     getFormatter(),
+    headers(),
   ]);
+  const publicPath = `/${profile.slug}`;
+  const host = headerList.get("x-forwarded-host") ?? headerList.get("host");
+  const protocol = headerList.get("x-forwarded-proto") ?? "http";
+  const publicUrl = host ? `${protocol}://${host}${publicPath}` : publicPath;
 
   return (
     <DashboardShell>
@@ -40,14 +46,14 @@ export async function PublicProfileManagementPage() {
         actions={
           <div className="flex flex-wrap gap-2">
             <Button asChild>
-              <Link href={`/${profile.slug}`} target="_blank">
+              <Link href={publicPath} target="_blank">
                 <ExternalLink />
                 {t("open")}
               </Link>
             </Button>
             <PublicProfileActions
               businessName={profile.name}
-              path={`/${profile.slug}`}
+              path={publicPath}
               labels={{
                 share: t("share"),
                 copy: t("copy"),
@@ -59,6 +65,55 @@ export async function PublicProfileManagementPage() {
           </div>
         }
       />
+
+      <PublicProfileSection>
+        <Card className="border-primary/15 bg-gradient-to-br from-primary/5 to-background">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ExternalLink className="size-5" />
+              {t("publicBusinessPage")}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-center">
+              <div className="min-w-0 rounded-2xl border bg-background/80 p-4">
+                <p className="text-xs font-medium text-muted-foreground">
+                  {t("publicUrl")}
+                </p>
+                <Link
+                  className="mt-1 block break-all text-sm font-semibold text-primary underline-offset-4 hover:underline"
+                  href={publicPath}
+                  target="_blank"
+                >
+                  {publicUrl}
+                </Link>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {t("businessSlug")}: <span dir="ltr">{profile.slug}</span>
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button asChild>
+                  <Link href={publicPath} target="_blank">
+                    <ExternalLink />
+                    {t("viewPublicPage")}
+                  </Link>
+                </Button>
+                <PublicProfileActions
+                  businessName={profile.name}
+                  path={publicPath}
+                  labels={{
+                    share: t("share"),
+                    copy: t("copyPublicLink"),
+                    copied: t("copiedPublicLink"),
+                    qr: t("qr"),
+                    qrDescription: t("qrDescription"),
+                  }}
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </PublicProfileSection>
 
       <PublicProfileSection>
         <Card className="border-primary/15">

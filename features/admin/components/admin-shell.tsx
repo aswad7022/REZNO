@@ -12,6 +12,7 @@ const links = [
   ["/admin/users", "المستخدمون", "USERS_VIEW"],
   ["/admin/bookings", "الحجوزات", "ADMIN_DASHBOARD_VIEW"],
   ["/admin/restaurants", "المطاعم والكافيهات", "BUSINESSES_VIEW"],
+  ["/admin/reviews", "المراجعات", "BUSINESSES_VIEW"],
   ["/admin/notifications", "الإشعارات", "NOTIFICATIONS_SEND"],
   ["/admin/messages", "الرسائل", "MESSAGES_VIEW"],
   ["/admin/access", "صلاحيات الأدمن", "SUPER_ADMIN"],

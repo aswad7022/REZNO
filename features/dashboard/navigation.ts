@@ -12,6 +12,7 @@ import {
   PanelsTopLeft,
   Settings,
   Sparkles,
+  Star,
   Armchair,
   UserRound,
   UsersRound,
@@ -142,6 +143,11 @@ const businessNavigation: DashboardNavigationGroup[] = [
         icon: Bell,
       },
       {
+        title: "reviews",
+        href: "/business/reviews",
+        icon: Star,
+      },
+      {
         title: "messages",
         href: "/business/messages",
         icon: BookOpen,
@@ -175,6 +181,7 @@ const restaurantNavigation: DashboardNavigationGroup[] = [
     label: "insights",
     items: [
       { title: "notifications", href: "/business/notifications", icon: Bell },
+      { title: "reviews", href: "/business/reviews", icon: Star },
       { title: "messages", href: "/business/messages", icon: BookOpen },
     ],
   },
@@ -219,6 +226,7 @@ export const dashboardRouteLabels: Readonly<
   locations: "locations",
   settings: "settings",
   analytics: "analytics",
+  reviews: "reviews",
   messages: "messages",
   admin: "admin",
   assistant: "assistant",

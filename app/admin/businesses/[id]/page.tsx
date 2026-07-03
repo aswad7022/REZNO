@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 
 import {
   updateAdminBusiness,
@@ -25,15 +27,21 @@ export default async function AdminBusinessDetailsPage({
 }) {
   const { id } = await params;
   const result = (await searchParams).adminAction;
-  const [business, canManage] = await Promise.all([
+  const [business, canManage, t, headerList] = await Promise.all([
     getAdminBusinessDetails(id),
     canAdmin("BUSINESSES_MANAGE"),
+    getTranslations("Admin"),
+    headers(),
   ]);
   if (!business) notFound();
   const restaurant = isRestaurantVertical(business.vertical);
   const owner = business.organizationMembers.find(
     (member) => member.role.systemRole === "OWNER",
   );
+  const publicPath = `/${business.slug}`;
+  const host = headerList.get("x-forwarded-host") ?? headerList.get("host");
+  const protocol = headerList.get("x-forwarded-proto") ?? "http";
+  const publicUrl = host ? `${protocol}://${host}${publicPath}` : publicPath;
 
   return (
     <>
@@ -63,11 +71,35 @@ export default async function AdminBusinessDetailsPage({
           {business.isVerified ? "موثق" : "غير موثق"}
         </Badge>
         <Button asChild size="sm" variant="outline">
-          <Link href={`/${business.slug}`} target="_blank">
-            فتح الصفحة العامة
+          <Link href={publicPath} target="_blank">
+            {t("viewPublicPage")}
           </Link>
         </Button>
       </div>
+      <Card className="mb-5 border-primary/10 bg-primary/5">
+        <CardHeader>
+          <CardTitle>{t("publicBusinessPage")}</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-3 text-sm md:grid-cols-[1fr_auto] md:items-center">
+          <div className="min-w-0">
+            <p className="text-xs font-medium text-muted-foreground">
+              {t("businessSlug")}: <span dir="ltr">{business.slug}</span>
+            </p>
+            <Link
+              className="mt-1 block break-all font-semibold text-primary underline-offset-4 hover:underline"
+              href={publicPath}
+              target="_blank"
+            >
+              {publicUrl}
+            </Link>
+          </div>
+          <Button asChild size="sm">
+            <Link href={publicPath} target="_blank">
+              {t("viewPublicPage")}
+            </Link>
+          </Button>
+        </CardContent>
+      </Card>
       <div className="grid gap-5 lg:grid-cols-3">
         <Card className="border-primary/10 lg:col-span-2">
           <CardHeader>
