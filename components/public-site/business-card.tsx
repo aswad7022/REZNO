@@ -6,13 +6,16 @@ import { getFormatter, getTranslations } from "next-intl/server";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { FavoriteBusinessButton } from "@/features/favorites/components/favorite-business-button";
 import { isRestaurantVertical } from "@/features/businesses/config/verticals";
 import type { MarketplaceBusiness } from "@/features/marketplace/types";
 
 export async function BusinessCard({
   business,
+  canToggleFavorite = false,
 }: {
   business: MarketplaceBusiness;
+  canToggleFavorite?: boolean;
 }) {
   const [t, format] = await Promise.all([
     getTranslations("Marketplace"),
@@ -21,11 +24,12 @@ export async function BusinessCard({
   const restaurantExperience = isRestaurantVertical(business.vertical);
 
   return (
-    <Link
-      href={`/${business.slug}`}
-      className="group rounded-3xl outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-    >
-      <Card className="h-full overflow-hidden border-primary/10 bg-card/95 shadow-sm transition-all group-hover:-translate-y-1 group-hover:border-primary/20 group-hover:shadow-2xl group-hover:shadow-primary/10">
+    <Card className="group h-full overflow-hidden border-primary/10 bg-card/95 shadow-sm transition-all hover:-translate-y-1 hover:border-primary/20 hover:shadow-2xl hover:shadow-primary/10">
+      <div className="relative">
+        <Link
+          href={`/${business.slug}`}
+          className="block outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+        >
         <div className="relative flex aspect-[16/7] items-center justify-center overflow-hidden bg-gradient-to-br from-blue-100 via-indigo-100 to-violet-100 dark:from-blue-950 dark:via-indigo-950 dark:to-violet-950">
           {business.coverImageUrl ? (
             <Image
@@ -41,6 +45,16 @@ export async function BusinessCard({
             <ImageIcon className="size-7 text-primary/35" />
           ) : null}
         </div>
+        </Link>
+        <div className="absolute end-3 top-3">
+          <FavoriteBusinessButton
+            canToggle={canToggleFavorite}
+            compact
+            initialFavorited={business.isFavorited}
+            organizationId={business.id}
+          />
+        </div>
+      </div>
         <CardHeader className="flex-row items-center gap-3">
           <Avatar className="relative size-14 overflow-hidden rounded-2xl border-2 border-background shadow-md">
             {business.logoUrl ? (
@@ -59,9 +73,14 @@ export async function BusinessCard({
             ) : null}
           </Avatar>
           <div className="min-w-0 flex-1">
-            <CardTitle className="truncate text-lg font-bold text-foreground transition-colors group-hover:text-primary">
-              {business.name}
-            </CardTitle>
+            <Link
+              href={`/${business.slug}`}
+              className="outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+            >
+              <CardTitle className="truncate text-lg font-bold text-foreground transition-colors group-hover:text-primary">
+                {business.name}
+              </CardTitle>
+            </Link>
             {business.categoryName ? (
               <p className="mt-0.5 truncate text-xs text-muted-foreground">
                 {business.categoryName}
@@ -99,9 +118,13 @@ export async function BusinessCard({
               </p>
             ) : null}
           </div>
-          <span className="grid size-9 place-items-center rounded-xl bg-muted text-muted-foreground transition-all group-hover:bg-primary group-hover:text-primary-foreground">
+          <Link
+            href={`/${business.slug}`}
+            aria-label={t("viewBusiness")}
+            className="grid size-9 place-items-center rounded-xl bg-muted text-muted-foreground transition-all group-hover:bg-primary group-hover:text-primary-foreground"
+          >
             <ArrowUpLeft className="size-4 transition-transform group-hover:-translate-x-1 group-hover:-translate-y-1 rtl:rotate-90" />
-          </span>
+          </Link>
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="line-clamp-2 min-h-10 text-sm text-muted-foreground">
@@ -148,7 +171,6 @@ export async function BusinessCard({
             ) : null}
           </div>
         </CardContent>
-      </Card>
-    </Link>
+    </Card>
   );
 }

@@ -6,6 +6,7 @@ import {
   CalendarDays,
   CalendarRange,
   Clock3,
+  Heart,
   LayoutDashboard,
   MapPin,
   Menu as MenuIcon,
@@ -51,6 +52,11 @@ const customerNavigation: DashboardNavigationGroup[] = [
             icon: BookOpen,
           },
         ],
+      },
+      {
+        title: "favorites",
+        href: "/customer/favorites",
+        icon: Heart,
       },
       {
         title: "assistant",

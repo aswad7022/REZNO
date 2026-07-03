@@ -8,6 +8,7 @@ import {
 } from "@/components/dashboard/dashboard-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { getCurrentCustomerFavoriteBusinessIds } from "@/features/favorites/services/favorites";
 import { Input } from "@/components/ui/input";
 import { getLocalAssistantSuggestions } from "@/features/ai/services/local-assistant";
 import { requireCustomerIdentity } from "@/features/identity/server";
@@ -23,6 +24,13 @@ export default async function CustomerAssistantPage({
   const suggestions = prompt
     ? await getLocalAssistantSuggestions(prompt)
     : { mode: "local" as const, businesses: [] };
+  const favoriteState = await getCurrentCustomerFavoriteBusinessIds(
+    suggestions.businesses.map((business) => business.id),
+  );
+  const businesses = suggestions.businesses.map((business) => ({
+    ...business,
+    isFavorited: favoriteState.favoriteOrganizationIds.has(business.id),
+  }));
 
   return (
     <DashboardShell>
@@ -45,7 +53,7 @@ export default async function CustomerAssistantPage({
           </form>
         </CardContent>
       </Card>
-      {suggestions.businesses.length === 0 ? (
+      {businesses.length === 0 ? (
         <DashboardEmpty
           icon={Bot}
           title="اسأل عن مكان أو خدمة"
@@ -53,8 +61,12 @@ export default async function CustomerAssistantPage({
         />
       ) : (
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {suggestions.businesses.map((business) => (
-            <BusinessCard key={business.id} business={business} />
+          {businesses.map((business) => (
+            <BusinessCard
+              key={business.id}
+              business={business}
+              canToggleFavorite={favoriteState.isAuthenticated}
+            />
           ))}
         </div>
       )}

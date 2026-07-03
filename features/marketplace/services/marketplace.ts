@@ -245,6 +245,7 @@ export async function searchMarketplace(options?: {
         vertical: organization.vertical,
         hasMenu: organization.menuItems.length > 0,
         hasTables: organization.restaurantTables.length > 0,
+        isFavorited: false,
         averageRating: reviewStats?.averageRating ?? null,
         reviewCount: reviewStats?.reviewCount ?? 0,
         hasActiveBranch: organization.branches.length > 0,
@@ -327,6 +328,7 @@ export async function searchMarketplace(options?: {
       vertical: business.vertical,
       hasMenu: business.hasMenu,
       hasTables: business.hasTables,
+      isFavorited: false,
       averageRating: business.averageRating,
       reviewCount: business.reviewCount,
       distanceKm: business.distanceKm,
@@ -477,6 +479,7 @@ export const getPublicBusiness = cache(
         (category) => category.items.length > 0,
       ),
       hasTables: organization.restaurantTables.length > 0,
+      isFavorited: false,
       averageRating,
       reviewCount,
       distanceKm: null,
@@ -586,6 +589,7 @@ export const getPublicBusiness = cache(
                 assignment.member.person.displayName ??
                 assignment.member.person.firstName,
             ),
+            isFavorited: false,
           })),
         })),
       team: organization.organizationMembers

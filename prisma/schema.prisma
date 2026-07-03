@@ -29,6 +29,8 @@ model Person {
   reviews                 Review[]               @relation("ReviewCustomer")
   notifications           Notification[]
   customerConversations   Conversation[]         @relation("ConversationCustomer")
+  favoriteBusinesses      CustomerFavoriteBusiness[]
+  favoriteServices        CustomerFavoriteService[]
 
   @@index([phone])
 }
@@ -59,6 +61,8 @@ model Organization {
   restaurantReservations RestaurantReservationDetails[]
   notifications       Notification[]
   conversations       Conversation[]
+  favoritedBy         CustomerFavoriteBusiness[]
+  favoritedServices   CustomerFavoriteService[]
 
   @@index([vertical])
   @@index([status, isActive, deletedAt])
@@ -160,6 +164,7 @@ model BranchService {
   branch          Branch      @relation(fields: [branchId], references: [id])
   service         Service     @relation(fields: [serviceId], references: [id])
   bookings        Booking[]
+  favoritedBy     CustomerFavoriteService[]
 
   @@unique([branchId, serviceId])
   @@index([serviceId, isAvailable])
@@ -454,6 +459,35 @@ model Review {
   @@index([memberId])
   @@index([customerId])
   @@index([status, createdAt])
+}
+
+model CustomerFavoriteBusiness {
+  id             String       @id @default(uuid()) @db.Uuid
+  customerId     String       @db.Uuid
+  organizationId String       @db.Uuid
+  createdAt      DateTime     @default(now()) @db.Timestamptz(6)
+  customer       Person       @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, organizationId])
+  @@index([customerId, createdAt])
+  @@index([organizationId])
+}
+
+model CustomerFavoriteService {
+  id              String        @id @default(uuid()) @db.Uuid
+  customerId      String        @db.Uuid
+  organizationId  String        @db.Uuid
+  branchServiceId String        @db.Uuid
+  createdAt       DateTime      @default(now()) @db.Timestamptz(6)
+  customer        Person        @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  organization    Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  branchService   BranchService @relation(fields: [branchServiceId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, branchServiceId])
+  @@index([customerId, createdAt])
+  @@index([branchServiceId])
+  @@index([organizationId])
 }
 
 model RestaurantReservationDetails {

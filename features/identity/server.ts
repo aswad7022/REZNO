@@ -2,13 +2,14 @@ import "server-only";
 
 import { cache } from "react";
 import { cookies, headers } from "next/headers";
-import { notFound, redirect } from "next/navigation";
+import { forbidden, redirect } from "next/navigation";
 import type { BusinessVertical } from "@prisma/client";
 
 import { provisionPerson } from "@/features/identity/services/provision-person";
 import { getSafeBusinessReturnPath } from "@/features/business-context/utils/return-path";
 import { auth } from "@/lib/auth/auth";
 import { prisma } from "@/lib/db/prisma";
+import { getSignInPath } from "@/lib/navigation/safe-redirect";
 
 export const ACTIVE_BUSINESS_COOKIE = "rezno-active-business-id";
 
@@ -18,11 +19,15 @@ export const getCurrentSession = cache(async () =>
   }),
 );
 
+async function getCurrentRequestPath() {
+  return (await headers()).get("x-rezno-current-path");
+}
+
 export async function requireSession() {
   const session = await getCurrentSession();
 
   if (!session) {
-    redirect("/register?mode=signin");
+    redirect(getSignInPath(await getCurrentRequestPath()));
   }
 
   return session;
@@ -48,7 +53,7 @@ export async function requireIdentity() {
   const identity = await getCurrentIdentity();
 
   if (!identity) {
-    redirect("/register?mode=signin");
+    redirect(getSignInPath(await getCurrentRequestPath()));
   }
 
   return identity;
@@ -58,7 +63,21 @@ export async function requireActiveIdentity() {
   const identity = await requireIdentity();
 
   if (identity.person.deletedAt || identity.person.status !== "ACTIVE") {
-    notFound();
+    forbidden();
+  }
+
+  return identity;
+}
+
+export async function getOptionalActiveIdentity() {
+  const identity = await getCurrentIdentity();
+
+  if (
+    !identity ||
+    identity.person.deletedAt ||
+    identity.person.status !== "ACTIVE"
+  ) {
+    return null;
   }
 
   return identity;

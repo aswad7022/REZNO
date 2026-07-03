@@ -11,6 +11,7 @@ import {
   ClipboardCopy,
   Clock3,
   ExternalLink,
+  Heart,
   LayoutDashboard,
   Map,
   PanelsTopLeft,
@@ -52,6 +53,7 @@ type CommandDefinition = {
     | "customer.dashboard"
     | "customer.marketplace"
     | "customer.bookings"
+    | "customer.favorites"
     | "customer.notifications"
     | "actions.addService"
     | "actions.addEmployee"
@@ -131,6 +133,7 @@ export default function DashboardCommandPalette({
       { id: "customer-dashboard", labelKey: "customer.dashboard", group: "navigation", href: "/customer", icon: LayoutDashboard },
       { id: "marketplace", labelKey: "customer.marketplace", group: "navigation", href: "/marketplace", icon: Map },
       { id: "customer-bookings", labelKey: "customer.bookings", group: "navigation", href: "/customer/bookings", icon: CalendarDays },
+      { id: "customer-favorites", labelKey: "customer.favorites", group: "navigation", href: "/customer/favorites", icon: Heart },
       { id: "customer-notifications", labelKey: "customer.notifications", group: "navigation", href: "/customer/notifications", icon: Bell },
       { id: "create-booking", labelKey: "actions.createBooking", group: "actions", href: "/customer/bookings/new", icon: CalendarPlus },
     ];

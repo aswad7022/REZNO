@@ -10,6 +10,7 @@ import { isReservedBusinessSlug } from "@/features/business/lib/business-slug";
 import { businessOnboardingSchema } from "@/features/onboarding/schemas/onboarding";
 import type { BusinessOnboardingState } from "@/features/onboarding/types";
 import { prisma } from "@/lib/db/prisma";
+import { getSafeInternalPath } from "@/lib/navigation/safe-redirect";
 
 function slugify(value: string): string {
   return value
@@ -20,9 +21,7 @@ function slugify(value: string): string {
 }
 
 function safeNextPath(value: string | undefined): string {
-  return value?.startsWith("/") && !value.startsWith("//")
-    ? value
-    : "/customer";
+  return getSafeInternalPath(value, "/customer");
 }
 
 export async function completeCustomerOnboarding(

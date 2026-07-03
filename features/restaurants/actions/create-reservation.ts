@@ -10,13 +10,21 @@ import {
   ensureRestaurantReservationOffering,
   hasRestaurantTableConflict,
 } from "@/features/restaurants/services/reservations";
+import {
+  getPublicBusinessPath,
+  isValidBusinessSlug,
+} from "@/features/business/lib/business-slug";
 import { isRestaurantVertical } from "@/features/businesses/config/verticals";
 import { prisma } from "@/lib/db/prisma";
 import { logServerError } from "@/lib/logging/server";
 import { consumeRateLimit } from "@/lib/security/rate-limit";
 
 const reservationSchema = z.object({
-  slug: z.string().trim().min(1),
+  slug: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .refine(isValidBusinessSlug),
   branchId: z.string().uuid(),
   tableId: z.string().uuid(),
   startsAt: z.string().datetime(),
@@ -37,6 +45,31 @@ function parseMenuItems(formData: FormData) {
     if (!menuItemId || !Number.isInteger(quantity) || quantity <= 0) return [];
     return [{ menuItemId, quantity: Math.min(quantity, 20) }];
   });
+}
+
+function reservationErrorUrl({
+  slug,
+  date,
+  guests,
+  startsAt,
+  error,
+}: {
+  slug: string;
+  date: string;
+  guests: string;
+  startsAt?: string;
+  error: string;
+}) {
+  const query = new URLSearchParams();
+  if (date) query.set("date", date);
+  if (guests) query.set("guests", guests);
+  if (startsAt) query.set("startsAt", startsAt);
+  query.set("error", error);
+
+  const businessPath = getPublicBusinessPath(slug, "");
+  const basePath = businessPath ? `${businessPath}/reserve` : "/marketplace";
+
+  return `${basePath}?${query.toString()}`;
 }
 
 function timeToMinutes(value: string) {
@@ -119,13 +152,24 @@ export async function createRestaurantReservation(formData: FormData) {
 
   if (!rateLimit.success) {
     redirect(
-      `/${fallbackSlug}/reserve?date=${fallbackDate}&guests=${fallbackGuests}&startsAt=${encodeURIComponent(fallbackStartsAt)}&error=rateLimited`,
+      reservationErrorUrl({
+        slug: fallbackSlug,
+        date: fallbackDate,
+        guests: fallbackGuests,
+        startsAt: fallbackStartsAt,
+        error: "rateLimited",
+      }),
     );
   }
 
   if (!parsed.success) {
     redirect(
-      `/${fallbackSlug}/reserve?date=${fallbackDate}&guests=${fallbackGuests}&error=invalid`,
+      reservationErrorUrl({
+        slug: fallbackSlug,
+        date: fallbackDate,
+        guests: fallbackGuests,
+        error: "invalid",
+      }),
     );
   }
 
@@ -134,6 +178,18 @@ export async function createRestaurantReservation(formData: FormData) {
     startsAt.getTime() + parsed.data.durationMinutes * 60_000,
   );
   const selectedMenuItems = parseMenuItems(formData);
+
+  if (startsAt <= new Date()) {
+    redirect(
+      reservationErrorUrl({
+        slug: parsed.data.slug,
+        date: fallbackDate,
+        guests: String(parsed.data.guestCount),
+        startsAt: parsed.data.startsAt,
+        error: "time",
+      }),
+    );
+  }
 
   const result = await prisma
     .$transaction(
@@ -319,7 +375,13 @@ export async function createRestaurantReservation(formData: FormData) {
             ? "failed"
           : "invalid";
     redirect(
-      `/${parsed.data.slug}/reserve?date=${fallbackDate}&guests=${parsed.data.guestCount}&startsAt=${encodeURIComponent(parsed.data.startsAt)}&error=${error}`,
+      reservationErrorUrl({
+        slug: parsed.data.slug,
+        date: fallbackDate,
+        guests: String(parsed.data.guestCount),
+        startsAt: parsed.data.startsAt,
+        error,
+      }),
     );
   }
 
