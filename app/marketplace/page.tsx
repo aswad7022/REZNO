@@ -13,6 +13,7 @@ import {
   getMarketplaceFilters,
   searchMarketplace,
 } from "@/features/marketplace/services/marketplace";
+import { getCurrentCustomerFavoriteBusinessIds } from "@/features/favorites/services/favorites";
 import { MAX_SEARCH_QUERY_LENGTH } from "@/features/search/services/search-normalization";
 import { businessVerticals } from "@/features/businesses/config/verticals";
 import { MarketplaceCategoryTiles } from "@/features/marketplace/components/marketplace-category-tiles";
@@ -54,7 +55,7 @@ export default async function MarketplacePage({
   const view = query.view === "map" ? "map" : "list";
   const hasCustomerLocation =
     Number.isFinite(latitude) && Number.isFinite(longitude);
-  const [businesses, filters, t] = await Promise.all([
+  const [marketplaceBusinesses, filters, t] = await Promise.all([
     searchMarketplace({
       query: searchQuery,
       category: query.category,
@@ -67,6 +68,13 @@ export default async function MarketplacePage({
     getMarketplaceFilters(),
     getTranslations("Marketplace"),
   ]);
+  const favoriteState = await getCurrentCustomerFavoriteBusinessIds(
+    marketplaceBusinesses.map((business) => business.id),
+  );
+  const businesses = marketplaceBusinesses.map((business) => ({
+    ...business,
+    isFavorited: favoriteState.favoriteOrganizationIds.has(business.id),
+  }));
   const mapMarkers = businesses.flatMap((business) => {
     if (business.branchLatitude === null || business.branchLongitude === null) {
       return [];
@@ -242,7 +250,11 @@ export default async function MarketplacePage({
         ) : businesses.length > 0 ? (
           <div className="mt-4 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {businesses.map((business) => (
-              <BusinessCard key={business.id} business={business} />
+              <BusinessCard
+                key={business.id}
+                business={business}
+                canToggleFavorite={favoriteState.isAuthenticated}
+              />
             ))}
           </div>
         ) : (

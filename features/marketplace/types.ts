@@ -15,6 +15,7 @@ export interface MarketplaceOffering {
   durationMinutes: number;
   staffSelectionMode: StaffSelectionMode;
   assignedEmployees: string[];
+  isFavorited: boolean;
 }
 
 export interface MarketplaceBusiness {
@@ -33,6 +34,7 @@ export interface MarketplaceBusiness {
   vertical: BusinessVertical;
   hasMenu: boolean;
   hasTables: boolean;
+  isFavorited: boolean;
   averageRating: number | null;
   reviewCount: number;
   distanceKm: number | null;

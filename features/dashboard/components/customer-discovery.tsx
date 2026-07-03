@@ -7,15 +7,23 @@ import { BusinessCard } from "@/components/public-site/business-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { getPublicOfferings } from "@/features/bookings/services/bookings";
+import { getCurrentCustomerFavoriteBusinessIds } from "@/features/favorites/services/favorites";
 import { MarketplaceCategoryTiles } from "@/features/marketplace/components/marketplace-category-tiles";
 import { searchMarketplace } from "@/features/marketplace/services/marketplace";
 
 export async function CustomerDiscovery() {
-  const [businesses, services, t] = await Promise.all([
+  const [marketplaceBusinesses, services, t] = await Promise.all([
     searchMarketplace({ take: 4 }),
     getPublicOfferings(),
     getTranslations("DashboardHome"),
   ]);
+  const favoriteState = await getCurrentCustomerFavoriteBusinessIds(
+    marketplaceBusinesses.map((business) => business.id),
+  );
+  const businesses = marketplaceBusinesses.map((business) => ({
+    ...business,
+    isFavorited: favoriteState.favoriteOrganizationIds.has(business.id),
+  }));
 
   return (
     <>
@@ -38,7 +46,11 @@ export async function CustomerDiscovery() {
         {businesses.length > 0 ? (
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {businesses.map((business) => (
-              <BusinessCard key={business.id} business={business} />
+              <BusinessCard
+                key={business.id}
+                business={business}
+                canToggleFavorite={favoriteState.isAuthenticated}
+              />
             ))}
           </div>
         ) : (

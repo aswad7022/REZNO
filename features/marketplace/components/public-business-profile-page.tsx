@@ -35,6 +35,12 @@ import {
 } from "@/features/marketplace/components/public-profile-motion";
 import { getPublicBusiness } from "@/features/marketplace/services/marketplace";
 import { isRestaurantVertical } from "@/features/businesses/config/verticals";
+import { FavoriteBusinessButton } from "@/features/favorites/components/favorite-business-button";
+import { FavoriteServiceButton } from "@/features/favorites/components/favorite-service-button";
+import {
+  getCurrentCustomerFavoriteBusinessIds,
+  getCurrentCustomerFavoriteServiceIds,
+} from "@/features/favorites/services/favorites";
 import { NearbyBusinessMap } from "@/features/location/components/nearby-business-map";
 import { buildWazeNavigationUrl } from "@/features/location/services/waze";
 
@@ -47,6 +53,14 @@ export async function PublicBusinessProfilePage({ slug }: { slug: string }) {
     getFormatter(),
   ]);
   if (!business) notFound();
+  const offeringIds = business.branches.flatMap((branch) =>
+    branch.offerings.map((offering) => offering.id),
+  );
+  const [favoriteState, serviceFavoriteState] = await Promise.all([
+    getCurrentCustomerFavoriteBusinessIds([business.id]),
+    getCurrentCustomerFavoriteServiceIds(offeringIds),
+  ]);
+  const isFavorited = favoriteState.favoriteOrganizationIds.has(business.id);
   const restaurantExperience = isRestaurantVertical(business.vertical);
   const whatsappPhone = business.whatsappPhone?.replace(/\D/g, "");
   const firstOffering = restaurantExperience
@@ -123,6 +137,11 @@ export async function PublicBusinessProfilePage({ slug }: { slug: string }) {
                           })}
                         </span>
                       ) : null}
+                      <FavoriteBusinessButton
+                        canToggle={favoriteState.isAuthenticated}
+                        initialFavorited={isFavorited}
+                        organizationId={business.id}
+                      />
                     </div>
                     <p className="mt-4 max-w-3xl text-base leading-8 text-muted-foreground">
                       {business.description ?? t("defaultDescription")}
@@ -362,9 +381,19 @@ export async function PublicBusinessProfilePage({ slug }: { slug: string }) {
                               <CardTitle className="text-lg font-bold">
                                 {offering.serviceName}
                               </CardTitle>
-                              <Badge variant="secondary" className="bg-primary/10 text-primary">
-                                {offering.categoryName}
-                              </Badge>
+                              <div className="flex shrink-0 items-center gap-2">
+                                <Badge variant="secondary" className="bg-primary/10 text-primary">
+                                  {offering.categoryName}
+                                </Badge>
+                                <FavoriteServiceButton
+                                  branchServiceId={offering.id}
+                                  canToggle={serviceFavoriteState.isAuthenticated}
+                                  compact
+                                  initialFavorited={serviceFavoriteState.favoriteBranchServiceIds.has(
+                                    offering.id,
+                                  )}
+                                />
+                              </div>
                             </div>
                             {offering.description ? (
                               <p className="line-clamp-2 text-sm text-muted-foreground">
