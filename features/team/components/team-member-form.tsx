@@ -107,72 +107,78 @@ export function TeamMemberForm({
         </div>
       </div>
 
-      <div className="grid gap-5 md:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor={`team-photo-${member?.id ?? "new"}`}>
-            {t("fields.photoUrl")}
-          </Label>
-          <Input
-            id={`team-photo-${member?.id ?? "new"}`}
-            name="photoUrl"
-            type="url"
-            dir="ltr"
-            defaultValue={member?.photoUrl}
-            placeholder="https://"
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor={`team-specialties-${member?.id ?? "new"}`}>
-            {t("fields.specialties")}
-          </Label>
-          <Input
-            id={`team-specialties-${member?.id ?? "new"}`}
-            name="specialties"
-            defaultValue={member?.specialties.join(", ")}
-            placeholder={t("placeholders.specialties")}
-          />
-        </div>
-        <div className="space-y-2 md:col-span-2">
-          <Label htmlFor={`team-bio-${member?.id ?? "new"}`}>
-            {t("fields.bio")}
-          </Label>
-          <Textarea
-            id={`team-bio-${member?.id ?? "new"}`}
-            name="bio"
-            defaultValue={member?.bio}
-            maxLength={1000}
-            className="min-h-24"
-          />
-        </div>
-      </div>
-
-      <fieldset className="space-y-3">
-        <legend className="text-sm font-medium">{t("fields.branches")}</legend>
-        {branches.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{t("noBranches")}</p>
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-2">
-            {branches.map((branch) => (
-              <Label
-                key={branch.id}
-                className="flex min-h-10 items-center gap-3 rounded-lg border p-3 font-normal"
-              >
-                <Checkbox
-                  name="branchIds"
-                  value={branch.id}
-                  defaultChecked={member?.branchIds.includes(branch.id)}
-                />
-                {branch.name}
+      {member ? (
+        <>
+          <div className="grid gap-5 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor={`team-photo-${member.id}`}>
+                {t("fields.photoUrl")}
               </Label>
-            ))}
+              <Input
+                id={`team-photo-${member.id}`}
+                name="photoUrl"
+                type="url"
+                dir="ltr"
+                defaultValue={member.photoUrl}
+                placeholder="https://"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor={`team-specialties-${member.id}`}>
+                {t("fields.specialties")}
+              </Label>
+              <Input
+                id={`team-specialties-${member.id}`}
+                name="specialties"
+                defaultValue={member.specialties.join(", ")}
+                placeholder={t("placeholders.specialties")}
+              />
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor={`team-bio-${member.id}`}>
+                {t("fields.bio")}
+              </Label>
+              <Textarea
+                id={`team-bio-${member.id}`}
+                name="bio"
+                defaultValue={member.bio}
+                maxLength={1000}
+                className="min-h-24"
+              />
+            </div>
           </div>
-        )}
-        {state.fieldErrors?.branchIds ? (
-          <p role="alert" className="text-xs text-destructive">
-            {state.fieldErrors.branchIds}
-          </p>
-        ) : null}
-      </fieldset>
+
+          <fieldset className="space-y-3">
+            <legend className="text-sm font-medium">
+              {t("fields.branches")}
+            </legend>
+            {branches.length === 0 ? (
+              <p className="text-sm text-muted-foreground">{t("noBranches")}</p>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2">
+                {branches.map((branch) => (
+                  <Label
+                    key={branch.id}
+                    className="flex min-h-10 items-center gap-3 rounded-lg border p-3 font-normal"
+                  >
+                    <Checkbox
+                      name="branchIds"
+                      value={branch.id}
+                      defaultChecked={member.branchIds.includes(branch.id)}
+                    />
+                    {branch.name}
+                  </Label>
+                ))}
+              </div>
+            )}
+            {state.fieldErrors?.branchIds ? (
+              <p role="alert" className="text-xs text-destructive">
+                {state.fieldErrors.branchIds}
+              </p>
+            ) : null}
+          </fieldset>
+        </>
+      ) : null}
 
       <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p
@@ -195,7 +201,7 @@ export function TeamMemberForm({
             ? common("saving")
             : member
               ? common("saveChanges")
-              : t("add")}
+              : t("sendInvitation")}
         </Button>
       </div>
     </form>

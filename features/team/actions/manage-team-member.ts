@@ -5,7 +5,6 @@ import { getTranslations } from "next-intl/server";
 
 import { canManageOrganization } from "@/features/business/policies/access";
 import { requireBusinessIdentity } from "@/features/identity/server";
-import { provisionPerson } from "@/features/identity/services/provision-person";
 import {
   createTeamMemberSchema,
   createTeamMemberUpdateSchema,
@@ -22,6 +21,10 @@ const roleNames: Record<AssignableSystemRole, string> = {
   RECEPTIONIST: "Receptionist",
   STAFF: "Staff",
 };
+
+function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
 
 async function getTeamActionContext() {
   const [identity, tMessages, tValidation] = await Promise.all([
@@ -94,45 +97,64 @@ export async function addTeamMember(
     };
   }
 
-  const { email, systemRole, branchIds, photoUrl, bio, specialties } = parsed.data;
+  const { email, systemRole } = parsed.data;
+  const normalizedEmail = normalizeEmail(email);
   const organizationId = context.identity.membership.organizationId;
-  const [user, validBranches] = await Promise.all([
-    prisma.user.findFirst({
-      where: { email: { equals: email, mode: "insensitive" } },
+
+  if (normalizedEmail === normalizeEmail(context.identity.session.user.email)) {
+    return { status: "error", message: context.tMessages("selfInvite") };
+  }
+
+  const user = await prisma.user.findFirst({
+    where: { email: { equals: email, mode: "insensitive" } },
+    select: { id: true },
+  });
+  const recipientPerson = user
+    ? await prisma.person.findUnique({
+        where: { authUserId: user.id },
+        select: { id: true, deletedAt: true, status: true },
+      })
+    : null;
+
+  const [existingMember, existingPendingInvitation] = await Promise.all([
+    recipientPerson
+      ? prisma.organizationMember.findUnique({
+          where: {
+            personId_organizationId: {
+              personId: recipientPerson.id,
+              organizationId,
+            },
+          },
+          select: { id: true },
+        })
+      : Promise.resolve(null),
+    prisma.organizationInvitation.findFirst({
+      where: {
+        organizationId,
+        normalizedEmail,
+        status: "PENDING",
+      },
+      select: { id: true },
     }),
-    branchesBelongToOrganization(branchIds, organizationId),
   ]);
 
-  if (!user) {
-    return { status: "error", message: context.tMessages("userNotFound") };
+  if (
+    recipientPerson &&
+    (recipientPerson.deletedAt || recipientPerson.status !== "ACTIVE")
+  ) {
+    return { status: "error", message: context.tMessages("recipientInactive") };
   }
 
-  if (!validBranches) {
-    return { status: "error", message: context.tMessages("invalidBranches") };
+  if (existingMember) {
+    return { status: "error", message: context.tMessages("alreadyMember") };
   }
 
-  const person = await provisionPerson({
-    authUserId: user.id,
-    name: user.name,
-    image: user.image,
-  });
+  if (existingPendingInvitation) {
+    return { status: "error", message: context.tMessages("alreadyInvited") };
+  }
 
   try {
     await prisma.$transaction(async (transaction) => {
-      const existing = await transaction.organizationMember.findUnique({
-        where: {
-          personId_organizationId: {
-            personId: person.id,
-            organizationId,
-          },
-        },
-        select: { id: true },
-      });
-
-      if (existing) {
-        throw new Error("MEMBER_EXISTS");
-      }
-
       const roleName = roleNames[systemRole];
       const role = await transaction.role.upsert({
         where: {
@@ -150,31 +172,40 @@ export async function addTeamMember(
         },
       });
 
-      await transaction.organizationMember.create({
+      await transaction.organizationInvitation.create({
         data: {
-          personId: person.id,
           organizationId,
+          email,
+          normalizedEmail,
           roleId: role.id,
-          photoUrl,
-          bio,
-          specialties,
-          assignments: {
-            create: branchIds.map((branchId) => ({ branchId })),
-          },
+          invitedByPersonId: context.identity.person.id,
+          recipientPersonId: recipientPerson?.id,
         },
       });
+
+      if (recipientPerson) {
+        await transaction.notification.create({
+          data: {
+            title: context.tMessages("workInviteNotificationTitle"),
+            body: context.tMessages("workInviteNotificationBody", {
+              business: context.identity.membership.organization.name,
+            }),
+            audience: "USER",
+            priority: "IMPORTANT",
+            recipientPersonId: recipientPerson.id,
+            businessId: organizationId,
+            createdByUserId: context.identity.session.user.id,
+          },
+        });
+      }
     });
   } catch (error) {
-    if (error instanceof Error && error.message === "MEMBER_EXISTS") {
-      return { status: "error", message: context.tMessages("alreadyMember") };
-    }
-
-    logServerError("team.addMember", error, { organizationId });
+    logServerError("team.inviteMember", error, { organizationId });
     return { status: "error", message: context.tMessages("failure") };
   }
 
   revalidatePath("/business/team");
-  return { status: "success", message: context.tMessages("added") };
+  return { status: "success", message: context.tMessages("invited") };
 }
 
 export async function updateTeamMember(

@@ -31,6 +31,8 @@ model Person {
   customerConversations   Conversation[]         @relation("ConversationCustomer")
   favoriteBusinesses      CustomerFavoriteBusiness[]
   favoriteServices        CustomerFavoriteService[]
+  sentOrganizationInvitations OrganizationInvitation[] @relation("OrganizationInvitationInvitedBy")
+  receivedOrganizationInvitations OrganizationInvitation[] @relation("OrganizationInvitationRecipient")
 
   @@index([phone])
 }
@@ -63,6 +65,7 @@ model Organization {
   conversations       Conversation[]
   favoritedBy         CustomerFavoriteBusiness[]
   favoritedServices   CustomerFavoriteService[]
+  invitations         OrganizationInvitation[]
 
   @@index([vertical])
   @@index([status, isActive, deletedAt])
@@ -207,6 +210,7 @@ model Role {
   createdAt           DateTime             @default(now()) @db.Timestamptz(6)
   updatedAt           DateTime             @updatedAt @db.Timestamptz(6)
   organizationMembers OrganizationMember[]
+  invitations         OrganizationInvitation[]
   organization        Organization         @relation(fields: [organizationId], references: [id])
 
   @@unique([organizationId, name])
@@ -247,6 +251,33 @@ model Branch {
   @@index([organizationId, status, deletedAt])
   @@index([city])
   @@index([latitude, longitude])
+}
+
+model OrganizationInvitation {
+  id                String                       @id @default(uuid()) @db.Uuid
+  organizationId    String                       @db.Uuid
+  email             String
+  normalizedEmail   String
+  roleId            String?                      @db.Uuid
+  invitedByPersonId String                       @db.Uuid
+  recipientPersonId String?                      @db.Uuid
+  status            OrganizationInvitationStatus @default(PENDING)
+  acceptedAt        DateTime?                    @db.Timestamptz(6)
+  declinedAt        DateTime?                    @db.Timestamptz(6)
+  cancelledAt       DateTime?                    @db.Timestamptz(6)
+  expiresAt         DateTime?                    @db.Timestamptz(6)
+  createdAt         DateTime                     @default(now()) @db.Timestamptz(6)
+  updatedAt         DateTime                     @updatedAt @db.Timestamptz(6)
+  organization      Organization                 @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  role              Role?                        @relation(fields: [roleId], references: [id], onDelete: SetNull)
+  invitedByPerson   Person                       @relation("OrganizationInvitationInvitedBy", fields: [invitedByPersonId], references: [id], onDelete: Cascade)
+  recipientPerson   Person?                      @relation("OrganizationInvitationRecipient", fields: [recipientPersonId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([normalizedEmail])
+  @@index([recipientPersonId])
+  @@index([status])
+  @@index([organizationId, normalizedEmail, status])
 }
 
 model RestaurantTable {
@@ -786,6 +817,14 @@ enum BookingChangeRequestStatus {
   ACCEPTED
   REJECTED
   CANCELLED
+}
+
+enum OrganizationInvitationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  CANCELLED
+  EXPIRED
 }
 
 enum NotificationAudience {

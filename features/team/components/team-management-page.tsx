@@ -30,7 +30,7 @@ function initials(name: string): string {
 }
 
 export async function TeamManagementPage() {
-  const [{ members, branches, canEdit }, t, format] = await Promise.all([
+  const [{ members, invitations, branches, canEdit }, t, format] = await Promise.all([
     getCurrentOrganizationTeam(),
     getTranslations("Team"),
     getFormatter(),
@@ -43,11 +43,47 @@ export async function TeamManagementPage() {
       {canEdit ? (
         <Card>
           <CardHeader>
-            <CardTitle>{t("add")}</CardTitle>
-            <CardDescription>{t("emptyDescription")}</CardDescription>
+            <CardTitle>{t("invite")}</CardTitle>
+            <CardDescription>{t("inviteDescription")}</CardDescription>
           </CardHeader>
           <CardContent>
             <TeamMemberForm branches={branches} />
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {canEdit && invitations.length > 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t("pendingInvitations")}</CardTitle>
+            <CardDescription>{t("pendingInvitationsDescription")}</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3">
+            {invitations.map((invitation) => {
+              const roleKey = invitation.systemRole ?? "CUSTOM";
+              return (
+                <div
+                  key={invitation.id}
+                  className="flex flex-col gap-2 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div>
+                    <p className="font-medium" dir="ltr">
+                      {invitation.email}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {t(`roles.${roleKey}`)}
+                      {" · "}
+                      {t("invited", {
+                        date: format.dateTime(invitation.createdAt, {
+                          dateStyle: "medium",
+                        }),
+                      })}
+                    </p>
+                  </div>
+                  <Badge variant="secondary">{t("pending")}</Badge>
+                </div>
+              );
+            })}
           </CardContent>
         </Card>
       ) : null}

@@ -10,6 +10,7 @@ export type DashboardNavigationItemKey =
   | "upcoming"
   | "history"
   | "favorites"
+  | "workInvitations"
   | "notifications"
   | "profile"
   | "publicProfile"
