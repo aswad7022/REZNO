@@ -48,7 +48,13 @@ export async function PublicHeader() {
             <Link href="/marketplace">{t("marketplace")}</Link>
           </Button>
           <Button asChild variant="ghost">
-            <Link href="/register?intent=business">{t("forBusiness")}</Link>
+            <Link
+              href={
+                identity ? "/onboarding/business" : "/register?intent=business"
+              }
+            >
+              {t("forBusiness")}
+            </Link>
           </Button>
         </nav>
         <div className="ms-auto flex items-center gap-1 sm:ms-0">

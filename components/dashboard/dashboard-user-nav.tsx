@@ -103,6 +103,12 @@ export function DashboardUserNav({
             </DropdownMenuItem>
           ) : null}
           <DropdownMenuItem asChild>
+            <Link href="/onboarding/business">
+              <Building2 />
+              {t(role === "business" ? "addAnotherBusiness" : "addBusiness")}
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
             <Link href={`/${role}/profile`}>
               <UserRound />
               {t("navigation.items.profile")}
