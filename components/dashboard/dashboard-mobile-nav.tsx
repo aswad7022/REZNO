@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Menu, ShieldCheck } from "lucide-react";
+import { Building2, CalendarDays, Menu, ShieldCheck } from "lucide-react";
 import type { BusinessVertical } from "@prisma/client";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
@@ -28,10 +28,14 @@ export function DashboardMobileNav({
   role,
   vertical,
   canAccessAdmin = false,
+  canAccessCustomerDashboard = false,
+  canAccessBusinessDashboard = false,
 }: {
   role: DashboardRole;
   vertical?: BusinessVertical;
   canAccessAdmin?: boolean;
+  canAccessCustomerDashboard?: boolean;
+  canAccessBusinessDashboard?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
@@ -75,10 +79,12 @@ export function DashboardMobileNav({
                   {t(`navigation.groups.${group.label}`)}
                 </p>
                 <div className="space-y-1">
-                  {group.items.flatMap((item) => [item, ...(item.children ?? [])]).map(
-                    (item) => {
+                  {group.items
+                    .flatMap((item) => [item, ...(item.children ?? [])])
+                    .map((item) => {
                       const active = isNavigationItemActive(pathname, item.href);
                       const Icon = item.icon;
+
                       return (
                         <Link
                           key={item.href}
@@ -96,21 +102,44 @@ export function DashboardMobileNav({
                           {t(`navigation.items.${item.title}`)}
                         </Link>
                       );
-                    },
-                  )}
+                    })}
                 </div>
               </div>
             ))}
-            {canAccessAdmin ? (
+            {(canAccessCustomerDashboard ||
+              canAccessBusinessDashboard ||
+              canAccessAdmin) ? (
               <div className="mt-6 border-t border-white/10 pt-4">
-                <Link
-                  href="/admin"
-                  onClick={() => setOpen(false)}
-                  className="flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium text-sidebar-foreground/80 outline-none transition-colors hover:bg-white/8 hover:text-white focus-visible:ring-3 focus-visible:ring-sidebar-ring/50"
-                >
-                  <ShieldCheck className="size-4" aria-hidden="true" />
-                  {t("adminDashboard")}
-                </Link>
+                {canAccessCustomerDashboard && role !== "customer" ? (
+                  <Link
+                    href="/customer"
+                    onClick={() => setOpen(false)}
+                    className="flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium text-sidebar-foreground/80 outline-none transition-colors hover:bg-white/8 hover:text-white focus-visible:ring-3 focus-visible:ring-sidebar-ring/50"
+                  >
+                    <CalendarDays className="size-4" aria-hidden="true" />
+                    {t("customerDashboard")}
+                  </Link>
+                ) : null}
+                {canAccessBusinessDashboard && role !== "business" ? (
+                  <Link
+                    href="/business"
+                    onClick={() => setOpen(false)}
+                    className="flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium text-sidebar-foreground/80 outline-none transition-colors hover:bg-white/8 hover:text-white focus-visible:ring-3 focus-visible:ring-sidebar-ring/50"
+                  >
+                    <Building2 className="size-4" aria-hidden="true" />
+                    {t("businessDashboard")}
+                  </Link>
+                ) : null}
+                {canAccessAdmin ? (
+                  <Link
+                    href="/admin"
+                    onClick={() => setOpen(false)}
+                    className="flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium text-sidebar-foreground/80 outline-none transition-colors hover:bg-white/8 hover:text-white focus-visible:ring-3 focus-visible:ring-sidebar-ring/50"
+                  >
+                    <ShieldCheck className="size-4" aria-hidden="true" />
+                    {t("adminDashboard")}
+                  </Link>
+                ) : null}
               </div>
             ) : null}
           </nav>

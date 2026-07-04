@@ -977,6 +977,8 @@
     "searchLabel": "Search dashboard",
     "openUserMenu": "Open user menu",
     "signOut": "Sign out",
+    "customerDashboard": "Customer dashboard",
+    "businessDashboard": "Business dashboard",
     "adminDashboard": "Admin Dashboard",
     "superAdminDashboard": "Super Admin Dashboard",
     "lightTheme": "Use light theme",

@@ -2,7 +2,10 @@ import type { ReactNode } from "react";
 
 import { DashboardLayout } from "@/components/dashboard/dashboard-layout";
 import { getCurrentAdminAccess } from "@/features/admin/services/admin-auth";
-import { requireCustomerIdentity } from "@/features/identity/server";
+import {
+  getAnyBusinessMembership,
+  requireCustomerIdentity,
+} from "@/features/identity/server";
 import { toDashboardUser } from "@/lib/auth/dashboard-user";
 import {
   getDashboardMessagePreviews,
@@ -15,10 +18,11 @@ export default async function CustomerDashboardLayout({
 }: {
   children: ReactNode;
 }) {
-  const [{ session }, notifications] = await Promise.all([
+  const [{ person, session }, notifications] = await Promise.all([
     requireCustomerIdentity(),
     getDashboardNotifications("customer"),
   ]);
+  const businessMembership = await getAnyBusinessMembership(person.id);
   const adminAccess = await getCurrentAdminAccess();
   const canAccessAdmin = Boolean(
     adminAccess?.isSuperAdmin ||
@@ -43,6 +47,7 @@ export default async function CustomerDashboardLayout({
       messagePreviews={messagePreviews}
       isSuperAdmin={Boolean(adminAccess?.isSuperAdmin)}
       canAccessAdmin={canAccessAdmin}
+      canAccessBusinessDashboard={Boolean(businessMembership)}
     >
       {children}
     </DashboardLayout>

@@ -27,6 +27,8 @@ export function DashboardLayout({
   messagePreviews,
   isSuperAdmin = false,
   canAccessAdmin = false,
+  canAccessCustomerDashboard = false,
+  canAccessBusinessDashboard = false,
   publicSlug,
   vertical,
   activeBusinessId,
@@ -41,6 +43,8 @@ export function DashboardLayout({
   messagePreviews: DashboardMessagePreview[];
   isSuperAdmin?: boolean;
   canAccessAdmin?: boolean;
+  canAccessCustomerDashboard?: boolean;
+  canAccessBusinessDashboard?: boolean;
   publicSlug?: string;
   vertical?: BusinessVertical;
   activeBusinessId?: string;
@@ -84,6 +88,8 @@ export function DashboardLayout({
         role={role}
         vertical={vertical}
         canAccessAdmin={canAccessAdmin}
+        canAccessCustomerDashboard={canAccessCustomerDashboard}
+        canAccessBusinessDashboard={canAccessBusinessDashboard}
         collapsed={collapsed}
         onCollapsedChange={updateCollapsed}
       />
@@ -103,6 +109,8 @@ export function DashboardLayout({
           messagePreviews={messagePreviews}
           isSuperAdmin={isSuperAdmin}
           canAccessAdmin={canAccessAdmin}
+          canAccessCustomerDashboard={canAccessCustomerDashboard}
+          canAccessBusinessDashboard={canAccessBusinessDashboard}
           activeBusinessId={activeBusinessId}
           businesses={businesses}
         />
