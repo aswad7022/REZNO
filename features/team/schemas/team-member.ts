@@ -4,7 +4,8 @@ type TeamValidationKey =
   | "emailInvalid"
   | "roleInvalid"
   | "branchSelectionInvalid"
-  | "urlInvalid";
+  | "urlInvalid"
+  | "slugInvalid";
 
 type TeamValidationTranslator = (key: TeamValidationKey) => string;
 
@@ -37,6 +38,20 @@ export function createTeamMemberSchema(t: TeamValidationTranslator) {
       .transform((value) =>
         [...new Set(value.split(",").map((item) => item.trim()).filter(Boolean))],
       ),
+    publicSlug: z
+      .string()
+      .trim()
+      .toLowerCase()
+      .max(80)
+      .refine(
+        (value) => !value || /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value),
+        t("slugInvalid"),
+      )
+      .transform((value) => value || null),
+    isPublicProfessional: z.preprocess(
+      (value) => value === "on" || value === "true" || value === true,
+      z.boolean(),
+    ),
   });
 }
 

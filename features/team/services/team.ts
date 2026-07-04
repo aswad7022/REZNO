@@ -78,6 +78,8 @@ export async function getCurrentOrganizationTeam(): Promise<TeamManagementData> 
       photoUrl: member.photoUrl ?? "",
       bio: member.bio ?? "",
       specialties: member.specialties,
+      publicSlug: member.publicSlug ?? "",
+      isPublicProfessional: member.isPublicProfessional,
     })),
     invitations: invitations.map((invitation) => ({
       id: invitation.id,

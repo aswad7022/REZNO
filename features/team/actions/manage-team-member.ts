@@ -79,6 +79,8 @@ export async function addTeamMember(
     photoUrl: formData.get("photoUrl") ?? "",
     bio: formData.get("bio") ?? "",
     specialties: formData.get("specialties") ?? "",
+    publicSlug: "",
+    isPublicProfessional: false,
   });
 
   if (!parsed.success) {
@@ -93,6 +95,8 @@ export async function addTeamMember(
         photoUrl: errors.photoUrl?.[0],
         bio: errors.bio?.[0],
         specialties: errors.specialties?.[0],
+        publicSlug: errors.publicSlug?.[0],
+        isPublicProfessional: errors.isPublicProfessional?.[0],
       },
     };
   }
@@ -228,6 +232,8 @@ export async function updateTeamMember(
     photoUrl: formData.get("photoUrl") ?? "",
     bio: formData.get("bio") ?? "",
     specialties: formData.get("specialties") ?? "",
+    publicSlug: formData.get("publicSlug") ?? "",
+    isPublicProfessional: formData.get("isPublicProfessional") ?? false,
   });
 
   if (!parsed.success) {
@@ -241,16 +247,30 @@ export async function updateTeamMember(
         photoUrl: errors.photoUrl?.[0],
         bio: errors.bio?.[0],
         specialties: errors.specialties?.[0],
+        publicSlug: errors.publicSlug?.[0],
+        isPublicProfessional: errors.isPublicProfessional?.[0],
       },
     };
   }
 
-  const { systemRole, branchIds, photoUrl, bio, specialties } = parsed.data;
+  const {
+    systemRole,
+    branchIds,
+    photoUrl,
+    bio,
+    specialties,
+    publicSlug,
+    isPublicProfessional,
+  } = parsed.data;
   const organizationId = context.identity.membership.organizationId;
   const [member, validBranches] = await Promise.all([
     prisma.organizationMember.findFirst({
       where: { id: memberId, organizationId },
-      include: { role: true },
+      include: {
+        role: true,
+        person: { select: { deletedAt: true, status: true } },
+        organization: { select: { slug: true } },
+      },
     }),
     branchesBelongToOrganization(branchIds, organizationId),
   ]);
@@ -263,8 +283,43 @@ export async function updateTeamMember(
     return { status: "error", message: context.tMessages("ownerProtected") };
   }
 
+  if (
+    isPublicProfessional &&
+    (member.person.deletedAt || member.person.status !== "ACTIVE")
+  ) {
+    return { status: "error", message: context.tMessages("recipientInactive") };
+  }
+
+  if (isPublicProfessional && !publicSlug) {
+    return {
+      status: "error",
+      message: context.tMessages("invalid"),
+      fieldErrors: { publicSlug: context.tMessages("publicSlugRequired") },
+    };
+  }
+
   if (!validBranches) {
     return { status: "error", message: context.tMessages("invalidBranches") };
+  }
+
+  const normalizedPublicSlug = isPublicProfessional ? publicSlug : null;
+  if (normalizedPublicSlug) {
+    const slugOwner = await prisma.organizationMember.findFirst({
+      where: {
+        organizationId,
+        publicSlug: normalizedPublicSlug,
+        id: { not: member.id },
+      },
+      select: { id: true },
+    });
+
+    if (slugOwner) {
+      return {
+        status: "error",
+        message: context.tMessages("invalid"),
+        fieldErrors: { publicSlug: context.tMessages("publicSlugTaken") },
+      };
+    }
   }
 
   try {
@@ -288,7 +343,14 @@ export async function updateTeamMember(
 
       await transaction.organizationMember.update({
         where: { id: member.id },
-        data: { roleId: role.id, photoUrl, bio, specialties },
+        data: {
+          roleId: role.id,
+          photoUrl,
+          bio,
+          specialties,
+          publicSlug: normalizedPublicSlug,
+          isPublicProfessional,
+        },
       });
       await transaction.branchAssignment.deleteMany({
         where: { memberId: member.id },
@@ -311,5 +373,12 @@ export async function updateTeamMember(
   }
 
   revalidatePath("/business/team");
+  revalidatePath(`/${member.organization.slug}`);
+  if (member.publicSlug) {
+    revalidatePath(`/${member.organization.slug}/staff/${member.publicSlug}`);
+  }
+  if (normalizedPublicSlug) {
+    revalidatePath(`/${member.organization.slug}/staff/${normalizedPublicSlug}`);
+  }
   return { status: "success", message: context.tMessages("updated") };
 }

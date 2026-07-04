@@ -328,7 +328,14 @@
       "branches": "المواقع المعيّنة",
       "photoUrl": "رابط صورة الموظف",
       "bio": "نبذة عن الموظف",
-      "specialties": "التخصصات"
+      "specialties": "التخصصات",
+      "publicProfileEnabled": "إظهار ملف مهني عام",
+      "publicSlug": "رابط الموظف العام"
+    },
+    "professionalProfile": {
+      "title": "الملف المهني",
+      "description": "اجعل عضو الفريق المقبول ظاهرًا في صفحة النشاط العامة.",
+      "slugHelp": "استخدم أحرفًا إنجليزية صغيرة وأرقامًا وشرطات فقط."
     },
     "placeholders": {
       "specialties": "حلاقة، عناية بالشعر، صبغة"
@@ -355,6 +362,8 @@
       "recipientInactive": "هذا الحساب لا يمكنه استلام دعوات العمل الآن.",
       "invalidBranches": "موقع واحد أو أكثر من المواقع المحددة غير متاح.",
       "ownerProtected": "لا يمكن تغيير عضوية المالك من هنا.",
+      "publicSlugRequired": "أضف رابط موظف عام قبل تفعيل الملف.",
+      "publicSlugTaken": "رابط الموظف العام مستخدم بالفعل داخل هذا النشاط.",
       "notFound": "عضو الفريق هذا لم يعد متاحًا.",
       "workInviteNotificationTitle": "دعوة عمل جديدة",
       "workInviteNotificationBody": "تمت دعوتك للانضمام إلى {business}.",
@@ -717,6 +726,13 @@
     "openMap": "فتح الموقع على الخريطة",
     "openInWaze": "فتح في Waze",
     "team": "فريق العمل",
+    "viewProfessionalProfile": "عرض الملف",
+    "professionalProfile": {
+      "publicProfessional": "مهني",
+      "atBusiness": "ضمن {business}",
+      "backToBusiness": "العودة للنشاط",
+      "services": "الخدمات القابلة للحجز"
+    },
     "bookingPolicy": "سياسات الحجز",
     "faq": "الأسئلة الشائعة",
     "actions": {
