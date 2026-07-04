@@ -109,7 +109,17 @@ export async function createBooking(formData: FormData): Promise<void> {
 
   const startsAt = new Date(selectedSlot.startsAt);
   const endsAt = new Date(selectedSlot.endsAt);
-  let created = false;
+  if (startsAt <= new Date()) {
+    redirect(
+      bookingErrorUrl(
+        "unavailable",
+        parsed.data.branchServiceId,
+        parsed.data.date,
+      ),
+    );
+  }
+
+  let createdBookingId: string | null = null;
   let failedUnexpectedly = false;
 
   try {
@@ -144,7 +154,7 @@ export async function createBooking(formData: FormData): Promise<void> {
 
         if (conflict || blocked) return;
 
-        await transaction.booking.create({
+        const booking = await transaction.booking.create({
           data: {
             organizationId: offering.branch.organizationId,
             branchId: offering.branchId,
@@ -165,7 +175,7 @@ export async function createBooking(formData: FormData): Promise<void> {
             },
           },
         });
-        created = true;
+        createdBookingId = booking.id;
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
@@ -175,10 +185,10 @@ export async function createBooking(formData: FormData): Promise<void> {
       branchServiceId: parsed.data.branchServiceId,
       customerId: identity.person.id,
     });
-    created = false;
+    createdBookingId = null;
   }
 
-  if (!created) {
+  if (!createdBookingId) {
     redirect(
       bookingErrorUrl(
         failedUnexpectedly ? "failed" : "unavailable",
@@ -189,9 +199,10 @@ export async function createBooking(formData: FormData): Promise<void> {
   }
 
   revalidatePath("/customer/bookings");
+  revalidatePath(`/customer/bookings/${createdBookingId}`);
   revalidatePath("/business/bookings");
   revalidatePath("/business/calendar");
-  redirect("/customer/bookings?created=1");
+  redirect(`/customer/bookings/${createdBookingId}?created=1`);
 }
 
 export async function cancelCustomerBooking(
