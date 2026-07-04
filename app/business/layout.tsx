@@ -44,6 +44,7 @@ export default async function BusinessDashboardLayout({
       messagePreviews={messagePreviews}
       isSuperAdmin={Boolean(adminAccess?.isSuperAdmin)}
       canAccessAdmin={canAccessAdmin}
+      canAccessCustomerDashboard
       publicSlug={membership.organization.slug}
       vertical={membership.organization.vertical}
       activeBusinessId={membership.organizationId}

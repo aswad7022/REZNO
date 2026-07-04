@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import {
+  Building2,
+  CalendarDays,
   ChevronDown,
   ChevronsLeft,
   ChevronsRight,
@@ -81,12 +83,16 @@ export function DashboardSidebar({
   role,
   vertical,
   canAccessAdmin = false,
+  canAccessCustomerDashboard = false,
+  canAccessBusinessDashboard = false,
 }: {
   collapsed: boolean;
   onCollapsedChange: (collapsed: boolean) => void;
   role: DashboardRole;
   vertical?: BusinessVertical;
   canAccessAdmin?: boolean;
+  canAccessCustomerDashboard?: boolean;
+  canAccessBusinessDashboard?: boolean;
 }) {
   const pathname = usePathname();
   const locale = useLocale();
@@ -171,6 +177,36 @@ export function DashboardSidebar({
         </nav>
       </ScrollArea>
       <div className="relative border-t border-white/10 p-3">
+        {canAccessCustomerDashboard && role !== "customer" ? (
+          <Link
+            href="/customer"
+            title={collapsed ? t("customerDashboard") : undefined}
+            className={cn(
+              "mb-2 flex min-h-10 items-center gap-3 rounded-xl px-3 text-sm font-medium text-sidebar-foreground/80 outline-none transition-colors hover:bg-white/8 hover:text-white focus-visible:ring-3 focus-visible:ring-sidebar-ring/50",
+              collapsed && "justify-center px-0",
+            )}
+          >
+            <CalendarDays className="size-4" aria-hidden="true" />
+            <span className={cn("truncate", collapsed && "sr-only")}>
+              {t("customerDashboard")}
+            </span>
+          </Link>
+        ) : null}
+        {canAccessBusinessDashboard && role !== "business" ? (
+          <Link
+            href="/business"
+            title={collapsed ? t("businessDashboard") : undefined}
+            className={cn(
+              "mb-2 flex min-h-10 items-center gap-3 rounded-xl px-3 text-sm font-medium text-sidebar-foreground/80 outline-none transition-colors hover:bg-white/8 hover:text-white focus-visible:ring-3 focus-visible:ring-sidebar-ring/50",
+              collapsed && "justify-center px-0",
+            )}
+          >
+            <Building2 className="size-4" aria-hidden="true" />
+            <span className={cn("truncate", collapsed && "sr-only")}>
+              {t("businessDashboard")}
+            </span>
+          </Link>
+        ) : null}
         {canAccessAdmin ? (
           <Link
             href="/admin"

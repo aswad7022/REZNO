@@ -1,7 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { LogOut, ShieldCheck, UserRound } from "lucide-react";
+import {
+  Building2,
+  CalendarDays,
+  LogOut,
+  ShieldCheck,
+  UserRound,
+} from "lucide-react";
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 
@@ -32,11 +38,15 @@ export function DashboardUserNav({
   user,
   isSuperAdmin = false,
   canAccessAdmin = false,
+  canAccessCustomerDashboard = false,
+  canAccessBusinessDashboard = false,
 }: {
   role: DashboardRole;
   user: DashboardUser;
   isSuperAdmin?: boolean;
   canAccessAdmin?: boolean;
+  canAccessCustomerDashboard?: boolean;
+  canAccessBusinessDashboard?: boolean;
 }) {
   const t = useTranslations("Dashboard");
   const [signingOut, setSigningOut] = useState(false);
@@ -76,6 +86,22 @@ export function DashboardUserNav({
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
+          {canAccessCustomerDashboard && role !== "customer" ? (
+            <DropdownMenuItem asChild>
+              <Link href="/customer">
+                <CalendarDays />
+                {t("customerDashboard")}
+              </Link>
+            </DropdownMenuItem>
+          ) : null}
+          {canAccessBusinessDashboard && role !== "business" ? (
+            <DropdownMenuItem asChild>
+              <Link href="/business">
+                <Building2 />
+                {t("businessDashboard")}
+              </Link>
+            </DropdownMenuItem>
+          ) : null}
           <DropdownMenuItem asChild>
             <Link href={`/${role}/profile`}>
               <UserRound />

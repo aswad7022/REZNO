@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CalendarDays } from "lucide-react";
+import { Building2, CalendarDays } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 
 import { DashboardUserNav } from "@/components/dashboard/dashboard-user-nav";
@@ -16,7 +16,7 @@ import { toDashboardUser } from "@/lib/auth/dashboard-user";
 export async function PublicHeader() {
   const [t, dashboardT, identity] = await Promise.all([
     getTranslations("Public"),
-    getTranslations("Dashboard.navigation.items"),
+    getTranslations("Dashboard"),
     getOptionalActiveIdentity(),
   ]);
   const [adminAccess, membership] = identity
@@ -56,19 +56,43 @@ export async function PublicHeader() {
           <DashboardThemeToggle />
           {identity ? (
             <>
-              <Button asChild size="sm" variant="outline">
-                <Link href={dashboardHref}>
-                  <CalendarDays aria-hidden="true" />
-                  <span className="hidden min-[420px]:inline">
-                    {dashboardT("dashboard")}
-                  </span>
-                </Link>
-              </Button>
+              {identity.person.isOnboarded && membership ? (
+                <>
+                  <Button asChild size="sm" variant="ghost">
+                    <Link href="/customer">
+                      <CalendarDays aria-hidden="true" />
+                      <span className="hidden min-[520px]:inline">
+                        {dashboardT("customerDashboard")}
+                      </span>
+                    </Link>
+                  </Button>
+                  <Button asChild size="sm" variant="outline">
+                    <Link href="/business">
+                      <Building2 aria-hidden="true" />
+                      <span className="hidden min-[520px]:inline">
+                        {dashboardT("businessDashboard")}
+                      </span>
+                    </Link>
+                  </Button>
+                </>
+              ) : (
+                <Button asChild size="sm" variant="outline">
+                  <Link href={dashboardHref}>
+                    <CalendarDays aria-hidden="true" />
+                    <span className="hidden min-[420px]:inline">
+                      {dashboardT("navigation.items.dashboard")}
+                    </span>
+                  </Link>
+                </Button>
+              )}
               <DashboardUserNav
                 role={dashboardRole}
                 user={toDashboardUser(identity.session.user)}
                 isSuperAdmin={adminAccess?.isSuperAdmin ?? false}
                 canAccessAdmin={Boolean(adminAccess)}
+                canAccessCustomerDashboard={Boolean(
+                  identity.person.isOnboarded && membership,
+                )}
               />
             </>
           ) : (

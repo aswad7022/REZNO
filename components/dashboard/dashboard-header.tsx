@@ -25,6 +25,8 @@ export function DashboardHeader({
   messagePreviews,
   isSuperAdmin,
   canAccessAdmin,
+  canAccessCustomerDashboard,
+  canAccessBusinessDashboard,
   vertical,
   activeBusinessId,
   businesses = [],
@@ -37,6 +39,8 @@ export function DashboardHeader({
   messagePreviews: DashboardMessagePreview[];
   isSuperAdmin?: boolean;
   canAccessAdmin?: boolean;
+  canAccessCustomerDashboard?: boolean;
+  canAccessBusinessDashboard?: boolean;
   vertical?: BusinessVertical;
   activeBusinessId?: string;
   businesses?: Array<{ id: string; name: string }>;
@@ -48,6 +52,8 @@ export function DashboardHeader({
           role={role}
           vertical={vertical}
           canAccessAdmin={canAccessAdmin}
+          canAccessCustomerDashboard={canAccessCustomerDashboard}
+          canAccessBusinessDashboard={canAccessBusinessDashboard}
         />
         <Separator orientation="vertical" className="h-5 lg:hidden" />
         <div className="hidden min-w-0 flex-1 lg:block">
@@ -85,6 +91,8 @@ export function DashboardHeader({
             user={user}
             isSuperAdmin={Boolean(isSuperAdmin)}
             canAccessAdmin={Boolean(canAccessAdmin)}
+            canAccessCustomerDashboard={Boolean(canAccessCustomerDashboard)}
+            canAccessBusinessDashboard={Boolean(canAccessBusinessDashboard)}
           />
         </div>
       </div>
