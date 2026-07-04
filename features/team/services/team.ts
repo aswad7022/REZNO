@@ -8,7 +8,7 @@ import type { TeamManagementData } from "@/features/team/types";
 export async function getCurrentOrganizationTeam(): Promise<TeamManagementData> {
   const { membership } = await requireBusinessIdentity();
   const organizationId = membership.organizationId;
-  const [members, branches] = await Promise.all([
+  const [members, invitations, branches] = await Promise.all([
     prisma.organizationMember.findMany({
       where: {
         organizationId,
@@ -25,6 +25,16 @@ export async function getCurrentOrganizationTeam(): Promise<TeamManagementData> 
         },
       },
       orderBy: { createdAt: "asc" },
+    }),
+    prisma.organizationInvitation.findMany({
+      where: {
+        organizationId,
+        status: "PENDING",
+      },
+      include: {
+        role: true,
+      },
+      orderBy: { createdAt: "desc" },
     }),
     prisma.branch.findMany({
       where: {
@@ -68,6 +78,15 @@ export async function getCurrentOrganizationTeam(): Promise<TeamManagementData> 
       photoUrl: member.photoUrl ?? "",
       bio: member.bio ?? "",
       specialties: member.specialties,
+    })),
+    invitations: invitations.map((invitation) => ({
+      id: invitation.id,
+      email: invitation.email,
+      roleName: invitation.role?.name ?? "",
+      systemRole: invitation.role?.systemRole ?? null,
+      status: invitation.status,
+      createdAt: invitation.createdAt,
+      expiresAt: invitation.expiresAt,
     })),
   };
 }

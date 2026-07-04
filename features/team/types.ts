@@ -22,8 +22,19 @@ export interface TeamMemberDetails {
   specialties: string[];
 }
 
+export interface TeamInvitationDetails {
+  id: string;
+  email: string;
+  roleName: string;
+  systemRole: SystemRole | null;
+  status: "PENDING" | "ACCEPTED" | "DECLINED" | "CANCELLED" | "EXPIRED";
+  createdAt: Date;
+  expiresAt: Date | null;
+}
+
 export interface TeamManagementData {
   members: TeamMemberDetails[];
+  invitations: TeamInvitationDetails[];
   branches: TeamBranchOption[];
   canEdit: boolean;
 }

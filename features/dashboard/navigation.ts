@@ -2,6 +2,7 @@ import {
   Bell,
   Bot,
   BookOpen,
+  BriefcaseBusiness,
   Building2,
   CalendarDays,
   CalendarRange,
@@ -57,6 +58,11 @@ const customerNavigation: DashboardNavigationGroup[] = [
         title: "favorites",
         href: "/customer/favorites",
         icon: Heart,
+      },
+      {
+        title: "workInvitations",
+        href: "/customer/work-invitations",
+        icon: BriefcaseBusiness,
       },
       {
         title: "assistant",
@@ -219,6 +225,7 @@ export const dashboardRouteLabels: Readonly<
   upcoming: "upcoming",
   history: "history",
   favorites: "favorites",
+  "work-invitations": "workInvitations",
   notifications: "notifications",
   profile: "profile",
   "public-profile": "publicProfile",
