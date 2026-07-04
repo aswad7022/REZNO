@@ -21,6 +21,7 @@ export function BookingCard({
   labels,
   audience,
   canOperate = false,
+  showDetailsLink = true,
 }: {
   booking: BookingListItem;
   formattedRange: string;
@@ -35,6 +36,7 @@ export function BookingCard({
     business: string;
     price: string;
     contact: string;
+    viewDetails: string;
     messageBusiness: string;
     messageCustomer: string;
     table: string;
@@ -51,6 +53,7 @@ export function BookingCard({
   };
   audience: "customer" | "business";
   canOperate?: boolean;
+  showDetailsLink?: boolean;
 }) {
   const transitions = getAvailableTransitions(booking.status);
 
@@ -195,6 +198,13 @@ export function BookingCard({
         ) : null}
         {audience === "customer" ? (
           <div className="flex flex-wrap gap-2 pt-1">
+            {showDetailsLink ? (
+              <Button asChild size="sm" variant="outline">
+                <Link href={`/customer/bookings/${booking.id}`}>
+                  {labels.viewDetails}
+                </Link>
+              </Button>
+            ) : null}
             {booking.canCustomerReschedule ? (
               <Button asChild size="sm" variant="outline">
                 <Link href={`/customer/bookings/${booking.id}/reschedule`}>

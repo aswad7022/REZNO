@@ -120,6 +120,7 @@ async function BusinessBookingCard({
       business: t("business"),
       price: t("price"),
       contact: t("contactBusiness"),
+      viewDetails: t("viewDetails"),
       messageBusiness: t("messageBusiness"),
       messageCustomer: t("messageCustomer"),
       table: t("restaurant.table"),
