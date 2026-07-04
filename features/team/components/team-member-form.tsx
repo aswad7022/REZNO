@@ -148,6 +148,61 @@ export function TeamMemberForm({
             </div>
           </div>
 
+          <fieldset className="rounded-2xl border bg-muted/20 p-4 md:col-span-2">
+            <legend className="px-1 text-sm font-medium">
+              {t("professionalProfile.title")}
+            </legend>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {t("professionalProfile.description")}
+            </p>
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <Label
+                htmlFor={`team-public-profile-${member.id}`}
+                className="flex min-h-11 items-center gap-3 rounded-lg border bg-background p-3 font-normal"
+              >
+                <Checkbox
+                  id={`team-public-profile-${member.id}`}
+                  name="isPublicProfessional"
+                  defaultChecked={member.isPublicProfessional}
+                />
+                <span>{t("fields.publicProfileEnabled")}</span>
+              </Label>
+              <div className="space-y-2">
+                <Label htmlFor={`team-public-slug-${member.id}`}>
+                  {t("fields.publicSlug")}
+                </Label>
+                <Input
+                  id={`team-public-slug-${member.id}`}
+                  name="publicSlug"
+                  dir="ltr"
+                  defaultValue={member.publicSlug}
+                  placeholder="staff-name"
+                  aria-invalid={Boolean(state.fieldErrors?.publicSlug)}
+                  aria-describedby={
+                    state.fieldErrors?.publicSlug
+                      ? `team-public-slug-${member.id}-error`
+                      : `team-public-slug-${member.id}-help`
+                  }
+                />
+                <p
+                  id={`team-public-slug-${member.id}-help`}
+                  className="text-xs text-muted-foreground"
+                >
+                  {t("professionalProfile.slugHelp")}
+                </p>
+                {state.fieldErrors?.publicSlug ? (
+                  <p
+                    id={`team-public-slug-${member.id}-error`}
+                    role="alert"
+                    className="text-xs text-destructive"
+                  >
+                    {state.fieldErrors.publicSlug}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          </fieldset>
+
           <fieldset className="space-y-3">
             <legend className="text-sm font-medium">
               {t("fields.branches")}

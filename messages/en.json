@@ -328,7 +328,14 @@
       "branches": "Assigned locations",
       "photoUrl": "Employee photo URL",
       "bio": "Employee bio",
-      "specialties": "Specialties"
+      "specialties": "Specialties",
+      "publicProfileEnabled": "Show public professional profile",
+      "publicSlug": "Public staff URL"
+    },
+    "professionalProfile": {
+      "title": "Professional profile",
+      "description": "Make this accepted team member visible on your public business page.",
+      "slugHelp": "Use lowercase English letters, numbers, and hyphens only."
     },
     "placeholders": {
       "specialties": "Haircut, styling, color"
@@ -355,6 +362,8 @@
       "recipientInactive": "This account cannot receive work invitations right now.",
       "invalidBranches": "One or more selected locations are unavailable.",
       "ownerProtected": "The owner membership cannot be changed here.",
+      "publicSlugRequired": "Add a public staff URL before enabling the profile.",
+      "publicSlugTaken": "This public staff URL is already used in this business.",
       "notFound": "This team member is no longer available.",
       "workInviteNotificationTitle": "New work invitation",
       "workInviteNotificationBody": "You were invited to join {business}.",
@@ -717,6 +726,13 @@
     "openMap": "Open in Google Maps",
     "openInWaze": "Open in Waze",
     "team": "Our team",
+    "viewProfessionalProfile": "View profile",
+    "professionalProfile": {
+      "publicProfessional": "Professional",
+      "atBusiness": "At {business}",
+      "backToBusiness": "Back to business",
+      "services": "Bookable services"
+    },
     "bookingPolicy": "Booking policies",
     "faq": "Frequently asked questions",
     "actions": {

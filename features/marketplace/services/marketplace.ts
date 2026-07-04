@@ -6,6 +6,7 @@ import type { BusinessVertical, Prisma } from "@prisma/client";
 import type {
   MarketplaceBusiness,
   PublicBusinessProfile,
+  PublicProfessionalProfile,
 } from "@/features/marketplace/types";
 import type { NormalizedSearchQuery } from "@/features/search/types";
 import {
@@ -385,13 +386,31 @@ export const getPublicBusiness = cache(
         },
         organizationMembers: {
           where: {
-            OR: [
-              { photoUrl: { not: null } },
-              { bio: { not: null } },
-              { specialties: { isEmpty: false } },
-            ],
+            isPublicProfessional: true,
+            publicSlug: { not: null },
+            person: { status: "ACTIVE", deletedAt: null },
           },
-          include: { person: true },
+          include: {
+            person: true,
+            serviceAssignments: {
+              where: {
+                service: {
+                  status: "ACTIVE",
+                  branchServices: {
+                    some: {
+                      isAvailable: true,
+                      branch: {
+                        status: "ACTIVE",
+                        deletedAt: null,
+                      },
+                    },
+                  },
+                },
+              },
+              select: { id: true },
+              take: 1,
+            },
+          },
           orderBy: { createdAt: "asc" },
         },
         restaurantTables: {
@@ -430,6 +449,13 @@ export const getPublicBusiness = cache(
                   include: {
                     category: true,
                     staffAssignments: {
+                      where: {
+                        member: {
+                          isPublicProfessional: true,
+                          publicSlug: { not: null },
+                          person: { status: "ACTIVE", deletedAt: null },
+                        },
+                      },
                       include: { member: { include: { person: true } } },
                     },
                   },
@@ -595,9 +621,9 @@ export const getPublicBusiness = cache(
       team: organization.organizationMembers
         .filter(
           (member) =>
-            member.photoUrl ||
-            member.bio ||
-            member.specialties.length > 0,
+            member.publicSlug &&
+            member.isPublicProfessional &&
+            member.serviceAssignments.length > 0,
         )
         .map((member) => ({
           id: member.id,
@@ -606,10 +632,114 @@ export const getPublicBusiness = cache(
             [member.person.firstName, member.person.lastName]
               .filter(Boolean)
               .join(" "),
+          publicSlug: member.publicSlug ?? "",
           photoUrl: member.photoUrl ?? member.person.avatarUrl,
           bio: member.bio,
           specialties: member.specialties,
         })),
+    };
+  },
+);
+
+export const getPublicProfessionalProfile = cache(
+  async (
+    businessSlug: string,
+    staffSlug: string,
+  ): Promise<PublicProfessionalProfile | null> => {
+    const member = await prisma.organizationMember.findFirst({
+      where: {
+        publicSlug: staffSlug,
+        isPublicProfessional: true,
+        person: { status: "ACTIVE", deletedAt: null },
+        organization: {
+          slug: businessSlug,
+          ...publicOrganizationWhere,
+        },
+      },
+      include: {
+        person: true,
+        organization: {
+          include: {
+            profile: true,
+          },
+        },
+        serviceAssignments: {
+          where: {
+            service: {
+              status: "ACTIVE",
+              branchServices: {
+                some: {
+                  isAvailable: true,
+                  branch: {
+                    status: "ACTIVE",
+                    deletedAt: null,
+                  },
+                },
+              },
+            },
+          },
+          include: {
+            service: {
+              include: {
+                category: true,
+                branchServices: {
+                  where: {
+                    isAvailable: true,
+                    branch: {
+                      status: "ACTIVE",
+                      deletedAt: null,
+                    },
+                  },
+                  include: {
+                    branch: true,
+                  },
+                  orderBy: { branch: { name: "asc" } },
+                },
+              },
+            },
+          },
+          orderBy: { service: { name: "asc" } },
+        },
+      },
+    });
+
+    if (!member?.publicSlug) return null;
+
+    const services = member.serviceAssignments.flatMap((assignment) =>
+      assignment.service.branchServices.map((offering) => ({
+        id: offering.id,
+        name: assignment.service.name,
+        description: assignment.service.description,
+        imageUrl: assignment.service.imageUrl,
+        categoryName: assignment.service.category.name,
+        branchName: offering.branch.name,
+        price: offering.price.toString(),
+        durationMinutes: offering.durationMinutes,
+      })),
+    );
+
+    if (services.length === 0) return null;
+
+    return {
+      id: member.id,
+      publicSlug: member.publicSlug,
+      name:
+        member.person.displayName ??
+        [member.person.firstName, member.person.lastName]
+          .filter(Boolean)
+          .join(" "),
+      photoUrl: member.photoUrl ?? member.person.avatarUrl,
+      bio: member.bio,
+      specialties: member.specialties,
+      business: {
+        id: member.organization.id,
+        name: member.organization.name,
+        slug: member.organization.slug,
+        logoUrl: member.organization.profile?.logoUrl ?? null,
+        categoryName: member.organization.profile?.businessCategory ?? null,
+        vertical: member.organization.vertical,
+      },
+      services,
     };
   },
 );

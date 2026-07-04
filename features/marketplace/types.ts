@@ -107,8 +107,36 @@ export interface PublicBusinessProfile extends MarketplaceBusiness {
   team: Array<{
     id: string;
     name: string;
+    publicSlug: string;
     photoUrl: string | null;
     bio: string | null;
     specialties: string[];
+  }>;
+}
+
+export interface PublicProfessionalProfile {
+  id: string;
+  publicSlug: string;
+  name: string;
+  photoUrl: string | null;
+  bio: string | null;
+  specialties: string[];
+  business: {
+    id: string;
+    name: string;
+    slug: string;
+    logoUrl: string | null;
+    categoryName: string | null;
+    vertical: BusinessVertical;
+  };
+  services: Array<{
+    id: string;
+    name: string;
+    description: string | null;
+    imageUrl: string | null;
+    categoryName: string;
+    branchName: string;
+    price: string;
+    durationMinutes: number;
   }>;
 }

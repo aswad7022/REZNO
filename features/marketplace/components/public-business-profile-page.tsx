@@ -509,6 +509,13 @@ export async function PublicBusinessProfilePage({ slug }: { slug: string }) {
                                 {member.bio}
                               </p>
                             ) : null}
+                            <Button asChild variant="outline" className="mt-4 w-full">
+                              <Link
+                                href={`/${business.slug}/staff/${member.publicSlug}`}
+                              >
+                                {t("viewProfessionalProfile")}
+                              </Link>
+                            </Button>
                           </CardContent>
                         </Card>
                       </PublicProfileCardMotion>

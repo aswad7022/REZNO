@@ -184,6 +184,8 @@ model OrganizationMember {
   photoUrl               String?
   bio                    String?
   specialties            String[]                 @default([])
+  publicSlug             String?
+  isPublicProfessional   Boolean                  @default(false)
   assignments            BranchAssignment[]
   availabilities         Availability[]
   blockedTimes           BlockedTime[]
@@ -196,7 +198,9 @@ model OrganizationMember {
   role                   Role                     @relation(fields: [roleId], references: [id])
 
   @@unique([personId, organizationId])
+  @@unique([organizationId, publicSlug])
   @@index([organizationId])
+  @@index([organizationId, isPublicProfessional])
   @@index([roleId])
 }
 

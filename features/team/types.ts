@@ -20,6 +20,8 @@ export interface TeamMemberDetails {
   photoUrl: string;
   bio: string;
   specialties: string[];
+  publicSlug: string;
+  isPublicProfessional: boolean;
 }
 
 export interface TeamInvitationDetails {
@@ -45,7 +47,9 @@ export type TeamMemberField =
   | "branchIds"
   | "photoUrl"
   | "bio"
-  | "specialties";
+  | "specialties"
+  | "publicSlug"
+  | "isPublicProfessional";
 
 export interface TeamMemberActionState {
   status: "idle" | "success" | "error";

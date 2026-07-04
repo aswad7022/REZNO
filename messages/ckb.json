@@ -328,7 +328,14 @@
       "branches": "شوێنە تەرخانکراوەکان",
       "photoUrl": "بەستەری وێنەی کارمەند",
       "bio": "پوختەی کارمەند",
-      "specialties": "پسپۆڕییەکان"
+      "specialties": "پسپۆڕییەکان",
+      "publicProfileEnabled": "پڕۆفایلی پیشەیی گشتی پیشان بدە",
+      "publicSlug": "بەستەری گشتی کارمەند"
+    },
+    "professionalProfile": {
+      "title": "پڕۆفایلی پیشەیی",
+      "description": "ئەم ئەندامەی تیم لە پەڕەی گشتی بازرگانییەکەدا دیار بکە.",
+      "slugHelp": "تەنها پیتی بچووکی ئینگلیزی، ژمارە و هێڵی کورت بەکاربهێنە."
     },
     "placeholders": {
       "specialties": "قژبڕین، ڕێکخستن، ڕەنگکردن"
@@ -355,6 +362,8 @@
       "recipientInactive": "ئەم هەژمارە ئێستا ناتوانێت بانگهێشتی کار وەربگرێت.",
       "invalidBranches": "یەکێک لە شوێنە هەڵبژێردراوەکان بەردەست نییە.",
       "ownerProtected": "ئەندامێتی خاوەن لێرە ناگۆڕدرێت.",
+      "publicSlugRequired": "پێش چالاککردنی پڕۆفایل بەستەری گشتی کارمەند زیاد بکە.",
+      "publicSlugTaken": "ئەم بەستەری گشتییە لەم بازرگانییەدا بەکارهاتووە.",
       "notFound": "ئەم ئەندامە چیتر بەردەست نییە.",
       "workInviteNotificationTitle": "بانگهێشتی کاری نوێ",
       "workInviteNotificationBody": "بانگهێشت کرایت بۆ پەیوەستبوون بە {business}.",
@@ -717,6 +726,13 @@
     "openMap": "کردنەوە لە نەخشە",
     "openInWaze": "کردنەوە لە Waze",
     "team": "تیمی ئێمە",
+    "viewProfessionalProfile": "بینینی پڕۆفایل",
+    "professionalProfile": {
+      "publicProfessional": "پیشەیی",
+      "atBusiness": "لە {business}",
+      "backToBusiness": "گەڕانەوە بۆ بازرگانی",
+      "services": "خزمەتگوزارییە قابلەکانی حجز"
+    },
     "bookingPolicy": "سیاسەتەکانی حجز",
     "faq": "پرسیارە باوەکان",
     "actions": {
