@@ -123,6 +123,32 @@ function toListItem(booking: {
   };
 }
 
+function withCustomerPermissions(
+  item: BookingListItem,
+  booking: {
+    status: BookingListItem["status"];
+    startsAt: Date;
+    organization: {
+      settings?: { cancellationWindowHours: number | null } | null;
+    };
+    review?: { rating: number; comment: string | null } | null;
+  },
+): BookingListItem {
+  const windowHours =
+    booking.organization.settings?.cancellationWindowHours ?? 24;
+  const isActive =
+    booking.status === "PENDING" || booking.status === "CONFIRMED";
+  const canChange =
+    isActive && Date.now() < booking.startsAt.getTime() - windowHours * 3_600_000;
+
+  return {
+    ...item,
+    canCustomerCancel: canChange,
+    canCustomerReschedule: canChange,
+    canCustomerReview: booking.status === "COMPLETED" && !booking.review,
+  };
+}
+
 export async function getCustomerBookings(
   filter: "all" | "upcoming" | "history" = "all",
 ): Promise<BookingListItem[]> {
@@ -165,22 +191,43 @@ export async function getCustomerBookings(
     },
     orderBy: { startsAt: filter === "upcoming" ? "asc" : "desc" },
   });
-  const now = Date.now();
-  return bookings.map((booking) => {
-    const item = toListItem(booking);
-    const windowHours =
-      booking.organization.settings?.cancellationWindowHours ?? 24;
-    return {
-      ...item,
-      canCustomerCancel:
-        (booking.status === "PENDING" || booking.status === "CONFIRMED") &&
-        now < booking.startsAt.getTime() - windowHours * 3_600_000,
-      canCustomerReschedule:
-        (booking.status === "PENDING" || booking.status === "CONFIRMED") &&
-        now < booking.startsAt.getTime() - windowHours * 3_600_000,
-      canCustomerReview: booking.status === "COMPLETED" && !booking.review,
-    };
+  return bookings.map((booking) =>
+    withCustomerPermissions(toListItem(booking), booking),
+  );
+}
+
+export async function getCustomerBookingDetails(
+  bookingId: string,
+): Promise<BookingListItem | null> {
+  const { person } = await requireCustomerIdentity();
+  const booking = await prisma.booking.findFirst({
+    where: {
+      id: bookingId,
+      customerId: person.id,
+    },
+    include: {
+      branch: true,
+      member: { include: { person: true } },
+      organization: { include: { settings: true, profile: true } },
+      review: true,
+      restaurantReservation: {
+        include: {
+          table: true,
+          items: { include: { menuItem: true } },
+        },
+      },
+      changeRequests: {
+        where: { status: "PENDING" },
+        include: { proposedMember: { include: { person: true } } },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+      },
+    },
   });
+
+  if (!booking) return null;
+
+  return withCustomerPermissions(toListItem(booking), booking);
 }
 
 export async function getBusinessBookings(options?: {
