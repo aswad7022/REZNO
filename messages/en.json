@@ -15,6 +15,14 @@
     "readOnly": "Read only",
     "backHome": "Back home"
   },
+  "MobileAppNav": {
+    "label": "Mobile app navigation",
+    "customer": "Home",
+    "marketplace": "Explore",
+    "bookings": "Bookings",
+    "messages": "Messages",
+    "business": "Business"
+  },
   "BusinessManagement": {
     "title": "Business profile",
     "description": "Update your business identity and customer-facing contact information.",

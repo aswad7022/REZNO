@@ -6,6 +6,7 @@ import type { BusinessVertical } from "@prisma/client";
 
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar";
+import { MobileAppShellNav } from "@/components/mobile/mobile-app-shell-nav";
 import { cn } from "@/lib/utils";
 import type { DashboardRole, DashboardUser } from "@/types/dashboard";
 import type { DashboardNotification } from "@/features/notifications/types";
@@ -114,7 +115,21 @@ export function DashboardLayout({
           activeBusinessId={activeBusinessId}
           businesses={businesses}
         />
-        <main id="main-content">{children}</main>
+        <main
+          id="main-content"
+          className="pb-[calc(5.25rem+env(safe-area-inset-bottom))] md:pb-0"
+        >
+          {children}
+        </main>
+        {role === "customer" || role === "business" ? (
+          <MobileAppShellNav
+            businessHref={
+              role === "business" || canAccessBusinessDashboard
+                ? "/business"
+                : "/onboarding/business"
+            }
+          />
+        ) : null}
       </div>
     </div>
   );

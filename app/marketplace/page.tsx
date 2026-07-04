@@ -3,27 +3,32 @@ import type { BusinessVertical } from "@prisma/client";
 import { Search } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 
+import { MobileAppShellNav } from "@/components/mobile/mobile-app-shell-nav";
 import { BusinessCard } from "@/components/public-site/business-card";
 import { PublicFooter } from "@/components/public-site/public-footer";
 import { PublicHeader } from "@/components/public-site/public-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import {
-  getMarketplaceFilters,
-  searchMarketplace,
-} from "@/features/marketplace/services/marketplace";
-import { getCurrentCustomerFavoriteBusinessIds } from "@/features/favorites/services/favorites";
-import { MAX_SEARCH_QUERY_LENGTH } from "@/features/search/services/search-normalization";
 import { businessVerticals } from "@/features/businesses/config/verticals";
-import { MarketplaceCategoryTiles } from "@/features/marketplace/components/marketplace-category-tiles";
-import { NearbyBusinessMap } from "@/features/location/components/nearby-business-map";
-import { LocationPermissionButton } from "@/features/location/components/location-permission-button";
+import { getCurrentCustomerFavoriteBusinessIds } from "@/features/favorites/services/favorites";
+import {
+  getAnyBusinessMembership,
+  getOptionalActiveIdentity,
+} from "@/features/identity/server";
 import {
   DEFAULT_NEARBY_RADIUS_KM,
   NEARBY_RADIUS_OPTIONS_KM,
 } from "@/features/location/services/nearby-businesses";
 import { buildWazeNavigationUrl } from "@/features/location/services/waze";
+import { LocationPermissionButton } from "@/features/location/components/location-permission-button";
+import { NearbyBusinessMap } from "@/features/location/components/nearby-business-map";
+import { MarketplaceCategoryTiles } from "@/features/marketplace/components/marketplace-category-tiles";
+import {
+  getMarketplaceFilters,
+  searchMarketplace,
+} from "@/features/marketplace/services/marketplace";
+import { MAX_SEARCH_QUERY_LENGTH } from "@/features/search/services/search-normalization";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("Marketplace");
@@ -55,7 +60,7 @@ export default async function MarketplacePage({
   const view = query.view === "map" ? "map" : "list";
   const hasCustomerLocation =
     Number.isFinite(latitude) && Number.isFinite(longitude);
-  const [marketplaceBusinesses, filters, t] = await Promise.all([
+  const [marketplaceBusinesses, filters, t, identity] = await Promise.all([
     searchMarketplace({
       query: searchQuery,
       category: query.category,
@@ -67,7 +72,26 @@ export default async function MarketplacePage({
     }),
     getMarketplaceFilters(),
     getTranslations("Marketplace"),
+    getOptionalActiveIdentity(),
   ]);
+  const businessMembership =
+    identity?.person.isOnboarded
+      ? await getAnyBusinessMembership(identity.person.id)
+      : null;
+  const customerHref = identity?.person.isOnboarded
+    ? "/customer"
+    : "/register?mode=signin&next=%2Fcustomer";
+  const bookingsHref = identity?.person.isOnboarded
+    ? "/customer/bookings"
+    : "/register?mode=signin&next=%2Fcustomer%2Fbookings";
+  const messagesHref = identity?.person.isOnboarded
+    ? "/customer/messages"
+    : "/register?mode=signin&next=%2Fcustomer%2Fmessages";
+  const businessHref = !identity
+    ? "/register?intent=business"
+    : businessMembership
+      ? "/business"
+      : "/onboarding/business";
   const favoriteState = await getCurrentCustomerFavoriteBusinessIds(
     marketplaceBusinesses.map((business) => business.id),
   );
@@ -106,7 +130,7 @@ export default async function MarketplacePage({
   return (
     <div className="min-h-screen bg-background">
       <PublicHeader />
-      <main className="relative mx-auto max-w-7xl overflow-hidden px-4 py-10 sm:px-6 sm:py-16">
+      <main className="relative mx-auto max-w-7xl overflow-hidden px-4 py-10 pb-[calc(6rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-16 md:pb-16">
         <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[28rem] bg-[radial-gradient(circle_at_top_right,color-mix(in_oklch,var(--primary)_18%,transparent),transparent_32rem),radial-gradient(circle_at_top_left,color-mix(in_oklch,var(--accent)_16%,transparent),transparent_28rem)]" />
         <div className="mx-auto max-w-3xl text-center">
           <span className="inline-flex rounded-full border border-primary/15 bg-primary/8 px-3 py-1 text-sm font-semibold text-primary">
@@ -133,8 +157,12 @@ export default async function MarketplacePage({
                 aria-label={t("searchLabel")}
                 className="h-11"
               />
-              {query.lat ? <input type="hidden" name="lat" value={query.lat} /> : null}
-              {query.lng ? <input type="hidden" name="lng" value={query.lng} /> : null}
+              {query.lat ? (
+                <input type="hidden" name="lat" value={query.lat} />
+              ) : null}
+              {query.lng ? (
+                <input type="hidden" name="lng" value={query.lng} />
+              ) : null}
               <input type="hidden" name="view" value={view} />
               <select
                 name="category"
@@ -290,6 +318,12 @@ export default async function MarketplacePage({
         )}
       </main>
       <PublicFooter />
+      <MobileAppShellNav
+        businessHref={businessHref}
+        customerHref={customerHref}
+        bookingsHref={bookingsHref}
+        messagesHref={messagesHref}
+      />
     </div>
   );
 }

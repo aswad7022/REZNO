@@ -15,6 +15,14 @@
     "readOnly": "تەنها بۆ خوێندنەوە",
     "backHome": "گەڕانەوە بۆ سەرەکی"
   },
+  "MobileAppNav": {
+    "label": "ڕێنیشاندەری ئەپی مۆبایل",
+    "customer": "سەرەکی",
+    "marketplace": "گەڕان",
+    "bookings": "حجزەکان",
+    "messages": "نامەکان",
+    "business": "بازرگانی"
+  },
   "BusinessManagement": {
     "title": "زانیارییەکانی بازرگانی",
     "description": "ناسنامە و زانیاری پەیوەندیی بازرگانییەکەت نوێ بکەرەوە.",
