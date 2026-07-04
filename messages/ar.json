@@ -15,6 +15,14 @@
     "readOnly": "للقراءة فقط",
     "backHome": "العودة للرئيسية"
   },
+  "MobileAppNav": {
+    "label": "تنقل تطبيق الهاتف",
+    "customer": "الرئيسية",
+    "marketplace": "استكشف",
+    "bookings": "الحجوزات",
+    "messages": "الرسائل",
+    "business": "النشاط"
+  },
   "BusinessManagement": {
     "title": "بيانات النشاط التجاري",
     "description": "حدّث هوية نشاطك ومعلومات التواصل التي يراها العملاء.",
