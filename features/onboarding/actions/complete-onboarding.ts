@@ -2,10 +2,14 @@
 
 import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 
-import { requireActiveIdentity } from "@/features/identity/server";
+import {
+  ACTIVE_BUSINESS_COOKIE,
+  requireActiveIdentity,
+} from "@/features/identity/server";
 import { isReservedBusinessSlug } from "@/features/business/lib/business-slug";
 import { businessOnboardingSchema } from "@/features/onboarding/schemas/onboarding";
 import type { BusinessOnboardingState } from "@/features/onboarding/types";
@@ -85,51 +89,43 @@ export async function completeBusinessOnboarding(
   try {
     await prisma.$transaction(
       async (transaction) => {
-        const existingMembership =
-          await transaction.organizationMember.findFirst({
-            where: { personId: identity.person.id },
-            select: { id: true },
-          });
-
-        if (!existingMembership) {
-          await transaction.organization.create({
-            data: {
-              id: organizationId,
-              name: organizationName,
-              slug: organizationSlug,
-              vertical,
-              branches: {
-                create: {
-                  name: branchName,
-                  slug: branchSlug,
-                },
-              },
-              profile: {
-                create: {},
-              },
-              roles: {
-                create: {
-                  id: ownerRoleId,
-                  name: "Owner",
-                  description: "Full access to the organization.",
-                  isSystem: true,
-                  systemRole: "OWNER",
-                },
-              },
-              settings: {
-                create: {},
+        await transaction.organization.create({
+          data: {
+            id: organizationId,
+            name: organizationName,
+            slug: organizationSlug,
+            vertical,
+            branches: {
+              create: {
+                name: branchName,
+                slug: branchSlug,
               },
             },
-          });
-
-          await transaction.organizationMember.create({
-            data: {
-              organizationId,
-              personId: identity.person.id,
-              roleId: ownerRoleId,
+            profile: {
+              create: {},
             },
-          });
-        }
+            roles: {
+              create: {
+                id: ownerRoleId,
+                name: "Owner",
+                description: "Full access to the organization.",
+                isSystem: true,
+                systemRole: "OWNER",
+              },
+            },
+            settings: {
+              create: {},
+            },
+          },
+        });
+
+        await transaction.organizationMember.create({
+          data: {
+            organizationId,
+            personId: identity.person.id,
+            roleId: ownerRoleId,
+          },
+        });
 
         await transaction.person.update({
           where: { id: identity.person.id },
@@ -156,6 +152,14 @@ export async function completeBusinessOnboarding(
       message: t("failure"),
     };
   }
+
+  (await cookies()).set(ACTIVE_BUSINESS_COOKIE, organizationId, {
+    httpOnly: true,
+    maxAge: 60 * 60 * 24 * 180,
+    path: "/",
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+  });
 
   redirect("/business");
 }
