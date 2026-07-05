@@ -31,6 +31,8 @@ The CTO may authorize a fast-lane docs/tools sprint when all compatible changes 
 
 The orchestrator may print plans, handoff prompts, status reports, local reviews, safe validation output, and close-sprint checklists. It must not edit files or start agents automatically.
 
+Phase 3 delegation also allows the orchestrator to print task risk analysis, a full sprint runner pack, a PR body draft, a compact CTO decision report, and a memory update block. These outputs are advisory text only. They do not authorize implementation, deployment, or merge by themselves.
+
 ## Human-only approvals
 
 The CTO or delegated human reviewer must approve:

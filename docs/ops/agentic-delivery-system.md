@@ -65,6 +65,31 @@ Fast-lane rules:
 - Never run Codex automatically from repository tooling.
 - Never merge without explicit CTO approval.
 
+## Phase 3 sprint runner and review pack
+
+Phase 3 reduces copy/paste during supervised delivery. It can generate a sprint pack, task risk analysis, PR body draft, CTO decision report, and memory update block from task text and local Git state.
+
+Use:
+
+```sh
+node tools/agents/rezno-orchestrator.mjs risk "Prepare next safe REZNO sprint"
+node tools/agents/rezno-orchestrator.mjs sprint "Prepare next safe REZNO sprint"
+node tools/agents/rezno-orchestrator.mjs pr-body "Agentic Delivery System Phase 3"
+node tools/agents/rezno-orchestrator.mjs decision
+node tools/agents/rezno-orchestrator.mjs memory "Agentic Delivery System Phase 3"
+```
+
+Phase 3 is still supervised execution:
+
+- It does not run Codex.
+- It does not edit files.
+- It does not call GitHub.
+- It does not commit, push, merge, deploy, or run EAS.
+- It does not inspect or print secrets.
+- It does not bypass CTO approval.
+
+Speed comes from packaging safe review text, not from skipping review gates.
+
 ## CTO decision labels
 
 Only these labels are valid:
