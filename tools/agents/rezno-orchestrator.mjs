@@ -474,8 +474,30 @@ function packageScripts() {
   return packageJson.scripts ?? {};
 }
 
-function isSafeScript(scriptText) {
-  return !RISKY_SCRIPT_TERMS.some((pattern) => pattern.test(scriptText));
+function riskyScriptTerm(scriptText) {
+  return RISKY_SCRIPT_TERMS.find((pattern) => pattern.test(scriptText)) ?? null;
+}
+
+function lifecycleScriptNames(scriptName) {
+  return [`pre${scriptName}`, scriptName, `post${scriptName}`];
+}
+
+function scriptSafetyReview(scripts, scriptName) {
+  const relatedScripts = lifecycleScriptNames(scriptName)
+    .filter((name) => Object.hasOwn(scripts, name))
+    .map((name) => ({
+      name,
+      text: scripts[name],
+      riskyTerm: riskyScriptTerm(scripts[name]),
+    }));
+
+  const riskyScript = relatedScripts.find((script) => script.riskyTerm);
+
+  return {
+    relatedScripts,
+    riskyScript,
+    safe: !riskyScript,
+  };
 }
 
 function npmCommand() {
@@ -507,8 +529,12 @@ function runValidation() {
       continue;
     }
 
-    if (!isSafeScript(scriptText)) {
-      console.log(`- npm run ${scriptName}: skipped (script contains risky terms)`);
+    const safetyReview = scriptSafetyReview(scripts, scriptName);
+
+    if (!safetyReview.safe) {
+      console.log(
+        `- npm run ${scriptName}: skipped (${safetyReview.riskyScript.name} contains risky term ${safetyReview.riskyScript.riskyTerm})`,
+      );
       continue;
     }
 

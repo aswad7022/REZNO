@@ -39,6 +39,8 @@ Phase 2 adds fast-lane commands for safe docs/tools work:
 - `validate` runs only safe checks: Node syntax check, `git diff --check`, and safe npm scripts when present.
 - `close-sprint` prints a post-merge sync checklist and memory update block.
 
+Before `validate` runs `npm run lint` or `npm run typecheck`, it inspects the matching npm lifecycle scripts (`prelint`, `lint`, `postlint`, `pretypecheck`, `typecheck`, and `posttypecheck`). If any related lifecycle script contains a risky term, the whole command is skipped with a clear reason.
+
 Speed comes from combining compatible safe docs/tools work into one reviewable PR. It never bypasses CTO approval, validation, or merge rules.
 
 ## CTO decision labels
