@@ -19,6 +19,8 @@ Turns an approved goal into a narrow sprint plan. It identifies scope, out-of-sc
 
 Escalates when implementation would require schema, auth, permissions, deployment, or product architecture expansion.
 
+In fast-lane mode, it may use `node tools/agents/rezno-orchestrator.mjs plan "<task>"` to produce a concise plan without editing files.
+
 ## Codex Execution Agent
 
 Implements the approved scope. It must preserve existing functionality, avoid broad refactors, avoid `git add .`, and change only authorized files.
@@ -29,6 +31,8 @@ It must not merge without explicit CTO approval.
 
 Runs the requested validation and runtime checks. It reports exact pass/fail results, blockers, and reproduction steps. It does not invent new flows or mutate data outside the approved QA plan.
 
+In fast-lane mode, it may use `node tools/agents/rezno-orchestrator.mjs validate` for safe local checks and `review-local` for risk review.
+
 ## Security Agent
 
 Reviews auth, permissions, ownership, safe redirects, server actions, secrets, rate limits, and data exposure risks. It escalates high-risk findings before code changes unless a narrow fix is explicitly approved.
@@ -36,6 +40,8 @@ Reviews auth, permissions, ownership, safe redirects, server actions, secrets, r
 ## Release Agent
 
 Verifies branch, commit, PR state, checks, mergeability, generated artifacts, and final file scope. It may merge only after explicit CTO approval for the exact PR.
+
+In fast-lane mode, it may use `close-sprint` to print the post-merge sync checklist and memory block, but it must not update memory automatically.
 
 ## Memory Agent
 

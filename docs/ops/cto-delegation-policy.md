@@ -19,6 +19,18 @@ When explicitly requested, agents may:
 - Commit, push, and open a PR when authorized.
 - Draft handoff prompts for the next task.
 
+## Fast-lane delegation
+
+The CTO may authorize a fast-lane docs/tools sprint when all compatible changes are safe to combine. Fast-lane delegation permits faster preparation and review, but it does not permit:
+
+- Merge without explicit CTO approval.
+- Package installation.
+- Schema or migration changes.
+- Auth, API, permission, payment, business logic, production deployment, EAS, Flutter, or mobile app logic changes.
+- Automatic Codex execution from repository tooling.
+
+The orchestrator may print plans, handoff prompts, status reports, local reviews, safe validation output, and close-sprint checklists. It must not edit files or start agents automatically.
+
 ## Human-only approvals
 
 The CTO or delegated human reviewer must approve:
