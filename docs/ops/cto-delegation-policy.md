@@ -35,6 +35,8 @@ Phase 3 delegation also allows the orchestrator to print task risk analysis, a f
 
 Phase 4 delegation allows the repository-local memory ledger to track closed sprints and the next recommended action. Default memory commands are read-only. `record-sprint` is the only write command, and it may update only `tools/agents/rezno-agent-memory.json` after validating the PR number, main SHA, and CTO decision label.
 
+Phase 5 delegation allows the orchestrator to generate delegated sprint prompts and operator packs. Safe, low-risk goals may produce prompts that authorize sync, branch creation, scoped implementation, checks, commit, push, and PR creation. High-risk goals must produce planning/review-only prompts until CTO explicitly approves implementation. Merge always remains human-only.
+
 ## Human-only approvals
 
 The CTO or delegated human reviewer must approve:

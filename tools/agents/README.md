@@ -72,6 +72,9 @@ node tools/agents/rezno-orchestrator.mjs memory-status
 node tools/agents/rezno-orchestrator.mjs record-sprint "Sprint Name" "20" "<40-character-main-sha>" "APPROVE"
 node tools/agents/rezno-orchestrator.mjs next
 node tools/agents/rezno-orchestrator.mjs audit
+node tools/agents/rezno-orchestrator.mjs delegate "Improve REZNO agentic delivery docs safely"
+node tools/agents/rezno-orchestrator.mjs gate "Prepare mobile EAS build"
+node tools/agents/rezno-orchestrator.mjs operator-pack "Improve REZNO agentic delivery docs safely"
 ```
 
 The ledger lives at `tools/agents/rezno-agent-memory.json`. Default commands are read-only. `record-sprint` is the only write command, and it may write only to that JSON file. It validates the PR number, main SHA, and CTO decision label before updating the ledger.
@@ -79,6 +82,25 @@ The ledger lives at `tools/agents/rezno-agent-memory.json`. Default commands are
 The `audit` command checks that `memory.currentApprovedMain` is a valid 40-character SHA, compares it with local `main`, validates all closed sprint records, and flags stale memory with `NEEDS QA GATE`.
 
 The memory ledger is a coordination aid. It does not authorize implementation, merge, deployment, package changes, schema changes, or secret handling.
+
+## Phase 5 delegated sprint mode
+
+Phase 5 adds daily-use delegated sprint commands:
+
+- `delegate "<goal>"` reads memory, reviews repo state, classifies goal risk, and prints the next safe action plus a ready-to-copy Codex prompt.
+- `gate "<goal>"` prints a QA/security gate checklist for risky work.
+- `operator-pack "<goal>"` prints a full CTO/operator pack with summary, risks, allowed/disallowed actions, prompt, QA checklist, PR checklist, and memory update template.
+
+Daily workflow:
+
+1. Run `node tools/agents/rezno-orchestrator.mjs memory-status`.
+2. Run `node tools/agents/rezno-orchestrator.mjs delegate "<goal>"`.
+3. Copy the generated Codex prompt.
+4. Review the resulting PR with CTO.
+5. Merge only after explicit CTO approval.
+6. After merge, record the sprint only when instructed with `record-sprint`.
+
+Delegated sprint mode can plan, generate prompts, classify risk, and prepare review packs. It does not autonomously run Codex, merge, deploy, install packages, change schema, or change auth.
 
 ## CTO decision labels
 

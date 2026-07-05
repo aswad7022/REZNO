@@ -451,6 +451,9 @@ Usage:
   node tools/agents/rezno-orchestrator.mjs record-sprint "<sprint name>" "<pr number>" "<main sha>" "<decision>"
   node tools/agents/rezno-orchestrator.mjs next
   node tools/agents/rezno-orchestrator.mjs audit
+  node tools/agents/rezno-orchestrator.mjs delegate "<goal>"
+  node tools/agents/rezno-orchestrator.mjs gate "<goal>"
+  node tools/agents/rezno-orchestrator.mjs operator-pack "<goal>"
   node tools/agents/rezno-orchestrator.mjs validate
   node tools/agents/rezno-orchestrator.mjs close-sprint
 
@@ -537,6 +540,182 @@ function printRiskAnalysis() {
     console.log("- Stop for CTO review before implementation if any detected category is outside the approved scope.");
     console.log("- Add QA/security gates for all detected categories.");
   }
+  console.log("");
+  printDecision(decision);
+}
+
+function goalIsHighRisk(risks) {
+  return risks.size > 0;
+}
+
+function goalDecision(risks) {
+  return decisionForGoalRisks(risks);
+}
+
+function hardRulesText() {
+  return `- Do not use git add .
+- Do not merge without explicit CTO approval.
+- Do not install packages unless explicitly approved.
+- Do not change package.json or lockfiles unless explicitly approved.
+- Do not change database, Prisma schema, migrations, auth, API, permissions, payments, production deployment, EAS, Flutter, mobile app logic, or business logic unless explicitly approved.
+- Do not print or store secrets.
+- Do not run destructive commands.
+- Do not run Codex automatically from repository tooling.`;
+}
+
+function safeExecutionPrompt(goal, allowImplementation) {
+  if (!allowImplementation) {
+    return `You are Codex working in the REZNO repository.
+
+Task:
+${goal}
+
+Mode:
+Planning and review only.
+
+Hard rules:
+${hardRulesText()}
+- Do not implement.
+- Do not commit.
+- Do not push.
+- Do not open a PR.
+
+Start with:
+- git status --short
+- git branch --show-current
+- git log -1 --oneline
+- node tools/agents/rezno-orchestrator.mjs status
+- node tools/agents/rezno-orchestrator.mjs risk "${goal}"
+
+Return a plan, risk review, QA/security gates, and CTO decision recommendation.`;
+  }
+
+  return `You are Codex working in the REZNO repository.
+
+Task:
+${goal}
+
+CTO approval is granted only for this safe scoped task to:
+- sync main
+- create a branch
+- implement scoped safe changes
+- run checks
+- commit
+- push
+- open a PR
+
+Hard rules:
+${hardRulesText()}
+- No merge is allowed.
+
+Start with:
+- git fetch origin
+- git checkout main
+- git pull --ff-only origin main
+- git status --short
+- node tools/agents/rezno-orchestrator.mjs status
+
+Then implement only the approved scope, run safe checks, review risk, commit with explicit paths only, push, open a PR, and stop for CTO review.`;
+}
+
+function printDelegate() {
+  const goal = taskText();
+  const memory = readMemory();
+  const state = context();
+  const risks = detectGoalRisks(goal);
+  const decision = goalDecision(risks);
+  const allowImplementation = !goalIsHighRisk(risks);
+
+  console.log("REZNO Delegated Sprint Mode");
+  console.log(`Goal: ${goal}`);
+  console.log(`Current approved main: ${memory.currentApprovedMain}`);
+  console.log(`Current branch: ${state.branch}`);
+  console.log(`Working tree: ${state.workingEntries.length === 0 ? "clean" : "dirty"}`);
+  console.log("Risk classification:");
+  console.log(riskLines(risks).join("\n"));
+  console.log(`Decision recommendation: ${decision.label}`);
+  console.log(`Reason: ${decision.reason}`);
+  console.log(
+    `Next safe action: ${
+      allowImplementation
+        ? "Use the generated implementation prompt, then stop at PR for CTO review."
+        : "Run planning/security QA only. Do not implement, commit, push, or open PR until CTO approves the risky scope."
+    }`,
+  );
+  console.log("");
+  console.log("Ready-to-copy Codex prompt:");
+  console.log(safeExecutionPrompt(goal, allowImplementation));
+}
+
+function printGate() {
+  const goal = taskText();
+  const risks = detectGoalRisks(goal);
+  const decision = goalDecision(risks);
+
+  console.log(`REZNO QA/Security Gate: ${goal}`);
+  console.log("");
+  console.log("Detected risk categories:");
+  console.log(riskLines(risks).join("\n"));
+  console.log("");
+  console.log("Approval required before implementation:");
+  for (const category of GOAL_RISK_RULES.map((rule) => rule.name)) {
+    console.log(`- ${category}: ${risks.has(category) ? "CTO review required" : "no keyword risk detected"}`);
+  }
+  console.log("");
+  console.log("Gate checklist:");
+  console.log("- Confirm scope and out-of-scope items.");
+  console.log("- Confirm no secrets are printed or stored.");
+  console.log("- Confirm safe validation commands.");
+  console.log("- Confirm ownership, auth, permission, and data exposure risks when relevant.");
+  console.log("- Confirm no merge without explicit CTO approval.");
+  console.log("");
+  printDecision(decision);
+}
+
+function printOperatorPack() {
+  const goal = taskText();
+  const risks = detectGoalRisks(goal);
+  const decision = goalDecision(risks);
+  const allowImplementation = !goalIsHighRisk(risks);
+
+  console.log(`REZNO CTO/Operator Pack: ${goal}`);
+  console.log("");
+  console.log("Executive summary:");
+  console.log("- Delegated sprint mode can generate safe prompts, classify risk, and prepare review packs.");
+  console.log("- It does not run Codex, merge, deploy, install packages, change schema, or change auth.");
+  console.log("");
+  console.log("Risk summary:");
+  console.log(riskLines(risks).join("\n"));
+  console.log("");
+  console.log("Allowed actions:");
+  console.log("- Plan safe scoped work.");
+  console.log("- Generate implementation prompts.");
+  console.log("- Run safe repository checks when explicitly requested.");
+  console.log("- Commit, push, and open PR only when the generated prompt explicitly authorizes it.");
+  console.log("");
+  console.log("Disallowed actions:");
+  console.log("- No git add .");
+  console.log("- No merge without CTO approval.");
+  console.log("- No package/schema/migration/auth/API/business logic changes unless explicitly approved.");
+  console.log("- No deploy, EAS, destructive database commands, or secret exposure.");
+  console.log("");
+  console.log("Codex execution prompt:");
+  console.log(safeExecutionPrompt(goal, allowImplementation));
+  console.log("");
+  console.log("QA checklist:");
+  console.log("- Run node tools/agents/rezno-orchestrator.mjs status.");
+  console.log("- Run node tools/agents/rezno-orchestrator.mjs review-local.");
+  console.log("- Run node tools/agents/rezno-orchestrator.mjs validate.");
+  console.log("- Run extra QA only when approved and safe.");
+  console.log("");
+  console.log("PR review checklist:");
+  console.log("- Confirm files changed match scope.");
+  console.log("- Confirm risk categories and checks.");
+  console.log("- Confirm no package, schema, migration, auth, API, business logic, deploy, EAS, or mobile app logic changes unless approved.");
+  console.log("- Confirm no merge without CTO approval.");
+  console.log("");
+  console.log("Post-merge memory update command template:");
+  console.log('node tools/agents/rezno-orchestrator.mjs record-sprint "<sprint name>" "<pr number>" "<40-character-main-sha>" "APPROVE"');
   console.log("");
   printDecision(decision);
 }
@@ -896,6 +1075,7 @@ function printNext() {
   console.log(`Current approved main: ${memory.currentApprovedMain}`);
   console.log(`Current branch: ${state.branch}`);
   console.log(`Working tree: ${state.workingEntries.length === 0 ? "clean" : "dirty"}`);
+  console.log(`Recommended command: node tools/agents/rezno-orchestrator.mjs delegate "${nextAction}"`);
   console.log("");
   console.log("Ready-to-copy Codex prompt:");
   console.log(`You are Codex working in the REZNO repository.
@@ -919,6 +1099,7 @@ Start with:
 - git pull --ff-only origin main
 - node tools/agents/rezno-orchestrator.mjs status
 - node tools/agents/rezno-orchestrator.mjs audit
+- node tools/agents/rezno-orchestrator.mjs delegate "${nextAction}"
 
 Plan the sprint, execute only approved scope, run safe checks, and stop for CTO review. No merge without explicit CTO approval.`);
 }
@@ -1165,6 +1346,21 @@ function main() {
 
   if (command === "audit") {
     printAudit();
+    return;
+  }
+
+  if (command === "delegate") {
+    printDelegate();
+    return;
+  }
+
+  if (command === "gate") {
+    printGate();
+    return;
+  }
+
+  if (command === "operator-pack") {
+    printOperatorPack();
     return;
   }
 
