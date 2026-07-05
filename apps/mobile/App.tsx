@@ -7,6 +7,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  useColorScheme,
   View,
 } from "react-native";
 
@@ -21,6 +22,11 @@ import {
 } from "./src/i18n/labels";
 import { MOBILE_TABS, type MobileTabId } from "./src/navigation/tabs";
 import { getScreenContent } from "./src/screens/content";
+import {
+  darkMobileTheme,
+  lightMobileTheme,
+  type MobileTheme,
+} from "./src/theme/tokens";
 import type { MobileMarketplaceBusiness } from "./src/types/marketplace";
 
 I18nManager.allowRTL(true);
@@ -32,11 +38,14 @@ type MarketplaceState =
   | { status: "error"; message: string };
 
 export default function App() {
+  const colorScheme = useColorScheme();
   const [locale, setLocale] = useState<MobileLocale>(DEFAULT_LOCALE);
   const [activeTab, setActiveTab] = useState<MobileTabId>("customerHome");
   const [marketplaceState, setMarketplaceState] = useState<MarketplaceState>({
     status: "idle",
   });
+  const theme = colorScheme === "light" ? lightMobileTheme : darkMobileTheme;
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const text = labels[locale];
   const direction = getTextDirection(locale);
   const isRtl = direction === "rtl";
@@ -73,7 +82,7 @@ export default function App() {
 
   return (
     <SafeAreaView style={styles.shell}>
-      <StatusBar style="dark" />
+      <StatusBar style={theme.isDark ? "light" : "dark"} />
       <View style={styles.header}>
         <View style={styles.brandRow}>
           <View style={styles.logoMark}>
@@ -116,6 +125,7 @@ export default function App() {
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
+        style={styles.scrollArea}
       >
         <View style={styles.noticeCard}>
           <Text style={[styles.noticeTitle, isRtl && styles.rtlText]}>
@@ -131,6 +141,7 @@ export default function App() {
             isRtl={isRtl}
             onRetry={loadMarketplace}
             state={marketplaceState}
+            styles={styles}
             text={text}
           />
         ) : (
@@ -225,11 +236,13 @@ function MarketplaceSection({
   isRtl,
   onRetry,
   state,
+  styles,
   text,
 }: {
   isRtl: boolean;
   onRetry: () => void;
   state: MarketplaceState;
+  styles: MobileStyles;
   text: (typeof labels)[MobileLocale];
 }) {
   if (state.status === "idle" || state.status === "loading") {
@@ -291,6 +304,7 @@ function MarketplaceSection({
           business={business}
           isRtl={isRtl}
           key={business.id}
+          styles={styles}
           text={text}
         />
       ))}
@@ -301,10 +315,12 @@ function MarketplaceSection({
 function MarketplaceBusinessCard({
   business,
   isRtl,
+  styles,
   text,
 }: {
   business: MobileMarketplaceBusiness;
   isRtl: boolean;
+  styles: MobileStyles;
   text: (typeof labels)[MobileLocale];
 }) {
   const meta = [
@@ -340,6 +356,19 @@ function MarketplaceBusinessCard({
         </Text>
       ) : null}
 
+      {business.matchingServiceName || business.matchingServicePrice ? (
+        <View style={styles.bookingStrip}>
+          <Text style={[styles.bookingStripTitle, isRtl && styles.rtlText]}>
+            {business.matchingServiceName ?? text.marketplaceServices}
+          </Text>
+          {business.matchingServicePrice ? (
+            <Text style={styles.bookingStripPrice}>
+              {business.matchingServicePrice}
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
+
       <View style={styles.businessPills}>
         <Text style={styles.businessPill}>
           ★ {business.averageRating?.toFixed(1) ?? "-"} ·{" "}
@@ -355,274 +384,330 @@ function MarketplaceBusinessCard({
         ) : null}
       </View>
 
-      <Text style={[styles.publicPath, isRtl && styles.rtlText]}>
-        {text.marketplaceOpenBusiness}: {business.publicPath}
-      </Text>
+      <View style={styles.cardFooter}>
+        <Text style={[styles.publicPath, isRtl && styles.rtlText]}>
+          {text.marketplaceOpenBusiness}: {business.publicPath}
+        </Text>
+      </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  shell: {
-    flex: 1,
-    backgroundColor: "#f8fafc",
-  },
-  header: {
-    gap: 16,
-    paddingHorizontal: 20,
-    paddingTop: 18,
-    paddingBottom: 14,
-  },
-  brandRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 12,
-  },
-  logoMark: {
-    alignItems: "center",
-    backgroundColor: "#111827",
-    borderRadius: 18,
-    height: 44,
-    justifyContent: "center",
-    width: 44,
-  },
-  logoText: {
-    color: "#ffffff",
-    fontSize: 22,
-    fontWeight: "900",
-  },
-  brandName: {
-    color: "#0f172a",
-    fontSize: 21,
-    fontWeight: "900",
-    letterSpacing: 0.5,
-  },
-  brandTagline: {
-    color: "#64748b",
-    fontSize: 13,
-    marginTop: 2,
-  },
-  localeRow: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  localeButton: {
-    borderColor: "#dbe4ef",
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-  },
-  localeButtonActive: {
-    backgroundColor: "#111827",
-    borderColor: "#111827",
-  },
-  localeButtonText: {
-    color: "#475569",
-    fontSize: 12,
-    fontWeight: "800",
-  },
-  localeButtonTextActive: {
-    color: "#ffffff",
-  },
-  content: {
-    gap: 14,
-    paddingBottom: 104,
-    paddingHorizontal: 20,
-  },
-  noticeCard: {
-    backgroundColor: "#ecfeff",
-    borderColor: "#bae6fd",
-    borderRadius: 24,
-    borderWidth: 1,
-    padding: 18,
-  },
-  noticeTitle: {
-    color: "#0f172a",
-    fontSize: 17,
-    fontWeight: "900",
-  },
-  noticeBody: {
-    color: "#475569",
-    fontSize: 14,
-    lineHeight: 21,
-    marginTop: 8,
-  },
-  screenCard: {
-    backgroundColor: "#ffffff",
-    borderColor: "#e2e8f0",
-    borderRadius: 28,
-    borderWidth: 1,
-    padding: 20,
-    shadowColor: "#0f172a",
-    shadowOffset: { height: 12, width: 0 },
-    shadowOpacity: 0.08,
-    shadowRadius: 24,
-  },
-  screenEyebrow: {
-    color: "#7c3aed",
-    fontSize: 12,
-    fontWeight: "900",
-    letterSpacing: 0.5,
-    textTransform: "uppercase",
-  },
-  screenTitle: {
-    color: "#0f172a",
-    fontSize: 26,
-    fontWeight: "900",
-    lineHeight: 31,
-    marginTop: 8,
-  },
-  screenDescription: {
-    color: "#475569",
-    fontSize: 15,
-    lineHeight: 23,
-    marginTop: 10,
-  },
-  actionStack: {
-    gap: 10,
-    marginTop: 20,
-  },
-  actionButton: {
-    alignItems: "center",
-    backgroundColor: "#111827",
-    borderRadius: 18,
-    paddingVertical: 14,
-  },
-  secondaryActionButton: {
-    backgroundColor: "#f1f5f9",
-  },
-  disabledActionButton: {
-    backgroundColor: "#e2e8f0",
-  },
-  actionButtonText: {
-    color: "#ffffff",
-    fontSize: 15,
-    fontWeight: "900",
-  },
-  secondaryActionText: {
-    color: "#111827",
-  },
-  disabledActionText: {
-    color: "#64748b",
-  },
-  integrationCard: {
-    backgroundColor: "#fff7ed",
-    borderColor: "#fed7aa",
-    borderRadius: 24,
-    borderWidth: 1,
-    padding: 18,
-  },
-  integrationTitle: {
-    color: "#9a3412",
-    fontSize: 16,
-    fontWeight: "900",
-  },
-  integrationBody: {
-    color: "#9a3412",
-    fontSize: 14,
-    lineHeight: 21,
-    marginTop: 8,
-  },
-  apiText: {
-    color: "#7c2d12",
-    fontSize: 12,
-    fontWeight: "700",
-    marginTop: 12,
-  },
-  marketplaceList: {
-    gap: 12,
-  },
-  businessCard: {
-    backgroundColor: "#ffffff",
-    borderColor: "#e2e8f0",
-    borderRadius: 24,
-    borderWidth: 1,
-    gap: 12,
-    padding: 16,
-  },
-  businessHeader: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 12,
-  },
-  businessHeaderText: {
-    flex: 1,
-  },
-  businessName: {
-    color: "#0f172a",
-    fontSize: 18,
-    fontWeight: "900",
-  },
-  businessMeta: {
-    color: "#64748b",
-    fontSize: 13,
-    marginTop: 3,
-  },
-  businessDescription: {
-    color: "#475569",
-    fontSize: 14,
-    lineHeight: 21,
-  },
-  businessPills: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  businessPill: {
-    backgroundColor: "#f1f5f9",
-    borderRadius: 999,
-    color: "#334155",
-    fontSize: 12,
-    fontWeight: "800",
-    overflow: "hidden",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  publicPath: {
-    color: "#4338ca",
-    fontSize: 13,
-    fontWeight: "800",
-  },
-  tabBar: {
-    backgroundColor: "#ffffff",
-    borderTopColor: "#e2e8f0",
-    borderTopWidth: 1,
-    bottom: 0,
-    flexDirection: "row",
-    gap: 4,
-    left: 0,
-    paddingBottom: 12,
-    paddingHorizontal: 8,
-    paddingTop: 10,
-    position: "absolute",
-    right: 0,
-  },
-  tabButton: {
-    alignItems: "center",
-    borderRadius: 18,
-    flex: 1,
-    gap: 3,
-    minHeight: 58,
-    justifyContent: "center",
-    paddingHorizontal: 4,
-  },
-  tabButtonActive: {
-    backgroundColor: "#eef2ff",
-  },
-  tabIcon: {
-    fontSize: 18,
-  },
-  tabLabel: {
-    color: "#64748b",
-    fontSize: 10,
-    fontWeight: "800",
-  },
-  tabLabelActive: {
-    color: "#4338ca",
-  },
-  rtlText: {
-    textAlign: "right",
-    writingDirection: "rtl",
-  },
-});
+type MobileStyles = ReturnType<typeof createStyles>;
+
+const createStyles = (theme: MobileTheme) =>
+  StyleSheet.create({
+    actionButton: {
+      alignItems: "center",
+      backgroundColor: theme.colors.gold,
+      borderRadius: theme.radii.control,
+      paddingVertical: 14,
+      shadowColor: theme.colors.shadow,
+      shadowOffset: { height: 10, width: 0 },
+      shadowOpacity: theme.isDark ? 0.24 : 0.12,
+      shadowRadius: 18,
+    },
+    actionButtonText: {
+      color: theme.colors.foregroundInverse,
+      fontSize: 15,
+      fontWeight: "900",
+    },
+    actionStack: {
+      gap: theme.spacing.sm,
+      marginTop: 20,
+    },
+    apiText: {
+      color: theme.colors.warning,
+      fontSize: 12,
+      fontWeight: "700",
+      marginTop: 12,
+    },
+    bookingStrip: {
+      backgroundColor: theme.colors.goldSoft,
+      borderColor: theme.colors.accent,
+      borderRadius: theme.radii.control,
+      borderWidth: 1,
+      flexDirection: "row",
+      gap: theme.spacing.sm,
+      justifyContent: "space-between",
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+    },
+    bookingStripPrice: {
+      color: theme.colors.gold,
+      fontSize: 13,
+      fontWeight: "900",
+    },
+    bookingStripTitle: {
+      color: theme.colors.foreground,
+      flex: 1,
+      fontSize: 13,
+      fontWeight: "900",
+    },
+    brandName: {
+      color: theme.colors.foreground,
+      fontSize: 21,
+      fontWeight: "900",
+      letterSpacing: 0.5,
+    },
+    brandRow: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 12,
+    },
+    brandTagline: {
+      color: theme.colors.mutedForeground,
+      fontSize: 13,
+      marginTop: 2,
+    },
+    businessCard: {
+      backgroundColor: theme.colors.cardElevated,
+      borderColor: theme.colors.border,
+      borderRadius: theme.radii.card,
+      borderWidth: 1,
+      gap: 13,
+      padding: 16,
+      shadowColor: theme.colors.shadow,
+      shadowOffset: { height: 16, width: 0 },
+      shadowOpacity: theme.isDark ? 0.28 : 0.08,
+      shadowRadius: 24,
+    },
+    businessDescription: {
+      color: theme.colors.mutedForeground,
+      fontSize: 14,
+      lineHeight: 21,
+    },
+    businessHeader: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 12,
+    },
+    businessHeaderText: {
+      flex: 1,
+    },
+    businessMeta: {
+      color: theme.colors.mutedForeground,
+      fontSize: 13,
+      marginTop: 3,
+    },
+    businessName: {
+      color: theme.colors.foreground,
+      fontSize: 18,
+      fontWeight: "900",
+    },
+    businessPill: {
+      backgroundColor: theme.colors.muted,
+      borderRadius: theme.radii.pill,
+      color: theme.colors.mutedForeground,
+      fontSize: 12,
+      fontWeight: "800",
+      overflow: "hidden",
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+    },
+    businessPills: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+    },
+    cardFooter: {
+      borderTopColor: theme.colors.border,
+      borderTopWidth: 1,
+      paddingTop: 12,
+    },
+    content: {
+      gap: theme.spacing.md,
+      paddingBottom: 132,
+      paddingHorizontal: 20,
+    },
+    disabledActionButton: {
+      backgroundColor: theme.colors.disabled,
+      shadowOpacity: 0,
+    },
+    disabledActionText: {
+      color: theme.colors.disabledText,
+    },
+    header: {
+      gap: 16,
+      paddingBottom: 14,
+      paddingHorizontal: 20,
+      paddingTop: 18,
+    },
+    integrationBody: {
+      color: theme.colors.warning,
+      fontSize: 14,
+      lineHeight: 21,
+      marginTop: 8,
+    },
+    integrationCard: {
+      backgroundColor: theme.colors.warningSoft,
+      borderColor: theme.colors.warning,
+      borderRadius: 24,
+      borderWidth: 1,
+      padding: 18,
+    },
+    integrationTitle: {
+      color: theme.colors.warning,
+      fontSize: 16,
+      fontWeight: "900",
+    },
+    localeButton: {
+      backgroundColor: theme.colors.muted,
+      borderColor: theme.colors.border,
+      borderRadius: theme.radii.pill,
+      borderWidth: 1,
+      paddingHorizontal: 12,
+      paddingVertical: 7,
+    },
+    localeButtonActive: {
+      backgroundColor: theme.colors.gold,
+      borderColor: theme.colors.gold,
+    },
+    localeButtonText: {
+      color: theme.colors.mutedForeground,
+      fontSize: 12,
+      fontWeight: "800",
+    },
+    localeButtonTextActive: {
+      color: theme.colors.foregroundInverse,
+    },
+    localeRow: {
+      flexDirection: "row",
+      gap: 8,
+    },
+    logoMark: {
+      alignItems: "center",
+      backgroundColor: theme.colors.gold,
+      borderRadius: 18,
+      height: 44,
+      justifyContent: "center",
+      shadowColor: theme.colors.shadow,
+      shadowOffset: { height: 8, width: 0 },
+      shadowOpacity: theme.isDark ? 0.3 : 0.14,
+      shadowRadius: 14,
+      width: 44,
+    },
+    logoText: {
+      color: theme.colors.foregroundInverse,
+      fontSize: 22,
+      fontWeight: "900",
+    },
+    marketplaceList: {
+      gap: 12,
+    },
+    noticeBody: {
+      color: theme.colors.mutedForeground,
+      fontSize: 14,
+      lineHeight: 21,
+      marginTop: 8,
+    },
+    noticeCard: {
+      backgroundColor: theme.colors.accentMuted,
+      borderColor: theme.colors.gold,
+      borderRadius: theme.radii.card,
+      borderWidth: 1,
+      padding: 18,
+    },
+    noticeTitle: {
+      color: theme.colors.foreground,
+      fontSize: 17,
+      fontWeight: "900",
+    },
+    publicPath: {
+      color: theme.colors.gold,
+      fontSize: 13,
+      fontWeight: "800",
+    },
+    rtlText: {
+      textAlign: "right",
+      writingDirection: "rtl",
+    },
+    screenCard: {
+      backgroundColor: theme.colors.card,
+      borderColor: theme.colors.border,
+      borderRadius: theme.radii.xl,
+      borderWidth: 1,
+      padding: 20,
+      shadowColor: theme.colors.shadow,
+      shadowOffset: { height: 16, width: 0 },
+      shadowOpacity: theme.isDark ? 0.3 : 0.08,
+      shadowRadius: 26,
+    },
+    screenDescription: {
+      color: theme.colors.mutedForeground,
+      fontSize: 15,
+      lineHeight: 23,
+      marginTop: 10,
+    },
+    screenEyebrow: {
+      color: theme.colors.gold,
+      fontSize: 12,
+      fontWeight: "900",
+      letterSpacing: 0.5,
+      textTransform: "uppercase",
+    },
+    screenTitle: {
+      color: theme.colors.foreground,
+      fontSize: 26,
+      fontWeight: "900",
+      lineHeight: 31,
+      marginTop: 8,
+    },
+    secondaryActionButton: {
+      backgroundColor: theme.colors.muted,
+      shadowOpacity: 0,
+    },
+    secondaryActionText: {
+      color: theme.colors.foreground,
+    },
+    shell: {
+      backgroundColor: theme.colors.background,
+      flex: 1,
+    },
+    scrollArea: {
+      flex: 1,
+    },
+    tabBar: {
+      backgroundColor: theme.colors.nav,
+      borderColor: theme.colors.border,
+      borderRadius: 28,
+      borderWidth: 1,
+      bottom: 28,
+      elevation: 20,
+      flexDirection: "row",
+      height: 86,
+      left: 14,
+      padding: 8,
+      position: "absolute",
+      right: 14,
+      shadowColor: theme.colors.shadow,
+      shadowOffset: { height: 16, width: 0 },
+      shadowOpacity: theme.isDark ? 0.36 : 0.14,
+      shadowRadius: 26,
+      zIndex: 20,
+    },
+    tabButton: {
+      alignItems: "center",
+      borderRadius: 22,
+      flex: 1,
+      gap: 3,
+      justifyContent: "center",
+      minHeight: 58,
+      paddingHorizontal: 4,
+    },
+    tabButtonActive: {
+      backgroundColor: theme.colors.goldSoft,
+    },
+    tabIcon: {
+      color: theme.colors.mutedForeground,
+      fontSize: 18,
+    },
+    tabLabel: {
+      color: theme.colors.mutedForeground,
+      fontSize: 10,
+      fontWeight: "800",
+    },
+    tabLabelActive: {
+      color: theme.colors.gold,
+    },
+  });
