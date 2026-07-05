@@ -1,4 +1,5 @@
 import { betterAuth } from "better-auth";
+import { expo } from "@better-auth/expo";
 import { prismaAdapter } from "@better-auth/prisma-adapter";
 
 import { provisionPerson } from "@/features/identity/services/provision-person";
@@ -6,7 +7,10 @@ import { prisma } from "@/lib/db/prisma";
 
 const trustedOrigins = [
   process.env.BETTER_AUTH_URL,
+  "rezno://",
   process.env.NODE_ENV === "development" ? "http://localhost:3000" : undefined,
+  process.env.NODE_ENV === "development" ? "exp://" : undefined,
+  process.env.NODE_ENV === "development" ? "exp://**" : undefined,
 ].filter((origin): origin is string => Boolean(origin));
 
 export const auth = betterAuth({
@@ -22,6 +26,7 @@ export const auth = betterAuth({
   },
 
   trustedOrigins,
+  plugins: [expo()],
 
   databaseHooks: {
     user: {
