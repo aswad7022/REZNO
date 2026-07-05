@@ -1,0 +1,28 @@
+{
+  "project": "REZNO",
+  "productVision": "One Platform. Every Booking.",
+  "currentApprovedMain": "6812d0f795ae7c49caa57ec1742af0a71d87f902",
+  "closedSprints": [
+    {
+      "name": "Agentic Delivery System MVP",
+      "pr": 17,
+      "mainSha": "dd7ca71567fb583aa8d5ee61bedfe9e9266faf21",
+      "decision": "APPROVE"
+    },
+    {
+      "name": "Agentic Delivery System Phase 2 - Fast Lane Commands",
+      "pr": 18,
+      "mainSha": "f21406f8e45ca01a1f96e48cbe07b48713961818",
+      "decision": "APPROVE"
+    },
+    {
+      "name": "Agentic Delivery System Phase 3 - Sprint Runner and Review Pack",
+      "pr": 19,
+      "mainSha": "6812d0f795ae7c49caa57ec1742af0a71d87f902",
+      "decision": "APPROVE"
+    }
+  ],
+  "activeSprint": null,
+  "blockedItems": [],
+  "nextRecommendedAction": "Agentic Delivery System Phase 5 - Delegated Sprint Mode"
+}

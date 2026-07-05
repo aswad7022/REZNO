@@ -17,6 +17,9 @@ node tools/agents/rezno-orchestrator.mjs review-local
 node tools/agents/rezno-orchestrator.mjs pr-body "Agentic Delivery System Phase 3"
 node tools/agents/rezno-orchestrator.mjs decision
 node tools/agents/rezno-orchestrator.mjs memory "Agentic Delivery System Phase 3"
+node tools/agents/rezno-orchestrator.mjs memory-status
+node tools/agents/rezno-orchestrator.mjs next
+node tools/agents/rezno-orchestrator.mjs audit
 node tools/agents/rezno-orchestrator.mjs validate
 node tools/agents/rezno-orchestrator.mjs close-sprint
 ```
@@ -59,6 +62,21 @@ Phase 3 reduces copy/paste by generating complete sprint and review text from lo
 - `memory "<sprint name>"` prints a memory update block with placeholders for PR number and final main SHA.
 
 These commands do not run Codex, edit files, call GitHub, merge, deploy, or inspect secrets. They support supervised delivery only.
+
+## Phase 4 memory ledger and next action
+
+Phase 4 adds a repository-local memory ledger:
+
+```sh
+node tools/agents/rezno-orchestrator.mjs memory-status
+node tools/agents/rezno-orchestrator.mjs record-sprint "Sprint Name" "20" "<40-character-main-sha>" "APPROVE"
+node tools/agents/rezno-orchestrator.mjs next
+node tools/agents/rezno-orchestrator.mjs audit
+```
+
+The ledger lives at `tools/agents/rezno-agent-memory.json`. Default commands are read-only. `record-sprint` is the only write command, and it may write only to that JSON file. It validates the PR number, main SHA, and CTO decision label before updating the ledger.
+
+The memory ledger is a coordination aid. It does not authorize implementation, merge, deployment, package changes, schema changes, or secret handling.
 
 ## CTO decision labels
 

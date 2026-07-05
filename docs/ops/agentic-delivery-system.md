@@ -90,6 +90,28 @@ Phase 3 is still supervised execution:
 
 Speed comes from packaging safe review text, not from skipping review gates.
 
+## Phase 4 memory ledger and next action
+
+Phase 4 adds a safe repository-local memory ledger at `tools/agents/rezno-agent-memory.json`. The ledger records approved main SHAs, closed Agentic Delivery System sprints, blocked items, and the next recommended action.
+
+Commands:
+
+```sh
+node tools/agents/rezno-orchestrator.mjs memory-status
+node tools/agents/rezno-orchestrator.mjs record-sprint "Sprint Name" "20" "<40-character-main-sha>" "APPROVE"
+node tools/agents/rezno-orchestrator.mjs next
+node tools/agents/rezno-orchestrator.mjs audit
+```
+
+Safety rules:
+
+- Default commands are read-only.
+- `record-sprint` is the only write command.
+- `record-sprint` may edit only `tools/agents/rezno-agent-memory.json`.
+- The ledger never stores secrets.
+- The system remains supervised and does not merge, deploy, or run Codex automatically.
+- Merge still requires explicit CTO approval.
+
 ## CTO decision labels
 
 Only these labels are valid:
