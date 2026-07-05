@@ -799,6 +799,41 @@ function validateDecision(decision) {
   return Object.values(DECISIONS).includes(decision);
 }
 
+function isGitSha(value) {
+  return /^[a-f0-9]{40}$/i.test(value);
+}
+
+function validateMemoryLedger(memory) {
+  const errors = [];
+
+  if (!isGitSha(memory?.currentApprovedMain ?? "")) {
+    errors.push("currentApprovedMain must be a 40-character git SHA");
+  }
+
+  if (!Array.isArray(memory?.closedSprints)) {
+    errors.push("closedSprints must be an array");
+    return errors;
+  }
+
+  for (const [index, sprint] of memory.closedSprints.entries()) {
+    const label = `closedSprints[${index}]`;
+    if (!sprint?.name || typeof sprint.name !== "string") {
+      errors.push(`${label}.name is required`);
+    }
+    if (!Number.isInteger(sprint?.pr)) {
+      errors.push(`${label}.pr must be numeric`);
+    }
+    if (!isGitSha(sprint?.mainSha ?? "")) {
+      errors.push(`${label}.mainSha must be a 40-character git SHA`);
+    }
+    if (!validateDecision(sprint?.decision)) {
+      errors.push(`${label}.decision must be a valid CTO decision label`);
+    }
+  }
+
+  return errors;
+}
+
 function printRecordSprint() {
   const [sprintName, prNumberText, mainSha, ...decisionParts] = process.argv.slice(3);
   const decision = decisionParts.join(" ");
@@ -815,7 +850,7 @@ function printRecordSprint() {
     return;
   }
 
-  if (!/^[a-f0-9]{40}$/i.test(mainSha)) {
+  if (!isGitSha(mainSha)) {
     console.error("Main SHA must look like a 40-character git SHA.");
     process.exitCode = 1;
     return;
@@ -902,9 +937,17 @@ function printAudit() {
   const memoryExists = existsSync(memoryPath());
   const latestMain = hasRef("main") ? runGit(["rev-parse", "main"]) : "missing";
   const approvedMain = memory?.currentApprovedMain ?? null;
-  const approvedMainKnown = Boolean(approvedMain);
+  const approvedMainKnown = isGitSha(approvedMain ?? "");
+  const memoryValidationErrors = memory ? validateMemoryLedger(memory) : [];
+  const mainMismatch = approvedMainKnown && latestMain !== "missing" && approvedMain !== latestMain;
   const risks = state.risks;
-  const auditPassed = memoryExists && !memoryError && approvedMainKnown && state.decision.label === DECISIONS.APPROVE;
+  const auditPassed =
+    memoryExists &&
+    !memoryError &&
+    memoryValidationErrors.length === 0 &&
+    approvedMainKnown &&
+    !mainMismatch &&
+    state.decision.label === DECISIONS.APPROVE;
   const decision = auditPassed
     ? { label: DECISIONS.APPROVE, reason: "Memory ledger exists, JSON is valid, and repository risk review is approved." }
     : { label: DECISIONS.NEEDS_QA_GATE, reason: "Audit found missing, dirty, or uncertain state that needs review." };
@@ -914,6 +957,19 @@ function printAudit() {
   console.log(`Memory JSON valid: ${memoryError ? `no (${memoryError.message})` : "yes"}`);
   console.log(`Current approved main in memory: ${approvedMain ?? "missing"}`);
   console.log(`Latest local main SHA: ${latestMain}`);
+  console.log(`Current branch: ${state.branch}`);
+  console.log(`Memory approved main format: ${approvedMainKnown ? "valid" : "invalid"}`);
+  console.log(`Closed sprints array valid: ${Array.isArray(memory?.closedSprints) ? "yes" : "no"}`);
+  if (memoryValidationErrors.length > 0) {
+    console.log("Memory validation errors:");
+    console.log(memoryValidationErrors.map((error) => `- ${error}`).join("\n"));
+  }
+  if (mainMismatch) {
+    console.log("Warning: Memory approved main differs from local main. Run record-sprint only after CTO-approved merge.");
+    if (state.branch !== "main") {
+      console.log("Note: current branch is not main; this may be expected on a feature branch, but the mismatch is still reported.");
+    }
+  }
   console.log(`Working tree: ${state.workingEntries.length === 0 ? "clean" : "dirty"}`);
   console.log("Risk categories:");
   console.log(riskLines(risks).join("\n"));

@@ -76,6 +76,8 @@ node tools/agents/rezno-orchestrator.mjs audit
 
 The ledger lives at `tools/agents/rezno-agent-memory.json`. Default commands are read-only. `record-sprint` is the only write command, and it may write only to that JSON file. It validates the PR number, main SHA, and CTO decision label before updating the ledger.
 
+The `audit` command checks that `memory.currentApprovedMain` is a valid 40-character SHA, compares it with local `main`, validates all closed sprint records, and flags stale memory with `NEEDS QA GATE`.
+
 The memory ledger is a coordination aid. It does not authorize implementation, merge, deployment, package changes, schema changes, or secret handling.
 
 ## CTO decision labels
