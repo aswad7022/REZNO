@@ -113,6 +113,27 @@ There is one safe memory fallback: if `memory.currentApprovedMain` is a valid an
 
 If any gate fails, `delegate` and `operator-pack` must produce planning/review-only prompts and must not authorize implementation, commit, push, or PR creation.
 
+## Phase 6 GitHub operator queue
+
+Phase 6 connects the daily CTO flow to the GitHub issue-driven Codex queue while keeping the repository tooling itself safe and mostly read-only.
+
+Primary queue:
+
+- Use issue `#22` as the operator queue for Codex tasks.
+- Prefer planning-only tasks unless the CTO explicitly authorizes docs/tools implementation or product implementation.
+- Every Codex task must state the goal, authorization level, allowed actions, disallowed actions, required checks, and return format.
+- Codex may open PRs only when the task explicitly says PR creation is authorized.
+
+Routing order:
+
+1. Direct GitHub route for safe docs/ops/tools/memory edits that ChatGPT can perform through the connector.
+2. Issue Queue route through issue `#22` when Codex needs to inspect the repo or run commands.
+3. Issue-body fallback when adding comments is blocked.
+4. New issue fallback when issue `#22` cannot be updated.
+5. Manual-copy fallback only when all connector routes fail or the required setting is outside GitHub/Codex control.
+
+The detailed policy lives in `docs/ops/github-operator-queue.md`.
+
 ## CTO decision labels
 
 Only these labels are supported:

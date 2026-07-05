@@ -119,7 +119,6 @@ Phase 5 introduces the daily-use delegated sprint flow. The operator starts with
 Commands:
 
 ```sh
-node tools/agents/rezno-orchestrator.mjs memory-status
 node tools/agents/rezno-orchestrator.mjs delegate "Improve REZNO agentic delivery docs safely"
 node tools/agents/rezno-orchestrator.mjs gate "Prepare mobile EAS build"
 node tools/agents/rezno-orchestrator.mjs operator-pack "Improve REZNO agentic delivery docs safely"
@@ -147,6 +146,20 @@ Delegated sprint mode cannot:
 
 High-risk goals become planning/review-only prompts until CTO explicitly approves implementation.
 
+## Phase 6 GitHub operator queue
+
+Phase 6 confirms issue-driven Codex operation and makes GitHub routing the normal path for supervised tasks.
+
+Operating model:
+
+- The operator states the goal in chat.
+- The CTO reviewer selects the safest route: direct GitHub, issue `#22`, issue-body fallback, new issue fallback, or manual-copy fallback.
+- Codex tasks default to planning-only unless the task explicitly authorizes implementation and PR creation.
+- Codex may not merge, deploy, run EAS, change schema, change auth, or change business logic unless a future risk gate explicitly permits the relevant step.
+- Repository tooling still does not run Codex automatically.
+
+The detailed queue policy is documented in `docs/ops/github-operator-queue.md`.
+
 ## CTO decision labels
 
 Only these labels are valid:
@@ -161,8 +174,6 @@ Only these labels are valid:
 - Merge to `main`.
 - Force push.
 - Deploy to production.
-- Run `prisma migrate reset`.
-- Run `prisma db push`.
 - Run destructive database commands.
 - Print, store, or expose secrets.
 - Commit `.env` files.
