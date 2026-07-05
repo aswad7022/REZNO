@@ -124,6 +124,28 @@ node tools/agents/rezno-orchestrator.mjs gate "Prepare mobile EAS build"
 node tools/agents/rezno-orchestrator.mjs operator-pack "Improve REZNO agentic delivery docs safely"
 ```
 
+Delegated sprint mode can:
+
+- Plan safe work.
+- Generate English Codex prompts.
+- Classify risk.
+- Prepare QA/security gates.
+- Prepare CTO/operator review packs.
+
+Delegated sprint mode may generate an implementation-capable prompt only when the repository is on clean `main`, the working tree is clean, and no goal-risk categories are detected. The preferred memory state is an exact match between `memory.currentApprovedMain` and local `main`. A safe fallback is allowed when the memory SHA is an ancestor of local `main` and the drift contains only approved Agentic Delivery System docs/tools/memory files with no risk categories. Any unknown, product/app, API, auth, schema, business logic, or high-risk drift blocks implementation. Any API, business logic, booking, reservation, marketplace, tenant, customer data, staff, pricing, service catalog, notification, message, review, admin, mobile, EAS, auth, schema, migration, package, deployment, payment, secret, or permission risk forces planning/review-only output until CTO explicitly approves the risky scope.
+
+Delegated sprint mode cannot:
+
+- Run Codex automatically.
+- Merge.
+- Deploy.
+- Install packages.
+- Change schema.
+- Change auth.
+- Bypass CTO approval.
+
+High-risk goals become planning/review-only prompts until CTO explicitly approves implementation.
+
 ## Phase 6 GitHub operator queue
 
 Phase 6 confirms issue-driven Codex operation and makes GitHub routing the normal path for supervised tasks.
@@ -137,3 +159,41 @@ Operating model:
 - Repository tooling still does not run Codex automatically.
 
 The detailed queue policy is documented in `docs/ops/github-operator-queue.md`.
+
+## CTO decision labels
+
+Only these labels are valid:
+
+- `APPROVE`
+- `APPROVE AFTER SMALL FIX`
+- `NEEDS QA GATE`
+- `DO NOT MERGE`
+
+## Forbidden actions without explicit approval
+
+- Merge to `main`.
+- Force push.
+- Deploy to production.
+- Run destructive database commands.
+- Print, store, or expose secrets.
+- Commit `.env` files.
+- Change Prisma schema or migrations outside an approved schema sprint.
+- Change auth, permissions, payments, booking, business, or production deployment logic outside approved scope.
+- Install packages or change lockfiles outside an approved dependency task.
+- Run EAS builds, TestFlight, or Android internal testing without explicit approval.
+- Automatically execute Codex or another agent from repository tooling.
+
+## Escalation rules
+
+Escalate to CTO review immediately when:
+
+- A task touches auth, permissions, database schema, migrations, payments, secrets, or production deployment.
+- A validation command fails for a reason that requires code changes outside the approved scope.
+- Runtime QA finds a security, ownership, data leakage, or destructive-operation risk.
+- A PR has failing or pending checks.
+- A merge conflict appears.
+- The requested fix requires a broader refactor than the sprint allows.
+
+## Merge policy
+
+Merge requires explicit CTO approval every time. A passing PR, green checks, or an agent recommendation is not merge approval.
