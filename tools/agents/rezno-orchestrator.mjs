@@ -59,6 +59,53 @@ const RISK_RULES = [
   },
 ];
 
+const GOAL_RISK_RULES = [
+  {
+    name: "database",
+    keywords: ["database", "postgres", "postgresql", "neon", "sql", "data model", "db"],
+  },
+  {
+    name: "schema",
+    keywords: ["schema", "prisma schema", "model", "field", "relation"],
+  },
+  {
+    name: "migrations",
+    keywords: ["migration", "migrate", "prisma migrate", "migrations"],
+  },
+  {
+    name: "auth",
+    keywords: ["auth", "login", "sign in", "session", "better auth", "oauth"],
+  },
+  {
+    name: "permissions",
+    keywords: ["permission", "role", "rbac", "admin", "owner", "access control", "authorization"],
+  },
+  {
+    name: "secrets",
+    keywords: ["secret", "token", "password", "api key", "env", "credential"],
+  },
+  {
+    name: "production deployment",
+    keywords: ["production", "deploy", "deployment", "vercel", "hosting", "release"],
+  },
+  {
+    name: "payments",
+    keywords: ["payment", "stripe", "zaincash", "checkout", "invoice"],
+  },
+  {
+    name: "package changes",
+    keywords: ["package", "dependency", "install", "npm install", "lockfile", "package.json"],
+  },
+  {
+    name: "mobile",
+    keywords: ["mobile", "expo", "react native", "android", "ios", "phone"],
+  },
+  {
+    name: "EAS",
+    keywords: ["eas", "eas build", "testflight", "internal testing"],
+  },
+];
+
 const RISKY_SCRIPT_TERMS = [
   /prisma/i,
   /migrate/i,
@@ -233,6 +280,41 @@ function detectRisks(paths) {
   return risks;
 }
 
+function detectGoalRisks(goal) {
+  const normalizedGoal = goal.toLowerCase();
+  const risks = new Map();
+
+  for (const rule of GOAL_RISK_RULES) {
+    const matches = rule.keywords.filter((keyword) => normalizedGoal.includes(keyword.toLowerCase()));
+    if (matches.length > 0) {
+      risks.set(rule.name, matches);
+    }
+  }
+
+  return risks;
+}
+
+function decisionForGoalRisks(risks) {
+  if (risks.size === 0) {
+    return {
+      label: DECISIONS.APPROVE,
+      reason: "Task text does not mention high-risk categories. Normal scoped review still required.",
+    };
+  }
+
+  if (risks.has("secrets") || risks.has("production deployment") || risks.has("payments") || risks.has("EAS")) {
+    return {
+      label: DECISIONS.DO_NOT_MERGE,
+      reason: "Task text mentions categories that require explicit CTO approval before implementation or merge.",
+    };
+  }
+
+  return {
+    label: DECISIONS.NEEDS_QA_GATE,
+    reason: "Task text mentions risk categories that require a QA/security gate before approval.",
+  };
+}
+
 function isOnlyApprovedFiles(paths) {
   return paths.length > 0 && paths.every((path) => APPROVED_FILES.has(path));
 }
@@ -289,6 +371,18 @@ function printRisks(risks) {
   }
 }
 
+function riskLines(risks) {
+  if (risks.size === 0) {
+    return ["- none"];
+  }
+
+  return [...risks.entries()].map(([risk, details]) => `- ${risk}: ${uniqueSorted(details).join(", ")}`);
+}
+
+function changedFilesForReport(state) {
+  return state.reviewFiles.length === 0 ? ["- none"] : state.reviewFiles.map((file) => `- ${file}`);
+}
+
 function context() {
   const base = comparisonBase();
   const workingEntries = workingTreeEntries();
@@ -325,9 +419,14 @@ function printHelp() {
 Usage:
   node tools/agents/rezno-orchestrator.mjs help
   node tools/agents/rezno-orchestrator.mjs status
+  node tools/agents/rezno-orchestrator.mjs risk "<goal>"
+  node tools/agents/rezno-orchestrator.mjs sprint "<goal>"
   node tools/agents/rezno-orchestrator.mjs plan "<task>"
   node tools/agents/rezno-orchestrator.mjs handoff "<task>"
   node tools/agents/rezno-orchestrator.mjs review-local
+  node tools/agents/rezno-orchestrator.mjs pr-body "<sprint name>"
+  node tools/agents/rezno-orchestrator.mjs decision
+  node tools/agents/rezno-orchestrator.mjs memory "<sprint name>"
   node tools/agents/rezno-orchestrator.mjs validate
   node tools/agents/rezno-orchestrator.mjs close-sprint
 
@@ -389,6 +488,35 @@ function taskText() {
   return process.argv.slice(3).join(" ").trim() || "Unspecified REZNO task";
 }
 
+function slugify(value) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 72);
+}
+
+function printRiskAnalysis() {
+  const goal = taskText();
+  const risks = detectGoalRisks(goal);
+  const decision = decisionForGoalRisks(risks);
+
+  console.log(`REZNO Task Risk Analysis: ${goal}`);
+  console.log("");
+  console.log("Risk categories detected from task text:");
+  console.log(riskLines(risks).join("\n"));
+  console.log("");
+  console.log("Escalation recommendation:");
+  if (risks.size === 0) {
+    console.log("- Continue with normal scoped planning and repository review.");
+  } else {
+    console.log("- Stop for CTO review before implementation if any detected category is outside the approved scope.");
+    console.log("- Add QA/security gates for all detected categories.");
+  }
+  console.log("");
+  printDecision(decision);
+}
+
 function printPlan() {
   const task = taskText();
 
@@ -423,6 +551,92 @@ function printPlan() {
   console.log("- APPROVE AFTER SMALL FIX: narrow fix required and safe.");
   console.log("- NEEDS QA GATE: unknown non-high-risk scope or runtime uncertainty.");
   console.log("- DO NOT MERGE: high-risk category, failed required checks, or unapproved expansion.");
+}
+
+function printSprintPack() {
+  const goal = taskText();
+  const risks = detectGoalRisks(goal);
+  const decision = decisionForGoalRisks(risks);
+  const sprintSlug = slugify(goal) || "safe-rezno-sprint";
+
+  console.log(`REZNO Sprint Runner Pack: ${goal}`);
+  console.log("");
+  console.log(`Sprint name suggestion: ${goal}`);
+  console.log(`Branch name suggestion: sprint-${sprintSlug}`);
+  console.log("");
+  console.log("Scope:");
+  console.log("- Confirm baseline branch and working tree state.");
+  console.log("- Inspect only files related to the approved task.");
+  console.log("- Implement the smallest safe change if implementation is explicitly approved.");
+  console.log("- Preserve existing REZNO behavior.");
+  console.log("");
+  console.log("Out of scope:");
+  console.log("- Package installs or lockfile changes unless explicitly approved.");
+  console.log("- Database, Prisma schema, migrations, auth, API, permissions, payments, production deployment, EAS, Flutter, mobile app logic, or business logic changes unless explicitly approved.");
+  console.log("- Broad refactors, unrelated UI changes, automatic Codex execution, deployment, or merge.");
+  console.log("");
+  console.log("Risk analysis:");
+  console.log(riskLines(risks).join("\n"));
+  console.log("");
+  console.log("Safe checks:");
+  console.log("- node tools/agents/rezno-orchestrator.mjs status");
+  console.log("- node tools/agents/rezno-orchestrator.mjs review-local");
+  console.log("- node tools/agents/rezno-orchestrator.mjs validate");
+  console.log("- git diff --check");
+  console.log("");
+  console.log("Ready-to-copy Codex implementation prompt:");
+  console.log(`You are Codex working in the REZNO repository.
+
+Task:
+${goal}
+
+Hard rules:
+- Do not use git add .
+- Do not merge without explicit CTO approval.
+- Do not install packages unless explicitly approved.
+- Do not change package.json or lockfiles unless explicitly approved.
+- Do not change database, Prisma schema, migrations, auth, API, permissions, payments, production deployment, EAS, Flutter, mobile app logic, or business logic unless explicitly approved.
+- Do not print or store secrets.
+- Do not run destructive commands.
+- Do not run Codex automatically from repository tooling.
+
+Start with:
+- git status --short
+- git branch --show-current
+- git log -1 --oneline
+- node tools/agents/rezno-orchestrator.mjs status
+
+Then plan, execute only approved scope, run safe checks, run review-local, and report with one CTO decision label.`);
+  console.log("");
+  console.log("PR body template:");
+  console.log(`## Scope
+- <Describe scoped change>
+
+## Safety constraints
+- No merge without CTO approval.
+- No package/schema/migration/auth/API/business logic/deployment changes unless explicitly approved.
+
+## Files changed
+- <List files>
+
+## Checks run
+- node tools/agents/rezno-orchestrator.mjs validate
+- git diff --check
+
+## Risk classification
+${riskLines(risks).join("\n")}
+
+## CTO decision recommendation
+${decision.label}
+
+## Merge policy
+No merge without explicit CTO approval.`);
+  console.log("");
+  console.log("CTO decision criteria:");
+  console.log("- APPROVE: scope is clean, checks pass, no high-risk categories.");
+  console.log("- APPROVE AFTER SMALL FIX: narrow fix required and safe.");
+  console.log("- NEEDS QA GATE: risk or runtime uncertainty needs validation.");
+  console.log("- DO NOT MERGE: high-risk category, failed checks, or unapproved scope expansion.");
 }
 
 function printHandoff() {
@@ -462,6 +676,76 @@ Decision labels only:
 - APPROVE AFTER SMALL FIX
 - NEEDS QA GATE
 - DO NOT MERGE`);
+}
+
+function printPrBody() {
+  const sprintName = taskText();
+  const state = context();
+
+  console.log(`## Scope
+- ${sprintName}
+- Generated from local branch state.
+
+## Safety constraints
+- No merge without explicit CTO approval.
+- No automatic Codex execution.
+- No package installs, deploys, EAS, Prisma, migrations, database commands, seed, reset, or destructive commands.
+- No schema, auth, API, permissions, payments, production deployment, mobile app logic, or business logic changes unless explicitly approved.
+
+## Files changed
+${changedFilesForReport(state).join("\n")}
+
+## Checks to run
+- node tools/agents/rezno-orchestrator.mjs status
+- node tools/agents/rezno-orchestrator.mjs review-local
+- node tools/agents/rezno-orchestrator.mjs validate
+- git diff --check
+
+## Risk classification
+${riskLines(state.risks).join("\n")}
+
+## CTO decision recommendation
+${state.decision.label}
+
+Reason: ${state.decision.reason}
+
+## Merge policy
+No merge without explicit CTO approval.`);
+}
+
+function printCompactDecision() {
+  const state = context();
+
+  console.log("REZNO CTO Decision Report");
+  console.log(`Branch: ${state.branch}`);
+  console.log(`Latest commit: ${state.latestCommit}`);
+  console.log(`Comparison base: ${state.base}`);
+  console.log("Changed files:");
+  console.log(changedFilesForReport(state).join("\n"));
+  console.log("Risks:");
+  console.log(riskLines(state.risks).join("\n"));
+  console.log(`Decision: ${state.decision.label}`);
+  console.log(`Reason: ${state.decision.reason}`);
+}
+
+function printMemoryBlock() {
+  const sprintName = taskText();
+  const state = context();
+
+  console.log("REZNO Memory Update Block");
+  console.log(`Sprint name: ${sprintName}`);
+  console.log(`Branch: ${state.branch}`);
+  console.log(`Latest commit: ${state.latestCommit}`);
+  console.log(`Comparison base: ${state.base}`);
+  console.log("Changed files:");
+  console.log(changedFilesForReport(state).join("\n"));
+  console.log("Risk classification:");
+  console.log(riskLines(state.risks).join("\n"));
+  console.log(`Decision: ${state.decision.label}`);
+  console.log("PR number: <PR_NUMBER>");
+  console.log("Final main SHA: <FINAL_MAIN_SHA>");
+  console.log("Blocked items: <NONE_OR_LIST>");
+  console.log("Note: memory files are not edited automatically.");
 }
 
 function packageScripts() {
@@ -593,6 +877,16 @@ function main() {
     return;
   }
 
+  if (command === "risk") {
+    printRiskAnalysis();
+    return;
+  }
+
+  if (command === "sprint") {
+    printSprintPack();
+    return;
+  }
+
   if (command === "plan") {
     printPlan();
     return;
@@ -605,6 +899,21 @@ function main() {
 
   if (command === "review-local") {
     printReviewLocal();
+    return;
+  }
+
+  if (command === "pr-body") {
+    printPrBody();
+    return;
+  }
+
+  if (command === "decision") {
+    printCompactDecision();
+    return;
+  }
+
+  if (command === "memory") {
+    printMemoryBlock();
     return;
   }
 
