@@ -40,6 +40,31 @@ This document defines the MVP operating model for using agents to help deliver R
    - Record closed sprint, confirmed main SHA, branch state, remaining risks, and next planned sprint.
    - Memory updates are summaries only; they must not imply approval for future code changes.
 
+## Phase 2 fast-lane workflow
+
+The fast lane is for combining compatible safe docs/tools improvements into one small PR. It is not a bypass around CTO approval.
+
+Use:
+
+```sh
+node tools/agents/rezno-orchestrator.mjs help
+node tools/agents/rezno-orchestrator.mjs status
+node tools/agents/rezno-orchestrator.mjs plan "Prepare next safe REZNO sprint"
+node tools/agents/rezno-orchestrator.mjs handoff "Prepare next safe REZNO sprint"
+node tools/agents/rezno-orchestrator.mjs review-local
+node tools/agents/rezno-orchestrator.mjs validate
+node tools/agents/rezno-orchestrator.mjs close-sprint
+```
+
+Fast-lane rules:
+
+- Prefer docs/tools-only changes.
+- Detect risk from both working tree files and committed branch diff files.
+- Treat database, schema, migrations, auth, permissions, secrets, production deployment, payments, and package changes as escalation categories.
+- Run only safe validation from the orchestrator.
+- Never run Codex automatically from repository tooling.
+- Never merge without explicit CTO approval.
+
 ## CTO decision labels
 
 Only these labels are valid:
