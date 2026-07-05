@@ -11,6 +11,15 @@ type MobileLabels = {
   appTagline: string;
   integrationBoundary: string;
   integrationBoundaryBody: string;
+  marketplaceEmptyBody: string;
+  marketplaceEmptyTitle: string;
+  marketplaceErrorTitle: string;
+  marketplaceLoading: string;
+  marketplaceOpenBusiness: string;
+  marketplaceReviews: string;
+  marketplaceRetry: string;
+  marketplaceServices: string;
+  marketplaceStartingFrom: string;
   nativeFoundation: string;
   nativeFoundationBody: string;
   tabs: Record<MobileTabId, string>;
@@ -23,6 +32,16 @@ export const labels: Record<MobileLocale, MobileLabels> = {
     integrationBoundary: "حدود التكامل",
     integrationBoundaryBody:
       "هذا الأساس لا يغير مصادقة الويب أو منطق الحجز. تسجيل الدخول الحقيقي مع Better Auth يحتاج موافقة منفصلة.",
+    marketplaceEmptyBody:
+      "لا توجد أنشطة عامة مطابقة حالياً. جرّب لاحقاً أو غيّر معايير البحث عند توفرها.",
+    marketplaceEmptyTitle: "لا توجد نتائج",
+    marketplaceErrorTitle: "تعذر تحميل السوق",
+    marketplaceLoading: "جاري تحميل بيانات السوق الحقيقية...",
+    marketplaceOpenBusiness: "عرض النشاط",
+    marketplaceReviews: "تقييم",
+    marketplaceRetry: "إعادة المحاولة",
+    marketplaceServices: "خدمة",
+    marketplaceStartingFrom: "يبدأ من",
     nativeFoundation: "أساس تطبيق موبايل حقيقي",
     nativeFoundationBody:
       "هذه نسخة Expo Native وليست WebView. الشاشات الحالية تحدد هيكل التطبيق والتنقل قبل ربط واجهات REZNO الخلفية.",
@@ -41,6 +60,16 @@ export const labels: Record<MobileLocale, MobileLabels> = {
     integrationBoundary: "Integration boundary",
     integrationBoundaryBody:
       "This foundation does not change web authentication or booking logic. Real Better Auth mobile integration needs separate approval.",
+    marketplaceEmptyBody:
+      "There are no matching public businesses yet. Try again later or adjust filters when search is available.",
+    marketplaceEmptyTitle: "No results yet",
+    marketplaceErrorTitle: "Could not load marketplace",
+    marketplaceLoading: "Loading real marketplace data...",
+    marketplaceOpenBusiness: "View business",
+    marketplaceReviews: "reviews",
+    marketplaceRetry: "Retry",
+    marketplaceServices: "services",
+    marketplaceStartingFrom: "From",
     nativeFoundation: "Real native mobile foundation",
     nativeFoundationBody:
       "This is an Expo Native app, not a WebView shell. The current screens define the app structure and navigation before REZNO backend APIs are connected.",
@@ -59,6 +88,16 @@ export const labels: Record<MobileLocale, MobileLabels> = {
     integrationBoundary: "سنووری پەیوەستکردن",
     integrationBoundaryBody:
       "ئەم بناغەیە دەستکاری چوونەژوورەوەی وێب یان لۆجیکی حجز ناکات. پەیوەستکردنی ڕاستەقینەی Better Auth بۆ مۆبایل پێویستی بە ڕەزامەندی جیاواز هەیە.",
+    marketplaceEmptyBody:
+      "هیچ کارێکی گشتی هاوتا نییە. دواتر هەوڵبدەرەوە یان کاتێک گەڕان بەردەست بوو پاڵێوەکان بگۆڕە.",
+    marketplaceEmptyTitle: "هیچ ئەنجامێک نییە",
+    marketplaceErrorTitle: "بازاڕ بار نەبوو",
+    marketplaceLoading: "داتای ڕاستەقینەی بازاڕ بار دەکرێت...",
+    marketplaceOpenBusiness: "کاری پیشان بدە",
+    marketplaceReviews: "هەڵسەنگاندن",
+    marketplaceRetry: "دووبارە هەوڵبدە",
+    marketplaceServices: "خزمەتگوزاری",
+    marketplaceStartingFrom: "لە",
     nativeFoundation: "بناغەی ئەپی مۆبایلی ڕاستەقینە",
     nativeFoundationBody:
       "ئەمە ئەپی Expo Native ـە، نەک WebView. شاشەکانی ئێستا پێکهاتە و گەڕانی ئەپ دیاری دەکەن پێش پەیوەستکردنی API ـەکانی REZNO.",

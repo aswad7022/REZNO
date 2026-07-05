@@ -1,5 +1,5 @@
 import { StatusBar } from "expo-status-bar";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   I18nManager,
   Pressable,
@@ -10,6 +10,7 @@ import {
   View,
 } from "react-native";
 
+import { fetchMobileMarketplace } from "./src/api/marketplace";
 import { API_BASE_URL } from "./src/config/api";
 import {
   DEFAULT_LOCALE,
@@ -20,12 +21,22 @@ import {
 } from "./src/i18n/labels";
 import { MOBILE_TABS, type MobileTabId } from "./src/navigation/tabs";
 import { getScreenContent } from "./src/screens/content";
+import type { MobileMarketplaceBusiness } from "./src/types/marketplace";
 
 I18nManager.allowRTL(true);
+
+type MarketplaceState =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "loaded"; businesses: MobileMarketplaceBusiness[] }
+  | { status: "error"; message: string };
 
 export default function App() {
   const [locale, setLocale] = useState<MobileLocale>(DEFAULT_LOCALE);
   const [activeTab, setActiveTab] = useState<MobileTabId>("customerHome");
+  const [marketplaceState, setMarketplaceState] = useState<MarketplaceState>({
+    status: "idle",
+  });
   const text = labels[locale];
   const direction = getTextDirection(locale);
   const isRtl = direction === "rtl";
@@ -38,6 +49,27 @@ export default function App() {
       }),
     [activeTab, locale],
   );
+
+  const loadMarketplace = useCallback(() => {
+    setMarketplaceState({ status: "loading" });
+
+    fetchMobileMarketplace({ limit: 10 })
+      .then((response) => {
+        setMarketplaceState({
+          status: "loaded",
+          businesses: response.data.businesses,
+        });
+      })
+      .catch((error: unknown) => {
+        setMarketplaceState({
+          status: "error",
+          message:
+            error instanceof Error
+              ? error.message
+              : "Could not load marketplace.",
+        });
+      });
+  }, []);
 
   return (
     <SafeAreaView style={styles.shell}>
@@ -94,42 +126,51 @@ export default function App() {
           </Text>
         </View>
 
-        <View style={styles.screenCard}>
-          <Text style={[styles.screenEyebrow, isRtl && styles.rtlText]}>
-            {screen.eyebrow}
-          </Text>
-          <Text style={[styles.screenTitle, isRtl && styles.rtlText]}>
-            {screen.title}
-          </Text>
-          <Text style={[styles.screenDescription, isRtl && styles.rtlText]}>
-            {screen.description}
-          </Text>
+        {activeTab === "marketplace" ? (
+          <MarketplaceSection
+            isRtl={isRtl}
+            onRetry={loadMarketplace}
+            state={marketplaceState}
+            text={text}
+          />
+        ) : (
+          <View style={styles.screenCard}>
+            <Text style={[styles.screenEyebrow, isRtl && styles.rtlText]}>
+              {screen.eyebrow}
+            </Text>
+            <Text style={[styles.screenTitle, isRtl && styles.rtlText]}>
+              {screen.title}
+            </Text>
+            <Text style={[styles.screenDescription, isRtl && styles.rtlText]}>
+              {screen.description}
+            </Text>
 
-          <View style={styles.actionStack}>
-            {screen.actions.map((action) => (
-              <Pressable
-                key={action.label}
-                accessibilityRole="button"
-                disabled={action.disabled}
-                style={[
-                  styles.actionButton,
-                  action.kind === "secondary" && styles.secondaryActionButton,
-                  action.disabled && styles.disabledActionButton,
-                ]}
-              >
-                <Text
+            <View style={styles.actionStack}>
+              {screen.actions.map((action) => (
+                <Pressable
+                  key={action.label}
+                  accessibilityRole="button"
+                  disabled={action.disabled}
                   style={[
-                    styles.actionButtonText,
-                    action.kind === "secondary" && styles.secondaryActionText,
-                    action.disabled && styles.disabledActionText,
+                    styles.actionButton,
+                    action.kind === "secondary" && styles.secondaryActionButton,
+                    action.disabled && styles.disabledActionButton,
                   ]}
                 >
-                  {action.label}
-                </Text>
-              </Pressable>
-            ))}
+                  <Text
+                    style={[
+                      styles.actionButtonText,
+                      action.kind === "secondary" && styles.secondaryActionText,
+                      action.disabled && styles.disabledActionText,
+                    ]}
+                  >
+                    {action.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
           </View>
-        </View>
+        )}
 
         <View style={styles.integrationCard}>
           <Text style={[styles.integrationTitle, isRtl && styles.rtlText]}>
@@ -153,7 +194,16 @@ export default function App() {
               key={tab.id}
               accessibilityRole="tab"
               accessibilityState={{ selected: active }}
-              onPress={() => setActiveTab(tab.id)}
+              onPress={() => {
+                if (
+                  tab.id === "marketplace" &&
+                  marketplaceState.status === "idle"
+                ) {
+                  loadMarketplace();
+                }
+
+                setActiveTab(tab.id);
+              }}
               style={[styles.tabButton, active && styles.tabButtonActive]}
             >
               <Text style={styles.tabIcon}>{tab.icon}</Text>
@@ -168,6 +218,147 @@ export default function App() {
         })}
       </View>
     </SafeAreaView>
+  );
+}
+
+function MarketplaceSection({
+  isRtl,
+  onRetry,
+  state,
+  text,
+}: {
+  isRtl: boolean;
+  onRetry: () => void;
+  state: MarketplaceState;
+  text: (typeof labels)[MobileLocale];
+}) {
+  if (state.status === "idle" || state.status === "loading") {
+    return (
+      <View style={styles.screenCard}>
+        <Text style={[styles.screenEyebrow, isRtl && styles.rtlText]}>
+          {text.tabs.marketplace}
+        </Text>
+        <Text style={[styles.screenTitle, isRtl && styles.rtlText]}>
+          {text.marketplaceLoading}
+        </Text>
+      </View>
+    );
+  }
+
+  if (state.status === "error") {
+    return (
+      <View style={styles.screenCard}>
+        <Text style={[styles.screenEyebrow, isRtl && styles.rtlText]}>
+          {text.tabs.marketplace}
+        </Text>
+        <Text style={[styles.screenTitle, isRtl && styles.rtlText]}>
+          {text.marketplaceErrorTitle}
+        </Text>
+        <Text style={[styles.screenDescription, isRtl && styles.rtlText]}>
+          {state.message}
+        </Text>
+        <Pressable
+          accessibilityRole="button"
+          onPress={onRetry}
+          style={styles.actionButton}
+        >
+          <Text style={styles.actionButtonText}>{text.marketplaceRetry}</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  if (state.businesses.length === 0) {
+    return (
+      <View style={styles.screenCard}>
+        <Text style={[styles.screenEyebrow, isRtl && styles.rtlText]}>
+          {text.tabs.marketplace}
+        </Text>
+        <Text style={[styles.screenTitle, isRtl && styles.rtlText]}>
+          {text.marketplaceEmptyTitle}
+        </Text>
+        <Text style={[styles.screenDescription, isRtl && styles.rtlText]}>
+          {text.marketplaceEmptyBody}
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.marketplaceList}>
+      {state.businesses.map((business) => (
+        <MarketplaceBusinessCard
+          business={business}
+          isRtl={isRtl}
+          key={business.id}
+          text={text}
+        />
+      ))}
+    </View>
+  );
+}
+
+function MarketplaceBusinessCard({
+  business,
+  isRtl,
+  text,
+}: {
+  business: MobileMarketplaceBusiness;
+  isRtl: boolean;
+  text: (typeof labels)[MobileLocale];
+}) {
+  const meta = [
+    business.categoryName,
+    business.city,
+    business.branch.locationLabel,
+  ].filter(Boolean);
+
+  return (
+    <View style={styles.businessCard}>
+      <View style={styles.businessHeader}>
+        <View style={styles.logoMark}>
+          <Text style={styles.logoText}>{business.name.charAt(0)}</Text>
+        </View>
+        <View style={styles.businessHeaderText}>
+          <Text style={[styles.businessName, isRtl && styles.rtlText]}>
+            {business.name}
+          </Text>
+          {meta.length > 0 ? (
+            <Text style={[styles.businessMeta, isRtl && styles.rtlText]}>
+              {meta.join(" · ")}
+            </Text>
+          ) : null}
+        </View>
+      </View>
+
+      {business.description ? (
+        <Text
+          numberOfLines={3}
+          style={[styles.businessDescription, isRtl && styles.rtlText]}
+        >
+          {business.description}
+        </Text>
+      ) : null}
+
+      <View style={styles.businessPills}>
+        <Text style={styles.businessPill}>
+          ★ {business.averageRating?.toFixed(1) ?? "-"} ·{" "}
+          {business.reviewCount} {text.marketplaceReviews}
+        </Text>
+        <Text style={styles.businessPill}>
+          {business.serviceCount} {text.marketplaceServices}
+        </Text>
+        {business.startingPrice ? (
+          <Text style={styles.businessPill}>
+            {text.marketplaceStartingFrom} {business.startingPrice}
+          </Text>
+        ) : null}
+      </View>
+
+      <Text style={[styles.publicPath, isRtl && styles.rtlText]}>
+        {text.marketplaceOpenBusiness}: {business.publicPath}
+      </Text>
+    </View>
   );
 }
 
@@ -338,6 +529,60 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
     marginTop: 12,
+  },
+  marketplaceList: {
+    gap: 12,
+  },
+  businessCard: {
+    backgroundColor: "#ffffff",
+    borderColor: "#e2e8f0",
+    borderRadius: 24,
+    borderWidth: 1,
+    gap: 12,
+    padding: 16,
+  },
+  businessHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 12,
+  },
+  businessHeaderText: {
+    flex: 1,
+  },
+  businessName: {
+    color: "#0f172a",
+    fontSize: 18,
+    fontWeight: "900",
+  },
+  businessMeta: {
+    color: "#64748b",
+    fontSize: 13,
+    marginTop: 3,
+  },
+  businessDescription: {
+    color: "#475569",
+    fontSize: 14,
+    lineHeight: 21,
+  },
+  businessPills: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  businessPill: {
+    backgroundColor: "#f1f5f9",
+    borderRadius: 999,
+    color: "#334155",
+    fontSize: 12,
+    fontWeight: "800",
+    overflow: "hidden",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  publicPath: {
+    color: "#4338ca",
+    fontSize: 13,
+    fontWeight: "800",
   },
   tabBar: {
     backgroundColor: "#ffffff",
