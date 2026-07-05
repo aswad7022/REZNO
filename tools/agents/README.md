@@ -107,7 +107,9 @@ Delegated implementation prompts are allowed only when all safety gates pass:
 - No goal-risk categories are detected.
 - The current branch is `main`.
 - The working tree is clean.
-- `memory.currentApprovedMain` matches local `main`.
+- `memory.currentApprovedMain` matches local `main`, which is the preferred clean state.
+
+There is one safe memory fallback: if `memory.currentApprovedMain` is a valid ancestor of local `main` and every file changed since that memory SHA is limited to approved Agentic Delivery System docs/tools/memory files with no risk categories, delegated implementation may still proceed. This keeps the system usable immediately after agentic docs/tools merges. Any unknown, product/app, API, auth, schema, business logic, or high-risk drift blocks implementation.
 
 If any gate fails, `delegate` and `operator-pack` must produce planning/review-only prompts and must not authorize implementation, commit, push, or PR creation.
 

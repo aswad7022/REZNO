@@ -608,10 +608,104 @@ function localMainSha() {
   return hasRef("main") ? runGit(["rev-parse", "main"]) : "missing";
 }
 
-function delegatedImplementationGate(memory, state, risks) {
-  const reasons = [];
+function isAncestor(ancestor, descendant) {
+  try {
+    runGit(["merge-base", "--is-ancestor", ancestor, descendant]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function filesChangedBetween(base, head) {
+  const output = runGit(["diff", "--name-only", `${base}..${head}`]);
+  if (!output) {
+    return [];
+  }
+
+  return uniqueSorted(output.split(/\r?\n/).filter(Boolean).map(normalizePath));
+}
+
+function memoryFreshness(memory) {
   const latestMain = localMainSha();
   const approvedMain = memory?.currentApprovedMain ?? "missing";
+
+  if (!isGitSha(approvedMain)) {
+    return {
+      status: "invalid",
+      latestMain,
+      approvedMain,
+      changedFiles: [],
+      risks: new Map(),
+      safeForDelegation: false,
+      reason: "memory.currentApprovedMain is missing or invalid",
+      note: null,
+    };
+  }
+
+  if (latestMain === "missing") {
+    return {
+      status: "missing-main",
+      latestMain,
+      approvedMain,
+      changedFiles: [],
+      risks: new Map(),
+      safeForDelegation: false,
+      reason: "local main ref is missing",
+      note: null,
+    };
+  }
+
+  if (approvedMain === latestMain) {
+    return {
+      status: "exact",
+      latestMain,
+      approvedMain,
+      changedFiles: [],
+      risks: new Map(),
+      safeForDelegation: true,
+      reason: "memory.currentApprovedMain matches local main",
+      note: null,
+    };
+  }
+
+  if (!isAncestor(approvedMain, latestMain)) {
+    return {
+      status: "not-ancestor",
+      latestMain,
+      approvedMain,
+      changedFiles: [],
+      risks: new Map(),
+      safeForDelegation: false,
+      reason: "memory.currentApprovedMain is not an ancestor of local main",
+      note: null,
+    };
+  }
+
+  const changedFiles = filesChangedBetween(approvedMain, latestMain);
+  const risks = detectRisks(changedFiles);
+  const approvedOnly = changedFiles.length > 0 && changedFiles.every((file) => APPROVED_FILES.has(file));
+  const safeDrift = approvedOnly && risks.size === 0;
+
+  return {
+    status: safeDrift ? "safe-drift" : "unsafe-drift",
+    latestMain,
+    approvedMain,
+    changedFiles,
+    risks,
+    safeForDelegation: safeDrift,
+    reason: safeDrift
+      ? "memory.currentApprovedMain is behind local main only by approved agentic docs/tools changes"
+      : "memory.currentApprovedMain is behind local main by unknown or risky changes",
+    note: safeDrift
+      ? "Memory is behind local main only by approved agentic docs/tools changes."
+      : null,
+  };
+}
+
+function delegatedImplementationGate(memory, state, risks) {
+  const reasons = [];
+  const freshness = memoryFreshness(memory);
   const goalRiskDecision = goalDecision(risks);
 
   if (risks.size > 0) {
@@ -626,12 +720,8 @@ function delegatedImplementationGate(memory, state, risks) {
     reasons.push("working tree is not clean");
   }
 
-  if (!isGitSha(approvedMain)) {
-    reasons.push("memory.currentApprovedMain is missing or invalid");
-  } else if (latestMain === "missing") {
-    reasons.push("local main ref is missing");
-  } else if (approvedMain !== latestMain) {
-    reasons.push("memory.currentApprovedMain does not match local main");
+  if (!freshness.safeForDelegation) {
+    reasons.push(freshness.reason);
   }
 
   const allowImplementation = reasons.length === 0;
@@ -639,7 +729,8 @@ function delegatedImplementationGate(memory, state, risks) {
   if (allowImplementation) {
     return {
       allowImplementation,
-      latestMain,
+      latestMain: freshness.latestMain,
+      freshness,
       reasons,
       decision: goalRiskDecision,
     };
@@ -647,7 +738,8 @@ function delegatedImplementationGate(memory, state, risks) {
 
   return {
     allowImplementation,
-    latestMain,
+    latestMain: freshness.latestMain,
+    freshness,
     reasons,
     decision:
       goalRiskDecision.label === DECISIONS.DO_NOT_MERGE
@@ -742,9 +834,14 @@ function printDelegate() {
   console.log(`Working tree: ${state.workingEntries.length === 0 ? "clean" : "dirty"}`);
   console.log("Risk classification:");
   console.log(riskLines(risks).join("\n"));
+  console.log(`Memory freshness: ${gate.freshness.reason}`);
+  if (gate.freshness.note) {
+    console.log(`Note: ${gate.freshness.note}`);
+    console.log("Recommendation: record the sprint after CTO-approved merge when appropriate.");
+  }
   console.log("Implementation gate:");
   if (allowImplementation) {
-    console.log("- passed: clean main, fresh memory, clean working tree, and no goal-risk categories");
+    console.log("- passed: clean main, accepted memory freshness, clean working tree, and no goal-risk categories");
   } else {
     for (const reason of gate.reasons) {
       console.log(`- blocked: ${reason}`);
@@ -807,9 +904,15 @@ function printOperatorPack() {
   console.log("Risk summary:");
   console.log(riskLines(risks).join("\n"));
   console.log("");
+  console.log(`Memory freshness: ${gate.freshness.reason}`);
+  if (gate.freshness.note) {
+    console.log(`Note: ${gate.freshness.note}`);
+    console.log("Recommendation: record the sprint after CTO-approved merge when appropriate.");
+  }
+  console.log("");
   console.log("Implementation gate:");
   if (allowImplementation) {
-    console.log("- passed: clean main, fresh memory, clean working tree, and no goal-risk categories");
+    console.log("- passed: clean main, accepted memory freshness, clean working tree, and no goal-risk categories");
   } else {
     for (const reason of gate.reasons) {
       console.log(`- blocked: ${reason}`);
@@ -1245,36 +1348,49 @@ function printAudit() {
   }
 
   const memoryExists = existsSync(memoryPath());
-  const latestMain = hasRef("main") ? runGit(["rev-parse", "main"]) : "missing";
   const approvedMain = memory?.currentApprovedMain ?? null;
   const approvedMainKnown = isGitSha(approvedMain ?? "");
   const memoryValidationErrors = memory ? validateMemoryLedger(memory) : [];
-  const mainMismatch = approvedMainKnown && latestMain !== "missing" && approvedMain !== latestMain;
+  const freshness = memory ? memoryFreshness(memory) : null;
   const risks = state.risks;
   const auditPassed =
     memoryExists &&
     !memoryError &&
     memoryValidationErrors.length === 0 &&
     approvedMainKnown &&
-    !mainMismatch &&
+    freshness?.safeForDelegation &&
     state.decision.label === DECISIONS.APPROVE;
   const decision = auditPassed
-    ? { label: DECISIONS.APPROVE, reason: "Memory ledger exists, JSON is valid, and repository risk review is approved." }
+    ? {
+        label: DECISIONS.APPROVE,
+        reason: `Memory ledger exists, JSON is valid, ${freshness.reason}, and repository risk review is approved.`,
+      }
     : { label: DECISIONS.NEEDS_QA_GATE, reason: "Audit found missing, dirty, or uncertain state that needs review." };
 
   console.log("REZNO Agent Memory Audit");
   console.log(`Memory file exists: ${memoryExists ? "yes" : "no"}`);
   console.log(`Memory JSON valid: ${memoryError ? `no (${memoryError.message})` : "yes"}`);
   console.log(`Current approved main in memory: ${approvedMain ?? "missing"}`);
-  console.log(`Latest local main SHA: ${latestMain}`);
+  console.log(`Latest local main SHA: ${freshness?.latestMain ?? "missing"}`);
   console.log(`Current branch: ${state.branch}`);
   console.log(`Memory approved main format: ${approvedMainKnown ? "valid" : "invalid"}`);
+  console.log(`Memory freshness: ${freshness?.reason ?? "memory unavailable"}`);
+  if (freshness?.note) {
+    console.log(`Note: ${freshness.note}`);
+    console.log("Recommendation: record the sprint after CTO-approved merge when appropriate.");
+  }
+  if ((freshness?.changedFiles ?? []).length > 0) {
+    console.log("Files changed between memory approved main and local main:");
+    console.log(freshness.changedFiles.map((file) => `- ${file}`).join("\n"));
+    console.log("Risk categories in memory drift:");
+    console.log(riskLines(freshness.risks).join("\n"));
+  }
   console.log(`Closed sprints array valid: ${Array.isArray(memory?.closedSprints) ? "yes" : "no"}`);
   if (memoryValidationErrors.length > 0) {
     console.log("Memory validation errors:");
     console.log(memoryValidationErrors.map((error) => `- ${error}`).join("\n"));
   }
-  if (mainMismatch) {
+  if (freshness && freshness.status !== "exact" && !freshness.safeForDelegation) {
     console.log("Warning: Memory approved main differs from local main. Run record-sprint only after CTO-approved merge.");
     if (state.branch !== "main") {
       console.log("Note: current branch is not main; this may be expected on a feature branch, but the mismatch is still reported.");
