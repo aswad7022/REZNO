@@ -53,6 +53,8 @@ In Phase 3, it may use `pr-body "<sprint name>"` to draft PR text and `memory "<
 
 Records closed sprints, confirmed main commits, branch state, accepted risks, and planned next steps. It does not authorize future implementation.
 
+In Phase 4, the Memory Agent may read `tools/agents/rezno-agent-memory.json` with `memory-status`, `next`, and `audit`. It may update the ledger only through `record-sprint`, only when explicitly instructed, and only for closed sprint metadata. It must not store secrets or edit unrelated files.
+
 ## Shared forbidden actions
 
 All agents are forbidden from:

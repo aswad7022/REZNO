@@ -33,6 +33,8 @@ The orchestrator may print plans, handoff prompts, status reports, local reviews
 
 Phase 3 delegation also allows the orchestrator to print task risk analysis, a full sprint runner pack, a PR body draft, a compact CTO decision report, and a memory update block. These outputs are advisory text only. They do not authorize implementation, deployment, or merge by themselves.
 
+Phase 4 delegation allows the repository-local memory ledger to track closed sprints and the next recommended action. Default memory commands are read-only. `record-sprint` is the only write command, and it may update only `tools/agents/rezno-agent-memory.json` after validating the PR number, main SHA, and CTO decision label.
+
 ## Human-only approvals
 
 The CTO or delegated human reviewer must approve:

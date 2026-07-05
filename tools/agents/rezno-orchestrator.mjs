@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -18,7 +18,10 @@ const APPROVED_FILES = new Set([
   "docs/ops/agent-roles.md",
   "tools/agents/rezno-orchestrator.mjs",
   "tools/agents/README.md",
+  "tools/agents/rezno-agent-memory.json",
 ]);
+
+const MEMORY_FILE = "tools/agents/rezno-agent-memory.json";
 
 const RISK_RULES = [
   {
@@ -148,6 +151,23 @@ function runCommand(command, args) {
 
 function repoRoot() {
   return runGit(["rev-parse", "--show-toplevel"]);
+}
+
+function memoryPath() {
+  return resolve(repoRoot(), MEMORY_FILE);
+}
+
+function readMemory() {
+  const path = memoryPath();
+  if (!existsSync(path)) {
+    throw new Error(`${MEMORY_FILE} does not exist`);
+  }
+
+  return JSON.parse(readFileSync(path, "utf8"));
+}
+
+function writeMemory(memory) {
+  writeFileSync(memoryPath(), `${JSON.stringify(memory, null, 2)}\n`, "utf8");
 }
 
 function normalizePath(path) {
@@ -427,10 +447,14 @@ Usage:
   node tools/agents/rezno-orchestrator.mjs pr-body "<sprint name>"
   node tools/agents/rezno-orchestrator.mjs decision
   node tools/agents/rezno-orchestrator.mjs memory "<sprint name>"
+  node tools/agents/rezno-orchestrator.mjs memory-status
+  node tools/agents/rezno-orchestrator.mjs record-sprint "<sprint name>" "<pr number>" "<main sha>" "<decision>"
+  node tools/agents/rezno-orchestrator.mjs next
+  node tools/agents/rezno-orchestrator.mjs audit
   node tools/agents/rezno-orchestrator.mjs validate
   node tools/agents/rezno-orchestrator.mjs close-sprint
 
-This tool is read-only except for running safe validation commands. It never runs Codex, installs packages, deploys, merges, or edits files.
+This tool is read-only except for running safe validation commands and record-sprint, which may write only to tools/agents/rezno-agent-memory.json. It never runs Codex, installs packages, deploys, merges, or edits app source files.
 
 Decision labels:
   APPROVE
@@ -745,7 +769,214 @@ function printMemoryBlock() {
   console.log("PR number: <PR_NUMBER>");
   console.log("Final main SHA: <FINAL_MAIN_SHA>");
   console.log("Blocked items: <NONE_OR_LIST>");
-  console.log("Note: memory files are not edited automatically.");
+  console.log("Note: memory files are not edited automatically by this command. Use record-sprint explicitly to update the ledger.");
+}
+
+function sprintLines(closedSprints) {
+  if (!Array.isArray(closedSprints) || closedSprints.length === 0) {
+    return ["- none"];
+  }
+
+  return closedSprints.map((sprint) => `- ${sprint.name}, PR ${sprint.pr}, main SHA ${sprint.mainSha}, decision ${sprint.decision}`);
+}
+
+function printMemoryStatus() {
+  const memory = readMemory();
+
+  console.log("REZNO Agent Memory Status");
+  console.log(`Project: ${memory.project}`);
+  console.log(`Product vision: ${memory.productVision}`);
+  console.log(`Current approved main: ${memory.currentApprovedMain}`);
+  console.log("Closed sprints:");
+  console.log(sprintLines(memory.closedSprints).join("\n"));
+  console.log(`Active sprint: ${memory.activeSprint ?? "none"}`);
+  console.log("Blocked items:");
+  console.log((memory.blockedItems ?? []).length === 0 ? "- none" : memory.blockedItems.map((item) => `- ${item}`).join("\n"));
+  console.log(`Next recommended action: ${memory.nextRecommendedAction}`);
+}
+
+function validateDecision(decision) {
+  return Object.values(DECISIONS).includes(decision);
+}
+
+function isGitSha(value) {
+  return /^[a-f0-9]{40}$/i.test(value);
+}
+
+function validateMemoryLedger(memory) {
+  const errors = [];
+
+  if (!isGitSha(memory?.currentApprovedMain ?? "")) {
+    errors.push("currentApprovedMain must be a 40-character git SHA");
+  }
+
+  if (!Array.isArray(memory?.closedSprints)) {
+    errors.push("closedSprints must be an array");
+    return errors;
+  }
+
+  for (const [index, sprint] of memory.closedSprints.entries()) {
+    const label = `closedSprints[${index}]`;
+    if (!sprint?.name || typeof sprint.name !== "string") {
+      errors.push(`${label}.name is required`);
+    }
+    if (!Number.isInteger(sprint?.pr)) {
+      errors.push(`${label}.pr must be numeric`);
+    }
+    if (!isGitSha(sprint?.mainSha ?? "")) {
+      errors.push(`${label}.mainSha must be a 40-character git SHA`);
+    }
+    if (!validateDecision(sprint?.decision)) {
+      errors.push(`${label}.decision must be a valid CTO decision label`);
+    }
+  }
+
+  return errors;
+}
+
+function printRecordSprint() {
+  const [sprintName, prNumberText, mainSha, ...decisionParts] = process.argv.slice(3);
+  const decision = decisionParts.join(" ");
+
+  if (!sprintName || !prNumberText || !mainSha || !decision) {
+    console.error('Usage: node tools/agents/rezno-orchestrator.mjs record-sprint "<sprint name>" "<pr number>" "<main sha>" "<decision>"');
+    process.exitCode = 1;
+    return;
+  }
+
+  if (!/^\d+$/.test(prNumberText)) {
+    console.error("PR number must be numeric.");
+    process.exitCode = 1;
+    return;
+  }
+
+  if (!isGitSha(mainSha)) {
+    console.error("Main SHA must look like a 40-character git SHA.");
+    process.exitCode = 1;
+    return;
+  }
+
+  if (!validateDecision(decision)) {
+    console.error(`Decision must be one of: ${Object.values(DECISIONS).join(", ")}`);
+    process.exitCode = 1;
+    return;
+  }
+
+  const memory = readMemory();
+  const pr = Number(prNumberText);
+  const record = {
+    name: sprintName,
+    pr,
+    mainSha,
+    decision,
+  };
+
+  const existingIndex = (memory.closedSprints ?? []).findIndex((sprint) => sprint.name === sprintName || sprint.pr === pr);
+  if (existingIndex >= 0) {
+    memory.closedSprints[existingIndex] = record;
+  } else {
+    memory.closedSprints = [...(memory.closedSprints ?? []), record];
+  }
+
+  if (decision === DECISIONS.APPROVE) {
+    memory.currentApprovedMain = mainSha;
+  }
+
+  writeMemory(memory);
+  console.log(`Recorded sprint in ${MEMORY_FILE}: ${sprintName}, PR ${pr}, decision ${decision}`);
+}
+
+function printNext() {
+  const memory = readMemory();
+  const state = context();
+  const nextAction = memory.nextRecommendedAction ?? "Prepare next safe REZNO sprint";
+
+  console.log("REZNO Next Recommended Action");
+  console.log(`Next: ${nextAction}`);
+  console.log(`Current approved main: ${memory.currentApprovedMain}`);
+  console.log(`Current branch: ${state.branch}`);
+  console.log(`Working tree: ${state.workingEntries.length === 0 ? "clean" : "dirty"}`);
+  console.log("");
+  console.log("Ready-to-copy Codex prompt:");
+  console.log(`You are Codex working in the REZNO repository.
+
+Sprint:
+${nextAction}
+
+Hard rules:
+- Do not use git add .
+- Do not merge without explicit CTO approval.
+- Do not install packages unless explicitly approved.
+- Do not change package.json or lockfiles unless explicitly approved.
+- Do not change database, Prisma schema, migrations, auth, API, permissions, payments, production deployment, EAS, Flutter, mobile app logic, or business logic unless explicitly approved.
+- Do not print or store secrets.
+- Do not run destructive commands.
+- Do not run Codex automatically from repository tooling.
+
+Start with:
+- git fetch origin
+- git checkout main
+- git pull --ff-only origin main
+- node tools/agents/rezno-orchestrator.mjs status
+- node tools/agents/rezno-orchestrator.mjs audit
+
+Plan the sprint, execute only approved scope, run safe checks, and stop for CTO review. No merge without explicit CTO approval.`);
+}
+
+function printAudit() {
+  const state = context();
+  let memory = null;
+  let memoryError = null;
+
+  try {
+    memory = readMemory();
+  } catch (error) {
+    memoryError = error;
+  }
+
+  const memoryExists = existsSync(memoryPath());
+  const latestMain = hasRef("main") ? runGit(["rev-parse", "main"]) : "missing";
+  const approvedMain = memory?.currentApprovedMain ?? null;
+  const approvedMainKnown = isGitSha(approvedMain ?? "");
+  const memoryValidationErrors = memory ? validateMemoryLedger(memory) : [];
+  const mainMismatch = approvedMainKnown && latestMain !== "missing" && approvedMain !== latestMain;
+  const risks = state.risks;
+  const auditPassed =
+    memoryExists &&
+    !memoryError &&
+    memoryValidationErrors.length === 0 &&
+    approvedMainKnown &&
+    !mainMismatch &&
+    state.decision.label === DECISIONS.APPROVE;
+  const decision = auditPassed
+    ? { label: DECISIONS.APPROVE, reason: "Memory ledger exists, JSON is valid, and repository risk review is approved." }
+    : { label: DECISIONS.NEEDS_QA_GATE, reason: "Audit found missing, dirty, or uncertain state that needs review." };
+
+  console.log("REZNO Agent Memory Audit");
+  console.log(`Memory file exists: ${memoryExists ? "yes" : "no"}`);
+  console.log(`Memory JSON valid: ${memoryError ? `no (${memoryError.message})` : "yes"}`);
+  console.log(`Current approved main in memory: ${approvedMain ?? "missing"}`);
+  console.log(`Latest local main SHA: ${latestMain}`);
+  console.log(`Current branch: ${state.branch}`);
+  console.log(`Memory approved main format: ${approvedMainKnown ? "valid" : "invalid"}`);
+  console.log(`Closed sprints array valid: ${Array.isArray(memory?.closedSprints) ? "yes" : "no"}`);
+  if (memoryValidationErrors.length > 0) {
+    console.log("Memory validation errors:");
+    console.log(memoryValidationErrors.map((error) => `- ${error}`).join("\n"));
+  }
+  if (mainMismatch) {
+    console.log("Warning: Memory approved main differs from local main. Run record-sprint only after CTO-approved merge.");
+    if (state.branch !== "main") {
+      console.log("Note: current branch is not main; this may be expected on a feature branch, but the mismatch is still reported.");
+    }
+  }
+  console.log(`Working tree: ${state.workingEntries.length === 0 ? "clean" : "dirty"}`);
+  console.log("Risk categories:");
+  console.log(riskLines(risks).join("\n"));
+  console.log("Closed sprints:");
+  console.log(memory ? sprintLines(memory.closedSprints).join("\n") : "- unavailable");
+  console.log("");
+  printDecision(decision);
 }
 
 function packageScripts() {
@@ -914,6 +1145,26 @@ function main() {
 
   if (command === "memory") {
     printMemoryBlock();
+    return;
+  }
+
+  if (command === "memory-status") {
+    printMemoryStatus();
+    return;
+  }
+
+  if (command === "record-sprint") {
+    printRecordSprint();
+    return;
+  }
+
+  if (command === "next") {
+    printNext();
+    return;
+  }
+
+  if (command === "audit") {
+    printAudit();
     return;
   }
 
