@@ -80,8 +80,64 @@ const GOAL_RISK_RULES = [
     keywords: ["auth", "login", "sign in", "session", "better auth", "oauth"],
   },
   {
+    name: "API",
+    keywords: ["api", "endpoint", "route handler", "json endpoint", "server action", "webhook"],
+  },
+  {
     name: "permissions",
     keywords: ["permission", "role", "rbac", "admin", "owner", "access control", "authorization"],
+  },
+  {
+    name: "business logic",
+    keywords: ["business logic", "business rule", "workflow", "lifecycle", "status transition"],
+  },
+  {
+    name: "booking",
+    keywords: ["booking", "bookings", "appointment", "appointments", "cancel booking", "reschedule"],
+  },
+  {
+    name: "reservation",
+    keywords: ["reservation", "reservations", "reserve", "table reservation"],
+  },
+  {
+    name: "marketplace",
+    keywords: ["marketplace", "discovery", "near me", "search results", "public business page"],
+  },
+  {
+    name: "tenant",
+    keywords: ["tenant", "multi-tenant", "organization isolation", "active business", "business context"],
+  },
+  {
+    name: "customer data",
+    keywords: ["customer data", "customer profile", "customer record", "person data", "private data"],
+  },
+  {
+    name: "staff",
+    keywords: ["staff", "employee", "team member", "professional profile", "member assignment"],
+  },
+  {
+    name: "pricing",
+    keywords: ["price", "pricing", "fee", "cost", "amount"],
+  },
+  {
+    name: "service catalog",
+    keywords: ["service catalog", "service", "offering", "branch service"],
+  },
+  {
+    name: "notification",
+    keywords: ["notification", "notifications", "notify"],
+  },
+  {
+    name: "message",
+    keywords: ["message", "messages", "messaging", "conversation"],
+  },
+  {
+    name: "review",
+    keywords: ["review", "reviews", "rating", "ratings"],
+  },
+  {
+    name: "admin",
+    keywords: ["admin", "super admin", "administrator", "admin dashboard"],
   },
   {
     name: "secrets",
@@ -451,6 +507,9 @@ Usage:
   node tools/agents/rezno-orchestrator.mjs record-sprint "<sprint name>" "<pr number>" "<main sha>" "<decision>"
   node tools/agents/rezno-orchestrator.mjs next
   node tools/agents/rezno-orchestrator.mjs audit
+  node tools/agents/rezno-orchestrator.mjs delegate "<goal>"
+  node tools/agents/rezno-orchestrator.mjs gate "<goal>"
+  node tools/agents/rezno-orchestrator.mjs operator-pack "<goal>"
   node tools/agents/rezno-orchestrator.mjs validate
   node tools/agents/rezno-orchestrator.mjs close-sprint
 
@@ -537,6 +596,358 @@ function printRiskAnalysis() {
     console.log("- Stop for CTO review before implementation if any detected category is outside the approved scope.");
     console.log("- Add QA/security gates for all detected categories.");
   }
+  console.log("");
+  printDecision(decision);
+}
+
+function goalDecision(risks) {
+  return decisionForGoalRisks(risks);
+}
+
+function localMainSha() {
+  return hasRef("main") ? runGit(["rev-parse", "main"]) : "missing";
+}
+
+function isAncestor(ancestor, descendant) {
+  try {
+    runGit(["merge-base", "--is-ancestor", ancestor, descendant]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function filesChangedBetween(base, head) {
+  const output = runGit(["diff", "--name-only", `${base}..${head}`]);
+  if (!output) {
+    return [];
+  }
+
+  return uniqueSorted(output.split(/\r?\n/).filter(Boolean).map(normalizePath));
+}
+
+function memoryFreshness(memory) {
+  const latestMain = localMainSha();
+  const approvedMain = memory?.currentApprovedMain ?? "missing";
+
+  if (!isGitSha(approvedMain)) {
+    return {
+      status: "invalid",
+      latestMain,
+      approvedMain,
+      changedFiles: [],
+      risks: new Map(),
+      safeForDelegation: false,
+      reason: "memory.currentApprovedMain is missing or invalid",
+      note: null,
+    };
+  }
+
+  if (latestMain === "missing") {
+    return {
+      status: "missing-main",
+      latestMain,
+      approvedMain,
+      changedFiles: [],
+      risks: new Map(),
+      safeForDelegation: false,
+      reason: "local main ref is missing",
+      note: null,
+    };
+  }
+
+  if (approvedMain === latestMain) {
+    return {
+      status: "exact",
+      latestMain,
+      approvedMain,
+      changedFiles: [],
+      risks: new Map(),
+      safeForDelegation: true,
+      reason: "memory.currentApprovedMain matches local main",
+      note: null,
+    };
+  }
+
+  if (!isAncestor(approvedMain, latestMain)) {
+    return {
+      status: "not-ancestor",
+      latestMain,
+      approvedMain,
+      changedFiles: [],
+      risks: new Map(),
+      safeForDelegation: false,
+      reason: "memory.currentApprovedMain is not an ancestor of local main",
+      note: null,
+    };
+  }
+
+  const changedFiles = filesChangedBetween(approvedMain, latestMain);
+  const risks = detectRisks(changedFiles);
+  const approvedOnly = changedFiles.length > 0 && changedFiles.every((file) => APPROVED_FILES.has(file));
+  const safeDrift = approvedOnly && risks.size === 0;
+
+  return {
+    status: safeDrift ? "safe-drift" : "unsafe-drift",
+    latestMain,
+    approvedMain,
+    changedFiles,
+    risks,
+    safeForDelegation: safeDrift,
+    reason: safeDrift
+      ? "memory.currentApprovedMain is behind local main only by approved agentic docs/tools changes"
+      : "memory.currentApprovedMain is behind local main by unknown or risky changes",
+    note: safeDrift
+      ? "Memory is behind local main only by approved agentic docs/tools changes."
+      : null,
+  };
+}
+
+function delegatedImplementationGate(memory, state, risks) {
+  const reasons = [];
+  const freshness = memoryFreshness(memory);
+  const goalRiskDecision = goalDecision(risks);
+
+  if (risks.size > 0) {
+    reasons.push("goal risk categories were detected");
+  }
+
+  if (state.branch !== "main") {
+    reasons.push("current branch is not main");
+  }
+
+  if (state.workingEntries.length > 0) {
+    reasons.push("working tree is not clean");
+  }
+
+  if (!freshness.safeForDelegation) {
+    reasons.push(freshness.reason);
+  }
+
+  const allowImplementation = reasons.length === 0;
+
+  if (allowImplementation) {
+    return {
+      allowImplementation,
+      latestMain: freshness.latestMain,
+      freshness,
+      reasons,
+      decision: goalRiskDecision,
+    };
+  }
+
+  return {
+    allowImplementation,
+    latestMain: freshness.latestMain,
+    freshness,
+    reasons,
+    decision:
+      goalRiskDecision.label === DECISIONS.DO_NOT_MERGE
+        ? goalRiskDecision
+        : {
+            label: DECISIONS.NEEDS_QA_GATE,
+            reason: `Delegated implementation is blocked: ${reasons.join("; ")}.`,
+          },
+  };
+}
+
+function hardRulesText() {
+  return `- Do not use git add .
+- Do not merge without explicit CTO approval.
+- Do not install packages unless explicitly approved.
+- Do not change package.json or lockfiles unless explicitly approved.
+- Do not change database, Prisma schema, migrations, auth, API, permissions, payments, production deployment, EAS, Flutter, mobile app logic, or business logic unless explicitly approved.
+- Do not print or store secrets.
+- Do not run destructive commands.
+- Do not run Codex automatically from repository tooling.`;
+}
+
+function safeExecutionPrompt(goal, allowImplementation) {
+  if (!allowImplementation) {
+    return `You are Codex working in the REZNO repository.
+
+Task:
+${goal}
+
+Mode:
+Planning and review only.
+
+Hard rules:
+${hardRulesText()}
+- Do not implement.
+- Do not commit.
+- Do not push.
+- Do not open a PR.
+
+Start with:
+- git status --short
+- git branch --show-current
+- git log -1 --oneline
+- node tools/agents/rezno-orchestrator.mjs status
+- node tools/agents/rezno-orchestrator.mjs risk "${goal}"
+
+Return a plan, risk review, QA/security gates, and CTO decision recommendation.`;
+  }
+
+  return `You are Codex working in the REZNO repository.
+
+Task:
+${goal}
+
+CTO approval is granted only for this safe scoped task to:
+- sync main
+- create a branch
+- implement scoped safe changes
+- run checks
+- commit
+- push
+- open a PR
+
+Hard rules:
+${hardRulesText()}
+- No merge is allowed.
+
+Start with:
+- git fetch origin
+- git checkout main
+- git pull --ff-only origin main
+- git status --short
+- node tools/agents/rezno-orchestrator.mjs status
+
+Then implement only the approved scope, run safe checks, review risk, commit with explicit paths only, push, open a PR, and stop for CTO review.`;
+}
+
+function printDelegate() {
+  const goal = taskText();
+  const memory = readMemory();
+  const state = context();
+  const risks = detectGoalRisks(goal);
+  const gate = delegatedImplementationGate(memory, state, risks);
+  const decision = gate.decision;
+  const allowImplementation = gate.allowImplementation;
+
+  console.log("REZNO Delegated Sprint Mode");
+  console.log(`Goal: ${goal}`);
+  console.log(`Current approved main: ${memory.currentApprovedMain}`);
+  console.log(`Local main SHA: ${gate.latestMain}`);
+  console.log(`Current branch: ${state.branch}`);
+  console.log(`Working tree: ${state.workingEntries.length === 0 ? "clean" : "dirty"}`);
+  console.log("Risk classification:");
+  console.log(riskLines(risks).join("\n"));
+  console.log(`Memory freshness: ${gate.freshness.reason}`);
+  if (gate.freshness.note) {
+    console.log(`Note: ${gate.freshness.note}`);
+    console.log("Recommendation: record the sprint after CTO-approved merge when appropriate.");
+  }
+  console.log("Implementation gate:");
+  if (allowImplementation) {
+    console.log("- passed: clean main, accepted memory freshness, clean working tree, and no goal-risk categories");
+  } else {
+    for (const reason of gate.reasons) {
+      console.log(`- blocked: ${reason}`);
+    }
+  }
+  console.log(`Decision recommendation: ${decision.label}`);
+  console.log(`Reason: ${decision.reason}`);
+  console.log(
+    `Next safe action: ${
+      allowImplementation
+        ? "Use the generated implementation prompt, then stop at PR for CTO review."
+        : "Run planning/security QA only. Do not implement, commit, push, or open PR until CTO approves the risky scope."
+    }`,
+  );
+  console.log("");
+  console.log("Ready-to-copy Codex prompt:");
+  console.log(safeExecutionPrompt(goal, allowImplementation));
+}
+
+function printGate() {
+  const goal = taskText();
+  const risks = detectGoalRisks(goal);
+  const decision = goalDecision(risks);
+
+  console.log(`REZNO QA/Security Gate: ${goal}`);
+  console.log("");
+  console.log("Detected risk categories:");
+  console.log(riskLines(risks).join("\n"));
+  console.log("");
+  console.log("Approval required before implementation:");
+  for (const category of GOAL_RISK_RULES.map((rule) => rule.name)) {
+    console.log(`- ${category}: ${risks.has(category) ? "CTO review required" : "no keyword risk detected"}`);
+  }
+  console.log("");
+  console.log("Gate checklist:");
+  console.log("- Confirm scope and out-of-scope items.");
+  console.log("- Confirm no secrets are printed or stored.");
+  console.log("- Confirm safe validation commands.");
+  console.log("- Confirm ownership, auth, permission, and data exposure risks when relevant.");
+  console.log("- Confirm no merge without explicit CTO approval.");
+  console.log("");
+  printDecision(decision);
+}
+
+function printOperatorPack() {
+  const goal = taskText();
+  const memory = readMemory();
+  const state = context();
+  const risks = detectGoalRisks(goal);
+  const gate = delegatedImplementationGate(memory, state, risks);
+  const decision = gate.decision;
+  const allowImplementation = gate.allowImplementation;
+
+  console.log(`REZNO CTO/Operator Pack: ${goal}`);
+  console.log("");
+  console.log("Executive summary:");
+  console.log("- Delegated sprint mode can generate safe prompts, classify risk, and prepare review packs.");
+  console.log("- It does not run Codex, merge, deploy, install packages, change schema, or change auth.");
+  console.log("");
+  console.log("Risk summary:");
+  console.log(riskLines(risks).join("\n"));
+  console.log("");
+  console.log(`Memory freshness: ${gate.freshness.reason}`);
+  if (gate.freshness.note) {
+    console.log(`Note: ${gate.freshness.note}`);
+    console.log("Recommendation: record the sprint after CTO-approved merge when appropriate.");
+  }
+  console.log("");
+  console.log("Implementation gate:");
+  if (allowImplementation) {
+    console.log("- passed: clean main, accepted memory freshness, clean working tree, and no goal-risk categories");
+  } else {
+    for (const reason of gate.reasons) {
+      console.log(`- blocked: ${reason}`);
+    }
+  }
+  console.log("");
+  console.log("Allowed actions:");
+  console.log("- Plan safe scoped work.");
+  console.log("- Generate implementation prompts.");
+  console.log("- Run safe repository checks when explicitly requested.");
+  console.log("- Commit, push, and open PR only when the generated prompt explicitly authorizes it.");
+  console.log("");
+  console.log("Disallowed actions:");
+  console.log("- No git add .");
+  console.log("- No merge without CTO approval.");
+  console.log("- No package/schema/migration/auth/API/business logic changes unless explicitly approved.");
+  console.log("- No deploy, EAS, destructive database commands, or secret exposure.");
+  console.log("");
+  console.log("Codex execution prompt:");
+  console.log(safeExecutionPrompt(goal, allowImplementation));
+  console.log("");
+  console.log("QA checklist:");
+  console.log("- Run node tools/agents/rezno-orchestrator.mjs status.");
+  console.log("- Run node tools/agents/rezno-orchestrator.mjs review-local.");
+  console.log("- Run node tools/agents/rezno-orchestrator.mjs validate.");
+  console.log("- Run extra QA only when approved and safe.");
+  console.log("");
+  console.log("PR review checklist:");
+  console.log("- Confirm files changed match scope.");
+  console.log("- Confirm risk categories and checks.");
+  console.log("- Confirm no package, schema, migration, auth, API, business logic, deploy, EAS, or mobile app logic changes unless approved.");
+  console.log("- Confirm no merge without CTO approval.");
+  console.log("");
+  console.log("Post-merge memory update command template:");
+  console.log('node tools/agents/rezno-orchestrator.mjs record-sprint "<sprint name>" "<pr number>" "<40-character-main-sha>" "APPROVE"');
   console.log("");
   printDecision(decision);
 }
@@ -896,6 +1307,7 @@ function printNext() {
   console.log(`Current approved main: ${memory.currentApprovedMain}`);
   console.log(`Current branch: ${state.branch}`);
   console.log(`Working tree: ${state.workingEntries.length === 0 ? "clean" : "dirty"}`);
+  console.log(`Recommended command: node tools/agents/rezno-orchestrator.mjs delegate "${nextAction}"`);
   console.log("");
   console.log("Ready-to-copy Codex prompt:");
   console.log(`You are Codex working in the REZNO repository.
@@ -919,6 +1331,7 @@ Start with:
 - git pull --ff-only origin main
 - node tools/agents/rezno-orchestrator.mjs status
 - node tools/agents/rezno-orchestrator.mjs audit
+- node tools/agents/rezno-orchestrator.mjs delegate "${nextAction}"
 
 Plan the sprint, execute only approved scope, run safe checks, and stop for CTO review. No merge without explicit CTO approval.`);
 }
@@ -935,36 +1348,49 @@ function printAudit() {
   }
 
   const memoryExists = existsSync(memoryPath());
-  const latestMain = hasRef("main") ? runGit(["rev-parse", "main"]) : "missing";
   const approvedMain = memory?.currentApprovedMain ?? null;
   const approvedMainKnown = isGitSha(approvedMain ?? "");
   const memoryValidationErrors = memory ? validateMemoryLedger(memory) : [];
-  const mainMismatch = approvedMainKnown && latestMain !== "missing" && approvedMain !== latestMain;
+  const freshness = memory ? memoryFreshness(memory) : null;
   const risks = state.risks;
   const auditPassed =
     memoryExists &&
     !memoryError &&
     memoryValidationErrors.length === 0 &&
     approvedMainKnown &&
-    !mainMismatch &&
+    freshness?.safeForDelegation &&
     state.decision.label === DECISIONS.APPROVE;
   const decision = auditPassed
-    ? { label: DECISIONS.APPROVE, reason: "Memory ledger exists, JSON is valid, and repository risk review is approved." }
+    ? {
+        label: DECISIONS.APPROVE,
+        reason: `Memory ledger exists, JSON is valid, ${freshness.reason}, and repository risk review is approved.`,
+      }
     : { label: DECISIONS.NEEDS_QA_GATE, reason: "Audit found missing, dirty, or uncertain state that needs review." };
 
   console.log("REZNO Agent Memory Audit");
   console.log(`Memory file exists: ${memoryExists ? "yes" : "no"}`);
   console.log(`Memory JSON valid: ${memoryError ? `no (${memoryError.message})` : "yes"}`);
   console.log(`Current approved main in memory: ${approvedMain ?? "missing"}`);
-  console.log(`Latest local main SHA: ${latestMain}`);
+  console.log(`Latest local main SHA: ${freshness?.latestMain ?? "missing"}`);
   console.log(`Current branch: ${state.branch}`);
   console.log(`Memory approved main format: ${approvedMainKnown ? "valid" : "invalid"}`);
+  console.log(`Memory freshness: ${freshness?.reason ?? "memory unavailable"}`);
+  if (freshness?.note) {
+    console.log(`Note: ${freshness.note}`);
+    console.log("Recommendation: record the sprint after CTO-approved merge when appropriate.");
+  }
+  if ((freshness?.changedFiles ?? []).length > 0) {
+    console.log("Files changed between memory approved main and local main:");
+    console.log(freshness.changedFiles.map((file) => `- ${file}`).join("\n"));
+    console.log("Risk categories in memory drift:");
+    console.log(riskLines(freshness.risks).join("\n"));
+  }
   console.log(`Closed sprints array valid: ${Array.isArray(memory?.closedSprints) ? "yes" : "no"}`);
   if (memoryValidationErrors.length > 0) {
     console.log("Memory validation errors:");
     console.log(memoryValidationErrors.map((error) => `- ${error}`).join("\n"));
   }
-  if (mainMismatch) {
+  if (freshness && freshness.status !== "exact" && !freshness.safeForDelegation) {
     console.log("Warning: Memory approved main differs from local main. Run record-sprint only after CTO-approved merge.");
     if (state.branch !== "main") {
       console.log("Note: current branch is not main; this may be expected on a feature branch, but the mismatch is still reported.");
@@ -1165,6 +1591,21 @@ function main() {
 
   if (command === "audit") {
     printAudit();
+    return;
+  }
+
+  if (command === "delegate") {
+    printDelegate();
+    return;
+  }
+
+  if (command === "gate") {
+    printGate();
+    return;
+  }
+
+  if (command === "operator-pack") {
+    printOperatorPack();
     return;
   }
 

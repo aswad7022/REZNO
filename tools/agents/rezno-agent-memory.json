@@ -1,7 +1,7 @@
 {
   "project": "REZNO",
   "productVision": "One Platform. Every Booking.",
-  "currentApprovedMain": "6812d0f795ae7c49caa57ec1742af0a71d87f902",
+  "currentApprovedMain": "c30bc7b5fa7f87a5b85c0602a316a8eaad658fc5",
   "closedSprints": [
     {
       "name": "Agentic Delivery System MVP",
@@ -20,9 +20,15 @@
       "pr": 19,
       "mainSha": "6812d0f795ae7c49caa57ec1742af0a71d87f902",
       "decision": "APPROVE"
+    },
+    {
+      "name": "Agentic Delivery System Phase 4 - Memory Ledger and Next Action",
+      "pr": 20,
+      "mainSha": "c30bc7b5fa7f87a5b85c0602a316a8eaad658fc5",
+      "decision": "APPROVE"
     }
   ],
   "activeSprint": null,
   "blockedItems": [],
-  "nextRecommendedAction": "Agentic Delivery System Phase 5 - Delegated Sprint Mode"
+  "nextRecommendedAction": "Use delegated sprint mode for the next safe REZNO task"
 }

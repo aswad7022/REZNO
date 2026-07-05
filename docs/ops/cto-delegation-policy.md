@@ -35,6 +35,8 @@ Phase 3 delegation also allows the orchestrator to print task risk analysis, a f
 
 Phase 4 delegation allows the repository-local memory ledger to track closed sprints and the next recommended action. Default memory commands are read-only. `record-sprint` is the only write command, and it may update only `tools/agents/rezno-agent-memory.json` after validating the PR number, main SHA, and CTO decision label.
 
+Phase 5 delegation allows the orchestrator to generate delegated sprint prompts and operator packs. Implementation-capable prompts require clean `main`, a clean working tree, accepted memory freshness, and no detected goal-risk categories. Exact memory/main match is preferred. Safe approved-files-only ancestor drift is allowed only when all changes since the memory SHA are Agentic Delivery System docs/tools/memory files with no risk categories. Unknown or product/app/API/auth/schema/business logic drift blocks implementation. API, business/product-domain, booking, reservation, marketplace, tenant, customer data, staff, pricing, service catalog, notification, message, review, admin, auth, schema, migration, package, deployment, payment, secret, permission, mobile, or EAS risk must produce planning/review-only prompts until CTO explicitly approves implementation. Merge always remains human-only.
+
 ## Human-only approvals
 
 The CTO or delegated human reviewer must approve:

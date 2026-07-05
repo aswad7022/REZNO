@@ -23,6 +23,8 @@ In fast-lane mode, it may use `node tools/agents/rezno-orchestrator.mjs plan "<t
 
 In Phase 3, it may use `risk "<goal>"` and `sprint "<goal>"` to create a fuller sprint runner pack before implementation. The pack is advisory and does not authorize merge or deployment.
 
+In Phase 5, it may use `delegate "<goal>"` to produce a daily-use prompt. If the goal is high-risk, the prompt must be planning/review-only.
+
 ## Codex Execution Agent
 
 Implements the approved scope. It must preserve existing functionality, avoid broad refactors, avoid `git add .`, and change only authorized files.
@@ -37,6 +39,8 @@ In fast-lane mode, it may use `node tools/agents/rezno-orchestrator.mjs validate
 
 In Phase 3, it may also use `decision` to summarize current repository risk and recommendation for CTO review.
 
+In Phase 5, it may use `gate "<goal>"` to prepare a QA/security checklist before risky implementation.
+
 ## Security Agent
 
 Reviews auth, permissions, ownership, safe redirects, server actions, secrets, rate limits, and data exposure risks. It escalates high-risk findings before code changes unless a narrow fix is explicitly approved.
@@ -48,6 +52,8 @@ Verifies branch, commit, PR state, checks, mergeability, generated artifacts, an
 In fast-lane mode, it may use `close-sprint` to print the post-merge sync checklist and memory block, but it must not update memory automatically.
 
 In Phase 3, it may use `pr-body "<sprint name>"` to draft PR text and `memory "<sprint name>"` to prepare a memory update block. It still must not merge without explicit CTO approval.
+
+In Phase 5, it may use `operator-pack "<goal>"` to prepare the CTO review package. The package does not authorize merge by itself.
 
 ## Memory Agent
 

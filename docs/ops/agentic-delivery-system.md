@@ -112,6 +112,41 @@ Safety rules:
 - The system remains supervised and does not merge, deploy, or run Codex automatically.
 - Merge still requires explicit CTO approval.
 
+## Phase 5 delegated sprint mode
+
+Phase 5 introduces the daily-use delegated sprint flow. The operator starts with memory, delegates a goal, and receives a ready-to-copy Codex prompt that is either implementation-capable for safe work or planning-only for risky work.
+
+Commands:
+
+```sh
+node tools/agents/rezno-orchestrator.mjs memory-status
+node tools/agents/rezno-orchestrator.mjs delegate "Improve REZNO agentic delivery docs safely"
+node tools/agents/rezno-orchestrator.mjs gate "Prepare mobile EAS build"
+node tools/agents/rezno-orchestrator.mjs operator-pack "Improve REZNO agentic delivery docs safely"
+```
+
+Delegated sprint mode can:
+
+- Plan safe work.
+- Generate English Codex prompts.
+- Classify risk.
+- Prepare QA/security gates.
+- Prepare CTO/operator review packs.
+
+Delegated sprint mode may generate an implementation-capable prompt only when the repository is on clean `main`, the working tree is clean, and no goal-risk categories are detected. The preferred memory state is an exact match between `memory.currentApprovedMain` and local `main`. A safe fallback is allowed when the memory SHA is an ancestor of local `main` and the drift contains only approved Agentic Delivery System docs/tools/memory files with no risk categories. Any unknown, product/app, API, auth, schema, business logic, or high-risk drift blocks implementation. Any API, business logic, booking, reservation, marketplace, tenant, customer data, staff, pricing, service catalog, notification, message, review, admin, mobile, EAS, auth, schema, migration, package, deployment, payment, secret, or permission risk forces planning/review-only output until CTO explicitly approves the risky scope.
+
+Delegated sprint mode cannot:
+
+- Run Codex automatically.
+- Merge.
+- Deploy.
+- Install packages.
+- Change schema.
+- Change auth.
+- Bypass CTO approval.
+
+High-risk goals become planning/review-only prompts until CTO explicitly approves implementation.
+
 ## CTO decision labels
 
 Only these labels are valid:
