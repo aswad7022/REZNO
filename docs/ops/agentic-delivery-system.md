@@ -133,6 +133,8 @@ Delegated sprint mode can:
 - Prepare QA/security gates.
 - Prepare CTO/operator review packs.
 
+Delegated sprint mode may generate an implementation-capable prompt only when the repository is on clean `main`, the memory ledger matches local `main`, the working tree is clean, and no goal-risk categories are detected. Any API, business logic, booking, reservation, marketplace, tenant, customer data, staff, pricing, service catalog, notification, message, review, admin, mobile, EAS, auth, schema, migration, package, deployment, payment, secret, or permission risk forces planning/review-only output until CTO explicitly approves the risky scope.
+
 Delegated sprint mode cannot:
 
 - Run Codex automatically.

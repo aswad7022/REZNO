@@ -80,8 +80,64 @@ const GOAL_RISK_RULES = [
     keywords: ["auth", "login", "sign in", "session", "better auth", "oauth"],
   },
   {
+    name: "API",
+    keywords: ["api", "endpoint", "route handler", "json endpoint", "server action", "webhook"],
+  },
+  {
     name: "permissions",
     keywords: ["permission", "role", "rbac", "admin", "owner", "access control", "authorization"],
+  },
+  {
+    name: "business logic",
+    keywords: ["business logic", "business rule", "workflow", "lifecycle", "status transition"],
+  },
+  {
+    name: "booking",
+    keywords: ["booking", "bookings", "appointment", "appointments", "cancel booking", "reschedule"],
+  },
+  {
+    name: "reservation",
+    keywords: ["reservation", "reservations", "reserve", "table reservation"],
+  },
+  {
+    name: "marketplace",
+    keywords: ["marketplace", "discovery", "near me", "search results", "public business page"],
+  },
+  {
+    name: "tenant",
+    keywords: ["tenant", "multi-tenant", "organization isolation", "active business", "business context"],
+  },
+  {
+    name: "customer data",
+    keywords: ["customer data", "customer profile", "customer record", "person data", "private data"],
+  },
+  {
+    name: "staff",
+    keywords: ["staff", "employee", "team member", "professional profile", "member assignment"],
+  },
+  {
+    name: "pricing",
+    keywords: ["price", "pricing", "fee", "cost", "amount"],
+  },
+  {
+    name: "service catalog",
+    keywords: ["service catalog", "service", "offering", "branch service"],
+  },
+  {
+    name: "notification",
+    keywords: ["notification", "notifications", "notify"],
+  },
+  {
+    name: "message",
+    keywords: ["message", "messages", "messaging", "conversation"],
+  },
+  {
+    name: "review",
+    keywords: ["review", "reviews", "rating", "ratings"],
+  },
+  {
+    name: "admin",
+    keywords: ["admin", "super admin", "administrator", "admin dashboard"],
   },
   {
     name: "secrets",
@@ -544,12 +600,63 @@ function printRiskAnalysis() {
   printDecision(decision);
 }
 
-function goalIsHighRisk(risks) {
-  return risks.size > 0;
-}
-
 function goalDecision(risks) {
   return decisionForGoalRisks(risks);
+}
+
+function localMainSha() {
+  return hasRef("main") ? runGit(["rev-parse", "main"]) : "missing";
+}
+
+function delegatedImplementationGate(memory, state, risks) {
+  const reasons = [];
+  const latestMain = localMainSha();
+  const approvedMain = memory?.currentApprovedMain ?? "missing";
+  const goalRiskDecision = goalDecision(risks);
+
+  if (risks.size > 0) {
+    reasons.push("goal risk categories were detected");
+  }
+
+  if (state.branch !== "main") {
+    reasons.push("current branch is not main");
+  }
+
+  if (state.workingEntries.length > 0) {
+    reasons.push("working tree is not clean");
+  }
+
+  if (!isGitSha(approvedMain)) {
+    reasons.push("memory.currentApprovedMain is missing or invalid");
+  } else if (latestMain === "missing") {
+    reasons.push("local main ref is missing");
+  } else if (approvedMain !== latestMain) {
+    reasons.push("memory.currentApprovedMain does not match local main");
+  }
+
+  const allowImplementation = reasons.length === 0;
+
+  if (allowImplementation) {
+    return {
+      allowImplementation,
+      latestMain,
+      reasons,
+      decision: goalRiskDecision,
+    };
+  }
+
+  return {
+    allowImplementation,
+    latestMain,
+    reasons,
+    decision:
+      goalRiskDecision.label === DECISIONS.DO_NOT_MERGE
+        ? goalRiskDecision
+        : {
+            label: DECISIONS.NEEDS_QA_GATE,
+            reason: `Delegated implementation is blocked: ${reasons.join("; ")}.`,
+          },
+  };
 }
 
 function hardRulesText() {
@@ -623,16 +730,26 @@ function printDelegate() {
   const memory = readMemory();
   const state = context();
   const risks = detectGoalRisks(goal);
-  const decision = goalDecision(risks);
-  const allowImplementation = !goalIsHighRisk(risks);
+  const gate = delegatedImplementationGate(memory, state, risks);
+  const decision = gate.decision;
+  const allowImplementation = gate.allowImplementation;
 
   console.log("REZNO Delegated Sprint Mode");
   console.log(`Goal: ${goal}`);
   console.log(`Current approved main: ${memory.currentApprovedMain}`);
+  console.log(`Local main SHA: ${gate.latestMain}`);
   console.log(`Current branch: ${state.branch}`);
   console.log(`Working tree: ${state.workingEntries.length === 0 ? "clean" : "dirty"}`);
   console.log("Risk classification:");
   console.log(riskLines(risks).join("\n"));
+  console.log("Implementation gate:");
+  if (allowImplementation) {
+    console.log("- passed: clean main, fresh memory, clean working tree, and no goal-risk categories");
+  } else {
+    for (const reason of gate.reasons) {
+      console.log(`- blocked: ${reason}`);
+    }
+  }
   console.log(`Decision recommendation: ${decision.label}`);
   console.log(`Reason: ${decision.reason}`);
   console.log(
@@ -674,9 +791,12 @@ function printGate() {
 
 function printOperatorPack() {
   const goal = taskText();
+  const memory = readMemory();
+  const state = context();
   const risks = detectGoalRisks(goal);
-  const decision = goalDecision(risks);
-  const allowImplementation = !goalIsHighRisk(risks);
+  const gate = delegatedImplementationGate(memory, state, risks);
+  const decision = gate.decision;
+  const allowImplementation = gate.allowImplementation;
 
   console.log(`REZNO CTO/Operator Pack: ${goal}`);
   console.log("");
@@ -686,6 +806,15 @@ function printOperatorPack() {
   console.log("");
   console.log("Risk summary:");
   console.log(riskLines(risks).join("\n"));
+  console.log("");
+  console.log("Implementation gate:");
+  if (allowImplementation) {
+    console.log("- passed: clean main, fresh memory, clean working tree, and no goal-risk categories");
+  } else {
+    for (const reason of gate.reasons) {
+      console.log(`- blocked: ${reason}`);
+    }
+  }
   console.log("");
   console.log("Allowed actions:");
   console.log("- Plan safe scoped work.");

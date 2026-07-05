@@ -102,6 +102,15 @@ Daily workflow:
 
 Delegated sprint mode can plan, generate prompts, classify risk, and prepare review packs. It does not autonomously run Codex, merge, deploy, install packages, change schema, or change auth.
 
+Delegated implementation prompts are allowed only when all safety gates pass:
+
+- No goal-risk categories are detected.
+- The current branch is `main`.
+- The working tree is clean.
+- `memory.currentApprovedMain` matches local `main`.
+
+If any gate fails, `delegate` and `operator-pack` must produce planning/review-only prompts and must not authorize implementation, commit, push, or PR creation.
+
 ## CTO decision labels
 
 Only these labels are supported:
