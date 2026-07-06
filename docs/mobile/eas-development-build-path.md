@@ -14,6 +14,8 @@ It supports the real-device visual smoke checklist in [real-device-visual-smoke-
 - TestFlight/internal build path: valid only if an artifact is available.
 - Simulator/emulator: allowed for preliminary review only, not physical-device smoke.
 
+Phase 26 execution evidence is recorded in [eas-development-build-execution.md](./eas-development-build-execution.md).
+
 ## Repo evidence
 
 Repo inspection found:
