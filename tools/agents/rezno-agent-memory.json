@@ -1,7 +1,7 @@
 {
   "project": "REZNO",
   "productVision": "One Platform. Every Booking.",
-  "currentApprovedMain": "134b1ca17b13d2a0985f37fe24a6f0ddf9eb67fe",
+  "currentApprovedMain": "be5ea8ff5b4290c60e9255457934f9f6fd9ff4e8",
   "closedSprints": [
     {
       "name": "Agentic Delivery System MVP",
@@ -176,6 +176,12 @@
       "pr": 47,
       "mainSha": "134b1ca17b13d2a0985f37fe24a6f0ddf9eb67fe",
       "decision": "APPROVE"
+    },
+    {
+      "name": "Mobile Premium Visual System Phase 14 - Luxury Theme Direction Lock",
+      "pr": 48,
+      "mainSha": "be5ea8ff5b4290c60e9255457934f9f6fd9ff4e8",
+      "decision": "APPROVE"
     }
   ],
   "activeSprint": null,
@@ -184,5 +190,5 @@
     "Vercel build-rate-limit affected PR #43; Phase 10 was merged with accepted infrastructure quota risk after local/static validation passed.",
     "Vercel build-rate-limit affected PR #47; Phase 13 was merged with accepted infrastructure quota risk after local/static validation passed."
   ],
-  "nextRecommendedAction": "Mobile Premium Visual System Phase 14 - Luxury Theme Direction Lock"
+  "nextRecommendedAction": "Mobile Premium Visual System Phase 15 - Luxury Screen-by-Screen Visual Polish"
 }
