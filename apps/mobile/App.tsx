@@ -55,12 +55,12 @@ type BookingStep = {
 };
 
 const categories = [
-  { icon: "✂", label: "صالونات", tone: "gold" },
-  { icon: "🍽", label: "مطاعم", tone: "green" },
-  { icon: "⚕", label: "عيادات", tone: "blue" },
-  { icon: "💆", label: "سبا", tone: "rose" },
-  { icon: "🏋", label: "رياضة", tone: "dark" },
-  { icon: "🧰", label: "خدمات", tone: "gold" },
+  { badge: "الأكثر حجزاً", count: "128 نشاط", icon: "✂", label: "صالونات", tone: "gold" },
+  { badge: "متاح اليوم", count: "42 مطعم", icon: "🍽", label: "مطاعم", tone: "green" },
+  { badge: "قريب منك", count: "31 عيادة", icon: "⚕", label: "عيادات", tone: "blue" },
+  { badge: "فاخر", count: "18 سبا", icon: "💆", label: "سبا", tone: "rose" },
+  { badge: "صباحي", count: "27 مركز", icon: "🏋", label: "رياضة", tone: "dark" },
+  { badge: "سريع", count: "64 خدمة", icon: "🧰", label: "خدمات", tone: "gold" },
 ];
 
 const featuredBusinesses: PremiumBusiness[] = [
@@ -154,6 +154,34 @@ const onboardingHighlights = [
 const accountActions = [
   { label: "تسجيل الدخول", tone: "primary" },
   { label: "إنشاء حساب", tone: "secondary" },
+];
+
+const searchSuggestions = [
+  "قص شعر اليوم",
+  "مطعم عائلي قريب",
+  "طبيب أسنان",
+];
+
+const recentSearches = [
+  "صالون نسائي",
+  "حجز طاولة",
+  "عيادة قريبة",
+];
+
+const popularSearches = [
+  "الأقرب",
+  "الأعلى تقييماً",
+  "متاح اليوم",
+  "عروض",
+];
+
+const filterChips = [
+  { label: "الأقرب", selected: true },
+  { label: "الأعلى تقييماً", selected: false },
+  { label: "متاح اليوم", selected: true },
+  { label: "السعر", selected: false },
+  { label: "للنساء", selected: false },
+  { label: "للعوائل", selected: false },
 ];
 
 export default function App() {
@@ -334,7 +362,7 @@ function CustomerHomeScreen({
     <>
       <WelcomeOnboardingCard isRtl={isRtl} styles={styles} />
       <HeroCard isRtl={isRtl} styles={styles} />
-      <SearchBar isRtl={isRtl} styles={styles} />
+      <SearchDiscoveryPanel isRtl={isRtl} styles={styles} />
       <CategoryGrid styles={styles} />
       <PromoCard isRtl={isRtl} styles={styles} />
       <BusinessDetailShowcase isRtl={isRtl} styles={styles} />
@@ -509,6 +537,101 @@ function HeroCard({ isRtl, styles }: { isRtl: boolean; styles: MobileStyles }) {
   );
 }
 
+function SearchDiscoveryPanel({
+  isRtl,
+  styles,
+}: {
+  isRtl: boolean;
+  styles: MobileStyles;
+}) {
+  return (
+    <View style={styles.discoveryCard}>
+      <View style={styles.discoveryHeaderRow}>
+        <View>
+          <Text style={[styles.screenEyebrow, isRtl && styles.rtlText]}>
+            اكتشف بسرعة
+          </Text>
+          <Text style={[styles.discoveryTitle, isRtl && styles.rtlText]}>
+            ماذا تريد أن تحجز اليوم؟
+          </Text>
+        </View>
+        <View style={styles.discoveryLocationButton}>
+          <Text style={styles.discoveryLocationText}>⌖</Text>
+        </View>
+      </View>
+
+      <SearchBar isRtl={isRtl} styles={styles} />
+
+      <View style={styles.searchActionRow}>
+        <View style={styles.searchActionButton}>
+          <Text style={styles.searchActionIcon}>⌕</Text>
+          <Text style={styles.searchActionText}>بحث</Text>
+        </View>
+        <View style={styles.searchActionButton}>
+          <Text style={styles.searchActionIcon}>◌</Text>
+          <Text style={styles.searchActionText}>صوت</Text>
+        </View>
+        <View style={styles.searchActionButton}>
+          <Text style={styles.searchActionIcon}>≡</Text>
+          <Text style={styles.searchActionText}>فلترة</Text>
+        </View>
+      </View>
+
+      <SearchChipSection
+        chips={searchSuggestions}
+        isRtl={isRtl}
+        styles={styles}
+        title="اقتراحات ذكية"
+      />
+      <SearchChipSection
+        chips={recentSearches}
+        isRtl={isRtl}
+        muted
+        styles={styles}
+        title="آخر عمليات البحث"
+      />
+      <SearchChipSection
+        chips={popularSearches}
+        isRtl={isRtl}
+        styles={styles}
+        title="الأكثر رواجاً"
+      />
+    </View>
+  );
+}
+
+function SearchChipSection({
+  chips,
+  isRtl,
+  muted,
+  styles,
+  title,
+}: {
+  chips: string[];
+  isRtl: boolean;
+  muted?: boolean;
+  styles: MobileStyles;
+  title: string;
+}) {
+  return (
+    <View style={styles.searchChipSection}>
+      <Text style={[styles.searchChipTitle, isRtl && styles.rtlText]}>
+        {title}
+      </Text>
+      <View style={styles.searchChipRow}>
+        {chips.map((chip) => (
+          <Text
+            key={chip}
+            style={[styles.searchChip, muted && styles.searchChipMuted]}
+          >
+            {chip}
+          </Text>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 function SearchBar({ isRtl, styles }: { isRtl: boolean; styles: MobileStyles }) {
   return (
     <View style={styles.searchBar}>
@@ -516,6 +639,9 @@ function SearchBar({ isRtl, styles }: { isRtl: boolean; styles: MobileStyles }) 
       <Text style={[styles.searchPlaceholder, isRtl && styles.rtlText]}>
         ابحث عن خدمة، مطعم، عيادة...
       </Text>
+      <View style={styles.voiceButton}>
+        <Text style={styles.voiceText}>◌</Text>
+      </View>
       <View style={styles.filterButton}>
         <Text style={styles.filterText}>⚙</Text>
       </View>
@@ -525,14 +651,45 @@ function SearchBar({ isRtl, styles }: { isRtl: boolean; styles: MobileStyles }) 
 
 function CategoryGrid({ styles }: { styles: MobileStyles }) {
   return (
-    <View style={styles.categoryGrid}>
-      {categories.map((category) => (
-        <View key={category.label} style={styles.categoryCard}>
-          <Text style={styles.categoryIcon}>{category.icon}</Text>
-          <Text style={styles.categoryLabel}>{category.label}</Text>
-        </View>
-      ))}
-    </View>
+    <>
+      <View style={styles.categoryRail}>
+        {categories.slice(0, 4).map((category, index) => (
+          <View
+            key={category.label}
+            style={[
+              styles.categoryRailCard,
+              index === 0 && styles.categoryRailCardActive,
+            ]}
+          >
+            <Text style={styles.categoryRailIcon}>{category.icon}</Text>
+            <Text
+              style={[
+                styles.categoryRailLabel,
+                index === 0 && styles.categoryRailLabelActive,
+              ]}
+            >
+              {category.label}
+            </Text>
+          </View>
+        ))}
+      </View>
+
+      <View style={styles.categoryGrid}>
+        {categories.map((category, index) => (
+          <View
+            key={category.label}
+            style={[styles.categoryCard, index === 0 && styles.categoryCardActive]}
+          >
+            <View style={styles.categoryTopRow}>
+              <Text style={styles.categoryIcon}>{category.icon}</Text>
+              <Text style={styles.categoryBadge}>{category.badge}</Text>
+            </View>
+            <Text style={styles.categoryLabel}>{category.label}</Text>
+            <Text style={styles.categoryCount}>{category.count}</Text>
+          </View>
+        ))}
+      </View>
+    </>
   );
 }
 
@@ -640,21 +797,20 @@ function MarketplaceScreen({
   return (
     <>
       <View style={styles.mapHeaderCard}>
+        <View style={styles.marketplaceModeRow}>
+          <Text style={styles.marketplaceModeActive}>قائمة</Text>
+          <Text style={styles.marketplaceMode}>خريطة</Text>
+        </View>
         <Text style={[styles.screenEyebrow, isRtl && styles.rtlText]}>
-          خريطة وقائمة
+          سوق REZNO
         </Text>
         <Text style={[styles.mapTitle, isRtl && styles.rtlText]}>
-          اكتشف الأعمال القريبة بدون إضافة SDK خرائط
+          اكتشف الأعمال والخدمات حسب قربك واهتماماتك
         </Text>
-        <View style={styles.chipRow}>
-          {["الأقرب", "الأعلى تقييماً", "متاح اليوم"].map((chip) => (
-            <Text key={chip} style={styles.filterChip}>
-              {chip}
-            </Text>
-          ))}
-        </View>
+        <PremiumFilterChips styles={styles} />
       </View>
-      <SearchBar isRtl={isRtl} styles={styles} />
+      <SearchDiscoveryPanel isRtl={isRtl} styles={styles} />
+      <RecommendedDiscoverySection isRtl={isRtl} styles={styles} />
       <MarketplaceStateView
         isRtl={isRtl}
         onRetry={onRetry}
@@ -663,6 +819,63 @@ function MarketplaceScreen({
         text={text}
       />
     </>
+  );
+}
+
+function PremiumFilterChips({ styles }: { styles: MobileStyles }) {
+  return (
+    <View style={styles.filterChipWrap}>
+      {filterChips.map((chip) => (
+        <Text
+          key={chip.label}
+          style={[
+            styles.filterChip,
+            chip.selected && styles.filterChipSelected,
+          ]}
+        >
+          {chip.label}
+        </Text>
+      ))}
+    </View>
+  );
+}
+
+function RecommendedDiscoverySection({
+  isRtl,
+  styles,
+}: {
+  isRtl: boolean;
+  styles: MobileStyles;
+}) {
+  return (
+    <View style={styles.recommendedCard}>
+      <SectionHeader
+        action="عرض المزيد"
+        isRtl={isRtl}
+        styles={styles}
+        title="مقترح لك"
+      />
+      <View style={styles.recommendedList}>
+        {featuredBusinesses.slice(0, 2).map((business) => (
+          <View key={business.id} style={styles.recommendedItem}>
+            <View style={styles.recommendedIcon}>
+              <Text style={styles.recommendedIconText}>
+                {business.name.charAt(0)}
+              </Text>
+            </View>
+            <View style={styles.rowCopy}>
+              <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>
+                {business.name}
+              </Text>
+              <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>
+                {business.category} · {business.distance} · ★ {business.rating}
+              </Text>
+            </View>
+            <Text style={styles.tagText}>{business.tag}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
   );
 }
 
@@ -1604,8 +1817,18 @@ const createStyles = (theme: MobileTheme) =>
       shadowOpacity: 0.12,
       shadowRadius: 22,
     },
+    categoryBadge: {
+      backgroundColor: theme.colors.goldSoft,
+      borderRadius: theme.radii.pill,
+      color: theme.colors.deepGold,
+      fontSize: 10,
+      fontWeight: "900",
+      overflow: "hidden",
+      paddingHorizontal: 8,
+      paddingVertical: 5,
+    },
     categoryCard: {
-      alignItems: "center",
+      alignItems: "flex-start",
       backgroundColor: theme.colors.card,
       borderColor: theme.colors.border,
       borderRadius: 22,
@@ -1614,6 +1837,15 @@ const createStyles = (theme: MobileTheme) =>
       flexGrow: 1,
       gap: 8,
       padding: 14,
+    },
+    categoryCardActive: {
+      backgroundColor: theme.colors.goldSoft,
+      borderColor: theme.colors.gold,
+    },
+    categoryCount: {
+      color: theme.colors.mutedForeground,
+      fontSize: 11,
+      fontWeight: "800",
     },
     categoryGrid: {
       flexDirection: "row",
@@ -1627,6 +1859,42 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.foreground,
       fontSize: 12,
       fontWeight: "900",
+    },
+    categoryRail: {
+      flexDirection: "row",
+      gap: 10,
+    },
+    categoryRailCard: {
+      alignItems: "center",
+      backgroundColor: theme.colors.cardElevated,
+      borderColor: theme.colors.border,
+      borderRadius: 22,
+      borderWidth: 1,
+      flex: 1,
+      gap: 7,
+      padding: 12,
+    },
+    categoryRailCardActive: {
+      backgroundColor: theme.colors.gold,
+      borderColor: theme.colors.gold,
+    },
+    categoryRailIcon: {
+      fontSize: 22,
+    },
+    categoryRailLabel: {
+      color: theme.colors.foreground,
+      fontSize: 11,
+      fontWeight: "900",
+    },
+    categoryRailLabelActive: {
+      color: theme.colors.foregroundInverse,
+    },
+    categoryTopRow: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 8,
+      justifyContent: "space-between",
+      width: "100%",
     },
     centerTabButton: {
       backgroundColor: theme.colors.gold,
@@ -1841,6 +2109,43 @@ const createStyles = (theme: MobileTheme) =>
       flexDirection: "row",
       justifyContent: "space-between",
     },
+    discoveryCard: {
+      backgroundColor: theme.colors.cardElevated,
+      borderColor: theme.colors.border,
+      borderRadius: theme.radii.xl,
+      borderWidth: 1,
+      gap: 14,
+      padding: 18,
+      shadowColor: theme.colors.shadow,
+      shadowOffset: { height: 16, width: 0 },
+      shadowOpacity: theme.isDark ? 0.28 : 0.08,
+      shadowRadius: 26,
+    },
+    discoveryHeaderRow: {
+      alignItems: "center",
+      flexDirection: "row",
+      justifyContent: "space-between",
+    },
+    discoveryLocationButton: {
+      alignItems: "center",
+      backgroundColor: theme.colors.gold,
+      borderRadius: 20,
+      height: 40,
+      justifyContent: "center",
+      width: 40,
+    },
+    discoveryLocationText: {
+      color: theme.colors.foregroundInverse,
+      fontSize: 18,
+      fontWeight: "900",
+    },
+    discoveryTitle: {
+      color: theme.colors.foreground,
+      fontSize: 22,
+      fontWeight: "900",
+      lineHeight: 28,
+      marginTop: 6,
+    },
     editAction: {
       color: theme.colors.gold,
       fontSize: 13,
@@ -1879,6 +2184,16 @@ const createStyles = (theme: MobileTheme) =>
       overflow: "hidden",
       paddingHorizontal: 12,
       paddingVertical: 7,
+    },
+    filterChipSelected: {
+      backgroundColor: theme.colors.gold,
+      color: theme.colors.foregroundInverse,
+    },
+    filterChipWrap: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+      marginTop: 16,
     },
     filterText: {
       color: theme.colors.foregroundInverse,
@@ -2062,6 +2377,32 @@ const createStyles = (theme: MobileTheme) =>
       fontWeight: "900",
       lineHeight: 29,
       marginTop: 8,
+    },
+    marketplaceMode: {
+      backgroundColor: theme.colors.muted,
+      borderRadius: theme.radii.pill,
+      color: theme.colors.mutedForeground,
+      fontSize: 12,
+      fontWeight: "900",
+      overflow: "hidden",
+      paddingHorizontal: 12,
+      paddingVertical: 7,
+    },
+    marketplaceModeActive: {
+      backgroundColor: theme.colors.gold,
+      borderRadius: theme.radii.pill,
+      color: theme.colors.foregroundInverse,
+      fontSize: 12,
+      fontWeight: "900",
+      overflow: "hidden",
+      paddingHorizontal: 12,
+      paddingVertical: 7,
+    },
+    marketplaceModeRow: {
+      flexDirection: "row",
+      gap: 8,
+      justifyContent: "flex-start",
+      marginBottom: 12,
     },
     myBookingCard: {
       backgroundColor: theme.colors.cardElevated,
@@ -2268,6 +2609,40 @@ const createStyles = (theme: MobileTheme) =>
       fontSize: 18,
       fontWeight: "900",
     },
+    recommendedCard: {
+      backgroundColor: theme.colors.card,
+      borderColor: theme.colors.border,
+      borderRadius: theme.radii.card,
+      borderWidth: 1,
+      gap: 14,
+      padding: 18,
+    },
+    recommendedIcon: {
+      alignItems: "center",
+      backgroundColor: theme.colors.goldSoft,
+      borderRadius: 20,
+      height: 40,
+      justifyContent: "center",
+      width: 40,
+    },
+    recommendedIconText: {
+      color: theme.colors.deepGold,
+      fontSize: 16,
+      fontWeight: "900",
+    },
+    recommendedItem: {
+      alignItems: "center",
+      backgroundColor: theme.colors.cardElevated,
+      borderColor: theme.colors.border,
+      borderRadius: 20,
+      borderWidth: 1,
+      flexDirection: "row",
+      gap: 12,
+      padding: 12,
+    },
+    recommendedList: {
+      gap: 10,
+    },
     ratingPill: {
       backgroundColor: theme.colors.goldSoft,
       borderRadius: theme.radii.pill,
@@ -2392,6 +2767,28 @@ const createStyles = (theme: MobileTheme) =>
       lineHeight: 31,
       marginTop: 8,
     },
+    searchActionButton: {
+      alignItems: "center",
+      backgroundColor: theme.colors.muted,
+      borderRadius: 18,
+      flex: 1,
+      gap: 5,
+      paddingVertical: 12,
+    },
+    searchActionIcon: {
+      color: theme.colors.gold,
+      fontSize: 17,
+      fontWeight: "900",
+    },
+    searchActionRow: {
+      flexDirection: "row",
+      gap: 10,
+    },
+    searchActionText: {
+      color: theme.colors.foreground,
+      fontSize: 12,
+      fontWeight: "900",
+    },
     searchBar: {
       alignItems: "center",
       backgroundColor: theme.colors.cardElevated,
@@ -2413,6 +2810,33 @@ const createStyles = (theme: MobileTheme) =>
       flex: 1,
       fontSize: 14,
       fontWeight: "700",
+    },
+    searchChip: {
+      backgroundColor: theme.colors.goldSoft,
+      borderRadius: theme.radii.pill,
+      color: theme.colors.deepGold,
+      fontSize: 12,
+      fontWeight: "900",
+      overflow: "hidden",
+      paddingHorizontal: 11,
+      paddingVertical: 7,
+    },
+    searchChipMuted: {
+      backgroundColor: theme.colors.muted,
+      color: theme.colors.mutedForeground,
+    },
+    searchChipRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+    },
+    searchChipSection: {
+      gap: 8,
+    },
+    searchChipTitle: {
+      color: theme.colors.foreground,
+      fontSize: 13,
+      fontWeight: "900",
     },
     secondaryButton: {
       alignItems: "center",
@@ -2627,5 +3051,18 @@ const createStyles = (theme: MobileTheme) =>
     },
     timeSlotTextActive: {
       color: theme.colors.foregroundInverse,
+    },
+    voiceButton: {
+      alignItems: "center",
+      backgroundColor: theme.colors.muted,
+      borderRadius: 18,
+      height: 36,
+      justifyContent: "center",
+      width: 36,
+    },
+    voiceText: {
+      color: theme.colors.gold,
+      fontSize: 15,
+      fontWeight: "900",
     },
   });
