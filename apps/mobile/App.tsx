@@ -12,15 +12,20 @@ import {
 } from "react-native";
 
 import { fetchMobileMarketplace } from "./src/api/marketplace";
+import {
+  BottomTabBar,
+  PrimaryButton,
+  ScreenHeader,
+  TOUCH_HIT_SLOP,
+} from "./src/components/mobile-chrome";
 import { API_BASE_URL } from "./src/config/api";
 import {
   DEFAULT_LOCALE,
-  SUPPORTED_LOCALES,
   getTextDirection,
   labels,
   type MobileLocale,
 } from "./src/i18n/labels";
-import { MOBILE_TABS, type MobileTabId } from "./src/navigation/tabs";
+import type { MobileTabId } from "./src/navigation/tabs";
 import {
   darkMobileTheme,
   lightMobileTheme,
@@ -29,8 +34,6 @@ import {
 import type { MobileMarketplaceBusiness } from "./src/types/marketplace";
 
 I18nManager.allowRTL(true);
-
-const TOUCH_HIT_SLOP = { bottom: 8, left: 8, right: 8, top: 8 };
 
 type MarketplaceState =
   | { status: "idle" }
@@ -497,64 +500,6 @@ export default function App() {
         text={text}
       />
     </SafeAreaView>
-  );
-}
-
-function ScreenHeader({
-  isRtl,
-  locale,
-  onLocaleChange,
-  styles,
-  text,
-}: {
-  isRtl: boolean;
-  locale: MobileLocale;
-  onLocaleChange: (locale: MobileLocale) => void;
-  styles: MobileStyles;
-  text: (typeof labels)[MobileLocale];
-}) {
-  return (
-    <View style={styles.header}>
-      <View style={styles.brandRow}>
-        <View style={styles.logoMark}>
-          <Text style={styles.logoText}>R</Text>
-        </View>
-        <View style={styles.brandCopy}>
-          <Text style={[styles.brandName, isRtl && styles.rtlText]}>REZNO</Text>
-          <Text style={[styles.brandTagline, isRtl && styles.rtlText]}>
-            {text.appTagline}
-          </Text>
-        </View>
-      </View>
-
-      <View style={styles.localeRow}>
-        {SUPPORTED_LOCALES.map((item) => (
-          <Pressable
-            accessibilityHint="يغير لغة الواجهة داخل هذه المعاينة فقط."
-            accessibilityLabel={`تغيير اللغة إلى ${item.toUpperCase()}`}
-            accessibilityRole="button"
-            accessibilityState={{ selected: item === locale }}
-            hitSlop={TOUCH_HIT_SLOP}
-            key={item}
-            onPress={() => onLocaleChange(item)}
-            style={({ pressed }) => [
-              styles.localeButton,
-              item === locale && styles.localeButtonActive,
-              pressed && styles.localeButtonPressed,
-            ]}
-          >
-            <Text
-              style={[
-                styles.localeButtonText,
-                item === locale && styles.localeButtonTextActive,
-              ]}
-            >
-              {item.toUpperCase()}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
-    </View>
   );
 }
 
@@ -2387,119 +2332,6 @@ function AccountScreen({
         </Text>
       </View>
     </>
-  );
-}
-
-function PrimaryButton({
-  disabled,
-  label,
-  onPress,
-  styles,
-}: {
-  disabled?: boolean;
-  label: string;
-  onPress?: () => void;
-  styles: MobileStyles;
-}) {
-  const isVisualOnly = !onPress;
-  const accessibilityDisabled = Boolean(disabled || isVisualOnly);
-
-  return (
-    <Pressable
-      accessibilityHint={
-        isVisualOnly
-          ? "زر بصري فقط في هذه المعاينة ولا ينفذ إجراء حقيقياً."
-          : "ينفذ الإجراء المعروض."
-      }
-      accessibilityLabel={label}
-      accessibilityRole="button"
-      accessibilityState={{ disabled: accessibilityDisabled }}
-      disabled={accessibilityDisabled}
-      hitSlop={TOUCH_HIT_SLOP}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.primaryButton,
-        isVisualOnly && styles.visualOnlyButton,
-        pressed && !accessibilityDisabled && styles.primaryButtonPressed,
-        disabled && styles.disabledButton,
-      ]}
-    >
-      <Text
-        style={[
-          styles.primaryButtonText,
-          disabled && styles.disabledButtonText,
-        ]}
-      >
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
-function BottomTabBar({
-  activeTab,
-  onTabPress,
-  styles,
-  text,
-}: {
-  activeTab: MobileTabId;
-  onTabPress: (tabId: MobileTabId) => void;
-  styles: MobileStyles;
-  text: (typeof labels)[MobileLocale];
-}) {
-  return (
-    <View style={styles.tabBar}>
-      {MOBILE_TABS.map((tab) => {
-        const active = tab.id === activeTab;
-        const isCenterAction = tab.id === "bookings";
-
-        return (
-          <Pressable
-            accessibilityHint={
-              active
-                ? "هذا هو التبويب المفتوح حالياً."
-                : `يفتح تبويب ${text.tabs[tab.id]}.`
-            }
-            accessibilityLabel={`تبويب ${text.tabs[tab.id]}`}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: active }}
-            hitSlop={TOUCH_HIT_SLOP}
-            key={tab.id}
-            onPress={() => onTabPress(tab.id)}
-            style={({ pressed }) => [
-              styles.tabButton,
-              active && styles.tabButtonActive,
-              isCenterAction && styles.centerTabButton,
-              isCenterAction && active && styles.centerTabButtonActive,
-              pressed && styles.tabButtonPressed,
-            ]}
-          >
-            <Text
-              style={[
-                styles.tabIcon,
-                active && styles.tabIconActive,
-                isCenterAction && styles.centerTabIcon,
-              ]}
-            >
-              {isCenterAction ? "+" : tab.icon}
-            </Text>
-            <Text
-              numberOfLines={1}
-              style={[styles.tabLabel, active && styles.tabLabelActive]}
-            >
-              {text.tabs[tab.id]}
-            </Text>
-            <View
-              style={[
-                styles.tabActiveIndicator,
-                active && styles.tabActiveIndicatorVisible,
-                isCenterAction && styles.centerTabActiveIndicator,
-              ]}
-            />
-          </Pressable>
-        );
-      })}
-    </View>
   );
 }
 
