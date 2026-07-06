@@ -1,7 +1,7 @@
 {
   "project": "REZNO",
   "productVision": "One Platform. Every Booking.",
-  "currentApprovedMain": "fc8505354e83e4c0c5cb167873bd1c240089b3b6",
+  "currentApprovedMain": "71d585dcd3852200a5656eef70677d72ee170808",
   "closedSprints": [
     {
       "name": "Agentic Delivery System MVP",
@@ -103,6 +103,18 @@
       "name": "Mobile Premium Visual System Phase 6 - Booking Confirmation and My Bookings Polish",
       "pr": 35,
       "mainSha": "fc8505354e83e4c0c5cb167873bd1c240089b3b6",
+      "decision": "APPROVE"
+    },
+    {
+      "name": "Record Mobile Visual System Phase 6 Memory",
+      "pr": 36,
+      "mainSha": "fea347ca7c5bf3e27c71a672bc7b7d2f35a1fc88",
+      "decision": "APPROVE"
+    },
+    {
+      "name": "Mobile Premium Visual System Phase 7 - Business Owner Dashboard Preview",
+      "pr": 37,
+      "mainSha": "71d585dcd3852200a5656eef70677d72ee170808",
       "decision": "APPROVE"
     }
   ],
