@@ -1,7 +1,7 @@
 {
   "project": "REZNO",
   "productVision": "One Platform. Every Booking.",
-  "currentApprovedMain": "5f666ee682ca6c3749c20fd42d2c1233a3c05168",
+  "currentApprovedMain": "6e723fa7f7d86f3da9cebff15d0a5ac26194c217",
   "closedSprints": [
     {
       "name": "Agentic Delivery System MVP",
@@ -44,11 +44,23 @@
       "pr": 24,
       "mainSha": "5f666ee682ca6c3749c20fd42d2c1233a3c05168",
       "decision": "APPROVE"
+    },
+    {
+      "name": "GitHub Operator Queue Phase 6",
+      "pr": 25,
+      "mainSha": "bffd21f7e7edcb193feb032304fa36f35a5b5d62",
+      "decision": "APPROVE"
+    },
+    {
+      "name": "Mobile Premium Visual System Phase 2",
+      "pr": 27,
+      "mainSha": "6e723fa7f7d86f3da9cebff15d0a5ac26194c217",
+      "decision": "APPROVE"
     }
   ],
   "activeSprint": null,
   "blockedItems": [
-    "Dependency lockfile needs a dedicated repair sprint before stable Codex setup returns to clean install mode."
+    "Mobile real-device runtime smoke remains blocked until an SDK 57-compatible Expo Go/TestFlight path or EAS development build path is available."
   ],
-  "nextRecommendedAction": "Complete GitHub Operator Queue Phase 6, then run a dependency-lock repair sprint."
+  "nextRecommendedAction": "Resume SDK 57 mobile runtime gate, then continue mobile visual QA evidence."
 }
