@@ -266,6 +266,95 @@ const staffAvailabilityPreview = [
 
 const weeklyBusinessBars = [42, 58, 37, 72, 64, 88, 76];
 
+const notificationPreviewItems = [
+  {
+    body: "تم تأكيد حجز قص وتصفيف فاخر اليوم 4:30 م.",
+    status: "غير مقروء",
+    time: "الآن",
+    title: "تم تأكيد الحجز",
+    tone: "success",
+  },
+  {
+    body: "موعدك في Noura Beauty Lounge يبدأ بعد ساعتين.",
+    status: "تذكير",
+    time: "قبل 12 دقيقة",
+    title: "تذكير قريب",
+    tone: "gold",
+  },
+  {
+    body: "النشاط رد على استفسارك حول تغيير الوقت.",
+    status: "رد جديد",
+    time: "قبل 28 دقيقة",
+    title: "رد من النشاط",
+    tone: "message",
+  },
+  {
+    body: "باقة عناية جديدة متاحة للحجز هذا الأسبوع.",
+    status: "مقروء",
+    time: "أمس",
+    title: "تحديث خدمة",
+    tone: "muted",
+  },
+];
+
+const conversationPreviewItems = [
+  {
+    initials: "N",
+    lastMessage: "نقدر نثبت موعدك اليوم 4:30 م.",
+    name: "Noura Beauty Lounge",
+    status: "نشط",
+    time: "2 د",
+    unread: "2",
+  },
+  {
+    initials: "M",
+    lastMessage: "تم استلام طلب الطاولة بنجاح.",
+    name: "Mat3am Gold",
+    status: "متابعة",
+    time: "24 د",
+    unread: "1",
+  },
+  {
+    initials: "S",
+    lastMessage: "يمكنك إرسال صورة الحالة قبل الزيارة.",
+    name: "Smile Studio Clinic",
+    status: "مقروء",
+    time: "أمس",
+    unread: "",
+  },
+];
+
+const messageBubblePreview = [
+  {
+    body: "مرحباً، هل يمكن تثبيت الموعد اليوم؟",
+    from: "customer",
+    time: "4:02 م",
+  },
+  {
+    body: "نعم، الموعد متاح مع ليان الساعة 4:30 م.",
+    from: "business",
+    time: "4:04 م",
+  },
+  {
+    body: "رائع، أحتاج تذكير فقط قبل الموعد.",
+    from: "customer",
+    time: "4:05 م",
+  },
+];
+
+const quickReplyPreview = [
+  "تمام",
+  "أحتاج تغيير الوقت",
+  "أرسل الموقع",
+];
+
+const notificationPreferenceRows = [
+  { enabled: true, label: "تذكيرات الحجز" },
+  { enabled: true, label: "ردود الأعمال" },
+  { enabled: false, label: "العروض" },
+  { enabled: true, label: "تحديثات النظام" },
+];
+
 export default function App() {
   const colorScheme = useColorScheme();
   const [locale, setLocale] = useState<MobileLocale>(DEFAULT_LOCALE);
@@ -341,15 +430,7 @@ export default function App() {
         ) : null}
 
         {activeTab === "messages" ? (
-          <SimpleBoundaryScreen
-            body="مركز الرسائل محفوظ كواجهة أصلية فاخرة. ربط المحادثات الحقيقية يبقى لسبرنت API منفصل."
-            eyebrow="الرسائل"
-            isRtl={isRtl}
-            primary="عرض المحادثات لاحقاً"
-            secondary="إشعارات داخلية"
-            styles={styles}
-            title="تواصل بدون مغادرة الحجز"
-          />
+          <MessagesNotificationsPreviewScreen isRtl={isRtl} styles={styles} />
         ) : null}
 
         {activeTab === "business" ? (
@@ -1559,6 +1640,231 @@ function BookingStatusBoard({
   );
 }
 
+function MessagesNotificationsPreviewScreen({
+  isRtl,
+  styles,
+}: {
+  isRtl: boolean;
+  styles: MobileStyles;
+}) {
+  return (
+    <>
+      <View style={styles.messageHeroCard}>
+        <View style={styles.messageHeroGlow} />
+        <View style={styles.messageHeroTopRow}>
+          <View style={styles.messageHeroIcon}>
+            <Text style={styles.messageHeroIconText}>✉</Text>
+          </View>
+          <Text style={styles.messageSafetyBadge}>معاينة آمنة</Text>
+        </View>
+        <Text style={[styles.screenEyebrow, isRtl && styles.rtlText]}>
+          الرسائل والإشعارات
+        </Text>
+        <Text style={[styles.messageHeroTitle, isRtl && styles.rtlText]}>
+          تواصل واضح حول كل حجز بدون منطق إرسال حقيقي
+        </Text>
+        <Text style={[styles.messageHeroBody, isRtl && styles.rtlText]}>
+          هذه واجهة عرض فقط. لا توجد إشعارات دفع، صلاحيات جهاز، WebSocket، أو
+          إرسال رسائل عبر API.
+        </Text>
+      </View>
+
+      <NotificationsCenterPreview isRtl={isRtl} styles={styles} />
+      <ConversationListPreview isRtl={isRtl} styles={styles} />
+      <MessageDetailPreview isRtl={isRtl} styles={styles} />
+      <NotificationPreferencesPreview isRtl={isRtl} styles={styles} />
+    </>
+  );
+}
+
+function NotificationsCenterPreview({
+  isRtl,
+  styles,
+}: {
+  isRtl: boolean;
+  styles: MobileStyles;
+}) {
+  return (
+    <View style={styles.notificationPanel}>
+      <SectionHeader
+        action="إدارة"
+        isRtl={isRtl}
+        styles={styles}
+        title="مركز الإشعارات"
+      />
+      {notificationPreviewItems.map((item, index) => (
+        <View
+          key={item.title}
+          style={[
+            styles.notificationCard,
+            index === 0 && styles.notificationCardUnread,
+          ]}
+        >
+          <View style={styles.notificationIcon}>
+            <Text style={styles.notificationIconText}>
+              {item.tone === "success"
+                ? "✓"
+                : item.tone === "message"
+                  ? "↩"
+                  : "•"}
+            </Text>
+          </View>
+          <View style={styles.rowCopy}>
+            <View style={styles.notificationTitleRow}>
+              <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>
+                {item.title}
+              </Text>
+              <Text style={styles.notificationTime}>{item.time}</Text>
+            </View>
+            <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>
+              {item.body}
+            </Text>
+            <Text style={styles.notificationStatusChip}>{item.status}</Text>
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function ConversationListPreview({
+  isRtl,
+  styles,
+}: {
+  isRtl: boolean;
+  styles: MobileStyles;
+}) {
+  return (
+    <View style={styles.conversationPanel}>
+      <SectionHeader isRtl={isRtl} styles={styles} title="المحادثات" />
+      {conversationPreviewItems.map((conversation) => (
+        <View key={conversation.name} style={styles.conversationRow}>
+          <View style={styles.conversationAvatar}>
+            <Text style={styles.conversationAvatarText}>
+              {conversation.initials}
+            </Text>
+          </View>
+          <View style={styles.rowCopy}>
+            <View style={styles.notificationTitleRow}>
+              <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>
+                {conversation.name}
+              </Text>
+              <Text style={styles.notificationTime}>{conversation.time}</Text>
+            </View>
+            <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>
+              {conversation.lastMessage}
+            </Text>
+            <Text style={styles.conversationStatus}>{conversation.status}</Text>
+          </View>
+          {conversation.unread ? (
+            <Text style={styles.unreadBadge}>{conversation.unread}</Text>
+          ) : null}
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function MessageDetailPreview({
+  isRtl,
+  styles,
+}: {
+  isRtl: boolean;
+  styles: MobileStyles;
+}) {
+  return (
+    <View style={styles.chatPanel}>
+      <View style={styles.chatHeader}>
+        <View>
+          <Text style={[styles.screenEyebrow, isRtl && styles.rtlText]}>
+            محادثة الحجز
+          </Text>
+          <Text style={[styles.chatTitle, isRtl && styles.rtlText]}>
+            Noura Beauty Lounge
+          </Text>
+        </View>
+        <Text style={styles.messageSafetyBadge}>بدون إرسال</Text>
+      </View>
+      {messageBubblePreview.map((message) => (
+        <View
+          key={`${message.from}-${message.time}`}
+          style={[
+            styles.chatBubble,
+            message.from === "customer" && styles.chatBubbleCustomer,
+          ]}
+        >
+          <Text
+            style={[
+              styles.chatBubbleText,
+              message.from === "customer" && styles.chatBubbleTextCustomer,
+              isRtl && styles.rtlText,
+            ]}
+          >
+            {message.body}
+          </Text>
+          <Text
+            style={[
+              styles.chatBubbleTime,
+              message.from === "customer" && styles.chatBubbleTimeCustomer,
+            ]}
+          >
+            {message.time}
+          </Text>
+        </View>
+      ))}
+      <View style={styles.quickReplyRow}>
+        {quickReplyPreview.map((reply) => (
+          <Text key={reply} style={styles.quickReplyChip}>
+            {reply}
+          </Text>
+        ))}
+      </View>
+      <View style={styles.messagePlaceholderRow}>
+        <Text style={styles.messagePlaceholderChip}>مرفق</Text>
+        <Text style={styles.messagePlaceholderChip}>موقع</Text>
+        <Text style={styles.messagePlaceholderChip}>دفع بصري</Text>
+      </View>
+    </View>
+  );
+}
+
+function NotificationPreferencesPreview({
+  isRtl,
+  styles,
+}: {
+  isRtl: boolean;
+  styles: MobileStyles;
+}) {
+  return (
+    <View style={styles.preferencesPanel}>
+      <SectionHeader isRtl={isRtl} styles={styles} title="تفضيلات الإشعارات" />
+      {notificationPreferenceRows.map((row) => (
+        <View key={row.label} style={styles.preferenceRow}>
+          <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>
+            {row.label}
+          </Text>
+          <View
+            style={[
+              styles.preferenceToggle,
+              row.enabled && styles.preferenceToggleActive,
+            ]}
+          >
+            <View
+              style={[
+                styles.preferenceKnob,
+                row.enabled && styles.preferenceKnobActive,
+              ]}
+            />
+          </View>
+        </View>
+      ))}
+      <Text style={[styles.preferenceNote, isRtl && styles.rtlText]}>
+        المفاتيح بصرية فقط ولا تحفظ أي إعدادات أو تطلب صلاحيات جهاز.
+      </Text>
+    </View>
+  );
+}
+
 function BusinessOwnerPreviewScreen({
   isRtl,
   styles,
@@ -1843,51 +2149,6 @@ function AccountScreen({
         </Text>
       </View>
     </>
-  );
-}
-
-function SimpleBoundaryScreen({
-  body,
-  eyebrow,
-  isRtl,
-  primary,
-  secondary,
-  styles,
-  title,
-}: {
-  body: string;
-  eyebrow: string;
-  isRtl: boolean;
-  primary: string;
-  secondary: string;
-  styles: MobileStyles;
-  title: string;
-}) {
-  return (
-    <View style={styles.screenCard}>
-      <View style={styles.boundaryIcon}>
-        <Text style={styles.boundaryIconText}>◇</Text>
-      </View>
-      <Text style={[styles.screenEyebrow, isRtl && styles.rtlText]}>
-        {eyebrow}
-      </Text>
-      <Text style={[styles.screenTitle, isRtl && styles.rtlText]}>
-        {title}
-      </Text>
-      <Text style={[styles.screenDescription, isRtl && styles.rtlText]}>
-        {body}
-      </Text>
-      <View style={styles.actionStack}>
-        <PrimaryButton disabled label={primary} styles={styles} />
-        <Pressable accessibilityRole="button" style={styles.secondaryButton}>
-          <Text style={styles.secondaryButtonText}>{secondary}</Text>
-        </Pressable>
-      </View>
-      <View style={styles.boundaryPillRow}>
-        <Text style={styles.boundaryPill}>واجهة آمنة</Text>
-        <Text style={styles.boundaryPill}>بدون بيانات حقيقية</Text>
-      </View>
-    </View>
   );
 }
 
@@ -2811,6 +3072,95 @@ const createStyles = (theme: MobileTheme) =>
       lineHeight: 29,
       marginTop: 8,
     },
+    chatBubble: {
+      alignSelf: "flex-start",
+      backgroundColor: theme.colors.cardElevated,
+      borderColor: theme.colors.border,
+      borderRadius: 22,
+      borderWidth: 1,
+      maxWidth: "82%",
+      padding: 12,
+    },
+    chatBubbleCustomer: {
+      alignSelf: "flex-end",
+      backgroundColor: theme.colors.gold,
+      borderColor: theme.colors.gold,
+    },
+    chatBubbleText: {
+      color: theme.colors.foreground,
+      fontSize: 14,
+      fontWeight: "800",
+      lineHeight: 21,
+    },
+    chatBubbleTextCustomer: {
+      color: theme.colors.foregroundInverse,
+    },
+    chatBubbleTime: {
+      color: theme.colors.mutedForeground,
+      fontSize: 10,
+      fontWeight: "800",
+      marginTop: 6,
+    },
+    chatBubbleTimeCustomer: {
+      color: theme.colors.foregroundInverse,
+      opacity: 0.75,
+    },
+    chatHeader: {
+      alignItems: "center",
+      flexDirection: "row",
+      justifyContent: "space-between",
+    },
+    chatPanel: {
+      backgroundColor: theme.colors.card,
+      borderColor: theme.colors.border,
+      borderRadius: theme.radii.card,
+      borderWidth: 1,
+      gap: 12,
+      padding: 18,
+    },
+    chatTitle: {
+      color: theme.colors.foreground,
+      fontSize: 20,
+      fontWeight: "900",
+      marginTop: 4,
+    },
+    conversationAvatar: {
+      alignItems: "center",
+      backgroundColor: theme.colors.goldSoft,
+      borderRadius: 22,
+      height: 44,
+      justifyContent: "center",
+      width: 44,
+    },
+    conversationAvatarText: {
+      color: theme.colors.deepGold,
+      fontSize: 16,
+      fontWeight: "900",
+    },
+    conversationPanel: {
+      backgroundColor: theme.colors.card,
+      borderColor: theme.colors.border,
+      borderRadius: theme.radii.card,
+      borderWidth: 1,
+      gap: 12,
+      padding: 18,
+    },
+    conversationRow: {
+      alignItems: "center",
+      backgroundColor: theme.colors.cardElevated,
+      borderColor: theme.colors.border,
+      borderRadius: 22,
+      borderWidth: 1,
+      flexDirection: "row",
+      gap: 12,
+      padding: 12,
+    },
+    conversationStatus: {
+      color: theme.colors.gold,
+      fontSize: 11,
+      fontWeight: "900",
+      marginTop: 6,
+    },
     marketplaceMode: {
       backgroundColor: theme.colors.muted,
       borderRadius: theme.radii.pill,
@@ -2837,6 +3187,87 @@ const createStyles = (theme: MobileTheme) =>
       justifyContent: "flex-start",
       marginBottom: 12,
     },
+    messageHeroBody: {
+      color: theme.colors.mutedForeground,
+      fontSize: 15,
+      lineHeight: 23,
+      marginTop: 10,
+    },
+    messageHeroCard: {
+      backgroundColor: theme.colors.hero,
+      borderColor: theme.colors.gold,
+      borderRadius: theme.radii.xl,
+      borderWidth: 1,
+      overflow: "hidden",
+      padding: 22,
+      shadowColor: theme.colors.shadow,
+      shadowOffset: { height: 18, width: 0 },
+      shadowOpacity: theme.isDark ? 0.34 : 0.12,
+      shadowRadius: 30,
+    },
+    messageHeroGlow: {
+      backgroundColor: theme.colors.goldSoft,
+      borderRadius: 999,
+      height: 150,
+      opacity: 0.85,
+      position: "absolute",
+      right: -48,
+      top: -52,
+      width: 150,
+    },
+    messageHeroIcon: {
+      alignItems: "center",
+      backgroundColor: theme.colors.gold,
+      borderRadius: 24,
+      height: 48,
+      justifyContent: "center",
+      width: 48,
+    },
+    messageHeroIconText: {
+      color: theme.colors.foregroundInverse,
+      fontSize: 22,
+      fontWeight: "900",
+    },
+    messageHeroTitle: {
+      color: theme.colors.foreground,
+      fontSize: 27,
+      fontWeight: "900",
+      lineHeight: 34,
+      marginTop: 20,
+    },
+    messageHeroTopRow: {
+      alignItems: "center",
+      flexDirection: "row",
+      justifyContent: "space-between",
+    },
+    messagePlaceholderChip: {
+      backgroundColor: theme.colors.muted,
+      borderRadius: theme.radii.pill,
+      color: theme.colors.mutedForeground,
+      fontSize: 12,
+      fontWeight: "900",
+      overflow: "hidden",
+      paddingHorizontal: 10,
+      paddingVertical: 7,
+    },
+    messagePlaceholderRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+      marginTop: 2,
+    },
+    messageSafetyBadge: {
+      backgroundColor: theme.colors.goldSoft,
+      borderColor: theme.colors.gold,
+      borderRadius: theme.radii.pill,
+      borderWidth: 1,
+      color: theme.colors.deepGold,
+      fontSize: 12,
+      fontWeight: "900",
+      overflow: "hidden",
+      paddingHorizontal: 10,
+      paddingVertical: 7,
+    },
     myBookingCard: {
       backgroundColor: theme.colors.cardElevated,
       borderColor: theme.colors.border,
@@ -2859,6 +3290,64 @@ const createStyles = (theme: MobileTheme) =>
       fontSize: 19,
       fontWeight: "900",
       marginTop: 4,
+    },
+    notificationCard: {
+      alignItems: "flex-start",
+      backgroundColor: theme.colors.cardElevated,
+      borderColor: theme.colors.border,
+      borderRadius: 22,
+      borderWidth: 1,
+      flexDirection: "row",
+      gap: 12,
+      padding: 12,
+    },
+    notificationCardUnread: {
+      backgroundColor: theme.colors.goldSoft,
+      borderColor: theme.colors.gold,
+    },
+    notificationIcon: {
+      alignItems: "center",
+      backgroundColor: theme.colors.gold,
+      borderRadius: 20,
+      height: 40,
+      justifyContent: "center",
+      width: 40,
+    },
+    notificationIconText: {
+      color: theme.colors.foregroundInverse,
+      fontSize: 16,
+      fontWeight: "900",
+    },
+    notificationPanel: {
+      backgroundColor: theme.colors.card,
+      borderColor: theme.colors.border,
+      borderRadius: theme.radii.card,
+      borderWidth: 1,
+      gap: 12,
+      padding: 18,
+    },
+    notificationStatusChip: {
+      alignSelf: "flex-start",
+      backgroundColor: theme.colors.card,
+      borderRadius: theme.radii.pill,
+      color: theme.colors.deepGold,
+      fontSize: 11,
+      fontWeight: "900",
+      marginTop: 8,
+      overflow: "hidden",
+      paddingHorizontal: 9,
+      paddingVertical: 6,
+    },
+    notificationTime: {
+      color: theme.colors.mutedForeground,
+      fontSize: 11,
+      fontWeight: "800",
+    },
+    notificationTitleRow: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 8,
+      justifyContent: "space-between",
     },
     onboardingActions: {
       flexDirection: "row",
@@ -3272,6 +3761,51 @@ const createStyles = (theme: MobileTheme) =>
       borderWidth: 1,
       padding: 18,
     },
+    preferenceKnob: {
+      backgroundColor: theme.colors.mutedForeground,
+      borderRadius: 999,
+      height: 18,
+      width: 18,
+    },
+    preferenceKnobActive: {
+      alignSelf: "flex-end",
+      backgroundColor: theme.colors.foregroundInverse,
+    },
+    preferenceNote: {
+      color: theme.colors.mutedForeground,
+      fontSize: 12,
+      fontWeight: "800",
+      lineHeight: 18,
+      marginTop: 4,
+    },
+    preferenceRow: {
+      alignItems: "center",
+      backgroundColor: theme.colors.cardElevated,
+      borderColor: theme.colors.border,
+      borderRadius: 18,
+      borderWidth: 1,
+      flexDirection: "row",
+      justifyContent: "space-between",
+      padding: 12,
+    },
+    preferencesPanel: {
+      backgroundColor: theme.colors.card,
+      borderColor: theme.colors.border,
+      borderRadius: theme.radii.card,
+      borderWidth: 1,
+      gap: 12,
+      padding: 18,
+    },
+    preferenceToggle: {
+      backgroundColor: theme.colors.muted,
+      borderRadius: 999,
+      justifyContent: "center",
+      padding: 3,
+      width: 44,
+    },
+    preferenceToggleActive: {
+      backgroundColor: theme.colors.gold,
+    },
     primaryButton: {
       alignItems: "center",
       backgroundColor: theme.colors.gold,
@@ -3321,6 +3855,22 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.foreground,
       fontSize: 18,
       fontWeight: "900",
+    },
+    quickReplyChip: {
+      backgroundColor: theme.colors.goldSoft,
+      borderRadius: theme.radii.pill,
+      color: theme.colors.deepGold,
+      fontSize: 12,
+      fontWeight: "900",
+      overflow: "hidden",
+      paddingHorizontal: 11,
+      paddingVertical: 7,
+    },
+    quickReplyRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+      marginTop: 4,
     },
     recommendedCard: {
       backgroundColor: theme.colors.card,
@@ -3928,6 +4478,16 @@ const createStyles = (theme: MobileTheme) =>
       fontSize: 20,
       fontWeight: "900",
       marginTop: 4,
+    },
+    unreadBadge: {
+      backgroundColor: theme.colors.gold,
+      borderRadius: 999,
+      color: theme.colors.foregroundInverse,
+      fontSize: 11,
+      fontWeight: "900",
+      overflow: "hidden",
+      paddingHorizontal: 8,
+      paddingVertical: 5,
     },
     voiceButton: {
       alignItems: "center",
