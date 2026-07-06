@@ -587,7 +587,13 @@ function WelcomeOnboardingCard({
       </View>
       <View style={styles.onboardingActions}>
         <PrimaryButton label="ابدأ الاستكشاف" styles={styles} />
-        <Pressable accessibilityRole="button" style={styles.onboardingSecondary}>
+        <Pressable
+          accessibilityRole="button"
+          style={({ pressed }) => [
+            styles.onboardingSecondary,
+            pressed && styles.softButtonPressed,
+          ]}
+        >
           <Text style={styles.onboardingSecondaryText}>تخطي الآن</Text>
         </Pressable>
       </View>
@@ -664,7 +670,13 @@ function BusinessDetailShowcase({
 
       <View style={styles.detailCtaRow}>
         <PrimaryButton label="احجز الآن" styles={styles} />
-        <Pressable accessibilityRole="button" style={styles.secondaryIconButton}>
+        <Pressable
+          accessibilityRole="button"
+          style={({ pressed }) => [
+            styles.secondaryIconButton,
+            pressed && styles.softButtonPressed,
+          ]}
+        >
           <Text style={styles.secondaryIconButtonText}>مراجعات</Text>
         </Pressable>
       </View>
@@ -691,7 +703,13 @@ function HeroCard({ isRtl, styles }: { isRtl: boolean; styles: MobileStyles }) {
       </Text>
       <View style={styles.heroActions}>
         <PrimaryButton label="ابدأ الحجز" styles={styles} />
-        <Pressable accessibilityRole="button" style={styles.ghostButton}>
+        <Pressable
+          accessibilityRole="button"
+          style={({ pressed }) => [
+            styles.ghostButton,
+            pressed && styles.outlineButtonPressed,
+          ]}
+        >
           <Text style={styles.ghostButtonText}>استكشف السوق</Text>
         </Pressable>
       </View>
@@ -2264,10 +2282,16 @@ const createStyles = (theme: MobileTheme) =>
       backgroundColor: theme.colors.muted,
       borderRadius: theme.radii.control,
       flex: 1,
+      opacity: 0.92,
       paddingVertical: 14,
     },
     accountActionButtonPrimary: {
       backgroundColor: theme.colors.gold,
+      opacity: 1,
+      shadowColor: theme.colors.deepGold,
+      shadowOffset: { height: 6, width: 0 },
+      shadowOpacity: theme.isDark ? 0.18 : 0.08,
+      shadowRadius: 12,
     },
     accountActionRow: {
       flexDirection: "row",
@@ -2319,6 +2343,10 @@ const createStyles = (theme: MobileTheme) =>
     accountPreferenceDotActive: {
       backgroundColor: theme.colors.gold,
       borderColor: theme.colors.gold,
+      shadowColor: theme.colors.deepGold,
+      shadowOffset: { height: 3, width: 0 },
+      shadowOpacity: theme.isDark ? 0.22 : 0.1,
+      shadowRadius: 6,
     },
     accountPreferenceRow: {
       alignItems: "center",
@@ -2586,6 +2614,7 @@ const createStyles = (theme: MobileTheme) =>
     categoryCardActive: {
       backgroundColor: theme.colors.goldSoft,
       borderColor: theme.colors.gold,
+      transform: [{ translateY: -1 }],
       shadowColor: theme.colors.deepGold,
       shadowOffset: { height: 8, width: 0 },
       shadowOpacity: theme.isDark ? 0.22 : 0.1,
@@ -2630,6 +2659,7 @@ const createStyles = (theme: MobileTheme) =>
     categoryRailCardActive: {
       backgroundColor: theme.colors.gold,
       borderColor: theme.colors.gold,
+      transform: [{ translateY: -1 }],
       shadowColor: theme.colors.deepGold,
       shadowOffset: { height: 8, width: 0 },
       shadowOpacity: theme.isDark ? 0.26 : 0.12,
@@ -2666,6 +2696,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     centerTabButtonActive: {
       backgroundColor: theme.colors.deepGold,
+      transform: [{ translateY: -16 }, { scale: 1.03 }],
     },
     centerTabActiveIndicator: {
       backgroundColor: theme.colors.foregroundInverse,
@@ -2739,6 +2770,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     disabledButton: {
       backgroundColor: theme.colors.disabled,
+      opacity: 0.72,
       shadowOpacity: 0,
     },
     disabledButtonText: {
@@ -2785,6 +2817,7 @@ const createStyles = (theme: MobileTheme) =>
     datePillActive: {
       backgroundColor: theme.colors.gold,
       borderColor: theme.colors.gold,
+      transform: [{ translateY: -1 }],
       shadowColor: theme.colors.deepGold,
       shadowOffset: { height: 6, width: 0 },
       shadowOpacity: theme.isDark ? 0.28 : 0.14,
@@ -2891,6 +2924,10 @@ const createStyles = (theme: MobileTheme) =>
     },
     detailTabActive: {
       backgroundColor: theme.colors.gold,
+      shadowColor: theme.colors.deepGold,
+      shadowOffset: { height: 4, width: 0 },
+      shadowOpacity: theme.isDark ? 0.2 : 0.08,
+      shadowRadius: 8,
     },
     detailTabText: {
       color: theme.colors.mutedForeground,
@@ -3029,6 +3066,7 @@ const createStyles = (theme: MobileTheme) =>
       shadowOffset: { height: 6, width: 0 },
       shadowOpacity: theme.isDark ? 0.25 : 0.12,
       shadowRadius: 12,
+      transform: [{ translateY: -1 }],
     },
     filterChipText: {
       color: theme.colors.deepGold,
@@ -3166,8 +3204,8 @@ const createStyles = (theme: MobileTheme) =>
       borderColor: theme.colors.gold,
     },
     localeButtonPressed: {
-      opacity: 0.78,
-      transform: [{ scale: 0.96 }],
+      opacity: 0.84,
+      transform: [{ scale: 0.97 }],
     },
     localeButtonText: {
       color: theme.colors.mutedForeground,
@@ -4020,6 +4058,10 @@ const createStyles = (theme: MobileTheme) =>
     },
     preferenceToggleActive: {
       backgroundColor: theme.colors.gold,
+      shadowColor: theme.colors.deepGold,
+      shadowOffset: { height: 4, width: 0 },
+      shadowOpacity: theme.isDark ? 0.2 : 0.08,
+      shadowRadius: 8,
     },
     profileHeroTopRow: {
       alignItems: "center",
@@ -4085,8 +4127,9 @@ const createStyles = (theme: MobileTheme) =>
       shadowRadius: 18,
     },
     primaryButtonPressed: {
-      opacity: 0.86,
-      transform: [{ scale: 0.98 }],
+      opacity: 0.9,
+      shadowOpacity: theme.isDark ? 0.28 : 0.12,
+      transform: [{ translateY: 1 }, { scale: 0.985 }],
     },
     primaryButtonText: {
       color: theme.colors.foregroundInverse,
@@ -4260,6 +4303,7 @@ const createStyles = (theme: MobileTheme) =>
     rowCardSelected: {
       backgroundColor: theme.colors.goldSoft,
       borderColor: theme.colors.gold,
+      transform: [{ translateY: -1 }],
       shadowColor: theme.colors.deepGold,
       shadowOffset: { height: 8, width: 0 },
       shadowOpacity: theme.isDark ? 0.22 : 0.1,
@@ -4323,6 +4367,7 @@ const createStyles = (theme: MobileTheme) =>
       shadowOffset: { height: 10, width: 0 },
       shadowOpacity: theme.isDark ? 0.18 : 0.06,
       shadowRadius: 18,
+      transform: [{ translateY: -1 }],
     },
     selectedServiceIcon: {
       alignItems: "center",
@@ -4453,6 +4498,15 @@ const createStyles = (theme: MobileTheme) =>
       backgroundColor: theme.colors.muted,
       borderRadius: theme.radii.control,
       paddingVertical: 14,
+    },
+    softButtonPressed: {
+      opacity: 0.88,
+      transform: [{ translateY: 1 }, { scale: 0.985 }],
+    },
+    outlineButtonPressed: {
+      backgroundColor: theme.colors.goldSoft,
+      opacity: 0.9,
+      transform: [{ translateY: 1 }, { scale: 0.985 }],
     },
     secondaryButtonText: {
       color: theme.colors.foreground,
@@ -4746,8 +4800,8 @@ const createStyles = (theme: MobileTheme) =>
       shadowRadius: 10,
     },
     tabButtonPressed: {
-      opacity: 0.82,
-      transform: [{ scale: 0.97 }],
+      opacity: 0.88,
+      transform: [{ translateY: 1 }, { scale: 0.97 }],
     },
     tabIcon: {
       color: theme.colors.mutedForeground,
@@ -4787,6 +4841,11 @@ const createStyles = (theme: MobileTheme) =>
     timeSlotActive: {
       backgroundColor: theme.colors.gold,
       borderColor: theme.colors.gold,
+      shadowColor: theme.colors.deepGold,
+      shadowOffset: { height: 6, width: 0 },
+      shadowOpacity: theme.isDark ? 0.24 : 0.12,
+      shadowRadius: 12,
+      transform: [{ translateY: -1 }],
     },
     timeSlotText: {
       color: theme.colors.foreground,
@@ -4852,6 +4911,7 @@ const createStyles = (theme: MobileTheme) =>
       fontWeight: "900",
     },
     visualOnlyButton: {
-      shadowOpacity: 0,
+      opacity: 0.96,
+      shadowOpacity: theme.isDark ? 0.16 : 0.06,
     },
   });
