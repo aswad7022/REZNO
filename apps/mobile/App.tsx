@@ -30,6 +30,8 @@ import type { MobileMarketplaceBusiness } from "./src/types/marketplace";
 
 I18nManager.allowRTL(true);
 
+const TOUCH_HIT_SLOP = { bottom: 8, left: 8, right: 8, top: 8 };
+
 type MarketplaceState =
   | { status: "idle" }
   | { status: "loading" }
@@ -528,13 +530,17 @@ function ScreenHeader({
       <View style={styles.localeRow}>
         {SUPPORTED_LOCALES.map((item) => (
           <Pressable
+            accessibilityHint="يغير لغة الواجهة داخل هذه المعاينة فقط."
+            accessibilityLabel={`تغيير اللغة إلى ${item.toUpperCase()}`}
             accessibilityRole="button"
             accessibilityState={{ selected: item === locale }}
+            hitSlop={TOUCH_HIT_SLOP}
             key={item}
             onPress={() => onLocaleChange(item)}
-            style={[
+            style={({ pressed }) => [
               styles.localeButton,
               item === locale && styles.localeButtonActive,
+              pressed && styles.localeButtonPressed,
             ]}
           >
             <Text
@@ -1027,15 +1033,28 @@ function PremiumFilterChips({ styles }: { styles: MobileStyles }) {
   return (
     <View style={styles.filterChipWrap}>
       {filterChips.map((chip) => (
-        <Text
+        <Pressable
+          accessibilityHint="فلتر بصري فقط ولا يغير نتائج السوق حالياً."
+          accessibilityLabel={`فلتر ${chip.label}`}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: true, selected: chip.selected }}
+          disabled
+          hitSlop={TOUCH_HIT_SLOP}
           key={chip.label}
           style={[
-            styles.filterChip,
-            chip.selected && styles.filterChipSelected,
+            styles.filterChipButton,
+            chip.selected && styles.filterChipButtonSelected,
           ]}
         >
-          {chip.label}
-        </Text>
+          <Text
+            style={[
+              styles.filterChipText,
+              chip.selected && styles.filterChipTextSelected,
+            ]}
+          >
+            {chip.label}
+          </Text>
+        </Pressable>
       ))}
     </View>
   );
@@ -2382,12 +2401,28 @@ function PrimaryButton({
   onPress?: () => void;
   styles: MobileStyles;
 }) {
+  const isVisualOnly = !onPress;
+  const accessibilityDisabled = Boolean(disabled || isVisualOnly);
+
   return (
     <Pressable
+      accessibilityHint={
+        isVisualOnly
+          ? "زر بصري فقط في هذه المعاينة ولا ينفذ إجراء حقيقياً."
+          : "ينفذ الإجراء المعروض."
+      }
+      accessibilityLabel={label}
       accessibilityRole="button"
-      disabled={disabled}
+      accessibilityState={{ disabled: accessibilityDisabled }}
+      disabled={accessibilityDisabled}
+      hitSlop={TOUCH_HIT_SLOP}
       onPress={onPress}
-      style={[styles.primaryButton, disabled && styles.disabledButton]}
+      style={({ pressed }) => [
+        styles.primaryButton,
+        isVisualOnly && styles.visualOnlyButton,
+        pressed && !accessibilityDisabled && styles.primaryButtonPressed,
+        disabled && styles.disabledButton,
+      ]}
     >
       <Text
         style={[
@@ -2420,14 +2455,23 @@ function BottomTabBar({
 
         return (
           <Pressable
+            accessibilityHint={
+              active
+                ? "هذا هو التبويب المفتوح حالياً."
+                : `يفتح تبويب ${text.tabs[tab.id]}.`
+            }
+            accessibilityLabel={`تبويب ${text.tabs[tab.id]}`}
             accessibilityRole="tab"
             accessibilityState={{ selected: active }}
+            hitSlop={TOUCH_HIT_SLOP}
             key={tab.id}
             onPress={() => onTabPress(tab.id)}
-            style={[
+            style={({ pressed }) => [
               styles.tabButton,
               active && styles.tabButtonActive,
               isCenterAction && styles.centerTabButton,
+              isCenterAction && active && styles.centerTabButtonActive,
+              pressed && styles.tabButtonPressed,
             ]}
           >
             <Text
@@ -2445,6 +2489,13 @@ function BottomTabBar({
             >
               {text.tabs[tab.id]}
             </Text>
+            <View
+              style={[
+                styles.tabActiveIndicator,
+                active && styles.tabActiveIndicatorVisible,
+                isCenterAction && styles.centerTabActiveIndicator,
+              ]}
+            />
           </Pressable>
         );
       })}
@@ -2833,6 +2884,13 @@ const createStyles = (theme: MobileTheme) =>
       borderRadius: 28,
       transform: [{ translateY: -14 }],
     },
+    centerTabButtonActive: {
+      backgroundColor: theme.colors.deepGold,
+    },
+    centerTabActiveIndicator: {
+      backgroundColor: theme.colors.foregroundInverse,
+      bottom: 9,
+    },
     centerTabIcon: {
       color: theme.colors.foregroundInverse,
       fontSize: 28,
@@ -3152,6 +3210,32 @@ const createStyles = (theme: MobileTheme) =>
       backgroundColor: theme.colors.gold,
       color: theme.colors.foregroundInverse,
     },
+    filterChipButton: {
+      alignItems: "center",
+      backgroundColor: theme.colors.goldSoft,
+      borderColor: theme.colors.gold,
+      borderRadius: theme.radii.pill,
+      borderWidth: 1,
+      justifyContent: "center",
+      minHeight: 38,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+    },
+    filterChipButtonSelected: {
+      backgroundColor: theme.colors.gold,
+      shadowColor: theme.colors.shadow,
+      shadowOffset: { height: 6, width: 0 },
+      shadowOpacity: theme.isDark ? 0.25 : 0.12,
+      shadowRadius: 12,
+    },
+    filterChipText: {
+      color: theme.colors.deepGold,
+      fontSize: 12,
+      fontWeight: "900",
+    },
+    filterChipTextSelected: {
+      color: theme.colors.foregroundInverse,
+    },
     filterChipWrap: {
       flexDirection: "row",
       flexWrap: "wrap",
@@ -3278,6 +3362,10 @@ const createStyles = (theme: MobileTheme) =>
     localeButtonActive: {
       backgroundColor: theme.colors.gold,
       borderColor: theme.colors.gold,
+    },
+    localeButtonPressed: {
+      opacity: 0.78,
+      transform: [{ scale: 0.96 }],
     },
     localeButtonText: {
       color: theme.colors.mutedForeground,
@@ -4157,11 +4245,17 @@ const createStyles = (theme: MobileTheme) =>
       backgroundColor: theme.colors.gold,
       borderRadius: theme.radii.control,
       flex: 1,
+      minHeight: 48,
+      justifyContent: "center",
       paddingVertical: 14,
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: 10, width: 0 },
       shadowOpacity: theme.isDark ? 0.26 : 0.14,
       shadowRadius: 18,
+    },
+    primaryButtonPressed: {
+      opacity: 0.86,
+      transform: [{ scale: 0.98 }],
     },
     primaryButtonText: {
       color: theme.colors.foregroundInverse,
@@ -4772,17 +4866,34 @@ const createStyles = (theme: MobileTheme) =>
       shadowRadius: 26,
       zIndex: 20,
     },
+    tabActiveIndicator: {
+      backgroundColor: "transparent",
+      borderRadius: 999,
+      height: 3,
+      marginTop: 2,
+      width: 18,
+    },
+    tabActiveIndicatorVisible: {
+      backgroundColor: theme.colors.gold,
+      width: 24,
+    },
     tabButton: {
       alignItems: "center",
       borderRadius: 22,
       flex: 1,
       gap: 3,
       justifyContent: "center",
-      minHeight: 58,
-      paddingHorizontal: 3,
+      minHeight: 62,
+      paddingHorizontal: 4,
     },
     tabButtonActive: {
       backgroundColor: theme.colors.goldSoft,
+      borderColor: theme.colors.gold,
+      borderWidth: 1,
+    },
+    tabButtonPressed: {
+      opacity: 0.82,
+      transform: [{ scale: 0.97 }],
     },
     tabIcon: {
       color: theme.colors.mutedForeground,
@@ -4795,6 +4906,8 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.mutedForeground,
       fontSize: 10,
       fontWeight: "800",
+      maxWidth: 58,
+      textAlign: "center",
     },
     tabLabelActive: {
       color: theme.colors.gold,
@@ -4883,5 +4996,8 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.gold,
       fontSize: 15,
       fontWeight: "900",
+    },
+    visualOnlyButton: {
+      shadowOpacity: 0,
     },
   });
