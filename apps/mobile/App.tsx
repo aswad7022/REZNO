@@ -558,25 +558,34 @@ function WelcomeOnboardingCard({
   return (
     <View style={styles.onboardingCard}>
       <View style={styles.onboardingGlow} />
-      <View style={styles.onboardingBrandRow}>
-        <View style={styles.onboardingLogo}>
-          <Text style={styles.onboardingLogoText}>R</Text>
-        </View>
-        <View style={styles.rowCopy}>
-          <Text style={[styles.onboardingBrand, isRtl && styles.rtlText]}>
-            REZNO
-          </Text>
-          <Text style={[styles.onboardingSlogan, isRtl && styles.rtlText]}>
-            One Platform. Every Booking.
-          </Text>
-        </View>
+      <View style={styles.onboardingPattern}>
+        <View
+          style={[
+            styles.onboardingPatternLine,
+            styles.onboardingPatternLineStart,
+          ]}
+        />
+        <View style={styles.onboardingPatternLineTall} />
+        <View
+          style={[
+            styles.onboardingPatternLine,
+            styles.onboardingPatternLineEnd,
+          ]}
+        />
+        <View style={styles.onboardingPatternArc} />
       </View>
-      <Text style={[styles.onboardingTitle, isRtl && styles.rtlText]}>
-        كل حجوزاتك وخدماتك في تجربة عربية فاخرة
+
+      <View style={styles.onboardingLogo}>
+        <Text style={styles.onboardingLogoText}>R</Text>
+      </View>
+      <Text style={[styles.onboardingBrand, isRtl && styles.rtlText]}>
+        REZNO
+      </Text>
+      <Text style={[styles.onboardingSlogan, isRtl && styles.rtlText]}>
+        Book Everything
       </Text>
       <Text style={[styles.onboardingBody, isRtl && styles.rtlText]}>
-        اكتشف الأعمال، اختر الخدمة، وتابع رحلتك من واجهة موبايل آمنة بدون تسجيل
-        دخول حقيقي في هذه المرحلة.
+        احجز أي خدمة في أي وقت وبسهولة وثقة
       </Text>
       <View style={styles.onboardingHighlights}>
         {onboardingHighlights.map((item) => (
@@ -586,7 +595,7 @@ function WelcomeOnboardingCard({
         ))}
       </View>
       <View style={styles.onboardingActions}>
-        <PrimaryButton label="ابدأ الاستكشاف" styles={styles} />
+        <PrimaryButton label="ابدأ الآن" styles={styles} />
         <Pressable
           accessibilityRole="button"
           style={({ pressed }) => [
@@ -594,7 +603,7 @@ function WelcomeOnboardingCard({
             pressed && styles.softButtonPressed,
           ]}
         >
-          <Text style={styles.onboardingSecondaryText}>تخطي الآن</Text>
+          <Text style={styles.onboardingSecondaryText}>تسجيل الدخول</Text>
         </Pressable>
       </View>
     </View>
@@ -839,6 +848,10 @@ function CategoryGrid({ styles }: { styles: MobileStyles }) {
             style={[
               styles.categoryRailCard,
               index === 0 && styles.categoryRailCardActive,
+              category.tone === "green" && styles.categoryRailCardGreen,
+              category.tone === "blue" && styles.categoryRailCardBlue,
+              category.tone === "rose" && styles.categoryRailCardRose,
+              category.tone === "dark" && styles.categoryRailCardPurple,
             ]}
           >
             <Text style={styles.categoryRailIcon}>{category.icon}</Text>
@@ -858,7 +871,14 @@ function CategoryGrid({ styles }: { styles: MobileStyles }) {
         {categories.map((category, index) => (
           <View
             key={category.label}
-            style={[styles.categoryCard, index === 0 && styles.categoryCardActive]}
+            style={[
+              styles.categoryCard,
+              index === 0 && styles.categoryCardActive,
+              category.tone === "green" && styles.categoryCardGreen,
+              category.tone === "blue" && styles.categoryCardBlue,
+              category.tone === "rose" && styles.categoryCardRose,
+              category.tone === "dark" && styles.categoryCardPurple,
+            ]}
           >
             <View style={styles.categoryTopRow}>
               <Text style={styles.categoryIcon}>{category.icon}</Text>
@@ -903,6 +923,9 @@ function PremiumBusinessCard({
   return (
     <View style={styles.businessCard}>
       <View style={styles.businessHero}>
+        <View style={styles.businessArtLineOne} />
+        <View style={styles.businessArtLineTwo} />
+        <View style={styles.businessArtCircle} />
         <View style={styles.businessStatusBadge}>
           <Text style={styles.businessStatusText}>{business.status}</Text>
         </View>
@@ -1111,6 +1134,9 @@ function MarketplaceStateView({
       {state.businesses.map((business) => (
         <View key={business.id} style={styles.businessCard}>
           <View style={styles.businessHeroCompact}>
+            <View style={styles.businessArtLineOne} />
+            <View style={styles.businessArtLineTwo} />
+            <View style={styles.businessArtCircle} />
             <View style={styles.businessStatusBadge}>
               <Text style={styles.businessStatusText}>
                 {business.serviceCount > 0 ? "حجز متاح" : "قيد الإعداد"}
@@ -2431,10 +2457,10 @@ const createStyles = (theme: MobileTheme) =>
     },
     brandName: {
       color: theme.colors.foreground,
-      fontSize: 22,
+      fontSize: 24,
       flexShrink: 1,
       fontWeight: "900",
-      letterSpacing: 1,
+      letterSpacing: 1.6,
     },
     brandRow: {
       alignItems: "center",
@@ -2444,27 +2470,28 @@ const createStyles = (theme: MobileTheme) =>
     },
     brandTagline: {
       color: theme.colors.mutedForeground,
-      fontSize: 12,
+      fontSize: 11,
       flexShrink: 1,
-      lineHeight: 16,
+      fontWeight: "800",
+      lineHeight: 15,
       marginTop: 2,
     },
     businessBody: {
-      gap: 16,
-      padding: 20,
+      gap: 14,
+      padding: 18,
     },
     businessCard: {
       ...createMobileSurface(theme, {
-        radius: theme.radii.card,
+        radius: 30,
         tone: "elevated",
       }),
-      borderColor: theme.colors.goldSoft,
+      borderColor: theme.colors.border,
       overflow: "hidden",
       ...createMobileShadow(theme, {
-        darkOpacity: 0.32,
+        darkOpacity: 0.42,
         height: 20,
-        lightOpacity: 0.11,
-        radius: 30,
+        lightOpacity: 0.12,
+        radius: 32,
       }),
     },
     businessCopy: {
@@ -2483,29 +2510,65 @@ const createStyles = (theme: MobileTheme) =>
       paddingTop: 14,
     },
     businessHero: {
-      backgroundColor: theme.colors.heroMuted,
-      borderBottomColor: theme.colors.goldSoft,
+      backgroundColor: "#050608",
+      borderBottomColor: theme.colors.border,
       borderBottomWidth: 1,
-      height: 126,
+      height: 118,
       justifyContent: "space-between",
-      padding: 18,
+      overflow: "hidden",
+      padding: 16,
     },
     businessHeroCompact: {
-      backgroundColor: theme.colors.heroMuted,
-      borderBottomColor: theme.colors.goldSoft,
+      backgroundColor: "#050608",
+      borderBottomColor: theme.colors.border,
       borderBottomWidth: 1,
       flexDirection: "row",
-      height: 92,
+      height: 104,
       justifyContent: "space-between",
-      padding: 18,
+      overflow: "hidden",
+      padding: 16,
+    },
+    businessArtCircle: {
+      backgroundColor: "rgba(255, 193, 58, 0.82)",
+      borderRadius: 999,
+      bottom: 24,
+      height: 20,
+      left: 54,
+      position: "absolute",
+      width: 20,
+    },
+    businessArtLineOne: {
+      backgroundColor: "rgba(255, 193, 58, 0.42)",
+      borderRadius: 999,
+      bottom: 16,
+      height: 76,
+      left: 24,
+      position: "absolute",
+      width: 4,
+    },
+    businessArtLineTwo: {
+      borderColor: "rgba(255, 193, 58, 0.55)",
+      borderRadius: 22,
+      borderWidth: 2,
+      bottom: 22,
+      height: 48,
+      left: 54,
+      position: "absolute",
+      width: 48,
     },
     businessInitial: {
       alignItems: "center",
       alignSelf: "flex-start",
       backgroundColor: theme.colors.gold,
+      borderColor: theme.colors.accent,
       borderRadius: 24,
+      borderWidth: 1,
       height: 48,
       justifyContent: "center",
+      shadowColor: theme.colors.deepGold,
+      shadowOffset: { height: 10, width: 0 },
+      shadowOpacity: theme.isDark ? 0.34 : 0.12,
+      shadowRadius: 16,
       width: 48,
     },
     businessInitialText: {
@@ -2524,7 +2587,9 @@ const createStyles = (theme: MobileTheme) =>
       marginTop: 4,
     },
     businessMetric: {
-      backgroundColor: theme.colors.muted,
+      backgroundColor: theme.colors.cardElevated,
+      borderColor: theme.colors.border,
+      borderWidth: 1,
       borderRadius: theme.radii.pill,
       color: theme.colors.foreground,
       fontSize: 12,
@@ -2540,10 +2605,11 @@ const createStyles = (theme: MobileTheme) =>
     },
     businessName: {
       color: theme.colors.foreground,
-      fontSize: 19,
+      fontSize: 20,
       flexShrink: 1,
       fontWeight: "900",
-      lineHeight: 24,
+      letterSpacing: -0.3,
+      lineHeight: 25,
     },
     businessStatusBadge: {
       alignSelf: "flex-start",
@@ -2630,46 +2696,64 @@ const createStyles = (theme: MobileTheme) =>
       paddingVertical: 5,
     },
     categoryCard: {
-      alignItems: "flex-start",
-      backgroundColor: theme.colors.card,
-      borderColor: theme.colors.border,
-      borderRadius: 22,
-      borderWidth: 1,
+      alignItems: "center",
+      backgroundColor: "#d94676",
+      borderColor: "transparent",
+      borderRadius: 28,
+      borderWidth: 0,
       flexBasis: "30%",
       flexGrow: 1,
-      gap: 8,
-      padding: 14,
+      gap: 10,
+      minHeight: 118,
+      paddingHorizontal: 12,
+      paddingVertical: 18,
       shadowColor: theme.colors.shadow,
-      shadowOffset: { height: 8, width: 0 },
-      shadowOpacity: theme.isDark ? 0.12 : 0.04,
-      shadowRadius: 14,
+      shadowOffset: { height: 14, width: 0 },
+      shadowOpacity: theme.isDark ? 0.34 : 0.08,
+      shadowRadius: 22,
     },
     categoryCardActive: {
-      backgroundColor: theme.colors.goldSoft,
-      borderColor: theme.colors.gold,
+      backgroundColor: "#f59e0b",
+      borderColor: "transparent",
       transform: [{ translateY: -1 }],
       shadowColor: theme.colors.deepGold,
-      shadowOffset: { height: 8, width: 0 },
-      shadowOpacity: theme.isDark ? 0.22 : 0.1,
-      shadowRadius: 16,
+      shadowOffset: { height: 16, width: 0 },
+      shadowOpacity: theme.isDark ? 0.36 : 0.12,
+      shadowRadius: 24,
+    },
+    categoryCardBlue: {
+      backgroundColor: "#38a9d3",
+    },
+    categoryCardGreen: {
+      backgroundColor: "#24a66f",
+    },
+    categoryCardPurple: {
+      backgroundColor: "#7c3aed",
+    },
+    categoryCardRose: {
+      backgroundColor: "#db4779",
     },
     categoryCount: {
-      color: theme.colors.mutedForeground,
+      color: "rgba(255, 255, 255, 0.74)",
       fontSize: 11,
       fontWeight: "800",
+      textAlign: "center",
     },
     categoryGrid: {
       flexDirection: "row",
       flexWrap: "wrap",
-      gap: 12,
+      gap: 14,
     },
     categoryIcon: {
-      fontSize: 24,
+      color: "#ffffff",
+      fontSize: 30,
+      fontWeight: "900",
     },
     categoryLabel: {
-      color: theme.colors.foreground,
-      fontSize: 12,
+      color: "#ffffff",
+      fontSize: 15,
       fontWeight: "900",
+      textAlign: "center",
     },
     categoryRail: {
       flexDirection: "row",
@@ -2679,11 +2763,12 @@ const createStyles = (theme: MobileTheme) =>
       alignItems: "center",
       backgroundColor: theme.colors.cardElevated,
       borderColor: theme.colors.border,
-      borderRadius: 22,
+      borderRadius: 24,
       borderWidth: 1,
       flex: 1,
       gap: 7,
-      padding: 12,
+      paddingHorizontal: 10,
+      paddingVertical: 13,
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: 6, width: 0 },
       shadowOpacity: theme.isDark ? 0.12 : 0.04,
@@ -2717,28 +2802,27 @@ const createStyles = (theme: MobileTheme) =>
       width: "100%",
     },
     centerTabButton: {
-      backgroundColor: theme.colors.gold,
-      borderColor: theme.colors.accent,
-      borderWidth: 1,
-      borderRadius: 28,
+      backgroundColor: "#153f31",
+      borderColor: theme.colors.gold,
+      borderWidth: 5,
+      borderRadius: 38,
       shadowColor: theme.colors.deepGold,
-      shadowOffset: { height: 10, width: 0 },
-      shadowOpacity: theme.isDark ? 0.42 : 0.22,
-      shadowRadius: 18,
-      transform: [{ translateY: -14 }],
+      shadowOffset: { height: 14, width: 0 },
+      shadowOpacity: theme.isDark ? 0.48 : 0.16,
+      shadowRadius: 22,
+      transform: [{ translateY: -22 }],
     },
     centerTabButtonActive: {
-      backgroundColor: theme.colors.deepGold,
-      transform: [{ translateY: -16 }, { scale: 1.03 }],
+      backgroundColor: "#174d3b",
+      transform: [{ translateY: -24 }, { scale: 1.04 }],
     },
     centerTabActiveIndicator: {
-      backgroundColor: theme.colors.foregroundInverse,
-      bottom: 9,
+      backgroundColor: "transparent",
     },
     centerTabIcon: {
-      color: theme.colors.foregroundInverse,
-      fontSize: 28,
-      lineHeight: 30,
+      color: theme.colors.foreground,
+      fontSize: 36,
+      lineHeight: 38,
     },
     chipRow: {
       flexDirection: "row",
@@ -2800,8 +2884,8 @@ const createStyles = (theme: MobileTheme) =>
       textAlign: "center",
     },
     content: {
-      gap: 22,
-      paddingBottom: 172,
+      gap: 24,
+      paddingBottom: 178,
       paddingHorizontal: 20,
     },
     dataOwnershipNote: {
@@ -3015,30 +3099,38 @@ const createStyles = (theme: MobileTheme) =>
     },
     discoveryCard: {
       ...createMobileSurface(theme, {
-        radius: theme.radii.xl,
+        radius: 34,
         tone: "elevated",
       }),
-      gap: 20,
-      padding: 24,
+      borderColor: theme.colors.border,
+      gap: 22,
+      padding: 22,
       ...createMobileShadow(theme, {
-        darkOpacity: 0.34,
-        height: 20,
+        darkOpacity: 0.4,
+        height: 18,
         lightOpacity: 0.12,
-        radius: 34,
+        radius: 32,
       }),
     },
     discoveryHeaderRow: {
-      alignItems: "center",
+      alignItems: "flex-start",
       flexDirection: "row",
+      gap: 14,
       justifyContent: "space-between",
     },
     discoveryLocationButton: {
       alignItems: "center",
       backgroundColor: theme.colors.gold,
-      borderRadius: 20,
-      height: 40,
+      borderColor: theme.colors.accent,
+      borderRadius: 24,
+      borderWidth: 1,
+      height: 46,
       justifyContent: "center",
-      width: 40,
+      shadowColor: theme.colors.deepGold,
+      shadowOffset: { height: 10, width: 0 },
+      shadowOpacity: theme.isDark ? 0.34 : 0.12,
+      shadowRadius: 18,
+      width: 46,
     },
     discoveryLocationText: {
       color: theme.colors.foregroundInverse,
@@ -3047,10 +3139,11 @@ const createStyles = (theme: MobileTheme) =>
     },
     discoveryTitle: {
       color: theme.colors.foreground,
-      fontSize: 22,
+      fontSize: 25,
       fontWeight: "900",
-      lineHeight: 28,
-      marginTop: 6,
+      letterSpacing: -0.4,
+      lineHeight: 32,
+      marginTop: 7,
     },
     editAction: {
       color: theme.colors.gold,
@@ -3061,10 +3154,12 @@ const createStyles = (theme: MobileTheme) =>
       alignItems: "center",
       alignSelf: "flex-end",
       backgroundColor: theme.colors.cardElevated,
-      borderRadius: 18,
-      height: 36,
+      borderColor: theme.colors.border,
+      borderRadius: 20,
+      borderWidth: 1,
+      height: 40,
       justifyContent: "center",
-      width: 36,
+      width: 40,
     },
     favoriteText: {
       color: theme.colors.gold,
@@ -3084,7 +3179,9 @@ const createStyles = (theme: MobileTheme) =>
     filterButton: {
       alignItems: "center",
       backgroundColor: theme.colors.gold,
-      borderRadius: 18,
+      borderColor: theme.colors.accent,
+      borderRadius: 20,
+      borderWidth: 1,
       height: 36,
       justifyContent: "center",
       width: 36,
@@ -3147,11 +3244,14 @@ const createStyles = (theme: MobileTheme) =>
     },
     ghostButton: {
       alignItems: "center",
-      borderColor: theme.colors.gold,
-      borderRadius: theme.radii.control,
+      backgroundColor: "transparent",
+      borderColor: "#5f6b7a",
+      borderRadius: theme.radii.pill,
       borderWidth: 1,
       flex: 1,
-      paddingVertical: 14,
+      justifyContent: "center",
+      minHeight: 56,
+      paddingVertical: 15,
     },
     ghostButtonText: {
       color: theme.colors.gold,
@@ -3160,11 +3260,14 @@ const createStyles = (theme: MobileTheme) =>
     },
     header: {
       alignItems: "center",
+      backgroundColor: theme.colors.background,
+      borderBottomColor: theme.colors.border,
+      borderBottomWidth: 1,
       flexDirection: "row",
       gap: 12,
-      paddingBottom: 16,
-      paddingHorizontal: 20,
-      paddingTop: 20,
+      paddingBottom: 18,
+      paddingHorizontal: 22,
+      paddingTop: 18,
     },
     iconAction: {
       alignItems: "center",
@@ -3184,27 +3287,27 @@ const createStyles = (theme: MobileTheme) =>
       fontWeight: "900",
     },
     heroActions: {
-      flexDirection: "row",
       gap: 12,
-      marginTop: 20,
+      marginTop: 24,
     },
     heroBody: {
       color: theme.colors.mutedForeground,
-      fontSize: 15,
-      lineHeight: 23,
-      marginTop: 10,
+      fontSize: 17,
+      fontWeight: "700",
+      lineHeight: 26,
+      marginTop: 12,
     },
     heroCard: {
       backgroundColor: theme.colors.hero,
-      borderColor: theme.colors.goldSoft,
-      borderRadius: theme.radii.xl,
+      borderColor: theme.colors.border,
+      borderRadius: 36,
       borderWidth: 1,
       overflow: "hidden",
-      padding: 30,
+      padding: 26,
       shadowColor: theme.colors.shadow,
-      shadowOffset: { height: 24, width: 0 },
-      shadowOpacity: theme.isDark ? 0.38 : 0.14,
-      shadowRadius: 38,
+      shadowOffset: { height: 26, width: 0 },
+      shadowOpacity: theme.isDark ? 0.44 : 0.14,
+      shadowRadius: 42,
     },
     heroEyebrow: {
       color: theme.colors.deepGold,
@@ -3217,19 +3320,20 @@ const createStyles = (theme: MobileTheme) =>
     heroGlow: {
       backgroundColor: theme.colors.goldSoft,
       borderRadius: 999,
-      height: 156,
-      opacity: 0.86,
+      height: 190,
+      opacity: theme.isDark ? 0.42 : 0.8,
       position: "absolute",
-      right: -46,
-      top: -54,
-      width: 156,
+      right: -64,
+      top: -68,
+      width: 190,
     },
     heroTitle: {
       color: theme.colors.foreground,
-      fontSize: 32,
+      fontSize: 33,
       fontWeight: "900",
-      lineHeight: 40,
-      marginTop: 10,
+      letterSpacing: -0.5,
+      lineHeight: 41,
+      marginTop: 12,
     },
     integrationBody: {
       color: theme.colors.warning,
@@ -3257,7 +3361,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     localeButton: {
       alignItems: "center",
-      backgroundColor: theme.colors.muted,
+      backgroundColor: theme.colors.cardElevated,
       borderColor: theme.colors.border,
       borderRadius: theme.radii.pill,
       borderWidth: 1,
@@ -3269,6 +3373,10 @@ const createStyles = (theme: MobileTheme) =>
     localeButtonActive: {
       backgroundColor: theme.colors.gold,
       borderColor: theme.colors.gold,
+      shadowColor: theme.colors.deepGold,
+      shadowOffset: { height: 6, width: 0 },
+      shadowOpacity: theme.isDark ? 0.28 : 0.08,
+      shadowRadius: 12,
     },
     localeButtonPressed: {
       opacity: 0.84,
@@ -3315,31 +3423,31 @@ const createStyles = (theme: MobileTheme) =>
       backgroundColor: theme.colors.gold,
       borderColor: theme.colors.accent,
       borderWidth: 1,
-      borderRadius: 20,
-      height: 46,
+      borderRadius: 24,
+      height: 50,
       justifyContent: "center",
       shadowColor: theme.colors.deepGold,
-      shadowOffset: { height: 10, width: 0 },
-      shadowOpacity: theme.isDark ? 0.44 : 0.2,
-      shadowRadius: 16,
-      width: 46,
+      shadowOffset: { height: 12, width: 0 },
+      shadowOpacity: theme.isDark ? 0.48 : 0.14,
+      shadowRadius: 20,
+      width: 50,
     },
     logoText: {
       color: theme.colors.foregroundInverse,
-      fontSize: 22,
+      fontSize: 24,
       fontWeight: "900",
     },
     mapHeaderCard: {
       backgroundColor: theme.colors.hero,
-      borderColor: theme.colors.goldSoft,
-      borderRadius: theme.radii.xl,
+      borderColor: theme.colors.border,
+      borderRadius: 34,
       borderWidth: 1,
       overflow: "hidden",
-      padding: 22,
+      padding: 24,
       shadowColor: theme.colors.shadow,
-      shadowOffset: { height: 20, width: 0 },
-      shadowOpacity: theme.isDark ? 0.3 : 0.1,
-      shadowRadius: 30,
+      shadowOffset: { height: 22, width: 0 },
+      shadowOpacity: theme.isDark ? 0.38 : 0.12,
+      shadowRadius: 34,
     },
     mapTitle: {
       color: theme.colors.foreground,
@@ -3439,7 +3547,9 @@ const createStyles = (theme: MobileTheme) =>
       marginTop: 6,
     },
     marketplaceMode: {
-      backgroundColor: theme.colors.muted,
+      backgroundColor: theme.colors.cardElevated,
+      borderColor: theme.colors.border,
+      borderWidth: 1,
       borderRadius: theme.radii.pill,
       color: theme.colors.mutedForeground,
       fontSize: 12,
@@ -3450,6 +3560,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     marketplaceModeActive: {
       backgroundColor: theme.colors.gold,
+      borderColor: theme.colors.gold,
+      borderWidth: 1,
       borderRadius: theme.radii.pill,
       color: theme.colors.foregroundInverse,
       fontSize: 12,
@@ -3641,21 +3753,36 @@ const createStyles = (theme: MobileTheme) =>
       justifyContent: "space-between",
     },
     onboardingActions: {
-      flexDirection: "row",
-      gap: 10,
-      marginTop: 18,
+      gap: 14,
+      marginTop: 96,
+    },
+    categoryRailCardBlue: {
+      borderColor: "#38a9d3",
+    },
+    categoryRailCardGreen: {
+      borderColor: "#24a66f",
+    },
+    categoryRailCardPurple: {
+      borderColor: "#7c3aed",
+    },
+    categoryRailCardRose: {
+      borderColor: "#db4779",
     },
     onboardingBody: {
-      color: theme.colors.mutedForeground,
-      fontSize: 15,
-      lineHeight: 23,
-      marginTop: 10,
+      color: theme.colors.foreground,
+      fontSize: 26,
+      fontWeight: "800",
+      lineHeight: 40,
+      marginTop: 28,
+      textAlign: "center",
     },
     onboardingBrand: {
       color: theme.colors.foreground,
-      fontSize: 20,
+      fontSize: 44,
       fontWeight: "900",
-      letterSpacing: 1,
+      letterSpacing: 2,
+      marginTop: 24,
+      textAlign: "center",
     },
     onboardingBrandRow: {
       alignItems: "center",
@@ -3663,82 +3790,127 @@ const createStyles = (theme: MobileTheme) =>
       gap: 12,
     },
     onboardingCard: {
-      backgroundColor: theme.colors.cardElevated,
-      borderColor: theme.isDark ? theme.colors.goldSoft : theme.colors.gold,
-      borderRadius: theme.radii.xl,
+      backgroundColor: theme.colors.hero,
+      borderColor: theme.colors.border,
+      borderRadius: 42,
       borderWidth: 1,
+      minHeight: 720,
       overflow: "hidden",
-      padding: 24,
+      paddingHorizontal: 28,
+      paddingVertical: 34,
       shadowColor: theme.colors.shadow,
-      shadowOffset: { height: 24, width: 0 },
-      shadowOpacity: theme.isDark ? 0.42 : 0.14,
-      shadowRadius: 36,
+      shadowOffset: { height: 30, width: 0 },
+      shadowOpacity: theme.isDark ? 0.52 : 0.16,
+      shadowRadius: 44,
     },
     onboardingGlow: {
       backgroundColor: theme.colors.goldSoft,
       borderRadius: 999,
-      height: 170,
-      opacity: 0.85,
+      height: 260,
+      opacity: 0.34,
       position: "absolute",
-      right: -50,
-      top: -58,
-      width: 170,
+      right: -94,
+      top: 130,
+      width: 260,
     },
     onboardingHighlight: {
-      backgroundColor: theme.colors.goldSoft,
-      borderColor: theme.colors.gold,
+      backgroundColor: theme.colors.card,
+      borderColor: theme.colors.border,
       borderRadius: theme.radii.pill,
       borderWidth: 1,
-      color: theme.colors.deepGold,
-      fontSize: 12,
+      color: theme.colors.mutedForeground,
+      fontSize: 11,
       fontWeight: "900",
       overflow: "hidden",
       paddingHorizontal: 11,
       paddingVertical: 7,
     },
     onboardingHighlights: {
+      alignSelf: "center",
       flexDirection: "row",
       flexWrap: "wrap",
       gap: 8,
-      marginTop: 14,
+      marginTop: 22,
     },
     onboardingLogo: {
       alignItems: "center",
-      backgroundColor: theme.colors.gold,
-      borderColor: theme.colors.accent,
-      borderRadius: 26,
-      borderWidth: 1,
-      height: 54,
+      alignSelf: "center",
+      backgroundColor: "transparent",
+      height: 156,
       justifyContent: "center",
-      shadowColor: theme.colors.deepGold,
-      shadowOffset: { height: 10, width: 0 },
-      shadowOpacity: theme.isDark ? 0.38 : 0.18,
-      shadowRadius: 16,
-      width: 54,
+      marginTop: 78,
+      width: 156,
     },
     onboardingLogoText: {
-      color: theme.colors.foregroundInverse,
-      fontSize: 22,
+      color: theme.colors.gold,
+      fontSize: 132,
       fontWeight: "900",
+      lineHeight: 142,
     },
     onboardingSecondary: {
       alignItems: "center",
-      backgroundColor: theme.colors.muted,
-      borderRadius: theme.radii.control,
-      flex: 1,
+      backgroundColor: "transparent",
+      borderColor: "#5f6b7a",
+      borderRadius: theme.radii.pill,
+      borderWidth: 1,
       justifyContent: "center",
-      paddingVertical: 14,
+      minHeight: 56,
+      paddingVertical: 15,
     },
     onboardingSecondaryText: {
       color: theme.colors.foreground,
-      fontSize: 14,
+      fontSize: 19,
       fontWeight: "900",
     },
     onboardingSlogan: {
-      color: theme.colors.mutedForeground,
-      fontSize: 12,
-      fontWeight: "800",
-      marginTop: 3,
+      color: theme.colors.gold,
+      fontSize: 31,
+      fontWeight: "500",
+      lineHeight: 38,
+      marginTop: 16,
+      textAlign: "center",
+    },
+    onboardingPattern: {
+      bottom: 0,
+      left: 0,
+      opacity: 0.9,
+      position: "absolute",
+      right: 0,
+      top: 0,
+    },
+    onboardingPatternArc: {
+      borderColor: "rgba(255, 193, 58, 0.32)",
+      borderRadius: 240,
+      borderTopWidth: 3,
+      height: 220,
+      left: -44,
+      position: "absolute",
+      right: -44,
+      top: 82,
+      transform: [{ rotate: "-8deg" }],
+    },
+    onboardingPatternLine: {
+      backgroundColor: "rgba(255, 193, 58, 0.22)",
+      borderRadius: 999,
+      height: "100%",
+      position: "absolute",
+      top: 0,
+      width: 3,
+    },
+    onboardingPatternLineEnd: {
+      right: "18%",
+    },
+    onboardingPatternLineStart: {
+      left: "18%",
+    },
+    onboardingPatternLineTall: {
+      backgroundColor: "rgba(255, 193, 58, 0.28)",
+      borderRadius: 999,
+      height: "100%",
+      left: "52%",
+      position: "absolute",
+      top: 0,
+      width: 3,
     },
     onboardingTitle: {
       color: theme.colors.foreground,
@@ -4218,13 +4390,13 @@ const createStyles = (theme: MobileTheme) =>
       borderWidth: 1,
       borderRadius: theme.radii.control,
       flex: 1,
-      minHeight: 48,
+      minHeight: 56,
       justifyContent: "center",
-      paddingVertical: 14,
+      paddingVertical: 16,
       shadowColor: theme.colors.deepGold,
-      shadowOffset: { height: 10, width: 0 },
-      shadowOpacity: theme.isDark ? 0.4 : 0.2,
-      shadowRadius: 18,
+      shadowOffset: { height: 14, width: 0 },
+      shadowOpacity: theme.isDark ? 0.5 : 0.18,
+      shadowRadius: 24,
     },
     primaryButtonPressed: {
       opacity: 0.9,
@@ -4233,42 +4405,51 @@ const createStyles = (theme: MobileTheme) =>
     },
     primaryButtonText: {
       color: theme.colors.foregroundInverse,
-      fontSize: 14,
+      fontSize: 17,
       fontWeight: "900",
     },
     promoBadge: {
       alignItems: "center",
-      backgroundColor: theme.colors.foreground,
-      borderRadius: 24,
-      height: 48,
+      backgroundColor: theme.colors.gold,
+      borderColor: theme.colors.accent,
+      borderRadius: 28,
+      borderWidth: 1,
+      height: 56,
       justifyContent: "center",
-      width: 48,
+      width: 56,
     },
     promoBadgeText: {
-      color: theme.colors.gold,
+      color: theme.colors.foregroundInverse,
       fontWeight: "900",
     },
     promoBody: {
-      color: theme.colors.mutedForeground,
-      fontSize: 14,
-      lineHeight: 21,
-      marginTop: 6,
+      color: theme.colors.foreground,
+      fontSize: 16,
+      fontWeight: "700",
+      lineHeight: 24,
+      marginTop: 8,
       maxWidth: 230,
     },
     promoCard: {
       alignItems: "center",
-      backgroundColor: theme.colors.accentMuted,
-      borderColor: theme.isDark ? theme.colors.goldSoft : theme.colors.gold,
-      borderRadius: theme.radii.card,
+      backgroundColor: "#0c251d",
+      borderColor: "#163e31",
+      borderRadius: 34,
       borderWidth: 1,
       flexDirection: "row",
       justifyContent: "space-between",
-      padding: 18,
+      minHeight: 142,
+      padding: 22,
+      shadowColor: theme.colors.shadow,
+      shadowOffset: { height: 20, width: 0 },
+      shadowOpacity: theme.isDark ? 0.34 : 0.1,
+      shadowRadius: 30,
     },
     promoTitle: {
-      color: theme.colors.foreground,
-      fontSize: 18,
+      color: theme.colors.gold,
+      fontSize: 29,
       fontWeight: "900",
+      lineHeight: 36,
     },
     quickReplyChip: {
       backgroundColor: theme.colors.goldSoft,
@@ -4515,8 +4696,8 @@ const createStyles = (theme: MobileTheme) =>
     screenDescription: {
       color: theme.colors.mutedForeground,
       flexShrink: 1,
-      fontSize: 15,
-      lineHeight: 23,
+      fontSize: 16,
+      lineHeight: 24,
       marginTop: 10,
     },
     screenEyebrow: {
@@ -4531,18 +4712,23 @@ const createStyles = (theme: MobileTheme) =>
     screenTitle: {
       color: theme.colors.foreground,
       flexShrink: 1,
-      fontSize: 25,
+      fontSize: 28,
       fontWeight: "900",
-      lineHeight: 31,
+      letterSpacing: -0.4,
+      lineHeight: 35,
       marginTop: 8,
     },
     searchActionButton: {
       alignItems: "center",
-      backgroundColor: theme.colors.muted,
-      borderRadius: 18,
+      backgroundColor: theme.colors.cardElevated,
+      borderColor: theme.colors.border,
+      borderRadius: 22,
+      borderWidth: 1,
       flex: 1,
-      gap: 5,
-      paddingVertical: 12,
+      gap: 6,
+      justifyContent: "center",
+      minHeight: 68,
+      paddingVertical: 13,
     },
     searchActionIcon: {
       color: theme.colors.gold,
@@ -4561,34 +4747,37 @@ const createStyles = (theme: MobileTheme) =>
     searchBar: {
       alignItems: "center",
       backgroundColor: theme.colors.cardElevated,
-      borderColor: theme.colors.goldSoft,
-      borderRadius: theme.radii.pill,
+      borderColor: theme.colors.border,
+      borderRadius: 30,
       borderWidth: 1,
       flexDirection: "row",
-      gap: 12,
-      paddingHorizontal: 16,
-      paddingVertical: 14,
+      gap: 14,
+      minHeight: 64,
+      paddingHorizontal: 18,
+      paddingVertical: 16,
       shadowColor: theme.colors.shadow,
-      shadowOffset: { height: 14, width: 0 },
-      shadowOpacity: theme.isDark ? 0.2 : 0.08,
-      shadowRadius: 22,
+      shadowOffset: { height: 16, width: 0 },
+      shadowOpacity: theme.isDark ? 0.28 : 0.08,
+      shadowRadius: 24,
     },
     searchIcon: {
-      color: theme.colors.gold,
-      fontSize: 20,
+      color: theme.colors.mutedForeground,
+      fontSize: 28,
       fontWeight: "900",
     },
     searchPlaceholder: {
       color: theme.colors.mutedForeground,
       flex: 1,
-      fontSize: 14,
-      fontWeight: "700",
-      lineHeight: 20,
+      fontSize: 16,
+      fontWeight: "800",
+      lineHeight: 22,
       minWidth: 0,
     },
     searchChip: {
-      backgroundColor: theme.colors.goldSoft,
+      backgroundColor: theme.colors.gold,
+      borderColor: theme.colors.gold,
       borderRadius: theme.radii.pill,
+      borderWidth: 1,
       color: theme.colors.deepGold,
       fontSize: 12,
       fontWeight: "900",
@@ -4598,6 +4787,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     searchChipMuted: {
       backgroundColor: theme.colors.muted,
+      borderColor: theme.colors.border,
       color: theme.colors.mutedForeground,
     },
     searchChipRow: {
@@ -4911,21 +5101,23 @@ const createStyles = (theme: MobileTheme) =>
     tabBar: {
       alignItems: "center",
       backgroundColor: theme.colors.nav,
-      borderColor: theme.colors.goldSoft,
-      borderRadius: 34,
+      borderColor: theme.colors.border,
+      borderRadius: 0,
       borderWidth: 1,
-      bottom: 20,
+      bottom: 0,
       elevation: 24,
       flexDirection: "row",
-      height: 92,
-      left: 16,
-      padding: 10,
+      height: 118,
+      left: 0,
+      paddingBottom: 22,
+      paddingHorizontal: 14,
+      paddingTop: 14,
       position: "absolute",
-      right: 16,
+      right: 0,
       shadowColor: theme.colors.shadow,
-      shadowOffset: { height: 18, width: 0 },
-      shadowOpacity: theme.isDark ? 0.4 : 0.16,
-      shadowRadius: 30,
+      shadowOffset: { height: -10, width: 0 },
+      shadowOpacity: theme.isDark ? 0.54 : 0.16,
+      shadowRadius: 28,
       zIndex: 20,
     },
     tabActiveIndicator: {
@@ -4943,38 +5135,32 @@ const createStyles = (theme: MobileTheme) =>
       alignItems: "center",
       borderRadius: 24,
       flex: 1,
-      gap: 3,
+      gap: 6,
       justifyContent: "center",
-      minHeight: 64,
-      paddingHorizontal: 4,
+      minHeight: 66,
+      paddingHorizontal: 2,
     },
     tabButtonActive: {
-      backgroundColor: theme.colors.goldSoft,
-      borderColor: theme.colors.gold,
-      borderWidth: 1,
-      shadowColor: theme.colors.deepGold,
-      shadowOffset: { height: 4, width: 0 },
-      shadowOpacity: theme.isDark ? 0.2 : 0.08,
-      shadowRadius: 10,
+      backgroundColor: "transparent",
     },
     tabButtonPressed: {
       opacity: 0.88,
       transform: [{ translateY: 1 }, { scale: 0.97 }],
     },
     tabIcon: {
-      color: theme.colors.mutedForeground,
-      fontSize: 18,
+      color: theme.colors.foreground,
+      fontSize: 25,
     },
     tabIconActive: {
       color: theme.colors.gold,
     },
     tabLabel: {
-      color: theme.colors.mutedForeground,
-      fontSize: 10,
+      color: theme.colors.foreground,
+      fontSize: 12,
       fontWeight: "800",
-      lineHeight: 12,
-      maxWidth: 58,
-      minWidth: 46,
+      lineHeight: 16,
+      maxWidth: 64,
+      minWidth: 48,
       textAlign: "center",
     },
     tabLabelActive: {
@@ -5072,7 +5258,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     voiceButton: {
       alignItems: "center",
-      backgroundColor: theme.colors.muted,
+      backgroundColor: "transparent",
       borderRadius: 18,
       height: 36,
       justifyContent: "center",
