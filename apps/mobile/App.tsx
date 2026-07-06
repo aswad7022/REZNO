@@ -27,6 +27,11 @@ import {
 } from "./src/i18n/labels";
 import type { MobileTabId } from "./src/navigation/tabs";
 import {
+  createMobileShadow,
+  createMobileSurface,
+  mobileRadii,
+} from "./src/design/primitives";
+import {
   darkMobileTheme,
   lightMobileTheme,
   type MobileTheme,
@@ -2408,7 +2413,7 @@ const createStyles = (theme: MobileTheme) =>
       alignItems: "center",
       backgroundColor: theme.colors.cardElevated,
       borderColor: theme.colors.border,
-      borderRadius: 18,
+      borderRadius: mobileRadii.compactCard,
       borderWidth: 1,
       flexDirection: "row",
       gap: 12,
@@ -2491,15 +2496,17 @@ const createStyles = (theme: MobileTheme) =>
       padding: 16,
     },
     businessCard: {
-      backgroundColor: theme.colors.cardElevated,
-      borderColor: theme.colors.border,
-      borderRadius: theme.radii.card,
-      borderWidth: 1,
+      ...createMobileSurface(theme, {
+        radius: theme.radii.card,
+        tone: "elevated",
+      }),
       overflow: "hidden",
-      shadowColor: theme.colors.shadow,
-      shadowOffset: { height: 16, width: 0 },
-      shadowOpacity: theme.isDark ? 0.24 : 0.08,
-      shadowRadius: 24,
+      ...createMobileShadow(theme, {
+        darkOpacity: 0.24,
+        height: 16,
+        lightOpacity: 0.08,
+        radius: 24,
+      }),
     },
     businessCopy: {
       flex: 1,
@@ -2835,15 +2842,17 @@ const createStyles = (theme: MobileTheme) =>
       gap: 10,
     },
     detailCard: {
-      backgroundColor: theme.colors.cardElevated,
-      borderColor: theme.colors.border,
-      borderRadius: theme.radii.xl,
-      borderWidth: 1,
+      ...createMobileSurface(theme, {
+        radius: theme.radii.xl,
+        tone: "elevated",
+      }),
       overflow: "hidden",
-      shadowColor: theme.colors.shadow,
-      shadowOffset: { height: 18, width: 0 },
-      shadowOpacity: theme.isDark ? 0.3 : 0.1,
-      shadowRadius: 28,
+      ...createMobileShadow(theme, {
+        darkOpacity: 0.3,
+        height: 18,
+        lightOpacity: 0.1,
+        radius: 28,
+      }),
     },
     detailCtaRow: {
       flexDirection: "row",
@@ -2876,7 +2885,7 @@ const createStyles = (theme: MobileTheme) =>
       alignItems: "center",
       backgroundColor: theme.colors.card,
       borderColor: theme.colors.border,
-      borderRadius: 22,
+      borderRadius: mobileRadii.listCard,
       borderWidth: 1,
       flexDirection: "row",
       gap: 12,
@@ -2953,16 +2962,18 @@ const createStyles = (theme: MobileTheme) =>
       justifyContent: "space-between",
     },
     discoveryCard: {
-      backgroundColor: theme.colors.cardElevated,
-      borderColor: theme.colors.border,
-      borderRadius: theme.radii.xl,
-      borderWidth: 1,
+      ...createMobileSurface(theme, {
+        radius: theme.radii.xl,
+        tone: "elevated",
+      }),
       gap: 14,
       padding: 18,
-      shadowColor: theme.colors.shadow,
-      shadowOffset: { height: 16, width: 0 },
-      shadowOpacity: theme.isDark ? 0.28 : 0.08,
-      shadowRadius: 26,
+      ...createMobileShadow(theme, {
+        darkOpacity: 0.28,
+        height: 16,
+        lightOpacity: 0.08,
+        radius: 26,
+      }),
     },
     discoveryHeaderRow: {
       alignItems: "center",
@@ -4290,15 +4301,14 @@ const createStyles = (theme: MobileTheme) =>
       writingDirection: "rtl",
     },
     screenCard: {
-      backgroundColor: theme.colors.card,
-      borderColor: theme.colors.border,
-      borderRadius: theme.radii.xl,
-      borderWidth: 1,
+      ...createMobileSurface(theme, { radius: theme.radii.xl }),
       padding: 20,
-      shadowColor: theme.colors.shadow,
-      shadowOffset: { height: 16, width: 0 },
-      shadowOpacity: theme.isDark ? 0.3 : 0.08,
-      shadowRadius: 26,
+      ...createMobileShadow(theme, {
+        darkOpacity: 0.3,
+        height: 16,
+        lightOpacity: 0.08,
+        radius: 26,
+      }),
     },
     selectedServiceCard: {
       alignItems: "center",
