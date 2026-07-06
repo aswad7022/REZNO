@@ -18,6 +18,11 @@ import {
   ScreenHeader,
   TOUCH_HIT_SLOP,
 } from "./src/components/mobile-chrome";
+import {
+  PremiumStateCard,
+  SectionHeader,
+  SummaryItem,
+} from "./src/components/screen-composition";
 import { API_BASE_URL } from "./src/config/api";
 import {
   DEFAULT_LOCALE,
@@ -868,27 +873,6 @@ function PromoCard({ isRtl, styles }: { isRtl: boolean; styles: MobileStyles }) 
   );
 }
 
-function SectionHeader({
-  action,
-  isRtl,
-  styles,
-  title,
-}: {
-  action?: string;
-  isRtl: boolean;
-  styles: MobileStyles;
-  title: string;
-}) {
-  return (
-    <View style={styles.sectionHeader}>
-      <Text style={[styles.sectionTitle, isRtl && styles.rtlText]}>
-        {title}
-      </Text>
-      {action ? <Text style={styles.sectionAction}>{action}</Text> : null}
-    </View>
-  );
-}
-
 function PremiumBusinessCard({
   business,
   isRtl,
@@ -1165,62 +1149,6 @@ function MarketplaceStateView({
   );
 }
 
-function PremiumStateCard({
-  body,
-  cta,
-  icon,
-  isRtl,
-  label,
-  onPress,
-  styles,
-  title,
-  tone = "default",
-}: {
-  body: string;
-  cta?: string;
-  icon: string;
-  isRtl: boolean;
-  label: string;
-  onPress?: () => void;
-  styles: MobileStyles;
-  title: string;
-  tone?: "default" | "warning";
-}) {
-  return (
-    <View style={styles.stateCard}>
-      <View
-        style={[
-          styles.stateIcon,
-          tone === "warning" && styles.stateIconWarning,
-        ]}
-      >
-        <Text
-          style={[
-            styles.stateIconText,
-            tone === "warning" && styles.stateIconTextWarning,
-          ]}
-        >
-          {icon}
-        </Text>
-      </View>
-      <Text style={[styles.screenEyebrow, isRtl && styles.rtlText]}>
-        {label}
-      </Text>
-      <Text style={[styles.screenTitle, isRtl && styles.rtlText]}>
-        {title}
-      </Text>
-      <Text style={[styles.screenDescription, isRtl && styles.rtlText]}>
-        {body}
-      </Text>
-      {cta ? (
-        <View style={styles.stateAction}>
-          <PrimaryButton label={cta} onPress={onPress} styles={styles} />
-        </View>
-      ) : null}
-    </View>
-  );
-}
-
 function BookingFlowScreen({
   isRtl,
   styles,
@@ -1479,23 +1407,6 @@ function BookingSummaryCard({
         <SummaryItem label="الموقع" value="بغداد · الكرادة" styles={styles} />
         <SummaryItem label="الطريقة" value="الدفع في المكان" styles={styles} />
       </View>
-    </View>
-  );
-}
-
-function SummaryItem({
-  label,
-  styles,
-  value,
-}: {
-  label: string;
-  styles: MobileStyles;
-  value: string;
-}) {
-  return (
-    <View style={styles.summaryItem}>
-      <Text style={styles.summaryLabel}>{label}</Text>
-      <Text style={styles.summaryValue}>{value}</Text>
     </View>
   );
 }
