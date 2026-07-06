@@ -1,7 +1,7 @@
 {
   "project": "REZNO",
   "productVision": "One Platform. Every Booking.",
-  "currentApprovedMain": "dde042ea08fa04ee4c28e404ec1937b2e061719d",
+  "currentApprovedMain": "37a5f35985b364f83ee4a7e81fb4dd8b359fa1d8",
   "closedSprints": [
     {
       "name": "Agentic Delivery System MVP",
@@ -140,11 +140,24 @@
       "pr": 41,
       "mainSha": "dde042ea08fa04ee4c28e404ec1937b2e061719d",
       "decision": "APPROVE"
+    },
+    {
+      "name": "Record Mobile Visual System Phase 9 Memory",
+      "pr": 42,
+      "mainSha": "f8515c0b2bcbd5153cc2c40de9f0cea03c8522ab",
+      "decision": "APPROVE"
+    },
+    {
+      "name": "Mobile Premium Visual System Phase 10 - Navigation Microinteractions and Accessibility Polish",
+      "pr": 43,
+      "mainSha": "37a5f35985b364f83ee4a7e81fb4dd8b359fa1d8",
+      "decision": "APPROVE"
     }
   ],
   "activeSprint": null,
   "blockedItems": [
-    "Mobile real-device runtime smoke remains blocked until an SDK 57-compatible Expo Go/TestFlight path or EAS development build path is available."
+    "Mobile real-device runtime smoke remains blocked until an SDK 57-compatible Expo Go/TestFlight path or EAS development build path is available.",
+    "Vercel build-rate-limit affected PR #43; Phase 10 was merged with accepted infrastructure quota risk after local/static validation passed."
   ],
   "nextRecommendedAction": "Bundle future memory updates into each completed sprint closure when technically possible, then continue mobile premium visual refinement or resume SDK 57 mobile runtime gate."
 }
