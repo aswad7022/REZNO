@@ -2473,10 +2473,11 @@ const createStyles = (theme: MobileTheme) =>
       minWidth: 0,
     },
     businessFooter: {
-      alignItems: "center",
+      alignItems: "flex-start",
       borderTopColor: theme.colors.border,
       borderTopWidth: 1,
       flexDirection: "row",
+      flexWrap: "wrap",
       gap: 10,
       justifyContent: "space-between",
       paddingTop: 14,
@@ -2660,7 +2661,7 @@ const createStyles = (theme: MobileTheme) =>
     categoryGrid: {
       flexDirection: "row",
       flexWrap: "wrap",
-      gap: 10,
+      gap: 12,
     },
     categoryIcon: {
       fontSize: 24,
@@ -2811,7 +2812,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     disabledButton: {
       backgroundColor: theme.colors.disabled,
-      borderColor: theme.colors.border,
+      borderColor: theme.colors.disabledText,
       opacity: 0.82,
       shadowOpacity: 0,
     },
@@ -3008,6 +3009,8 @@ const createStyles = (theme: MobileTheme) =>
     detailTopRow: {
       alignItems: "center",
       flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 10,
       justifyContent: "space-between",
     },
     discoveryCard: {
@@ -3633,6 +3636,7 @@ const createStyles = (theme: MobileTheme) =>
     notificationTitleRow: {
       alignItems: "flex-start",
       flexDirection: "row",
+      flexWrap: "wrap",
       gap: 8,
       justifyContent: "space-between",
     },
@@ -4308,14 +4312,14 @@ const createStyles = (theme: MobileTheme) =>
       fontWeight: "900",
     },
     recommendedItem: {
-      alignItems: "center",
+      alignItems: "flex-start",
       backgroundColor: theme.colors.cardElevated,
-      borderColor: theme.colors.border,
+      borderColor: theme.colors.goldSoft,
       borderRadius: 20,
       borderWidth: 1,
       flexDirection: "row",
       gap: 12,
-      padding: 12,
+      padding: 14,
     },
     recommendedList: {
       gap: 10,
@@ -4348,6 +4352,7 @@ const createStyles = (theme: MobileTheme) =>
     receiptHeader: {
       alignItems: "flex-start",
       flexDirection: "row",
+      flexWrap: "wrap",
       gap: 12,
       justifyContent: "space-between",
     },
@@ -4753,6 +4758,7 @@ const createStyles = (theme: MobileTheme) =>
     statusBookingHeader: {
       alignItems: "flex-start",
       flexDirection: "row",
+      flexWrap: "wrap",
       gap: 10,
       justifyContent: "space-between",
     },
@@ -4825,9 +4831,9 @@ const createStyles = (theme: MobileTheme) =>
       marginTop: 16,
     },
     summaryItem: {
-      alignItems: "center",
+      alignItems: "flex-start",
       backgroundColor: theme.colors.cardElevated,
-      borderColor: theme.colors.border,
+      borderColor: theme.colors.goldSoft,
       borderRadius: 18,
       borderWidth: 1,
       flexDirection: "row",
@@ -4855,7 +4861,9 @@ const createStyles = (theme: MobileTheme) =>
     },
     supportPill: {
       backgroundColor: theme.colors.cardElevated,
+      borderColor: theme.colors.warning,
       borderRadius: theme.radii.pill,
+      borderWidth: 1,
       color: theme.colors.warning,
       fontSize: 12,
       fontWeight: "900",
