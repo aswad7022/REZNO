@@ -214,6 +214,58 @@ const bookingStatusCards = [
   },
 ];
 
+const businessOverviewCards = [
+  { label: "حجوزات اليوم", value: "18", detail: "+4 عن أمس" },
+  { label: "إيراد اليوم", value: "420K", detail: "د.ع تجريبي" },
+  { label: "طلبات معلقة", value: "5", detail: "تحتاج مراجعة" },
+  { label: "تقييم العملاء", value: "4.9", detail: "128 تقييم" },
+];
+
+const businessQuickActions = [
+  { icon: "+", label: "إضافة خدمة" },
+  { icon: "👥", label: "إدارة الفريق" },
+  { icon: "◷", label: "التقويم" },
+  { icon: "⚙", label: "الإعدادات" },
+];
+
+const ownerBookingsPreview = [
+  {
+    customer: "زهراء",
+    initials: "ز",
+    service: "قص وتصفيف",
+    status: "مؤكد",
+    time: "4:30 م",
+  },
+  {
+    customer: "علي",
+    initials: "ع",
+    service: "عناية بشرة",
+    status: "ينتظر",
+    time: "5:15 م",
+  },
+  {
+    customer: "نور",
+    initials: "ن",
+    service: "باقة فاخرة",
+    status: "قادم",
+    time: "6:00 م",
+  },
+];
+
+const topServicesPreview = [
+  { name: "قص وتصفيف", percent: "86%", value: 86 },
+  { name: "عناية بشرة", percent: "64%", value: 64 },
+  { name: "باقة فاخرة", percent: "48%", value: 48 },
+];
+
+const staffAvailabilityPreview = [
+  { capacity: "80%", name: "ليان", status: "متاحة" },
+  { capacity: "55%", name: "سارة", status: "مشغولة جزئياً" },
+  { capacity: "30%", name: "آدم", status: "إدارة الحجوزات" },
+];
+
+const weeklyBusinessBars = [42, 58, 37, 72, 64, 88, 76];
+
 export default function App() {
   const colorScheme = useColorScheme();
   const [locale, setLocale] = useState<MobileLocale>(DEFAULT_LOCALE);
@@ -301,15 +353,7 @@ export default function App() {
         ) : null}
 
         {activeTab === "business" ? (
-          <SimpleBoundaryScreen
-            body="تبويب الأعمال يحافظ على نموذج الحساب الموحد. مالك النشاط يرى إدارة أعماله لاحقاً، والعميل يرى مسار إضافة نشاط."
-            eyebrow="الأعمال"
-            isRtl={isRtl}
-            primary="إدارة النشاط لاحقاً"
-            secondary="إضافة نشاط"
-            styles={styles}
-            title="أعمالك داخل نفس الحساب"
-          />
+          <BusinessOwnerPreviewScreen isRtl={isRtl} styles={styles} />
         ) : null}
 
         {activeTab === "account" ? (
@@ -1515,6 +1559,209 @@ function BookingStatusBoard({
   );
 }
 
+function BusinessOwnerPreviewScreen({
+  isRtl,
+  styles,
+}: {
+  isRtl: boolean;
+  styles: MobileStyles;
+}) {
+  return (
+    <>
+      <View style={styles.ownerHeroCard}>
+        <View style={styles.ownerHeroGlow} />
+        <View style={styles.ownerHeaderRow}>
+          <View style={styles.ownerLogo}>
+            <Text style={styles.ownerLogoText}>N</Text>
+          </View>
+          <View style={styles.rowCopy}>
+            <Text style={[styles.screenEyebrow, isRtl && styles.rtlText]}>
+              لوحة مالك النشاط
+            </Text>
+            <Text style={[styles.ownerBusinessName, isRtl && styles.rtlText]}>
+              Noura Beauty Lounge
+            </Text>
+            <Text style={[styles.ownerBusinessMeta, isRtl && styles.rtlText]}>
+              صالون وتجميل · بغداد، الكرادة
+            </Text>
+          </View>
+          <Text style={styles.ownerVerifiedBadge}>موثق</Text>
+        </View>
+        <Text style={[styles.ownerHeroBody, isRtl && styles.rtlText]}>
+          معاينة تشغيلية ثابتة لمالك النشاط. لا تعرض بيانات حقيقية ولا تنفذ أي
+          تعديل على الخدمات أو الحجوزات.
+        </Text>
+      </View>
+
+      <View style={styles.ownerOverviewGrid}>
+        {businessOverviewCards.map((card) => (
+          <View key={card.label} style={styles.ownerOverviewCard}>
+            <Text style={styles.ownerOverviewValue}>{card.value}</Text>
+            <Text style={[styles.ownerOverviewLabel, isRtl && styles.rtlText]}>
+              {card.label}
+            </Text>
+            <Text style={styles.ownerOverviewDetail}>{card.detail}</Text>
+          </View>
+        ))}
+      </View>
+
+      <View style={styles.ownerQuickActionsCard}>
+        <SectionHeader isRtl={isRtl} styles={styles} title="إجراءات سريعة" />
+        <View style={styles.ownerQuickGrid}>
+          {businessQuickActions.map((action) => (
+            <View key={action.label} style={styles.ownerQuickAction}>
+              <Text style={styles.ownerQuickIcon}>{action.icon}</Text>
+              <Text style={styles.ownerQuickText}>{action.label}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
+
+      <TodayBookingsPreview isRtl={isRtl} styles={styles} />
+      <ServicesStaffPreview isRtl={isRtl} styles={styles} />
+      <BusinessInsightsPreview isRtl={isRtl} styles={styles} />
+
+      <View style={styles.ownerSafetyCard}>
+        <Text style={[styles.integrationTitle, isRtl && styles.rtlText]}>
+          حد أمان الأعمال
+        </Text>
+        <Text style={[styles.integrationBody, isRtl && styles.rtlText]}>
+          هذه لوحة معاينة فقط. قبول الحجوزات، تعديل الخدمات، إدارة الموظفين،
+          والتحليلات الحقيقية تحتاج سبرنت صلاحيات ومنطق أعمال منفصل.
+        </Text>
+      </View>
+    </>
+  );
+}
+
+function TodayBookingsPreview({
+  isRtl,
+  styles,
+}: {
+  isRtl: boolean;
+  styles: MobileStyles;
+}) {
+  return (
+    <View style={styles.ownerPanelCard}>
+      <SectionHeader
+        action="فتح التقويم"
+        isRtl={isRtl}
+        styles={styles}
+        title="حجوزات اليوم"
+      />
+      {ownerBookingsPreview.map((booking) => (
+        <View key={`${booking.customer}-${booking.time}`} style={styles.ownerBookingRow}>
+          <View style={styles.ownerCustomerAvatar}>
+            <Text style={styles.ownerCustomerInitial}>{booking.initials}</Text>
+          </View>
+          <View style={styles.rowCopy}>
+            <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>
+              {booking.customer} · {booking.service}
+            </Text>
+            <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>
+              {booking.time}
+            </Text>
+          </View>
+          <View style={styles.ownerBookingActions}>
+            <Text style={styles.ownerStatusChip}>{booking.status}</Text>
+            <Text style={styles.ownerActionText}>قبول بصري</Text>
+            <Text style={styles.ownerMutedActionText}>إعادة جدولة</Text>
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function ServicesStaffPreview({
+  isRtl,
+  styles,
+}: {
+  isRtl: boolean;
+  styles: MobileStyles;
+}) {
+  return (
+    <View style={styles.ownerTwoColumn}>
+      <View style={styles.ownerPanelCard}>
+        <SectionHeader isRtl={isRtl} styles={styles} title="أفضل الخدمات" />
+        {topServicesPreview.map((service) => (
+          <View key={service.name} style={styles.ownerMetricRow}>
+            <View style={styles.rowCopy}>
+              <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>
+                {service.name}
+              </Text>
+              <View style={styles.ownerProgressTrack}>
+                <View
+                  style={[
+                    styles.ownerProgressFill,
+                    { width: `${service.value}%` as `${number}%` },
+                  ]}
+                />
+              </View>
+            </View>
+            <Text style={styles.ownerMetricValue}>{service.percent}</Text>
+          </View>
+        ))}
+      </View>
+
+      <View style={styles.ownerPanelCard}>
+        <SectionHeader isRtl={isRtl} styles={styles} title="توفر الفريق" />
+        {staffAvailabilityPreview.map((staff) => (
+          <View key={staff.name} style={styles.ownerStaffRow}>
+            <View style={styles.ownerCustomerAvatar}>
+              <Text style={styles.ownerCustomerInitial}>
+                {staff.name.charAt(0)}
+              </Text>
+            </View>
+            <View style={styles.rowCopy}>
+              <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>
+                {staff.name}
+              </Text>
+              <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>
+                {staff.status} · {staff.capacity}
+              </Text>
+            </View>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function BusinessInsightsPreview({
+  isRtl,
+  styles,
+}: {
+  isRtl: boolean;
+  styles: MobileStyles;
+}) {
+  return (
+    <View style={styles.ownerInsightsCard}>
+      <View style={styles.ownerInsightsHeader}>
+        <View>
+          <Text style={[styles.screenEyebrow, isRtl && styles.rtlText]}>
+            مؤشرات الأسبوع
+          </Text>
+          <Text style={[styles.ownerInsightsTitle, isRtl && styles.rtlText]}>
+            نمو حجوزات تجريبي
+          </Text>
+        </View>
+        <Text style={styles.ownerVerifiedBadge}>+18%</Text>
+      </View>
+      <View style={styles.ownerBarsRow}>
+        {weeklyBusinessBars.map((height, index) => (
+          <View key={`${height}-${index}`} style={styles.ownerBarTrack}>
+            <View style={[styles.ownerBarFill, { height }]} />
+          </View>
+        ))}
+      </View>
+      <Text style={[styles.ownerBusinessMeta, isRtl && styles.rtlText]}>
+        الخدمة الأعلى طلباً: قص وتصفيف · لا يوجد اتصال API تحليلات.
+      </Text>
+    </View>
+  );
+}
+
 function AccountScreen({
   isRtl,
   styles,
@@ -2713,6 +2960,279 @@ const createStyles = (theme: MobileTheme) =>
       fontWeight: "900",
       lineHeight: 35,
       marginTop: 24,
+    },
+    ownerActionText: {
+      backgroundColor: theme.colors.goldSoft,
+      borderRadius: theme.radii.pill,
+      color: theme.colors.deepGold,
+      fontSize: 11,
+      fontWeight: "900",
+      overflow: "hidden",
+      paddingHorizontal: 9,
+      paddingVertical: 6,
+    },
+    ownerBarFill: {
+      alignSelf: "stretch",
+      backgroundColor: theme.colors.gold,
+      borderRadius: 999,
+      minHeight: 18,
+    },
+    ownerBarsRow: {
+      alignItems: "flex-end",
+      flexDirection: "row",
+      gap: 8,
+      height: 96,
+      marginTop: 18,
+    },
+    ownerBarTrack: {
+      backgroundColor: theme.colors.muted,
+      borderRadius: 999,
+      flex: 1,
+      justifyContent: "flex-end",
+      overflow: "hidden",
+    },
+    ownerBookingActions: {
+      alignItems: "flex-end",
+      gap: 5,
+    },
+    ownerBookingRow: {
+      alignItems: "center",
+      backgroundColor: theme.colors.cardElevated,
+      borderColor: theme.colors.border,
+      borderRadius: 22,
+      borderWidth: 1,
+      flexDirection: "row",
+      gap: 12,
+      padding: 12,
+    },
+    ownerBusinessMeta: {
+      color: theme.colors.mutedForeground,
+      fontSize: 13,
+      lineHeight: 20,
+      marginTop: 4,
+    },
+    ownerBusinessName: {
+      color: theme.colors.foreground,
+      fontSize: 21,
+      fontWeight: "900",
+      marginTop: 4,
+    },
+    ownerCustomerAvatar: {
+      alignItems: "center",
+      backgroundColor: theme.colors.goldSoft,
+      borderRadius: 21,
+      height: 42,
+      justifyContent: "center",
+      width: 42,
+    },
+    ownerCustomerInitial: {
+      color: theme.colors.deepGold,
+      fontSize: 16,
+      fontWeight: "900",
+    },
+    ownerHeaderRow: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 12,
+    },
+    ownerHeroBody: {
+      color: theme.colors.mutedForeground,
+      fontSize: 14,
+      lineHeight: 22,
+      marginTop: 16,
+    },
+    ownerHeroCard: {
+      backgroundColor: theme.colors.hero,
+      borderColor: theme.colors.gold,
+      borderRadius: theme.radii.xl,
+      borderWidth: 1,
+      overflow: "hidden",
+      padding: 22,
+      shadowColor: theme.colors.shadow,
+      shadowOffset: { height: 18, width: 0 },
+      shadowOpacity: theme.isDark ? 0.34 : 0.12,
+      shadowRadius: 30,
+    },
+    ownerHeroGlow: {
+      backgroundColor: theme.colors.goldSoft,
+      borderRadius: 999,
+      height: 150,
+      opacity: 0.85,
+      position: "absolute",
+      right: -46,
+      top: -54,
+      width: 150,
+    },
+    ownerInsightsCard: {
+      backgroundColor: theme.colors.cardElevated,
+      borderColor: theme.colors.border,
+      borderRadius: theme.radii.card,
+      borderWidth: 1,
+      padding: 18,
+    },
+    ownerInsightsHeader: {
+      alignItems: "center",
+      flexDirection: "row",
+      justifyContent: "space-between",
+    },
+    ownerInsightsTitle: {
+      color: theme.colors.foreground,
+      fontSize: 20,
+      fontWeight: "900",
+      marginTop: 4,
+    },
+    ownerLogo: {
+      alignItems: "center",
+      backgroundColor: theme.colors.gold,
+      borderRadius: 24,
+      height: 48,
+      justifyContent: "center",
+      width: 48,
+    },
+    ownerLogoText: {
+      color: theme.colors.foregroundInverse,
+      fontSize: 22,
+      fontWeight: "900",
+    },
+    ownerMetricRow: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 12,
+    },
+    ownerMetricValue: {
+      color: theme.colors.deepGold,
+      fontSize: 13,
+      fontWeight: "900",
+    },
+    ownerMutedActionText: {
+      color: theme.colors.mutedForeground,
+      fontSize: 11,
+      fontWeight: "900",
+    },
+    ownerOverviewCard: {
+      backgroundColor: theme.colors.cardElevated,
+      borderColor: theme.colors.border,
+      borderRadius: 22,
+      borderWidth: 1,
+      flexBasis: "47%",
+      flexGrow: 1,
+      padding: 14,
+    },
+    ownerOverviewDetail: {
+      color: theme.colors.mutedForeground,
+      fontSize: 11,
+      fontWeight: "800",
+      marginTop: 6,
+    },
+    ownerOverviewGrid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 10,
+    },
+    ownerOverviewLabel: {
+      color: theme.colors.foreground,
+      fontSize: 13,
+      fontWeight: "900",
+      marginTop: 6,
+    },
+    ownerOverviewValue: {
+      color: theme.colors.deepGold,
+      fontSize: 26,
+      fontWeight: "900",
+    },
+    ownerPanelCard: {
+      backgroundColor: theme.colors.card,
+      borderColor: theme.colors.border,
+      borderRadius: theme.radii.card,
+      borderWidth: 1,
+      gap: 12,
+      padding: 18,
+    },
+    ownerProgressFill: {
+      backgroundColor: theme.colors.gold,
+      borderRadius: 999,
+      height: 8,
+    },
+    ownerProgressTrack: {
+      backgroundColor: theme.colors.muted,
+      borderRadius: 999,
+      height: 8,
+      marginTop: 8,
+      overflow: "hidden",
+    },
+    ownerQuickAction: {
+      alignItems: "center",
+      backgroundColor: theme.colors.cardElevated,
+      borderColor: theme.colors.border,
+      borderRadius: 20,
+      borderWidth: 1,
+      flexBasis: "47%",
+      flexGrow: 1,
+      gap: 8,
+      padding: 14,
+    },
+    ownerQuickActionsCard: {
+      backgroundColor: theme.colors.card,
+      borderColor: theme.colors.border,
+      borderRadius: theme.radii.card,
+      borderWidth: 1,
+      gap: 14,
+      padding: 18,
+    },
+    ownerQuickGrid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 10,
+    },
+    ownerQuickIcon: {
+      color: theme.colors.gold,
+      fontSize: 22,
+      fontWeight: "900",
+    },
+    ownerQuickText: {
+      color: theme.colors.foreground,
+      fontSize: 12,
+      fontWeight: "900",
+      textAlign: "center",
+    },
+    ownerSafetyCard: {
+      backgroundColor: theme.colors.warningSoft,
+      borderColor: theme.colors.warning,
+      borderRadius: theme.radii.card,
+      borderWidth: 1,
+      padding: 18,
+    },
+    ownerStaffRow: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 12,
+    },
+    ownerStatusChip: {
+      backgroundColor: theme.colors.successSoft,
+      borderColor: theme.colors.success,
+      borderRadius: theme.radii.pill,
+      borderWidth: 1,
+      color: theme.colors.success,
+      fontSize: 11,
+      fontWeight: "900",
+      overflow: "hidden",
+      paddingHorizontal: 9,
+      paddingVertical: 6,
+    },
+    ownerTwoColumn: {
+      gap: 14,
+    },
+    ownerVerifiedBadge: {
+      backgroundColor: theme.colors.goldSoft,
+      borderColor: theme.colors.gold,
+      borderRadius: theme.radii.pill,
+      borderWidth: 1,
+      color: theme.colors.deepGold,
+      fontSize: 12,
+      fontWeight: "900",
+      overflow: "hidden",
+      paddingHorizontal: 10,
+      paddingVertical: 7,
     },
     paymentBody: {
       color: theme.colors.mutedForeground,
