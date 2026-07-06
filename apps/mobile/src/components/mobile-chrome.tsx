@@ -184,10 +184,10 @@ export function BottomTabBar({
             onPress={() => onTabPress(tab.id)}
             style={({ pressed }) => [
               styles.tabButton,
+              pressed && styles.tabButtonPressed,
               active && styles.tabButtonActive,
               isCenterAction && styles.centerTabButton,
               isCenterAction && active && styles.centerTabButtonActive,
-              pressed && styles.tabButtonPressed,
             ]}
           >
             <Text
