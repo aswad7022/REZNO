@@ -184,6 +184,36 @@ const filterChips = [
   { label: "للعوائل", selected: false },
 ];
 
+const bookingTimeline = [
+  { label: "تم اختيار الخدمة", time: "10:24 ص" },
+  { label: "تم تثبيت الوقت", time: "10:26 ص" },
+  { label: "جاهز للتأكيد", time: "الآن" },
+];
+
+const bookingStatusCards = [
+  {
+    action: "تعديل الموعد",
+    business: "Noura Beauty Lounge",
+    meta: "الخميس · 4:30 م · قص وتصفيف",
+    status: "upcoming",
+    statusLabel: "قادم",
+  },
+  {
+    action: "عرض الإيصال",
+    business: "Mat3am Gold",
+    meta: "الأحد الماضي · طاولة عائلية · مكتمل",
+    status: "completed",
+    statusLabel: "مكتمل",
+  },
+  {
+    action: "إعادة الحجز",
+    business: "Smile Studio Clinic",
+    meta: "الثلاثاء · استشارة · تم الإلغاء",
+    status: "cancelled",
+    statusLabel: "ملغي",
+  },
+];
+
 export default function App() {
   const colorScheme = useColorScheme();
   const [locale, setLocale] = useState<MobileLocale>(DEFAULT_LOCALE);
@@ -1167,8 +1197,11 @@ function BookingFlowScreen({
 
       <BookingSummaryCard isRtl={isRtl} styles={styles} />
       <ConfirmationCard isRtl={isRtl} styles={styles} />
+      <BookingReceiptCard isRtl={isRtl} styles={styles} />
+      <BookingTimelineCard isRtl={isRtl} styles={styles} />
+      <PolicySupportCard isRtl={isRtl} styles={styles} />
+      <BookingStatusBoard isRtl={isRtl} styles={styles} />
       <BookingsEmptyState isRtl={isRtl} styles={styles} />
-      <MyBookingCard isRtl={isRtl} styles={styles} />
     </>
   );
 }
@@ -1291,15 +1324,38 @@ function BookingSummaryCard({
   return (
     <View style={styles.paymentCard}>
       <Text style={[styles.screenEyebrow, isRtl && styles.rtlText]}>
-        ملخص وطريقة الدفع
+        ملخص الحجز
       </Text>
       <Text style={[styles.paymentTitle, isRtl && styles.rtlText]}>
-        قص وتصفيف · ليان · اليوم 4:30 م
+        قص وتصفيف فاخر · ليان · اليوم 4:30 م
       </Text>
       <Text style={[styles.paymentBody, isRtl && styles.rtlText]}>
-        طريقة تجريبية للعرض فقط: الدفع عند الحضور. لا يوجد تكامل دفع حقيقي في
-        هذه المرحلة.
+        الدفع عند الحضور كعنصر عرض فقط. لا يوجد تكامل دفع حقيقي أو إنشاء حجز
+        في هذه المرحلة.
       </Text>
+      <View style={styles.summaryGrid}>
+        <SummaryItem label="النشاط" value="Noura Beauty Lounge" styles={styles} />
+        <SummaryItem label="المختص" value="ليان" styles={styles} />
+        <SummaryItem label="الموقع" value="بغداد · الكرادة" styles={styles} />
+        <SummaryItem label="الطريقة" value="الدفع في المكان" styles={styles} />
+      </View>
+    </View>
+  );
+}
+
+function SummaryItem({
+  label,
+  styles,
+  value,
+}: {
+  label: string;
+  styles: MobileStyles;
+  value: string;
+}) {
+  return (
+    <View style={styles.summaryItem}>
+      <Text style={styles.summaryLabel}>{label}</Text>
+      <Text style={styles.summaryValue}>{value}</Text>
     </View>
   );
 }
@@ -1313,18 +1369,25 @@ function ConfirmationCard({
 }) {
   return (
     <View style={styles.confirmationCard}>
-      <Text style={styles.confirmationIcon}>✓</Text>
+      <View style={styles.confirmationIconWrap}>
+        <Text style={styles.confirmationIcon}>✓</Text>
+      </View>
       <Text style={[styles.confirmationTitle, isRtl && styles.rtlText]}>
-        تم تجهيز شاشة التأكيد
+        تم تجهيز تأكيد الحجز
       </Text>
       <Text style={[styles.confirmationBody, isRtl && styles.rtlText]}>
-        تعرض رقم حجز وهمي وحالة واضحة بدون إنشاء حجز أو إرسال إشعارات.
+        رقم التأكيد التجريبي RZ-2406-183. لا يتم إنشاء حجز حقيقي أو إرسال
+        إشعارات.
       </Text>
+      <View style={styles.confirmationActions}>
+        <Text style={styles.receiptAction}>إضافة للتقويم</Text>
+        <Text style={styles.receiptAction}>مشاركة الإيصال</Text>
+      </View>
     </View>
   );
 }
 
-function MyBookingCard({
+function BookingReceiptCard({
   isRtl,
   styles,
 }: {
@@ -1332,20 +1395,122 @@ function MyBookingCard({
   styles: MobileStyles;
 }) {
   return (
-    <View style={styles.myBookingCard}>
-      <Text style={[styles.myBookingStatus, isRtl && styles.rtlText]}>
-        حجز قادم
-      </Text>
-      <Text style={[styles.myBookingTitle, isRtl && styles.rtlText]}>
-        Noura Beauty Lounge
-      </Text>
-      <Text style={[styles.myBookingMeta, isRtl && styles.rtlText]}>
-        الخميس · 4:30 م · قص وتصفيف
-      </Text>
-      <View style={styles.bookingActions}>
-        <Text style={styles.editAction}>تعديل</Text>
-        <Text style={styles.cancelAction}>إلغاء</Text>
+    <View style={styles.receiptCard}>
+      <View style={styles.receiptHeader}>
+        <View>
+          <Text style={[styles.screenEyebrow, isRtl && styles.rtlText]}>
+            إيصال الحجز
+          </Text>
+          <Text style={[styles.receiptTitle, isRtl && styles.rtlText]}>
+            RZ-2406-183
+          </Text>
+        </View>
+        <Text style={styles.receiptStatus}>مؤكد</Text>
       </View>
+      <View style={styles.receiptLine} />
+      <SummaryItem label="الخدمة" value="قص وتصفيف فاخر" styles={styles} />
+      <SummaryItem label="التاريخ" value="الخميس، 06 يوليو" styles={styles} />
+      <SummaryItem label="الوقت" value="4:30 م" styles={styles} />
+      <SummaryItem label="الإجمالي" value="25,000 د.ع" styles={styles} />
+    </View>
+  );
+}
+
+function BookingTimelineCard({
+  isRtl,
+  styles,
+}: {
+  isRtl: boolean;
+  styles: MobileStyles;
+}) {
+  return (
+    <View style={styles.timelineCard}>
+      <Text style={[styles.screenEyebrow, isRtl && styles.rtlText]}>
+        مسار الحجز
+      </Text>
+      <Text style={[styles.timelineTitle, isRtl && styles.rtlText]}>
+        خطوات واضحة حتى الوصول
+      </Text>
+      {bookingTimeline.map((item, index) => (
+        <View key={item.label} style={styles.timelineItem}>
+          <View style={styles.timelineDot}>
+            <Text style={styles.timelineDotText}>{index + 1}</Text>
+          </View>
+          <View style={styles.rowCopy}>
+            <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>
+              {item.label}
+            </Text>
+            <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>
+              {item.time}
+            </Text>
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function PolicySupportCard({
+  isRtl,
+  styles,
+}: {
+  isRtl: boolean;
+  styles: MobileStyles;
+}) {
+  return (
+    <View style={styles.policyCard}>
+      <Text style={[styles.integrationTitle, isRtl && styles.rtlText]}>
+        سياسة آمنة للعرض
+      </Text>
+      <Text style={[styles.integrationBody, isRtl && styles.rtlText]}>
+        أزرار التعديل والإلغاء والدعم في هذه الشاشة عناصر بصرية فقط. لا توجد
+        عمليات حقيقية على الحجوزات.
+      </Text>
+      <View style={styles.supportRow}>
+        <Text style={styles.supportPill}>مساعدة</Text>
+        <Text style={styles.supportPill}>سياسة الإلغاء</Text>
+        <Text style={styles.supportPill}>تواصل مع النشاط</Text>
+      </View>
+    </View>
+  );
+}
+
+function BookingStatusBoard({
+  isRtl,
+  styles,
+}: {
+  isRtl: boolean;
+  styles: MobileStyles;
+}) {
+  return (
+    <View style={styles.statusBoard}>
+      <SectionHeader isRtl={isRtl} styles={styles} title="حجوزاتي" />
+      {bookingStatusCards.map((booking) => (
+        <View key={booking.business} style={styles.statusBookingCard}>
+          <View style={styles.statusBookingHeader}>
+            <Text
+              style={[
+                styles.statusChip,
+                booking.status === "completed" && styles.statusChipCompleted,
+                booking.status === "cancelled" && styles.statusChipCancelled,
+              ]}
+            >
+              {booking.statusLabel}
+            </Text>
+            <Text style={styles.receiptAction}>{booking.action}</Text>
+          </View>
+          <Text style={[styles.myBookingTitle, isRtl && styles.rtlText]}>
+            {booking.business}
+          </Text>
+          <Text style={[styles.myBookingMeta, isRtl && styles.rtlText]}>
+            {booking.meta}
+          </Text>
+          <View style={styles.bookingActions}>
+            <Text style={styles.editAction}>عرض التفاصيل</Text>
+            <Text style={styles.cancelAction}>إلغاء بصري</Text>
+          </View>
+        </View>
+      ))}
     </View>
   );
 }
@@ -1641,6 +1806,12 @@ const createStyles = (theme: MobileTheme) =>
       gap: 16,
       marginTop: 14,
     },
+    bookingReceiptActionRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+      marginTop: 14,
+    },
     bookingHeroAccent: {
       backgroundColor: theme.colors.goldSoft,
       borderRadius: 999,
@@ -1926,10 +2097,25 @@ const createStyles = (theme: MobileTheme) =>
       borderWidth: 1,
       padding: 22,
     },
+    confirmationActions: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 10,
+      justifyContent: "center",
+      marginTop: 16,
+    },
     confirmationIcon: {
-      color: theme.colors.success,
-      fontSize: 34,
+      color: theme.colors.foregroundInverse,
+      fontSize: 28,
       fontWeight: "900",
+    },
+    confirmationIconWrap: {
+      alignItems: "center",
+      backgroundColor: theme.colors.success,
+      borderRadius: 30,
+      height: 60,
+      justifyContent: "center",
+      width: 60,
     },
     confirmationTitle: {
       color: theme.colors.foreground,
@@ -2547,6 +2733,13 @@ const createStyles = (theme: MobileTheme) =>
       fontWeight: "900",
       marginTop: 6,
     },
+    policyCard: {
+      backgroundColor: theme.colors.warningSoft,
+      borderColor: theme.colors.warning,
+      borderRadius: theme.radii.card,
+      borderWidth: 1,
+      padding: 18,
+    },
     priceText: {
       color: theme.colors.deepGold,
       fontSize: 13,
@@ -2642,6 +2835,57 @@ const createStyles = (theme: MobileTheme) =>
     },
     recommendedList: {
       gap: 10,
+    },
+    receiptAction: {
+      backgroundColor: theme.colors.goldSoft,
+      borderRadius: theme.radii.pill,
+      color: theme.colors.deepGold,
+      fontSize: 12,
+      fontWeight: "900",
+      overflow: "hidden",
+      paddingHorizontal: 10,
+      paddingVertical: 7,
+    },
+    receiptCard: {
+      backgroundColor: theme.colors.cardElevated,
+      borderColor: theme.colors.border,
+      borderRadius: theme.radii.card,
+      borderWidth: 1,
+      gap: 12,
+      padding: 18,
+      shadowColor: theme.colors.shadow,
+      shadowOffset: { height: 14, width: 0 },
+      shadowOpacity: theme.isDark ? 0.24 : 0.08,
+      shadowRadius: 22,
+    },
+    receiptHeader: {
+      alignItems: "center",
+      flexDirection: "row",
+      justifyContent: "space-between",
+    },
+    receiptLine: {
+      borderColor: theme.colors.border,
+      borderStyle: "dashed",
+      borderTopWidth: 1,
+      marginVertical: 2,
+    },
+    receiptStatus: {
+      backgroundColor: theme.colors.successSoft,
+      borderColor: theme.colors.success,
+      borderRadius: theme.radii.pill,
+      borderWidth: 1,
+      color: theme.colors.success,
+      fontSize: 12,
+      fontWeight: "900",
+      overflow: "hidden",
+      paddingHorizontal: 10,
+      paddingVertical: 7,
+    },
+    receiptTitle: {
+      color: theme.colors.foreground,
+      fontSize: 22,
+      fontWeight: "900",
+      marginTop: 4,
     },
     ratingPill: {
       backgroundColor: theme.colors.goldSoft,
@@ -2910,6 +3154,44 @@ const createStyles = (theme: MobileTheme) =>
       fontSize: 11,
       fontWeight: "900",
     },
+    statusBoard: {
+      backgroundColor: theme.colors.card,
+      borderColor: theme.colors.border,
+      borderRadius: theme.radii.card,
+      borderWidth: 1,
+      gap: 12,
+      padding: 18,
+    },
+    statusBookingCard: {
+      backgroundColor: theme.colors.cardElevated,
+      borderColor: theme.colors.border,
+      borderRadius: 22,
+      borderWidth: 1,
+      padding: 14,
+    },
+    statusBookingHeader: {
+      alignItems: "center",
+      flexDirection: "row",
+      justifyContent: "space-between",
+    },
+    statusChip: {
+      backgroundColor: theme.colors.goldSoft,
+      borderRadius: theme.radii.pill,
+      color: theme.colors.deepGold,
+      fontSize: 12,
+      fontWeight: "900",
+      overflow: "hidden",
+      paddingHorizontal: 10,
+      paddingVertical: 7,
+    },
+    statusChipCancelled: {
+      backgroundColor: theme.colors.dangerSoft,
+      color: theme.colors.danger,
+    },
+    statusChipCompleted: {
+      backgroundColor: theme.colors.successSoft,
+      color: theme.colors.success,
+    },
     stateAction: {
       marginTop: 18,
     },
@@ -2943,6 +3225,49 @@ const createStyles = (theme: MobileTheme) =>
     },
     stateIconWarning: {
       backgroundColor: theme.colors.warningSoft,
+    },
+    summaryGrid: {
+      gap: 10,
+      marginTop: 16,
+    },
+    summaryItem: {
+      alignItems: "center",
+      backgroundColor: theme.colors.cardElevated,
+      borderColor: theme.colors.border,
+      borderRadius: 18,
+      borderWidth: 1,
+      flexDirection: "row",
+      justifyContent: "space-between",
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+    },
+    summaryLabel: {
+      color: theme.colors.mutedForeground,
+      fontSize: 12,
+      fontWeight: "800",
+    },
+    summaryValue: {
+      color: theme.colors.foreground,
+      fontSize: 13,
+      fontWeight: "900",
+      maxWidth: "58%",
+      textAlign: "right",
+    },
+    supportPill: {
+      backgroundColor: theme.colors.cardElevated,
+      borderRadius: theme.radii.pill,
+      color: theme.colors.warning,
+      fontSize: 12,
+      fontWeight: "900",
+      overflow: "hidden",
+      paddingHorizontal: 10,
+      paddingVertical: 7,
+    },
+    supportRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+      marginTop: 14,
     },
     stepBody: {
       color: theme.colors.mutedForeground,
@@ -3051,6 +3376,38 @@ const createStyles = (theme: MobileTheme) =>
     },
     timeSlotTextActive: {
       color: theme.colors.foregroundInverse,
+    },
+    timelineCard: {
+      backgroundColor: theme.colors.card,
+      borderColor: theme.colors.border,
+      borderRadius: theme.radii.card,
+      borderWidth: 1,
+      gap: 14,
+      padding: 18,
+    },
+    timelineDot: {
+      alignItems: "center",
+      backgroundColor: theme.colors.gold,
+      borderRadius: 16,
+      height: 32,
+      justifyContent: "center",
+      width: 32,
+    },
+    timelineDotText: {
+      color: theme.colors.foregroundInverse,
+      fontSize: 12,
+      fontWeight: "900",
+    },
+    timelineItem: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 12,
+    },
+    timelineTitle: {
+      color: theme.colors.foreground,
+      fontSize: 20,
+      fontWeight: "900",
+      marginTop: 4,
     },
     voiceButton: {
       alignItems: "center",
