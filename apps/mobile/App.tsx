@@ -355,6 +355,52 @@ const notificationPreferenceRows = [
   { enabled: true, label: "تحديثات النظام" },
 ];
 
+const profileOverviewStats = [
+  { label: "الحجوزات", value: "12", meta: "عرض تجريبي" },
+  { label: "الأعمال", value: "2", meta: "عضويات مرئية" },
+  { label: "النقاط", value: "VIP", meta: "حالة مستقبلية" },
+];
+
+const languagePreferenceRows = [
+  { label: "العربية", meta: "الواجهة الأساسية", selected: true },
+  { label: "English", meta: "Available visually", selected: false },
+  { label: "کوردی", meta: "پشتیوانی کراوە", selected: false },
+];
+
+const themePreferenceRows = [
+  { label: "حسب النظام", meta: "يتبع إعدادات الجهاز", selected: true },
+  { label: "فاتح", meta: "كريمي وهادئ", selected: false },
+  { label: "داكن", meta: "أسود فاخر مع ذهب", selected: false },
+];
+
+const accountNotificationRows = [
+  { enabled: true, label: "تذكيرات الحجز", meta: "قبل الموعد بوقت مناسب" },
+  { enabled: true, label: "رسائل الأعمال", meta: "ردود وتحديثات الحجز" },
+  { enabled: false, label: "العروض", meta: "مرئية فقط ولا تطلب صلاحيات" },
+];
+
+const privacySecurityRows = [
+  {
+    body: "بيانات الحساب والجلسات ستدار لاحقاً عبر تكامل auth معتمد.",
+    label: "أمان الجلسة",
+  },
+  {
+    body: "ملكية البيانات والخصوصية واضحة قبل أي مزامنة حقيقية.",
+    label: "خصوصية البيانات",
+  },
+];
+
+const helpFaqRows = [
+  "كيف أتابع حجزي؟",
+  "كيف أضيف عملي لاحقاً؟",
+  "متى تتوفر إعدادات الحساب الحقيقية؟",
+];
+
+const accountManagementActions = [
+  { label: "إدارة الحساب لاحقاً", tone: "secondary" },
+  { label: "مركز المساعدة", tone: "primary" },
+];
+
 export default function App() {
   const colorScheme = useColorScheme();
   const [locale, setLocale] = useState<MobileLocale>(DEFAULT_LOCALE);
@@ -2080,19 +2126,44 @@ function AccountScreen({
   return (
     <>
       <View style={styles.accountHeroCard}>
-        <View style={styles.accountAvatar}>
-          <Text style={styles.accountAvatarText}>ر</Text>
+        <View style={styles.profileHeroTopRow}>
+          <View style={styles.accountAvatar}>
+            <Text style={styles.accountAvatarText}>ر</Text>
+          </View>
+          <View style={styles.profileStatusStack}>
+            <View style={styles.statusBadge}>
+              <Text style={styles.statusBadgeText}>حساب آمن</Text>
+            </View>
+            <Text style={[styles.profileMembershipText, isRtl && styles.rtlText]}>
+              عضو REZNO الموحد
+            </Text>
+          </View>
         </View>
         <Text style={[styles.screenEyebrow, isRtl && styles.rtlText]}>
-          الحساب
+          الملف الشخصي
         </Text>
         <Text style={[styles.screenTitle, isRtl && styles.rtlText]}>
-          حساب REZNO الموحد
+          إعداداتك وتجربتك في مكان واحد
         </Text>
         <Text style={[styles.screenDescription, isRtl && styles.rtlText]}>
-          واجهة حساب أصلية وآمنة للعرض فقط. تسجيل الدخول الحقيقي وربط الجلسة
-          يبقيان لسبرنت تكامل معتمد.
+          معاينة آمنة لحساب العميل والتفضيلات. لا توجد قراءة مستخدم حقيقية أو
+          تغيير جلسة في هذه المرحلة.
         </Text>
+        <View style={styles.profileStatsGrid}>
+          {profileOverviewStats.map((stat) => (
+            <View key={stat.label} style={styles.profileStatCard}>
+              <Text style={[styles.profileStatValue, isRtl && styles.rtlText]}>
+                {stat.value}
+              </Text>
+              <Text style={[styles.profileStatLabel, isRtl && styles.rtlText]}>
+                {stat.label}
+              </Text>
+              <Text style={[styles.profileStatMeta, isRtl && styles.rtlText]}>
+                {stat.meta}
+              </Text>
+            </View>
+          ))}
+        </View>
         <View style={styles.accountActionRow}>
           {accountActions.map((action) => (
             <Pressable
@@ -2118,23 +2189,171 @@ function AccountScreen({
       </View>
 
       <View style={styles.settingsCard}>
-        <Text style={[styles.integrationTitle, isRtl && styles.rtlText]}>
-          اللغة والإعدادات
+        <Text style={[styles.cardTitle, isRtl && styles.rtlText]}>
+          اللغة والمظهر
         </Text>
-        <Text style={[styles.integrationBody, isRtl && styles.rtlText]}>
-          التبديل بين العربية والإنجليزية والكردية متاح من أعلى الشاشة بدون حفظ
-          حالة دائمة.
+        <Text style={[styles.cardBody, isRtl && styles.rtlText]}>
+          صفوف بصرية فقط لتوضيح تجربة التفضيلات المستقبلية بدون حفظ دائم أو
+          صلاحيات جهاز.
+        </Text>
+        <View style={styles.preferencesGroup}>
+          <Text style={[styles.preferenceGroupTitle, isRtl && styles.rtlText]}>
+            اللغة
+          </Text>
+          {languagePreferenceRows.map((row) => (
+            <View key={row.label} style={styles.accountPreferenceRow}>
+              <View
+                style={[
+                  styles.accountPreferenceDot,
+                  row.selected && styles.accountPreferenceDotActive,
+                ]}
+              />
+              <View style={styles.preferenceCopy}>
+                <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>
+                  {row.label}
+                </Text>
+                <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>
+                  {row.meta}
+                </Text>
+              </View>
+              <Text style={styles.preferenceChevron}>
+                {row.selected ? "✓" : "›"}
+              </Text>
+            </View>
+          ))}
+        </View>
+        <View style={styles.preferencesGroup}>
+          <Text style={[styles.preferenceGroupTitle, isRtl && styles.rtlText]}>
+            النمط
+          </Text>
+          {themePreferenceRows.map((row) => (
+            <View key={row.label} style={styles.accountPreferenceRow}>
+              <View
+                style={[
+                  styles.accountPreferenceDot,
+                  row.selected && styles.accountPreferenceDotActive,
+                ]}
+              />
+              <View style={styles.preferenceCopy}>
+                <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>
+                  {row.label}
+                </Text>
+                <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>
+                  {row.meta}
+                </Text>
+              </View>
+              <Text style={styles.preferenceChevron}>
+                {row.selected ? "✓" : "›"}
+              </Text>
+            </View>
+          ))}
+        </View>
+      </View>
+
+      <View style={styles.preferencesPanel}>
+        <SectionHeader isRtl={isRtl} styles={styles} title="تفضيلات الإشعارات" />
+        {accountNotificationRows.map((row) => (
+          <View key={row.label} style={styles.preferenceRow}>
+            <View style={styles.preferenceCopy}>
+              <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>
+                {row.label}
+              </Text>
+              <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>
+                {row.meta}
+              </Text>
+            </View>
+            <View
+              style={[
+                styles.preferenceToggle,
+                row.enabled && styles.preferenceToggleActive,
+              ]}
+            >
+              <View
+                style={[
+                  styles.preferenceKnob,
+                  row.enabled && styles.preferenceKnobActive,
+                ]}
+              />
+            </View>
+          </View>
+        ))}
+        <Text style={[styles.preferenceNote, isRtl && styles.rtlText]}>
+          المفاتيح بصرية فقط ولا تطلب إذن إشعارات أو تحفظ تفضيلات.
         </Text>
       </View>
 
       <View style={styles.privacyCard}>
-        <Text style={[styles.integrationTitle, isRtl && styles.rtlText]}>
+        <Text style={[styles.cardTitle, isRtl && styles.rtlText]}>
           الأمان والخصوصية
         </Text>
-        <Text style={[styles.integrationBody, isRtl && styles.rtlText]}>
-          لا توجد كلمات مرور، رموز جلسة، أو بيانات حساسة داخل هذه الواجهة
-          التجريبية.
+        <Text style={[styles.cardBody, isRtl && styles.rtlText]}>
+          بطاقات توضح اتجاه الخصوصية بدون كشف بيانات أو رموز أو جلسات.
         </Text>
+        <View style={styles.privacyGrid}>
+          {privacySecurityRows.map((row) => (
+            <View key={row.label} style={styles.privacyMiniCard}>
+              <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>
+                {row.label}
+              </Text>
+              <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>
+                {row.body}
+              </Text>
+              <Text style={[styles.safeActionText, isRtl && styles.rtlText]}>
+                إدارة لاحقاً
+              </Text>
+            </View>
+          ))}
+        </View>
+        <Text style={[styles.dataOwnershipNote, isRtl && styles.rtlText]}>
+          سيبقى المستخدم مالكاً لبياناته، وإجراءات التصدير أو الحذف تحتاج
+          سبرنت صلاحيات معتمد قبل أي تنفيذ حقيقي.
+        </Text>
+      </View>
+
+      <View style={styles.supportCard}>
+        <View style={styles.supportHeaderRow}>
+          <View style={styles.supportHeaderCopy}>
+            <Text style={[styles.cardTitle, isRtl && styles.rtlText]}>
+              المساعدة والدعم
+            </Text>
+            <Text style={[styles.cardBody, isRtl && styles.rtlText]}>
+              مركز مساعدة بصري فقط، بدون رسائل أو تذاكر دعم حقيقية.
+            </Text>
+          </View>
+          <View style={styles.supportIconBubble}>
+            <Text style={styles.supportIconText}>?</Text>
+          </View>
+        </View>
+        {helpFaqRows.map((row) => (
+          <View key={row} style={styles.faqRow}>
+            <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>
+              {row}
+            </Text>
+            <Text style={styles.preferenceChevron}>›</Text>
+          </View>
+        ))}
+        <View style={styles.accountActionRow}>
+          {accountManagementActions.map((action) => (
+            <Pressable
+              accessibilityRole="button"
+              disabled
+              key={action.label}
+              style={[
+                styles.accountActionButton,
+                action.tone === "primary" && styles.accountActionButtonPrimary,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.accountActionText,
+                  action.tone === "primary" && styles.accountActionTextPrimary,
+                ]}
+              >
+                {action.label}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
       </View>
 
       <View style={styles.integrationCard}>
@@ -2289,6 +2508,28 @@ const createStyles = (theme: MobileTheme) =>
       shadowOffset: { height: 16, width: 0 },
       shadowOpacity: theme.isDark ? 0.3 : 0.08,
       shadowRadius: 26,
+    },
+    accountPreferenceDot: {
+      backgroundColor: theme.colors.muted,
+      borderColor: theme.colors.border,
+      borderRadius: 999,
+      borderWidth: 1,
+      height: 14,
+      width: 14,
+    },
+    accountPreferenceDotActive: {
+      backgroundColor: theme.colors.gold,
+      borderColor: theme.colors.gold,
+    },
+    accountPreferenceRow: {
+      alignItems: "center",
+      backgroundColor: theme.colors.cardElevated,
+      borderColor: theme.colors.border,
+      borderRadius: 18,
+      borderWidth: 1,
+      flexDirection: "row",
+      gap: 12,
+      padding: 12,
     },
     apiText: {
       color: theme.colors.warning,
@@ -2496,6 +2737,18 @@ const createStyles = (theme: MobileTheme) =>
       shadowOpacity: 0.12,
       shadowRadius: 22,
     },
+    cardBody: {
+      color: theme.colors.mutedForeground,
+      fontSize: 14,
+      fontWeight: "700",
+      lineHeight: 22,
+      marginTop: 8,
+    },
+    cardTitle: {
+      color: theme.colors.foreground,
+      fontSize: 17,
+      fontWeight: "900",
+    },
     categoryBadge: {
       backgroundColor: theme.colors.goldSoft,
       borderRadius: theme.radii.pill,
@@ -2635,6 +2888,12 @@ const createStyles = (theme: MobileTheme) =>
       gap: theme.spacing.md,
       paddingBottom: 132,
       paddingHorizontal: 18,
+    },
+    dataOwnershipNote: {
+      color: theme.colors.success,
+      fontSize: 12,
+      fontWeight: "800",
+      lineHeight: 19,
     },
     disabledButton: {
       backgroundColor: theme.colors.disabled,
@@ -2858,6 +3117,16 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.gold,
       fontSize: 20,
       fontWeight: "900",
+    },
+    faqRow: {
+      alignItems: "center",
+      backgroundColor: theme.colors.cardElevated,
+      borderColor: theme.colors.border,
+      borderRadius: 18,
+      borderWidth: 1,
+      flexDirection: "row",
+      justifyContent: "space-between",
+      padding: 14,
     },
     filterButton: {
       alignItems: "center",
@@ -3759,7 +4028,19 @@ const createStyles = (theme: MobileTheme) =>
       borderColor: theme.colors.success,
       borderRadius: 24,
       borderWidth: 1,
+      gap: 14,
       padding: 18,
+    },
+    privacyGrid: {
+      gap: 10,
+      marginTop: 4,
+    },
+    privacyMiniCard: {
+      backgroundColor: theme.colors.card,
+      borderColor: theme.colors.border,
+      borderRadius: 18,
+      borderWidth: 1,
+      padding: 14,
     },
     preferenceKnob: {
       backgroundColor: theme.colors.mutedForeground,
@@ -3778,6 +4059,23 @@ const createStyles = (theme: MobileTheme) =>
       lineHeight: 18,
       marginTop: 4,
     },
+    preferenceChevron: {
+      color: theme.colors.gold,
+      fontSize: 20,
+      fontWeight: "900",
+    },
+    preferenceCopy: {
+      flex: 1,
+    },
+    preferenceGroupTitle: {
+      color: theme.colors.deepGold,
+      fontSize: 13,
+      fontWeight: "900",
+    },
+    preferencesGroup: {
+      gap: 10,
+      marginTop: 16,
+    },
     preferenceRow: {
       alignItems: "center",
       backgroundColor: theme.colors.cardElevated,
@@ -3785,6 +4083,7 @@ const createStyles = (theme: MobileTheme) =>
       borderRadius: 18,
       borderWidth: 1,
       flexDirection: "row",
+      gap: 12,
       justifyContent: "space-between",
       padding: 12,
     },
@@ -3805,6 +4104,53 @@ const createStyles = (theme: MobileTheme) =>
     },
     preferenceToggleActive: {
       backgroundColor: theme.colors.gold,
+    },
+    profileHeroTopRow: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 12,
+      justifyContent: "space-between",
+      marginBottom: 14,
+    },
+    profileMembershipText: {
+      color: theme.colors.mutedForeground,
+      fontSize: 12,
+      fontWeight: "800",
+      marginTop: 6,
+    },
+    profileStatCard: {
+      backgroundColor: theme.colors.cardElevated,
+      borderColor: theme.colors.border,
+      borderRadius: 18,
+      borderWidth: 1,
+      flex: 1,
+      padding: 12,
+    },
+    profileStatLabel: {
+      color: theme.colors.foreground,
+      fontSize: 12,
+      fontWeight: "900",
+      marginTop: 4,
+    },
+    profileStatMeta: {
+      color: theme.colors.mutedForeground,
+      fontSize: 10,
+      fontWeight: "700",
+      marginTop: 3,
+    },
+    profileStatsGrid: {
+      flexDirection: "row",
+      gap: 8,
+      marginTop: 18,
+    },
+    profileStatValue: {
+      color: theme.colors.deepGold,
+      fontSize: 18,
+      fontWeight: "900",
+    },
+    profileStatusStack: {
+      alignItems: "flex-end",
+      flex: 1,
     },
     primaryButton: {
       alignItems: "center",
@@ -4061,6 +4407,12 @@ const createStyles = (theme: MobileTheme) =>
       fontSize: 16,
       fontWeight: "900",
     },
+    safeActionText: {
+      color: theme.colors.deepGold,
+      fontSize: 12,
+      fontWeight: "900",
+      marginTop: 10,
+    },
     screenDescription: {
       color: theme.colors.mutedForeground,
       fontSize: 15,
@@ -4205,6 +4557,36 @@ const createStyles = (theme: MobileTheme) =>
       borderRadius: 24,
       borderWidth: 1,
       padding: 18,
+    },
+    supportCard: {
+      backgroundColor: theme.colors.card,
+      borderColor: theme.colors.border,
+      borderRadius: theme.radii.card,
+      borderWidth: 1,
+      gap: 12,
+      padding: 18,
+    },
+    supportHeaderCopy: {
+      flex: 1,
+    },
+    supportHeaderRow: {
+      alignItems: "flex-start",
+      flexDirection: "row",
+      gap: 12,
+      justifyContent: "space-between",
+    },
+    supportIconBubble: {
+      alignItems: "center",
+      backgroundColor: theme.colors.goldSoft,
+      borderRadius: 18,
+      height: 36,
+      justifyContent: "center",
+      width: 36,
+    },
+    supportIconText: {
+      color: theme.colors.deepGold,
+      fontSize: 18,
+      fontWeight: "900",
     },
     shell: {
       backgroundColor: theme.colors.background,
