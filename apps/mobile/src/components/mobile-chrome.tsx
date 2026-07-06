@@ -68,8 +68,16 @@ export function ScreenHeader({
           <Text style={styles.logoText}>R</Text>
         </View>
         <View style={styles.brandCopy}>
-          <Text style={[styles.brandName, isRtl && styles.rtlText]}>REZNO</Text>
-          <Text style={[styles.brandTagline, isRtl && styles.rtlText]}>
+          <Text
+            numberOfLines={1}
+            style={[styles.brandName, isRtl && styles.rtlText]}
+          >
+            REZNO
+          </Text>
+          <Text
+            numberOfLines={2}
+            style={[styles.brandTagline, isRtl && styles.rtlText]}
+          >
             {text.appTagline}
           </Text>
         </View>
@@ -92,6 +100,7 @@ export function ScreenHeader({
             ]}
           >
             <Text
+              numberOfLines={1}
               style={[
                 styles.localeButtonText,
                 item === locale && styles.localeButtonTextActive,

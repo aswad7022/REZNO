@@ -2416,10 +2416,12 @@ const createStyles = (theme: MobileTheme) =>
     },
     brandCopy: {
       flex: 1,
+      minWidth: 0,
     },
     brandName: {
       color: theme.colors.foreground,
       fontSize: 22,
+      flexShrink: 1,
       fontWeight: "900",
       letterSpacing: 1,
     },
@@ -2432,6 +2434,8 @@ const createStyles = (theme: MobileTheme) =>
     brandTagline: {
       color: theme.colors.mutedForeground,
       fontSize: 12,
+      flexShrink: 1,
+      lineHeight: 16,
       marginTop: 2,
     },
     businessBody: {
@@ -2453,6 +2457,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     businessCopy: {
       flex: 1,
+      flexShrink: 1,
+      minWidth: 0,
     },
     businessFooter: {
       alignItems: "center",
@@ -2496,6 +2502,8 @@ const createStyles = (theme: MobileTheme) =>
     businessMeta: {
       color: theme.colors.mutedForeground,
       fontSize: 13,
+      flexShrink: 1,
+      lineHeight: 19,
       marginTop: 4,
     },
     businessMetric: {
@@ -2511,7 +2519,9 @@ const createStyles = (theme: MobileTheme) =>
     businessName: {
       color: theme.colors.foreground,
       fontSize: 18,
+      flexShrink: 1,
       fontWeight: "900",
+      lineHeight: 23,
     },
     businessStatusBadge: {
       alignSelf: "flex-start",
@@ -2530,6 +2540,7 @@ const createStyles = (theme: MobileTheme) =>
     businessTitleRow: {
       alignItems: "flex-start",
       flexDirection: "row",
+      flexWrap: "wrap",
       gap: 12,
       justifyContent: "space-between",
     },
@@ -2825,6 +2836,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     dateStrip: {
       flexDirection: "row",
+      flexWrap: "wrap",
       gap: 10,
     },
     detailCard: {
@@ -2865,6 +2877,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     detailMeta: {
       color: theme.colors.mutedForeground,
+      flexShrink: 1,
       fontSize: 14,
       lineHeight: 21,
       marginTop: 7,
@@ -2876,6 +2889,7 @@ const createStyles = (theme: MobileTheme) =>
       borderRadius: mobileRadii.listCard,
       borderWidth: 1,
       flexDirection: "row",
+      flexWrap: "wrap",
       gap: 12,
       justifyContent: "space-between",
       margin: 16,
@@ -2887,7 +2901,9 @@ const createStyles = (theme: MobileTheme) =>
     },
     detailServiceMeta: {
       color: theme.colors.mutedForeground,
+      flexShrink: 1,
       fontSize: 12,
+      lineHeight: 18,
       marginTop: 4,
     },
     detailServicePrice: {
@@ -2898,7 +2914,9 @@ const createStyles = (theme: MobileTheme) =>
     detailServiceTitle: {
       color: theme.colors.foreground,
       fontSize: 15,
+      flexShrink: 1,
       fontWeight: "900",
+      lineHeight: 20,
     },
     detailStat: {
       backgroundColor: theme.colors.cardElevated,
@@ -3072,6 +3090,7 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.deepGold,
       fontSize: 12,
       fontWeight: "900",
+      textAlign: "center",
     },
     filterChipTextSelected: {
       color: theme.colors.foregroundInverse,
@@ -3192,10 +3211,13 @@ const createStyles = (theme: MobileTheme) =>
       fontWeight: "900",
     },
     localeButton: {
+      alignItems: "center",
       backgroundColor: theme.colors.muted,
       borderColor: theme.colors.border,
       borderRadius: theme.radii.pill,
       borderWidth: 1,
+      justifyContent: "center",
+      minWidth: 42,
       paddingHorizontal: 10,
       paddingVertical: 7,
     },
@@ -3211,12 +3233,15 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.mutedForeground,
       fontSize: 11,
       fontWeight: "800",
+      lineHeight: 14,
     },
     localeButtonTextActive: {
       color: theme.colors.foregroundInverse,
     },
     localeRow: {
+      alignItems: "center",
       flexDirection: "row",
+      flexShrink: 0,
       gap: 6,
     },
     locationDot: {
@@ -3711,6 +3736,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     ownerBusinessMeta: {
       color: theme.colors.mutedForeground,
+      flexShrink: 1,
       fontSize: 13,
       lineHeight: 20,
       marginTop: 4,
@@ -3718,7 +3744,9 @@ const createStyles = (theme: MobileTheme) =>
     ownerBusinessName: {
       color: theme.colors.foreground,
       fontSize: 21,
+      flexShrink: 1,
       fontWeight: "900",
+      lineHeight: 27,
       marginTop: 4,
     },
     ownerCustomerAvatar: {
@@ -4020,6 +4048,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     preferenceCopy: {
       flex: 1,
+      flexShrink: 1,
+      minWidth: 0,
     },
     preferenceGroupTitle: {
       color: theme.colors.deepGold,
@@ -4311,6 +4341,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     rowCopy: {
       flex: 1,
+      flexShrink: 1,
+      minWidth: 0,
     },
     rowIcon: {
       alignItems: "center",
@@ -4328,6 +4360,8 @@ const createStyles = (theme: MobileTheme) =>
     rowMeta: {
       color: theme.colors.mutedForeground,
       fontSize: 13,
+      flexShrink: 1,
+      lineHeight: 19,
       marginTop: 4,
     },
     rowPrice: {
@@ -4338,7 +4372,9 @@ const createStyles = (theme: MobileTheme) =>
     rowTitle: {
       color: theme.colors.foreground,
       fontSize: 15,
+      flexShrink: 1,
       fontWeight: "900",
+      lineHeight: 20,
     },
     rtlText: {
       textAlign: "right",
@@ -4465,6 +4501,8 @@ const createStyles = (theme: MobileTheme) =>
       flex: 1,
       fontSize: 14,
       fontWeight: "700",
+      lineHeight: 20,
+      minWidth: 0,
     },
     searchChip: {
       backgroundColor: theme.colors.goldSoft,
@@ -4566,6 +4604,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     supportHeaderCopy: {
       flex: 1,
+      flexShrink: 1,
+      minWidth: 0,
     },
     supportHeaderRow: {
       alignItems: "flex-start",
@@ -4693,13 +4733,18 @@ const createStyles = (theme: MobileTheme) =>
     },
     summaryLabel: {
       color: theme.colors.mutedForeground,
+      flexShrink: 1,
       fontSize: 12,
       fontWeight: "800",
+      lineHeight: 17,
+      maxWidth: "42%",
     },
     summaryValue: {
       color: theme.colors.foreground,
+      flexShrink: 1,
       fontSize: 13,
       fontWeight: "900",
+      lineHeight: 18,
       maxWidth: "58%",
       textAlign: "right",
     },
@@ -4814,7 +4859,9 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.mutedForeground,
       fontSize: 10,
       fontWeight: "800",
+      lineHeight: 12,
       maxWidth: 58,
+      minWidth: 46,
       textAlign: "center",
     },
     tabLabelActive: {
@@ -4831,10 +4878,12 @@ const createStyles = (theme: MobileTheme) =>
       gap: 10,
     },
     timeSlot: {
+      alignItems: "center",
       backgroundColor: theme.colors.card,
       borderColor: theme.colors.border,
       borderRadius: theme.radii.pill,
       borderWidth: 1,
+      minWidth: 86,
       paddingHorizontal: 18,
       paddingVertical: 12,
     },
