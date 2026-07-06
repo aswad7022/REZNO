@@ -145,6 +145,17 @@ const dateOptions = [
 
 const businessTabs = ["الخدمات", "التقييمات", "حول"];
 
+const onboardingHighlights = [
+  "حجوزات",
+  "رسائل",
+  "أعمال",
+];
+
+const accountActions = [
+  { label: "تسجيل الدخول", tone: "primary" },
+  { label: "إنشاء حساب", tone: "secondary" },
+];
+
 export default function App() {
   const colorScheme = useColorScheme();
   const [locale, setLocale] = useState<MobileLocale>(DEFAULT_LOCALE);
@@ -321,6 +332,7 @@ function CustomerHomeScreen({
 }) {
   return (
     <>
+      <WelcomeOnboardingCard isRtl={isRtl} styles={styles} />
       <HeroCard isRtl={isRtl} styles={styles} />
       <SearchBar isRtl={isRtl} styles={styles} />
       <CategoryGrid styles={styles} />
@@ -343,6 +355,53 @@ function CustomerHomeScreen({
         ))}
       </View>
     </>
+  );
+}
+
+function WelcomeOnboardingCard({
+  isRtl,
+  styles,
+}: {
+  isRtl: boolean;
+  styles: MobileStyles;
+}) {
+  return (
+    <View style={styles.onboardingCard}>
+      <View style={styles.onboardingGlow} />
+      <View style={styles.onboardingBrandRow}>
+        <View style={styles.onboardingLogo}>
+          <Text style={styles.onboardingLogoText}>R</Text>
+        </View>
+        <View style={styles.rowCopy}>
+          <Text style={[styles.onboardingBrand, isRtl && styles.rtlText]}>
+            REZNO
+          </Text>
+          <Text style={[styles.onboardingSlogan, isRtl && styles.rtlText]}>
+            One Platform. Every Booking.
+          </Text>
+        </View>
+      </View>
+      <Text style={[styles.onboardingTitle, isRtl && styles.rtlText]}>
+        كل حجوزاتك وخدماتك في تجربة عربية فاخرة
+      </Text>
+      <Text style={[styles.onboardingBody, isRtl && styles.rtlText]}>
+        اكتشف الأعمال، اختر الخدمة، وتابع رحلتك من واجهة موبايل آمنة بدون تسجيل
+        دخول حقيقي في هذه المرحلة.
+      </Text>
+      <View style={styles.onboardingHighlights}>
+        {onboardingHighlights.map((item) => (
+          <Text key={item} style={styles.onboardingHighlight}>
+            {item}
+          </Text>
+        ))}
+      </View>
+      <View style={styles.onboardingActions}>
+        <PrimaryButton label="ابدأ الاستكشاف" styles={styles} />
+        <Pressable accessibilityRole="button" style={styles.onboardingSecondary}>
+          <Text style={styles.onboardingSecondaryText}>تخطي الآن</Text>
+        </Pressable>
+      </View>
+    </View>
   );
 }
 
@@ -622,41 +681,43 @@ function MarketplaceStateView({
 }) {
   if (state.status === "idle" || state.status === "loading") {
     return (
-      <View style={styles.screenCard}>
-        <Text style={[styles.screenEyebrow, isRtl && styles.rtlText]}>
-          {text.tabs.marketplace}
-        </Text>
-        <Text style={[styles.screenTitle, isRtl && styles.rtlText]}>
-          {text.marketplaceLoading}
-        </Text>
-      </View>
+      <PremiumStateCard
+        body="نجهز قائمة الأعمال القريبة مع الحفاظ على نفس مسار API الحالي."
+        icon="⌁"
+        isRtl={isRtl}
+        label={text.tabs.marketplace}
+        styles={styles}
+        title={text.marketplaceLoading}
+      />
     );
   }
 
   if (state.status === "error") {
     return (
-      <View style={styles.screenCard}>
-        <Text style={[styles.screenEyebrow, isRtl && styles.rtlText]}>
-          {text.marketplaceErrorTitle}
-        </Text>
-        <Text style={[styles.screenDescription, isRtl && styles.rtlText]}>
-          {state.message}
-        </Text>
-        <PrimaryButton label={text.marketplaceRetry} onPress={onRetry} styles={styles} />
-      </View>
+      <PremiumStateCard
+        body={state.message}
+        cta={text.marketplaceRetry}
+        icon="!"
+        isRtl={isRtl}
+        label={text.marketplaceErrorTitle}
+        onPress={onRetry}
+        styles={styles}
+        title="تعذر تحميل السوق"
+        tone="warning"
+      />
     );
   }
 
   if (state.businesses.length === 0) {
     return (
-      <View style={styles.screenCard}>
-        <Text style={[styles.screenTitle, isRtl && styles.rtlText]}>
-          {text.marketplaceEmptyTitle}
-        </Text>
-        <Text style={[styles.screenDescription, isRtl && styles.rtlText]}>
-          {text.marketplaceEmptyBody}
-        </Text>
-      </View>
+      <PremiumStateCard
+        body={text.marketplaceEmptyBody}
+        icon="◇"
+        isRtl={isRtl}
+        label={text.tabs.marketplace}
+        styles={styles}
+        title={text.marketplaceEmptyTitle}
+      />
     );
   }
 
@@ -717,6 +778,62 @@ function MarketplaceStateView({
           </View>
         </View>
       ))}
+    </View>
+  );
+}
+
+function PremiumStateCard({
+  body,
+  cta,
+  icon,
+  isRtl,
+  label,
+  onPress,
+  styles,
+  title,
+  tone = "default",
+}: {
+  body: string;
+  cta?: string;
+  icon: string;
+  isRtl: boolean;
+  label: string;
+  onPress?: () => void;
+  styles: MobileStyles;
+  title: string;
+  tone?: "default" | "warning";
+}) {
+  return (
+    <View style={styles.stateCard}>
+      <View
+        style={[
+          styles.stateIcon,
+          tone === "warning" && styles.stateIconWarning,
+        ]}
+      >
+        <Text
+          style={[
+            styles.stateIconText,
+            tone === "warning" && styles.stateIconTextWarning,
+          ]}
+        >
+          {icon}
+        </Text>
+      </View>
+      <Text style={[styles.screenEyebrow, isRtl && styles.rtlText]}>
+        {label}
+      </Text>
+      <Text style={[styles.screenTitle, isRtl && styles.rtlText]}>
+        {title}
+      </Text>
+      <Text style={[styles.screenDescription, isRtl && styles.rtlText]}>
+        {body}
+      </Text>
+      {cta ? (
+        <View style={styles.stateAction}>
+          <PrimaryButton label={cta} onPress={onPress} styles={styles} />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -837,6 +954,7 @@ function BookingFlowScreen({
 
       <BookingSummaryCard isRtl={isRtl} styles={styles} />
       <ConfirmationCard isRtl={isRtl} styles={styles} />
+      <BookingsEmptyState isRtl={isRtl} styles={styles} />
       <MyBookingCard isRtl={isRtl} styles={styles} />
     </>
   );
@@ -931,6 +1049,25 @@ function StaffRow({
   );
 }
 
+function BookingsEmptyState({
+  isRtl,
+  styles,
+}: {
+  isRtl: boolean;
+  styles: MobileStyles;
+}) {
+  return (
+    <PremiumStateCard
+      body="عند ربط الحساب الحقيقي ستظهر هنا الحجوزات القادمة والسابقة. حالياً هذه بطاقة عرض آمنة فقط."
+      icon="⌛"
+      isRtl={isRtl}
+      label="حجوزاتي"
+      styles={styles}
+      title="لا توجد حجوزات حقيقية بعد"
+    />
+  );
+}
+
 function BookingSummaryCard({
   isRtl,
   styles,
@@ -1011,15 +1148,64 @@ function AccountScreen({
 }) {
   return (
     <>
-      <SimpleBoundaryScreen
-        body="واجهة الحساب تعرض اللغة، حالة التكامل، وروابط مستقبلية بدون تخزين أسرار أو تسجيل دخول حقيقي."
-        eyebrow="الحساب"
-        isRtl={isRtl}
-        primary="ربط تسجيل الدخول لاحقاً"
-        secondary="إعدادات الحساب"
-        styles={styles}
-        title="حساب REZNO الموحد"
-      />
+      <View style={styles.accountHeroCard}>
+        <View style={styles.accountAvatar}>
+          <Text style={styles.accountAvatarText}>ر</Text>
+        </View>
+        <Text style={[styles.screenEyebrow, isRtl && styles.rtlText]}>
+          الحساب
+        </Text>
+        <Text style={[styles.screenTitle, isRtl && styles.rtlText]}>
+          حساب REZNO الموحد
+        </Text>
+        <Text style={[styles.screenDescription, isRtl && styles.rtlText]}>
+          واجهة حساب أصلية وآمنة للعرض فقط. تسجيل الدخول الحقيقي وربط الجلسة
+          يبقيان لسبرنت تكامل معتمد.
+        </Text>
+        <View style={styles.accountActionRow}>
+          {accountActions.map((action) => (
+            <Pressable
+              accessibilityRole="button"
+              disabled
+              key={action.label}
+              style={[
+                styles.accountActionButton,
+                action.tone === "primary" && styles.accountActionButtonPrimary,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.accountActionText,
+                  action.tone === "primary" && styles.accountActionTextPrimary,
+                ]}
+              >
+                {action.label}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+
+      <View style={styles.settingsCard}>
+        <Text style={[styles.integrationTitle, isRtl && styles.rtlText]}>
+          اللغة والإعدادات
+        </Text>
+        <Text style={[styles.integrationBody, isRtl && styles.rtlText]}>
+          التبديل بين العربية والإنجليزية والكردية متاح من أعلى الشاشة بدون حفظ
+          حالة دائمة.
+        </Text>
+      </View>
+
+      <View style={styles.privacyCard}>
+        <Text style={[styles.integrationTitle, isRtl && styles.rtlText]}>
+          الأمان والخصوصية
+        </Text>
+        <Text style={[styles.integrationBody, isRtl && styles.rtlText]}>
+          لا توجد كلمات مرور، رموز جلسة، أو بيانات حساسة داخل هذه الواجهة
+          التجريبية.
+        </Text>
+      </View>
+
       <View style={styles.integrationCard}>
         <Text style={[styles.integrationTitle, isRtl && styles.rtlText]}>
           {text.integrationBoundary}
@@ -1054,6 +1240,9 @@ function SimpleBoundaryScreen({
 }) {
   return (
     <View style={styles.screenCard}>
+      <View style={styles.boundaryIcon}>
+        <Text style={styles.boundaryIconText}>◇</Text>
+      </View>
       <Text style={[styles.screenEyebrow, isRtl && styles.rtlText]}>
         {eyebrow}
       </Text>
@@ -1165,6 +1354,55 @@ const createStyles = (theme: MobileTheme) =>
     actionStack: {
       gap: theme.spacing.sm,
       marginTop: 18,
+    },
+    accountActionButton: {
+      alignItems: "center",
+      backgroundColor: theme.colors.muted,
+      borderRadius: theme.radii.control,
+      flex: 1,
+      paddingVertical: 14,
+    },
+    accountActionButtonPrimary: {
+      backgroundColor: theme.colors.gold,
+    },
+    accountActionRow: {
+      flexDirection: "row",
+      gap: 10,
+      marginTop: 18,
+    },
+    accountActionText: {
+      color: theme.colors.foreground,
+      fontSize: 13,
+      fontWeight: "900",
+    },
+    accountActionTextPrimary: {
+      color: theme.colors.foregroundInverse,
+    },
+    accountAvatar: {
+      alignItems: "center",
+      backgroundColor: theme.colors.gold,
+      borderRadius: 26,
+      height: 52,
+      justifyContent: "center",
+      marginBottom: 14,
+      width: 52,
+    },
+    accountAvatarText: {
+      color: theme.colors.foregroundInverse,
+      fontSize: 24,
+      fontWeight: "900",
+    },
+    accountHeroCard: {
+      backgroundColor: theme.colors.hero,
+      borderColor: theme.colors.border,
+      borderRadius: theme.radii.xl,
+      borderWidth: 1,
+      overflow: "hidden",
+      padding: 22,
+      shadowColor: theme.colors.shadow,
+      shadowOffset: { height: 16, width: 0 },
+      shadowOpacity: theme.isDark ? 0.3 : 0.08,
+      shadowRadius: 26,
     },
     apiText: {
       color: theme.colors.warning,
@@ -1340,6 +1578,20 @@ const createStyles = (theme: MobileTheme) =>
       flexWrap: "wrap",
       gap: 8,
       marginTop: 14,
+    },
+    boundaryIcon: {
+      alignItems: "center",
+      backgroundColor: theme.colors.goldSoft,
+      borderRadius: 24,
+      height: 48,
+      justifyContent: "center",
+      marginBottom: 12,
+      width: 48,
+    },
+    boundaryIconText: {
+      color: theme.colors.deepGold,
+      fontSize: 22,
+      fontWeight: "900",
     },
     cancelAction: {
       color: theme.colors.danger,
@@ -1834,6 +2086,107 @@ const createStyles = (theme: MobileTheme) =>
       fontWeight: "900",
       marginTop: 4,
     },
+    onboardingActions: {
+      flexDirection: "row",
+      gap: 10,
+      marginTop: 18,
+    },
+    onboardingBody: {
+      color: theme.colors.mutedForeground,
+      fontSize: 15,
+      lineHeight: 23,
+      marginTop: 10,
+    },
+    onboardingBrand: {
+      color: theme.colors.foreground,
+      fontSize: 20,
+      fontWeight: "900",
+      letterSpacing: 1,
+    },
+    onboardingBrandRow: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 12,
+    },
+    onboardingCard: {
+      backgroundColor: theme.colors.cardElevated,
+      borderColor: theme.colors.gold,
+      borderRadius: theme.radii.xl,
+      borderWidth: 1,
+      overflow: "hidden",
+      padding: 22,
+      shadowColor: theme.colors.shadow,
+      shadowOffset: { height: 18, width: 0 },
+      shadowOpacity: theme.isDark ? 0.34 : 0.12,
+      shadowRadius: 30,
+    },
+    onboardingGlow: {
+      backgroundColor: theme.colors.goldSoft,
+      borderRadius: 999,
+      height: 170,
+      opacity: 0.85,
+      position: "absolute",
+      right: -50,
+      top: -58,
+      width: 170,
+    },
+    onboardingHighlight: {
+      backgroundColor: theme.colors.goldSoft,
+      borderColor: theme.colors.gold,
+      borderRadius: theme.radii.pill,
+      borderWidth: 1,
+      color: theme.colors.deepGold,
+      fontSize: 12,
+      fontWeight: "900",
+      overflow: "hidden",
+      paddingHorizontal: 11,
+      paddingVertical: 7,
+    },
+    onboardingHighlights: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+      marginTop: 14,
+    },
+    onboardingLogo: {
+      alignItems: "center",
+      backgroundColor: theme.colors.gold,
+      borderRadius: 22,
+      height: 48,
+      justifyContent: "center",
+      width: 48,
+    },
+    onboardingLogoText: {
+      color: theme.colors.foregroundInverse,
+      fontSize: 22,
+      fontWeight: "900",
+    },
+    onboardingSecondary: {
+      alignItems: "center",
+      backgroundColor: theme.colors.muted,
+      borderRadius: theme.radii.control,
+      flex: 1,
+      justifyContent: "center",
+      paddingVertical: 14,
+    },
+    onboardingSecondaryText: {
+      color: theme.colors.foreground,
+      fontSize: 14,
+      fontWeight: "900",
+    },
+    onboardingSlogan: {
+      color: theme.colors.mutedForeground,
+      fontSize: 12,
+      fontWeight: "800",
+      marginTop: 3,
+    },
+    onboardingTitle: {
+      color: theme.colors.foreground,
+      fontSize: 28,
+      fontWeight: "900",
+      lineHeight: 35,
+      marginTop: 24,
+    },
     paymentBody: {
       color: theme.colors.mutedForeground,
       fontSize: 14,
@@ -1857,6 +2210,13 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.deepGold,
       fontSize: 13,
       fontWeight: "900",
+    },
+    privacyCard: {
+      backgroundColor: theme.colors.successSoft,
+      borderColor: theme.colors.success,
+      borderRadius: 24,
+      borderWidth: 1,
+      padding: 18,
     },
     primaryButton: {
       alignItems: "center",
@@ -2101,6 +2461,13 @@ const createStyles = (theme: MobileTheme) =>
       alignItems: "flex-end",
       gap: 4,
     },
+    settingsCard: {
+      backgroundColor: theme.colors.card,
+      borderColor: theme.colors.border,
+      borderRadius: 24,
+      borderWidth: 1,
+      padding: 18,
+    },
     shell: {
       backgroundColor: theme.colors.background,
       flex: 1,
@@ -2118,6 +2485,40 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.success,
       fontSize: 11,
       fontWeight: "900",
+    },
+    stateAction: {
+      marginTop: 18,
+    },
+    stateCard: {
+      backgroundColor: theme.colors.card,
+      borderColor: theme.colors.border,
+      borderRadius: theme.radii.xl,
+      borderWidth: 1,
+      padding: 22,
+      shadowColor: theme.colors.shadow,
+      shadowOffset: { height: 16, width: 0 },
+      shadowOpacity: theme.isDark ? 0.28 : 0.08,
+      shadowRadius: 26,
+    },
+    stateIcon: {
+      alignItems: "center",
+      backgroundColor: theme.colors.goldSoft,
+      borderRadius: 28,
+      height: 56,
+      justifyContent: "center",
+      marginBottom: 14,
+      width: 56,
+    },
+    stateIconText: {
+      color: theme.colors.deepGold,
+      fontSize: 26,
+      fontWeight: "900",
+    },
+    stateIconTextWarning: {
+      color: theme.colors.warning,
+    },
+    stateIconWarning: {
+      backgroundColor: theme.colors.warningSoft,
     },
     stepBody: {
       color: theme.colors.mutedForeground,
