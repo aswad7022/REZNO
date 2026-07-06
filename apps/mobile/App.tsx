@@ -69,6 +69,8 @@ type BookingStep = {
   title: string;
 };
 
+type MobileThemeMode = "system" | "light" | "dark";
+
 const categories = [
   { badge: "الأكثر حجزاً", count: "128 نشاط", icon: "✂", label: "صالونات", tone: "gold" },
   { badge: "متاح اليوم", count: "42 مطعم", icon: "🍽", label: "مطاعم", tone: "green" },
@@ -383,10 +385,10 @@ const languagePreferenceRows = [
 ];
 
 const themePreferenceRows = [
-  { label: "حسب النظام", meta: "يتبع إعدادات الجهاز", selected: true },
-  { label: "فاتح", meta: "كريمي وهادئ", selected: false },
-  { label: "داكن", meta: "أسود فاخر مع ذهب", selected: false },
-];
+  { label: "حسب النظام", meta: "يتبع إعدادات الجهاز", mode: "system" },
+  { label: "فاتح", meta: "كريمي وهادئ", mode: "light" },
+  { label: "داكن", meta: "أسود فاخر مع ذهب", mode: "dark" },
+] as const;
 
 const accountNotificationRows = [
   { enabled: true, label: "تذكيرات الحجز", meta: "قبل الموعد بوقت مناسب" },
@@ -420,10 +422,14 @@ export default function App() {
   const colorScheme = useColorScheme();
   const [locale, setLocale] = useState<MobileLocale>(DEFAULT_LOCALE);
   const [activeTab, setActiveTab] = useState<MobileTabId>("customerHome");
+  const [themeMode, setThemeMode] = useState<MobileThemeMode>("dark");
   const [marketplaceState, setMarketplaceState] = useState<MarketplaceState>({
     status: "idle",
   });
-  const theme = colorScheme === "light" ? lightMobileTheme : darkMobileTheme;
+  const effectiveThemeMode =
+    themeMode === "system" ? colorScheme ?? "dark" : themeMode;
+  const theme =
+    effectiveThemeMode === "light" ? lightMobileTheme : darkMobileTheme;
   const styles = useMemo(() => createStyles(theme), [theme]);
   const text = labels[locale];
   const isRtl = getTextDirection(locale) === "rtl";
@@ -499,7 +505,13 @@ export default function App() {
         ) : null}
 
         {activeTab === "account" ? (
-          <AccountScreen isRtl={isRtl} styles={styles} text={text} />
+          <AccountScreen
+            isRtl={isRtl}
+            onThemeModeChange={setThemeMode}
+            styles={styles}
+            text={text}
+            themeMode={themeMode}
+          />
         ) : null}
       </ScrollView>
 
@@ -2040,12 +2052,16 @@ function BusinessInsightsPreview({
 
 function AccountScreen({
   isRtl,
+  onThemeModeChange,
   styles,
   text,
+  themeMode,
 }: {
   isRtl: boolean;
+  onThemeModeChange: (mode: MobileThemeMode) => void;
   styles: MobileStyles;
   text: (typeof labels)[MobileLocale];
+  themeMode: MobileThemeMode;
 }) {
   return (
     <>
@@ -2117,8 +2133,8 @@ function AccountScreen({
           اللغة والمظهر
         </Text>
         <Text style={[styles.cardBody, isRtl && styles.rtlText]}>
-          صفوف بصرية فقط لتوضيح تجربة التفضيلات المستقبلية بدون حفظ دائم أو
-          صلاحيات جهاز.
+          يمكن تبديل النمط محلياً بدون حفظ دائم أو صلاحيات جهاز. الوضع الداكن
+          هو الافتراضي لتجربة REZNO الفاخرة.
         </Text>
         <View style={styles.preferencesGroup}>
           <Text style={[styles.preferenceGroupTitle, isRtl && styles.rtlText]}>
@@ -2150,27 +2166,43 @@ function AccountScreen({
           <Text style={[styles.preferenceGroupTitle, isRtl && styles.rtlText]}>
             النمط
           </Text>
-          {themePreferenceRows.map((row) => (
-            <View key={row.label} style={styles.accountPreferenceRow}>
-              <View
-                style={[
-                  styles.accountPreferenceDot,
-                  row.selected && styles.accountPreferenceDotActive,
+          {themePreferenceRows.map((row) => {
+            const selected = row.mode === themeMode;
+
+            return (
+              <Pressable
+                accessibilityHint="يغير نمط ألوان التطبيق داخل هذه المعاينة فقط."
+                accessibilityLabel={`اختيار النمط ${row.label}`}
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
+                hitSlop={TOUCH_HIT_SLOP}
+                key={row.label}
+                onPress={() => onThemeModeChange(row.mode)}
+                style={({ pressed }) => [
+                  styles.accountPreferenceRow,
+                  pressed && styles.softButtonPressed,
                 ]}
-              />
-              <View style={styles.preferenceCopy}>
-                <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>
-                  {row.label}
+              >
+                <View
+                  style={[
+                    styles.accountPreferenceDot,
+                    selected && styles.accountPreferenceDotActive,
+                  ]}
+                />
+                <View style={styles.preferenceCopy}>
+                  <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>
+                    {row.label}
+                  </Text>
+                  <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>
+                    {row.meta}
+                  </Text>
+                </View>
+                <Text style={styles.preferenceChevron}>
+                  {selected ? "✓" : "›"}
                 </Text>
-                <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>
-                  {row.meta}
-                </Text>
-              </View>
-              <Text style={styles.preferenceChevron}>
-                {row.selected ? "✓" : "›"}
-              </Text>
-            </View>
-          ))}
+              </Pressable>
+            );
+          })}
         </View>
       </View>
 
