@@ -1,7 +1,7 @@
 {
   "project": "REZNO",
   "productVision": "One Platform. Every Booking.",
-  "currentApprovedMain": "37a5f35985b364f83ee4a7e81fb4dd8b359fa1d8",
+  "currentApprovedMain": "134b1ca17b13d2a0985f37fe24a6f0ddf9eb67fe",
   "closedSprints": [
     {
       "name": "Agentic Delivery System MVP",
@@ -152,12 +152,37 @@
       "pr": 43,
       "mainSha": "37a5f35985b364f83ee4a7e81fb4dd8b359fa1d8",
       "decision": "APPROVE"
+    },
+    {
+      "name": "Record Mobile Visual System Phase 10 Memory",
+      "pr": 44,
+      "mainSha": "1848de75c04142bb3bb19b28b49ce0b85449e28d",
+      "decision": "APPROVE"
+    },
+    {
+      "name": "Mobile Premium Visual System Phase 11 - Visual Cleanup and Component Extraction",
+      "pr": 45,
+      "mainSha": "97f27d4ba997844172621d759fcc94e923f83276",
+      "decision": "APPROVE"
+    },
+    {
+      "name": "Mobile Premium Visual System Phase 12 - Design System Foundation",
+      "pr": 46,
+      "mainSha": "8995e22a14618bd6f98cd1eddf1aa6c9afa4faca",
+      "decision": "APPROVE"
+    },
+    {
+      "name": "Mobile Premium Visual System Phase 13 - Screen Composition Cleanup",
+      "pr": 47,
+      "mainSha": "134b1ca17b13d2a0985f37fe24a6f0ddf9eb67fe",
+      "decision": "APPROVE"
     }
   ],
   "activeSprint": null,
   "blockedItems": [
     "Mobile real-device runtime smoke remains blocked until an SDK 57-compatible Expo Go/TestFlight path or EAS development build path is available.",
-    "Vercel build-rate-limit affected PR #43; Phase 10 was merged with accepted infrastructure quota risk after local/static validation passed."
+    "Vercel build-rate-limit affected PR #43; Phase 10 was merged with accepted infrastructure quota risk after local/static validation passed.",
+    "Vercel build-rate-limit affected PR #47; Phase 13 was merged with accepted infrastructure quota risk after local/static validation passed."
   ],
-  "nextRecommendedAction": "Bundle future memory updates into each completed sprint closure when technically possible, then continue mobile premium visual refinement or resume SDK 57 mobile runtime gate."
+  "nextRecommendedAction": "Mobile Premium Visual System Phase 14 - Luxury Theme Direction Lock"
 }
