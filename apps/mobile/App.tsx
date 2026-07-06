@@ -73,11 +73,11 @@ type MobileThemeMode = "system" | "light" | "dark";
 
 const categories = [
   { badge: "الأكثر حجزاً", count: "128 نشاط", icon: "✂", label: "صالونات", tone: "gold" },
-  { badge: "متاح اليوم", count: "42 مطعم", icon: "🍽", label: "مطاعم", tone: "green" },
+  { badge: "متاح اليوم", count: "42 مطعم", icon: "II", label: "مطاعم", tone: "green" },
   { badge: "قريب منك", count: "31 عيادة", icon: "⚕", label: "عيادات", tone: "blue" },
-  { badge: "فاخر", count: "18 سبا", icon: "💆", label: "سبا", tone: "rose" },
-  { badge: "صباحي", count: "27 مركز", icon: "🏋", label: "رياضة", tone: "dark" },
-  { badge: "سريع", count: "64 خدمة", icon: "🧰", label: "خدمات", tone: "gold" },
+  { badge: "فاخر", count: "18 سبا", icon: "✦", label: "سبا", tone: "rose" },
+  { badge: "صباحي", count: "27 مركز", icon: "H", label: "رياضة", tone: "dark" },
+  { badge: "سريع", count: "64 خدمة", icon: "▤", label: "خدمات", tone: "gold" },
 ];
 
 const featuredBusinesses: PremiumBusiness[] = [
@@ -160,8 +160,6 @@ const dateOptions = [
   { day: "الخميس", label: "09", meta: "أفضل" },
 ];
 
-const businessTabs = ["الخدمات", "التقييمات", "حول"];
-
 const onboardingHighlights = [
   "حجوزات",
   "رسائل",
@@ -171,25 +169,6 @@ const onboardingHighlights = [
 const accountActions = [
   { label: "تسجيل الدخول", tone: "primary" },
   { label: "إنشاء حساب", tone: "secondary" },
-];
-
-const searchSuggestions = [
-  "قص شعر اليوم",
-  "مطعم عائلي قريب",
-  "طبيب أسنان",
-];
-
-const recentSearches = [
-  "صالون نسائي",
-  "حجز طاولة",
-  "عيادة قريبة",
-];
-
-const popularSearches = [
-  "الأقرب",
-  "الأعلى تقييماً",
-  "متاح اليوم",
-  "عروض",
 ];
 
 const filterChips = [
@@ -422,6 +401,7 @@ export default function App() {
   const colorScheme = useColorScheme();
   const [locale, setLocale] = useState<MobileLocale>(DEFAULT_LOCALE);
   const [activeTab, setActiveTab] = useState<MobileTabId>("customerHome");
+  const [showOnboarding, setShowOnboarding] = useState(true);
   const [themeMode, setThemeMode] = useState<MobileThemeMode>("dark");
   const [marketplaceState, setMarketplaceState] = useState<MarketplaceState>({
     status: "idle",
@@ -462,6 +442,25 @@ export default function App() {
 
     setActiveTab(tabId);
   };
+
+  const handleEnterApp = () => {
+    setShowOnboarding(false);
+  };
+
+  if (showOnboarding) {
+    return (
+      <SafeAreaView style={styles.shell}>
+        <StatusBar style="light" />
+        <View style={styles.onboardingScreen}>
+          <WelcomeOnboardingCard
+            isRtl={isRtl}
+            onStart={handleEnterApp}
+            styles={styles}
+          />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.shell}>
@@ -534,37 +533,38 @@ function CustomerHomeScreen({
 }) {
   return (
     <>
-      <WelcomeOnboardingCard isRtl={isRtl} styles={styles} />
       <HeroCard isRtl={isRtl} styles={styles} />
       <SearchDiscoveryPanel isRtl={isRtl} styles={styles} />
       <CategoryGrid styles={styles} />
-      <PromoCard isRtl={isRtl} styles={styles} />
-      <BusinessDetailShowcase isRtl={isRtl} styles={styles} />
       <SectionHeader
         action="عرض الكل"
         isRtl={isRtl}
         styles={styles}
         title="قريب منك"
       />
-      <View style={styles.businessList}>
+      <View style={styles.homeBusinessGrid}>
         {featuredBusinesses.map((business) => (
-          <PremiumBusinessCard
-            business={business}
-            isRtl={isRtl}
-            key={business.id}
-            styles={styles}
-          />
+          <View key={business.id} style={styles.homeBusinessCardSlot}>
+            <PremiumBusinessCard
+              business={business}
+              isRtl={isRtl}
+              styles={styles}
+            />
+          </View>
         ))}
       </View>
+      <PromoCard isRtl={isRtl} styles={styles} />
     </>
   );
 }
 
 function WelcomeOnboardingCard({
   isRtl,
+  onStart,
   styles,
 }: {
   isRtl: boolean;
+  onStart: () => void;
   styles: MobileStyles;
 }) {
   return (
@@ -607,9 +607,10 @@ function WelcomeOnboardingCard({
         ))}
       </View>
       <View style={styles.onboardingActions}>
-        <PrimaryButton label="ابدأ الآن" styles={styles} />
+        <PrimaryButton label="ابدأ الآن" onPress={onStart} styles={styles} />
         <Pressable
           accessibilityRole="button"
+          onPress={onStart}
           style={({ pressed }) => [
             styles.onboardingSecondary,
             pressed && styles.softButtonPressed,
@@ -622,118 +623,23 @@ function WelcomeOnboardingCard({
   );
 }
 
-function BusinessDetailShowcase({
-  isRtl,
-  styles,
-}: {
-  isRtl: boolean;
-  styles: MobileStyles;
-}) {
-  return (
-    <View style={styles.detailCard}>
-      <View style={styles.detailHero}>
-        <View style={styles.detailHeroGlow} />
-        <View style={styles.detailTopRow}>
-          <View style={styles.statusBadge}>
-            <Text style={styles.statusBadgeText}>مفتوح الآن</Text>
-          </View>
-          <View style={styles.iconActionRow}>
-            <View style={styles.iconAction}>
-              <Text style={styles.iconActionText}>↗</Text>
-            </View>
-            <View style={styles.iconAction}>
-              <Text style={styles.iconActionText}>♡</Text>
-            </View>
-          </View>
-        </View>
-        <Text style={[styles.detailTitle, isRtl && styles.rtlText]}>
-          Noura Beauty Lounge
-        </Text>
-        <Text style={[styles.detailMeta, isRtl && styles.rtlText]}>
-          صالون وتجميل · بغداد، الكرادة · 1.8 كم
-        </Text>
-        <View style={styles.detailStatsRow}>
-          <Text style={styles.detailStat}>★ 4.9</Text>
-          <Text style={styles.detailStat}>128 تقييم</Text>
-          <Text style={styles.detailStat}>من 25,000 د.ع</Text>
-        </View>
-      </View>
-
-      <View style={styles.detailTabs}>
-        {businessTabs.map((tab, index) => (
-          <View
-            key={tab}
-            style={[styles.detailTab, index === 0 && styles.detailTabActive]}
-          >
-            <Text
-              style={[
-                styles.detailTabText,
-                index === 0 && styles.detailTabTextActive,
-              ]}
-            >
-              {tab}
-            </Text>
-          </View>
-        ))}
-      </View>
-
-      <View style={styles.detailServiceCard}>
-        <View>
-          <Text style={[styles.detailServiceTitle, isRtl && styles.rtlText]}>
-            قص وتصفيف فاخر
-          </Text>
-          <Text style={[styles.detailServiceMeta, isRtl && styles.rtlText]}>
-            45 دقيقة · مع ليان · تأكيد سريع
-          </Text>
-        </View>
-        <Text style={styles.detailServicePrice}>25,000 د.ع</Text>
-      </View>
-
-      <View style={styles.detailCtaRow}>
-        <PrimaryButton label="احجز الآن" styles={styles} />
-        <Pressable
-          accessibilityRole="button"
-          style={({ pressed }) => [
-            styles.secondaryIconButton,
-            pressed && styles.softButtonPressed,
-          ]}
-        >
-          <Text style={styles.secondaryIconButtonText}>مراجعات</Text>
-        </Pressable>
-      </View>
-    </View>
-  );
-}
-
 function HeroCard({ isRtl, styles }: { isRtl: boolean; styles: MobileStyles }) {
   return (
     <View style={styles.heroCard}>
       <View style={styles.heroGlow} />
       <View style={styles.locationPill}>
         <Text style={styles.locationDot}>●</Text>
-        <Text style={styles.locationText}>بغداد · الكرادة</Text>
+        <Text style={styles.locationText}>بغداد</Text>
       </View>
       <Text style={[styles.heroEyebrow, isRtl && styles.rtlText]}>
-        One Platform. Every Booking.
+        ما الخدمة التي تبحث عنها اليوم؟
       </Text>
       <Text style={[styles.heroTitle, isRtl && styles.rtlText]}>
-        احجز أفضل الخدمات حولك بتجربة فاخرة وسريعة
+        مرحباً علي
       </Text>
       <Text style={[styles.heroBody, isRtl && styles.rtlText]}>
-        صالونات، مطاعم، عيادات، وخدمات يومية في تطبيق واحد مصمم للموبايل.
+        اكتشف أفضل الخدمات القريبة منك واحجز بثقة من REZNO.
       </Text>
-      <View style={styles.heroActions}>
-        <PrimaryButton label="ابدأ الحجز" styles={styles} />
-        <Pressable
-          accessibilityRole="button"
-          style={({ pressed }) => [
-            styles.ghostButton,
-            pressed && styles.outlineButtonPressed,
-          ]}
-        >
-          <Text style={styles.ghostButtonText}>استكشف السوق</Text>
-        </Pressable>
-      </View>
     </View>
   );
 }
@@ -747,88 +653,7 @@ function SearchDiscoveryPanel({
 }) {
   return (
     <View style={styles.discoveryCard}>
-      <View style={styles.discoveryHeaderRow}>
-        <View>
-          <Text style={[styles.screenEyebrow, isRtl && styles.rtlText]}>
-            اكتشف بسرعة
-          </Text>
-          <Text style={[styles.discoveryTitle, isRtl && styles.rtlText]}>
-            ماذا تريد أن تحجز اليوم؟
-          </Text>
-        </View>
-        <View style={styles.discoveryLocationButton}>
-          <Text style={styles.discoveryLocationText}>⌖</Text>
-        </View>
-      </View>
-
       <SearchBar isRtl={isRtl} styles={styles} />
-
-      <View style={styles.searchActionRow}>
-        <View style={styles.searchActionButton}>
-          <Text style={styles.searchActionIcon}>⌕</Text>
-          <Text style={styles.searchActionText}>بحث</Text>
-        </View>
-        <View style={styles.searchActionButton}>
-          <Text style={styles.searchActionIcon}>◌</Text>
-          <Text style={styles.searchActionText}>صوت</Text>
-        </View>
-        <View style={styles.searchActionButton}>
-          <Text style={styles.searchActionIcon}>≡</Text>
-          <Text style={styles.searchActionText}>فلترة</Text>
-        </View>
-      </View>
-
-      <SearchChipSection
-        chips={searchSuggestions}
-        isRtl={isRtl}
-        styles={styles}
-        title="اقتراحات ذكية"
-      />
-      <SearchChipSection
-        chips={recentSearches}
-        isRtl={isRtl}
-        muted
-        styles={styles}
-        title="آخر عمليات البحث"
-      />
-      <SearchChipSection
-        chips={popularSearches}
-        isRtl={isRtl}
-        styles={styles}
-        title="الأكثر رواجاً"
-      />
-    </View>
-  );
-}
-
-function SearchChipSection({
-  chips,
-  isRtl,
-  muted,
-  styles,
-  title,
-}: {
-  chips: string[];
-  isRtl: boolean;
-  muted?: boolean;
-  styles: MobileStyles;
-  title: string;
-}) {
-  return (
-    <View style={styles.searchChipSection}>
-      <Text style={[styles.searchChipTitle, isRtl && styles.rtlText]}>
-        {title}
-      </Text>
-      <View style={styles.searchChipRow}>
-        {chips.map((chip) => (
-          <Text
-            key={chip}
-            style={[styles.searchChip, muted && styles.searchChipMuted]}
-          >
-            {chip}
-          </Text>
-        ))}
-      </View>
     </View>
   );
 }
@@ -2489,28 +2314,28 @@ const createStyles = (theme: MobileTheme) =>
     },
     brandName: {
       color: theme.colors.foreground,
-      fontSize: 24,
+      fontSize: 18,
       flexShrink: 1,
       fontWeight: "900",
-      letterSpacing: 1.6,
+      letterSpacing: 1.4,
     },
     brandRow: {
       alignItems: "center",
       flexDirection: "row",
       flex: 1,
-      gap: 12,
+      gap: 9,
     },
     brandTagline: {
       color: theme.colors.mutedForeground,
-      fontSize: 11,
+      fontSize: 10,
       flexShrink: 1,
       fontWeight: "800",
-      lineHeight: 15,
+      lineHeight: 13,
       marginTop: 2,
     },
     businessBody: {
-      gap: 14,
-      padding: 18,
+      gap: 9,
+      padding: 12,
     },
     businessCard: {
       ...createMobileSurface(theme, {
@@ -2518,6 +2343,7 @@ const createStyles = (theme: MobileTheme) =>
         tone: "elevated",
       }),
       borderColor: theme.colors.border,
+      flex: 1,
       overflow: "hidden",
       ...createMobileShadow(theme, {
         darkOpacity: 0.42,
@@ -2537,28 +2363,28 @@ const createStyles = (theme: MobileTheme) =>
       borderTopWidth: 1,
       flexDirection: "row",
       flexWrap: "wrap",
-      gap: 10,
+      gap: 6,
       justifyContent: "space-between",
-      paddingTop: 14,
+      paddingTop: 10,
     },
     businessHero: {
       backgroundColor: "#050608",
       borderBottomColor: theme.colors.border,
       borderBottomWidth: 1,
-      height: 118,
+      height: 88,
       justifyContent: "space-between",
       overflow: "hidden",
-      padding: 16,
+      padding: 12,
     },
     businessHeroCompact: {
       backgroundColor: "#050608",
       borderBottomColor: theme.colors.border,
       borderBottomWidth: 1,
       flexDirection: "row",
-      height: 104,
+      height: 92,
       justifyContent: "space-between",
       overflow: "hidden",
-      padding: 16,
+      padding: 12,
     },
     businessArtCircle: {
       backgroundColor: "rgba(255, 193, 58, 0.82)",
@@ -2595,17 +2421,17 @@ const createStyles = (theme: MobileTheme) =>
       borderColor: theme.colors.accent,
       borderRadius: 24,
       borderWidth: 1,
-      height: 48,
+      height: 42,
       justifyContent: "center",
       shadowColor: theme.colors.deepGold,
       shadowOffset: { height: 10, width: 0 },
       shadowOpacity: theme.isDark ? 0.34 : 0.12,
       shadowRadius: 16,
-      width: 48,
+      width: 42,
     },
     businessInitialText: {
       color: theme.colors.foregroundInverse,
-      fontSize: 22,
+      fontSize: 19,
       fontWeight: "900",
     },
     businessList: {
@@ -2613,10 +2439,10 @@ const createStyles = (theme: MobileTheme) =>
     },
     businessMeta: {
       color: theme.colors.mutedForeground,
-      fontSize: 13,
+      fontSize: 11,
       flexShrink: 1,
-      lineHeight: 19,
-      marginTop: 4,
+      lineHeight: 15,
+      marginTop: 3,
     },
     businessMetric: {
       backgroundColor: theme.colors.cardElevated,
@@ -2624,24 +2450,24 @@ const createStyles = (theme: MobileTheme) =>
       borderWidth: 1,
       borderRadius: theme.radii.pill,
       color: theme.colors.foreground,
-      fontSize: 12,
+      fontSize: 10,
       fontWeight: "800",
       overflow: "hidden",
-      paddingHorizontal: 10,
-      paddingVertical: 6,
+      paddingHorizontal: 8,
+      paddingVertical: 5,
     },
     businessMetricsRow: {
       flexDirection: "row",
       flexWrap: "wrap",
-      gap: 8,
+      gap: 5,
     },
     businessName: {
       color: theme.colors.foreground,
-      fontSize: 20,
+      fontSize: 14,
       flexShrink: 1,
       fontWeight: "900",
       letterSpacing: -0.3,
-      lineHeight: 25,
+      lineHeight: 18,
     },
     businessStatusBadge: {
       alignSelf: "flex-start",
@@ -2649,12 +2475,12 @@ const createStyles = (theme: MobileTheme) =>
       borderColor: theme.colors.success,
       borderRadius: theme.radii.pill,
       borderWidth: 1,
-      paddingHorizontal: 10,
-      paddingVertical: 6,
+      paddingHorizontal: 8,
+      paddingVertical: 5,
     },
     businessStatusText: {
       color: theme.colors.success,
-      fontSize: 11,
+      fontSize: 9,
       fontWeight: "900",
     },
     businessTitleRow: {
@@ -2731,14 +2557,14 @@ const createStyles = (theme: MobileTheme) =>
       alignItems: "center",
       backgroundColor: "#d94676",
       borderColor: "transparent",
-      borderRadius: 28,
+      borderRadius: 26,
       borderWidth: 0,
       flexBasis: "30%",
       flexGrow: 1,
       gap: 10,
-      minHeight: 118,
+      minHeight: 112,
       paddingHorizontal: 12,
-      paddingVertical: 18,
+      paddingVertical: 16,
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: 14, width: 0 },
       shadowOpacity: theme.isDark ? 0.34 : 0.08,
@@ -2778,12 +2604,12 @@ const createStyles = (theme: MobileTheme) =>
     },
     categoryIcon: {
       color: "#ffffff",
-      fontSize: 30,
+      fontSize: 28,
       fontWeight: "900",
     },
     categoryLabel: {
       color: "#ffffff",
-      fontSize: 15,
+      fontSize: 14,
       fontWeight: "900",
       textAlign: "center",
     },
@@ -2836,25 +2662,25 @@ const createStyles = (theme: MobileTheme) =>
     centerTabButton: {
       backgroundColor: "#153f31",
       borderColor: theme.colors.gold,
-      borderWidth: 5,
-      borderRadius: 38,
+      borderWidth: 4,
+      borderRadius: 34,
       shadowColor: theme.colors.deepGold,
-      shadowOffset: { height: 14, width: 0 },
-      shadowOpacity: theme.isDark ? 0.48 : 0.16,
-      shadowRadius: 22,
-      transform: [{ translateY: -22 }],
+      shadowOffset: { height: 10, width: 0 },
+      shadowOpacity: theme.isDark ? 0.38 : 0.14,
+      shadowRadius: 18,
+      transform: [{ translateY: -14 }],
     },
     centerTabButtonActive: {
       backgroundColor: "#174d3b",
-      transform: [{ translateY: -24 }, { scale: 1.04 }],
+      transform: [{ translateY: -16 }, { scale: 1.02 }],
     },
     centerTabActiveIndicator: {
       backgroundColor: "transparent",
     },
     centerTabIcon: {
       color: theme.colors.foreground,
-      fontSize: 36,
-      lineHeight: 38,
+      fontSize: 31,
+      lineHeight: 33,
     },
     chipRow: {
       flexDirection: "row",
@@ -2916,9 +2742,9 @@ const createStyles = (theme: MobileTheme) =>
       textAlign: "center",
     },
     content: {
-      gap: 24,
-      paddingBottom: 178,
-      paddingHorizontal: 20,
+      gap: 22,
+      paddingBottom: 150,
+      paddingHorizontal: 22,
     },
     dataOwnershipNote: {
       color: theme.colors.success,
@@ -3131,17 +2957,17 @@ const createStyles = (theme: MobileTheme) =>
     },
     discoveryCard: {
       ...createMobileSurface(theme, {
-        radius: 34,
+        radius: 32,
         tone: "elevated",
       }),
       borderColor: theme.colors.border,
-      gap: 22,
-      padding: 22,
+      gap: 0,
+      padding: 0,
       ...createMobileShadow(theme, {
-        darkOpacity: 0.4,
-        height: 18,
+        darkOpacity: 0.28,
+        height: 12,
         lightOpacity: 0.12,
-        radius: 32,
+        radius: 22,
       }),
     },
     discoveryHeaderRow: {
@@ -3293,13 +3119,11 @@ const createStyles = (theme: MobileTheme) =>
     header: {
       alignItems: "center",
       backgroundColor: theme.colors.background,
-      borderBottomColor: theme.colors.border,
-      borderBottomWidth: 1,
       flexDirection: "row",
-      gap: 12,
-      paddingBottom: 18,
+      gap: 10,
+      paddingBottom: 10,
       paddingHorizontal: 22,
-      paddingTop: 18,
+      paddingTop: 12,
     },
     iconAction: {
       alignItems: "center",
@@ -3324,48 +3148,43 @@ const createStyles = (theme: MobileTheme) =>
     },
     heroBody: {
       color: theme.colors.mutedForeground,
-      fontSize: 17,
+      fontSize: 19,
       fontWeight: "700",
-      lineHeight: 26,
-      marginTop: 12,
+      lineHeight: 27,
+      marginTop: 8,
     },
     heroCard: {
-      backgroundColor: theme.colors.hero,
-      borderColor: theme.colors.border,
-      borderRadius: 36,
-      borderWidth: 1,
+      backgroundColor: "transparent",
       overflow: "hidden",
-      padding: 26,
-      shadowColor: theme.colors.shadow,
-      shadowOffset: { height: 26, width: 0 },
-      shadowOpacity: theme.isDark ? 0.44 : 0.14,
-      shadowRadius: 42,
+      paddingHorizontal: 4,
+      paddingTop: 8,
     },
     heroEyebrow: {
-      color: theme.colors.deepGold,
-      fontSize: 12,
-      fontWeight: "900",
-      letterSpacing: 0.8,
-      marginTop: 18,
-      textTransform: "uppercase",
+      color: theme.colors.mutedForeground,
+      fontSize: 17,
+      fontWeight: "700",
+      letterSpacing: 0,
+      marginTop: 12,
     },
     heroGlow: {
-      backgroundColor: theme.colors.goldSoft,
-      borderRadius: 999,
-      height: 190,
-      opacity: theme.isDark ? 0.42 : 0.8,
-      position: "absolute",
-      right: -64,
-      top: -68,
-      width: 190,
+      display: "none",
     },
     heroTitle: {
       color: theme.colors.foreground,
-      fontSize: 33,
+      fontSize: 38,
       fontWeight: "900",
-      letterSpacing: -0.5,
-      lineHeight: 41,
-      marginTop: 12,
+      letterSpacing: -0.7,
+      lineHeight: 45,
+      marginTop: 4,
+    },
+    homeBusinessCardSlot: {
+      flexBasis: "31%",
+      flexGrow: 1,
+      minWidth: 0,
+    },
+    homeBusinessGrid: {
+      flexDirection: "row",
+      gap: 14,
     },
     integrationBody: {
       color: theme.colors.warning,
@@ -3398,9 +3217,9 @@ const createStyles = (theme: MobileTheme) =>
       borderRadius: theme.radii.pill,
       borderWidth: 1,
       justifyContent: "center",
-      minWidth: 42,
-      paddingHorizontal: 10,
-      paddingVertical: 7,
+      minWidth: 34,
+      paddingHorizontal: 8,
+      paddingVertical: 5,
     },
     localeButtonActive: {
       backgroundColor: theme.colors.gold,
@@ -3416,9 +3235,9 @@ const createStyles = (theme: MobileTheme) =>
     },
     localeButtonText: {
       color: theme.colors.mutedForeground,
-      fontSize: 11,
+      fontSize: 9,
       fontWeight: "800",
-      lineHeight: 14,
+      lineHeight: 12,
     },
     localeButtonTextActive: {
       color: theme.colors.foregroundInverse,
@@ -3427,7 +3246,7 @@ const createStyles = (theme: MobileTheme) =>
       alignItems: "center",
       flexDirection: "row",
       flexShrink: 0,
-      gap: 6,
+      gap: 4,
     },
     locationDot: {
       color: theme.colors.success,
@@ -3442,8 +3261,8 @@ const createStyles = (theme: MobileTheme) =>
       borderRadius: theme.radii.pill,
       flexDirection: "row",
       gap: 7,
-      paddingHorizontal: 12,
-      paddingVertical: 8,
+      paddingHorizontal: 22,
+      paddingVertical: 10,
     },
     locationText: {
       color: theme.colors.foreground,
@@ -3455,18 +3274,18 @@ const createStyles = (theme: MobileTheme) =>
       backgroundColor: theme.colors.gold,
       borderColor: theme.colors.accent,
       borderWidth: 1,
-      borderRadius: 24,
-      height: 50,
+      borderRadius: 20,
+      height: 42,
       justifyContent: "center",
       shadowColor: theme.colors.deepGold,
-      shadowOffset: { height: 12, width: 0 },
-      shadowOpacity: theme.isDark ? 0.48 : 0.14,
-      shadowRadius: 20,
-      width: 50,
+      shadowOffset: { height: 8, width: 0 },
+      shadowOpacity: theme.isDark ? 0.32 : 0.12,
+      shadowRadius: 14,
+      width: 42,
     },
     logoText: {
       color: theme.colors.foregroundInverse,
-      fontSize: 24,
+      fontSize: 20,
       fontWeight: "900",
     },
     mapHeaderCard: {
@@ -3823,17 +3642,11 @@ const createStyles = (theme: MobileTheme) =>
     },
     onboardingCard: {
       backgroundColor: theme.colors.hero,
-      borderColor: theme.colors.border,
-      borderRadius: 42,
-      borderWidth: 1,
-      minHeight: 720,
+      borderRadius: 0,
+      flex: 1,
       overflow: "hidden",
       paddingHorizontal: 28,
-      paddingVertical: 34,
-      shadowColor: theme.colors.shadow,
-      shadowOffset: { height: 30, width: 0 },
-      shadowOpacity: theme.isDark ? 0.52 : 0.16,
-      shadowRadius: 44,
+      paddingVertical: 28,
     },
     onboardingGlow: {
       backgroundColor: theme.colors.goldSoft,
@@ -3893,6 +3706,11 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.foreground,
       fontSize: 19,
       fontWeight: "900",
+    },
+    onboardingScreen: {
+      backgroundColor: theme.colors.hero,
+      flex: 1,
+      paddingHorizontal: 0,
     },
     onboardingSlogan: {
       color: theme.colors.gold,
@@ -5139,11 +4957,11 @@ const createStyles = (theme: MobileTheme) =>
       bottom: 0,
       elevation: 24,
       flexDirection: "row",
-      height: 118,
+      height: 104,
       left: 0,
-      paddingBottom: 22,
-      paddingHorizontal: 14,
-      paddingTop: 14,
+      paddingBottom: 18,
+      paddingHorizontal: 16,
+      paddingTop: 10,
       position: "absolute",
       right: 0,
       shadowColor: theme.colors.shadow,
@@ -5167,9 +4985,9 @@ const createStyles = (theme: MobileTheme) =>
       alignItems: "center",
       borderRadius: 24,
       flex: 1,
-      gap: 6,
+      gap: 5,
       justifyContent: "center",
-      minHeight: 66,
+      minHeight: 58,
       paddingHorizontal: 2,
     },
     tabButtonActive: {
@@ -5181,16 +4999,16 @@ const createStyles = (theme: MobileTheme) =>
     },
     tabIcon: {
       color: theme.colors.foreground,
-      fontSize: 25,
+      fontSize: 23,
     },
     tabIconActive: {
       color: theme.colors.gold,
     },
     tabLabel: {
       color: theme.colors.foreground,
-      fontSize: 12,
+      fontSize: 11,
       fontWeight: "800",
-      lineHeight: 16,
+      lineHeight: 15,
       maxWidth: 64,
       minWidth: 48,
       textAlign: "center",
