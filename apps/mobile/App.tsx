@@ -43,6 +43,8 @@ type PremiumBusiness = {
   name: string;
   price: string;
   rating: string;
+  reviewCount: string;
+  status: string;
   tag: string;
 };
 
@@ -69,6 +71,8 @@ const featuredBusinesses: PremiumBusiness[] = [
     name: "Noura Beauty Lounge",
     price: "من 25,000 د.ع",
     rating: "4.9",
+    reviewCount: "128 تقييم",
+    status: "مفتوح الآن",
     tag: "متاح اليوم",
   },
   {
@@ -78,6 +82,8 @@ const featuredBusinesses: PremiumBusiness[] = [
     name: "Mat3am Gold",
     price: "طاولة من 4 أشخاص",
     rating: "4.8",
+    reviewCount: "96 تقييم",
+    status: "حجز سريع",
     tag: "حجز سريع",
   },
   {
@@ -87,6 +93,8 @@ const featuredBusinesses: PremiumBusiness[] = [
     name: "Smile Studio Clinic",
     price: "استشارة من 15,000 د.ع",
     rating: "4.7",
+    reviewCount: "74 تقييم",
+    status: "الأقرب",
     tag: "مختصون",
   },
 ];
@@ -115,18 +123,27 @@ const bookingSteps: BookingStep[] = [
 ];
 
 const staffMembers = [
-  { name: "ليان", role: "خبيرة شعر", time: "متاحة 4:30 م" },
-  { name: "سارة", role: "مختصة بشرة", time: "متاحة غداً" },
-  { name: "آدم", role: "مدير حجوزات", time: "أقرب وقت 6:00 م" },
+  { name: "ليان", role: "خبيرة شعر", time: "متاحة 4:30 م", topRated: true },
+  { name: "سارة", role: "مختصة بشرة", time: "متاحة غداً", topRated: false },
+  { name: "آدم", role: "مدير حجوزات", time: "أقرب وقت 6:00 م", topRated: false },
 ];
 
 const services = [
-  { duration: "45 دقيقة", name: "قص وتصفيف", price: "25,000 د.ع" },
-  { duration: "60 دقيقة", name: "عناية بشرة", price: "35,000 د.ع" },
-  { duration: "90 دقيقة", name: "باقة فاخرة", price: "55,000 د.ع" },
+  { duration: "45 دقيقة", name: "قص وتصفيف", price: "25,000 د.ع", tag: "الأكثر طلباً" },
+  { duration: "60 دقيقة", name: "عناية بشرة", price: "35,000 د.ع", tag: "عناية فاخرة" },
+  { duration: "90 دقيقة", name: "باقة فاخرة", price: "55,000 د.ع", tag: "VIP" },
 ];
 
 const timeSlots = ["10:00", "12:30", "14:00", "16:30", "18:00"];
+
+const dateOptions = [
+  { day: "اليوم", label: "06", meta: "متاح" },
+  { day: "غداً", label: "07", meta: "6 أوقات" },
+  { day: "الأربعاء", label: "08", meta: "مزدحم" },
+  { day: "الخميس", label: "09", meta: "أفضل" },
+];
+
+const businessTabs = ["الخدمات", "التقييمات", "حول"];
 
 export default function App() {
   const colorScheme = useColorScheme();
@@ -308,6 +325,7 @@ function CustomerHomeScreen({
       <SearchBar isRtl={isRtl} styles={styles} />
       <CategoryGrid styles={styles} />
       <PromoCard isRtl={isRtl} styles={styles} />
+      <BusinessDetailShowcase isRtl={isRtl} styles={styles} />
       <SectionHeader
         action="عرض الكل"
         isRtl={isRtl}
@@ -325,6 +343,83 @@ function CustomerHomeScreen({
         ))}
       </View>
     </>
+  );
+}
+
+function BusinessDetailShowcase({
+  isRtl,
+  styles,
+}: {
+  isRtl: boolean;
+  styles: MobileStyles;
+}) {
+  return (
+    <View style={styles.detailCard}>
+      <View style={styles.detailHero}>
+        <View style={styles.detailHeroGlow} />
+        <View style={styles.detailTopRow}>
+          <View style={styles.statusBadge}>
+            <Text style={styles.statusBadgeText}>مفتوح الآن</Text>
+          </View>
+          <View style={styles.iconActionRow}>
+            <View style={styles.iconAction}>
+              <Text style={styles.iconActionText}>↗</Text>
+            </View>
+            <View style={styles.iconAction}>
+              <Text style={styles.iconActionText}>♡</Text>
+            </View>
+          </View>
+        </View>
+        <Text style={[styles.detailTitle, isRtl && styles.rtlText]}>
+          Noura Beauty Lounge
+        </Text>
+        <Text style={[styles.detailMeta, isRtl && styles.rtlText]}>
+          صالون وتجميل · بغداد، الكرادة · 1.8 كم
+        </Text>
+        <View style={styles.detailStatsRow}>
+          <Text style={styles.detailStat}>★ 4.9</Text>
+          <Text style={styles.detailStat}>128 تقييم</Text>
+          <Text style={styles.detailStat}>من 25,000 د.ع</Text>
+        </View>
+      </View>
+
+      <View style={styles.detailTabs}>
+        {businessTabs.map((tab, index) => (
+          <View
+            key={tab}
+            style={[styles.detailTab, index === 0 && styles.detailTabActive]}
+          >
+            <Text
+              style={[
+                styles.detailTabText,
+                index === 0 && styles.detailTabTextActive,
+              ]}
+            >
+              {tab}
+            </Text>
+          </View>
+        ))}
+      </View>
+
+      <View style={styles.detailServiceCard}>
+        <View>
+          <Text style={[styles.detailServiceTitle, isRtl && styles.rtlText]}>
+            قص وتصفيف فاخر
+          </Text>
+          <Text style={[styles.detailServiceMeta, isRtl && styles.rtlText]}>
+            45 دقيقة · مع ليان · تأكيد سريع
+          </Text>
+        </View>
+        <Text style={styles.detailServicePrice}>25,000 د.ع</Text>
+      </View>
+
+      <View style={styles.detailCtaRow}>
+        <PrimaryButton label="احجز الآن" styles={styles} />
+        <Pressable accessibilityRole="button" style={styles.secondaryIconButton}>
+          <Text style={styles.secondaryIconButtonText}>مراجعات</Text>
+        </Pressable>
+      </View>
+    </View>
   );
 }
 
@@ -433,6 +528,9 @@ function PremiumBusinessCard({
   return (
     <View style={styles.businessCard}>
       <View style={styles.businessHero}>
+        <View style={styles.businessStatusBadge}>
+          <Text style={styles.businessStatusText}>{business.status}</Text>
+        </View>
         <View style={styles.businessInitial}>
           <Text style={styles.businessInitialText}>{business.name.charAt(0)}</Text>
         </View>
@@ -454,8 +552,12 @@ function PremiumBusinessCard({
             <Text style={styles.ratingText}>★ {business.rating}</Text>
           </View>
         </View>
+        <View style={styles.businessMetricsRow}>
+          <Text style={styles.businessMetric}>{business.reviewCount}</Text>
+          <Text style={styles.businessMetric}>{business.price}</Text>
+        </View>
         <View style={styles.businessFooter}>
-          <Text style={styles.priceText}>{business.price}</Text>
+          <Text style={styles.priceText}>{business.distance}</Text>
           <Text style={styles.tagText}>{business.tag}</Text>
         </View>
       </View>
@@ -562,24 +664,54 @@ function MarketplaceStateView({
     <View style={styles.businessList}>
       {state.businesses.map((business) => (
         <View key={business.id} style={styles.businessCard}>
+          <View style={styles.businessHeroCompact}>
+            <View style={styles.businessStatusBadge}>
+              <Text style={styles.businessStatusText}>
+                {business.serviceCount > 0 ? "حجز متاح" : "قيد الإعداد"}
+              </Text>
+            </View>
+            <View style={styles.favoriteButton}>
+              <Text style={styles.favoriteText}>♡</Text>
+            </View>
+          </View>
           <View style={styles.businessBody}>
-            <Text style={[styles.businessName, isRtl && styles.rtlText]}>
-              {business.name}
-            </Text>
-            <Text style={[styles.businessMeta, isRtl && styles.rtlText]}>
-              {[business.categoryName, business.city, business.branch.locationLabel]
-                .filter(Boolean)
-                .join(" · ")}
-            </Text>
-            <View style={styles.businessFooter}>
-              <Text style={styles.priceText}>
-                ★ {business.averageRating?.toFixed(1) ?? "-"} ·{" "}
+            <View style={styles.businessTitleRow}>
+              <View style={styles.businessCopy}>
+                <Text style={[styles.businessName, isRtl && styles.rtlText]}>
+                  {business.name}
+                </Text>
+                <Text style={[styles.businessMeta, isRtl && styles.rtlText]}>
+                  {[
+                    business.categoryName,
+                    business.city,
+                    business.branch.locationLabel,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </Text>
+              </View>
+              <View style={styles.ratingPill}>
+                <Text style={styles.ratingText}>
+                  ★ {business.averageRating?.toFixed(1) ?? "-"}
+                </Text>
+              </View>
+            </View>
+            <View style={styles.businessMetricsRow}>
+              <Text style={styles.businessMetric}>
                 {business.reviewCount} {text.marketplaceReviews}
               </Text>
-              <Text style={styles.tagText}>
+              <Text style={styles.businessMetric}>
+                {business.serviceCount} {text.marketplaceServices}
+              </Text>
+            </View>
+            <View style={styles.businessFooter}>
+              <Text style={styles.priceText}>
                 {business.startingPrice
                   ? `${text.marketplaceStartingFrom} ${business.startingPrice}`
-                  : `${business.serviceCount} ${text.marketplaceServices}`}
+                  : text.marketplaceEmptyTitle}
+              </Text>
+              <Text style={styles.tagText}>
+                {business.branch.locationLabel ?? "قريب منك"}
               </Text>
             </View>
           </View>
@@ -599,6 +731,7 @@ function BookingFlowScreen({
   return (
     <>
       <View style={styles.bookingSummaryCard}>
+        <View style={styles.bookingHeroAccent} />
         <Text style={[styles.screenEyebrow, isRtl && styles.rtlText]}>
           رحلة الحجز
         </Text>
@@ -609,6 +742,8 @@ function BookingFlowScreen({
           هذه واجهة عرض فقط. لا تضيف دفعاً أو تغير منطق الحجز الحقيقي.
         </Text>
       </View>
+
+      <SelectedServiceCard isRtl={isRtl} styles={styles} />
 
       <View style={styles.stepGrid}>
         {bookingSteps.map((step) => (
@@ -625,14 +760,61 @@ function BookingFlowScreen({
       </View>
 
       <SectionHeader isRtl={isRtl} styles={styles} title="اختر الخدمة" />
-      {services.map((service) => (
-        <ServiceRow isRtl={isRtl} key={service.name} service={service} styles={styles} />
+      {services.map((service, index) => (
+        <ServiceRow
+          isRtl={isRtl}
+          key={service.name}
+          selected={index === 0}
+          service={service}
+          styles={styles}
+        />
       ))}
 
       <SectionHeader isRtl={isRtl} styles={styles} title="اختر المختص" />
-      {staffMembers.map((staff) => (
-        <StaffRow isRtl={isRtl} key={staff.name} staff={staff} styles={styles} />
+      {staffMembers.map((staff, index) => (
+        <StaffRow
+          isRtl={isRtl}
+          key={staff.name}
+          selected={index === 0}
+          staff={staff}
+          styles={styles}
+        />
       ))}
+
+      <SectionHeader isRtl={isRtl} styles={styles} title="اختر اليوم" />
+      <View style={styles.dateStrip}>
+        {dateOptions.map((date, index) => (
+          <View
+            key={date.day}
+            style={[styles.datePill, index === 0 && styles.datePillActive]}
+          >
+            <Text
+              style={[
+                styles.dateDay,
+                index === 0 && styles.dateDayActive,
+              ]}
+            >
+              {date.day}
+            </Text>
+            <Text
+              style={[
+                styles.dateLabel,
+                index === 0 && styles.dateLabelActive,
+              ]}
+            >
+              {date.label}
+            </Text>
+            <Text
+              style={[
+                styles.dateMeta,
+                index === 0 && styles.dateMetaActive,
+              ]}
+            >
+              {date.meta}
+            </Text>
+          </View>
+        ))}
+      </View>
 
       <SectionHeader isRtl={isRtl} styles={styles} title="اختر الوقت" />
       <View style={styles.timeGrid}>
@@ -660,17 +842,46 @@ function BookingFlowScreen({
   );
 }
 
+function SelectedServiceCard({
+  isRtl,
+  styles,
+}: {
+  isRtl: boolean;
+  styles: MobileStyles;
+}) {
+  return (
+    <View style={styles.selectedServiceCard}>
+      <View style={styles.selectedServiceIcon}>
+        <Text style={styles.selectedServiceIconText}>✦</Text>
+      </View>
+      <View style={styles.rowCopy}>
+        <Text style={[styles.selectedServiceTitle, isRtl && styles.rtlText]}>
+          قص وتصفيف فاخر
+        </Text>
+        <Text style={[styles.selectedServiceMeta, isRtl && styles.rtlText]}>
+          Noura Beauty Lounge · ليان · اليوم 4:30 م
+        </Text>
+      </View>
+      <View style={styles.statusBadge}>
+        <Text style={styles.statusBadgeText}>مختار</Text>
+      </View>
+    </View>
+  );
+}
+
 function ServiceRow({
   isRtl,
+  selected,
   service,
   styles,
 }: {
   isRtl: boolean;
-  service: { duration: string; name: string; price: string };
+  selected?: boolean;
+  service: { duration: string; name: string; price: string; tag: string };
   styles: MobileStyles;
 }) {
   return (
-    <View style={styles.rowCard}>
+    <View style={[styles.rowCard, selected && styles.rowCardSelected]}>
       <View style={styles.rowIcon}>
         <Text style={styles.rowIconText}>✦</Text>
       </View>
@@ -679,25 +890,30 @@ function ServiceRow({
           {service.name}
         </Text>
         <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>
-          {service.duration}
+          {service.duration} · {service.tag}
         </Text>
       </View>
-      <Text style={styles.rowPrice}>{service.price}</Text>
+      <View style={styles.servicePriceBlock}>
+        <Text style={styles.rowPrice}>{service.price}</Text>
+        {selected ? <Text style={styles.selectText}>مختارة</Text> : null}
+      </View>
     </View>
   );
 }
 
 function StaffRow({
   isRtl,
+  selected,
   staff,
   styles,
 }: {
   isRtl: boolean;
-  staff: { name: string; role: string; time: string };
+  selected?: boolean;
+  staff: { name: string; role: string; time: string; topRated: boolean };
   styles: MobileStyles;
 }) {
   return (
-    <View style={styles.rowCard}>
+    <View style={[styles.rowCard, selected && styles.rowCardSelected]}>
       <View style={styles.avatar}>
         <Text style={styles.avatarText}>{staff.name.charAt(0)}</Text>
       </View>
@@ -707,9 +923,10 @@ function StaffRow({
         </Text>
         <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>
           {staff.role} · {staff.time}
+          {staff.topRated ? " · الأعلى تقييماً" : ""}
         </Text>
       </View>
-      <Text style={styles.selectText}>اختيار</Text>
+      <Text style={styles.selectText}>{selected ? "مختارة" : "اختيار"}</Text>
     </View>
   );
 }
@@ -852,6 +1069,10 @@ function SimpleBoundaryScreen({
           <Text style={styles.secondaryButtonText}>{secondary}</Text>
         </Pressable>
       </View>
+      <View style={styles.boundaryPillRow}>
+        <Text style={styles.boundaryPill}>واجهة آمنة</Text>
+        <Text style={styles.boundaryPill}>بدون بيانات حقيقية</Text>
+      </View>
     </View>
   );
 }
@@ -969,11 +1190,22 @@ const createStyles = (theme: MobileTheme) =>
       gap: 16,
       marginTop: 14,
     },
+    bookingHeroAccent: {
+      backgroundColor: theme.colors.goldSoft,
+      borderRadius: 999,
+      height: 92,
+      opacity: 0.85,
+      position: "absolute",
+      right: -26,
+      top: -34,
+      width: 92,
+    },
     bookingSummaryCard: {
       backgroundColor: theme.colors.hero,
       borderColor: theme.colors.border,
       borderRadius: theme.radii.xl,
       borderWidth: 1,
+      overflow: "hidden",
       padding: 22,
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: 16, width: 0 },
@@ -1029,6 +1261,13 @@ const createStyles = (theme: MobileTheme) =>
       justifyContent: "space-between",
       padding: 14,
     },
+    businessHeroCompact: {
+      backgroundColor: theme.colors.heroMuted,
+      flexDirection: "row",
+      height: 78,
+      justifyContent: "space-between",
+      padding: 14,
+    },
     businessInitial: {
       alignItems: "center",
       alignSelf: "flex-start",
@@ -1051,9 +1290,33 @@ const createStyles = (theme: MobileTheme) =>
       fontSize: 13,
       marginTop: 4,
     },
+    businessMetric: {
+      color: theme.colors.mutedForeground,
+      fontSize: 12,
+      fontWeight: "800",
+    },
+    businessMetricsRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+    },
     businessName: {
       color: theme.colors.foreground,
       fontSize: 18,
+      fontWeight: "900",
+    },
+    businessStatusBadge: {
+      alignSelf: "flex-start",
+      backgroundColor: theme.colors.successSoft,
+      borderColor: theme.colors.success,
+      borderRadius: theme.radii.pill,
+      borderWidth: 1,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+    },
+    businessStatusText: {
+      color: theme.colors.success,
+      fontSize: 11,
       fontWeight: "900",
     },
     businessTitleRow: {
@@ -1061,6 +1324,22 @@ const createStyles = (theme: MobileTheme) =>
       flexDirection: "row",
       gap: 12,
       justifyContent: "space-between",
+    },
+    boundaryPill: {
+      backgroundColor: theme.colors.goldSoft,
+      borderRadius: theme.radii.pill,
+      color: theme.colors.deepGold,
+      fontSize: 11,
+      fontWeight: "900",
+      overflow: "hidden",
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+    },
+    boundaryPillRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+      marginTop: 14,
     },
     cancelAction: {
       color: theme.colors.danger,
@@ -1150,6 +1429,166 @@ const createStyles = (theme: MobileTheme) =>
     disabledButtonText: {
       color: theme.colors.disabledText,
     },
+    dateDay: {
+      color: theme.colors.mutedForeground,
+      fontSize: 12,
+      fontWeight: "900",
+    },
+    dateDayActive: {
+      color: theme.colors.foregroundInverse,
+    },
+    dateLabel: {
+      color: theme.colors.foreground,
+      fontSize: 24,
+      fontWeight: "900",
+      marginTop: 2,
+    },
+    dateLabelActive: {
+      color: theme.colors.foregroundInverse,
+    },
+    dateMeta: {
+      color: theme.colors.mutedForeground,
+      fontSize: 11,
+      fontWeight: "800",
+      marginTop: 3,
+    },
+    dateMetaActive: {
+      color: theme.colors.foregroundInverse,
+    },
+    datePill: {
+      backgroundColor: theme.colors.cardElevated,
+      borderColor: theme.colors.border,
+      borderRadius: 22,
+      borderWidth: 1,
+      minWidth: 82,
+      padding: 12,
+    },
+    datePillActive: {
+      backgroundColor: theme.colors.gold,
+      borderColor: theme.colors.gold,
+    },
+    dateStrip: {
+      flexDirection: "row",
+      gap: 10,
+    },
+    detailCard: {
+      backgroundColor: theme.colors.cardElevated,
+      borderColor: theme.colors.border,
+      borderRadius: theme.radii.xl,
+      borderWidth: 1,
+      overflow: "hidden",
+      shadowColor: theme.colors.shadow,
+      shadowOffset: { height: 18, width: 0 },
+      shadowOpacity: theme.isDark ? 0.3 : 0.1,
+      shadowRadius: 28,
+    },
+    detailCtaRow: {
+      flexDirection: "row",
+      gap: 10,
+      padding: 16,
+      paddingTop: 0,
+    },
+    detailHero: {
+      backgroundColor: theme.colors.heroMuted,
+      overflow: "hidden",
+      padding: 18,
+    },
+    detailHeroGlow: {
+      backgroundColor: theme.colors.goldSoft,
+      borderRadius: 999,
+      height: 150,
+      opacity: 0.85,
+      position: "absolute",
+      right: -42,
+      top: -52,
+      width: 150,
+    },
+    detailMeta: {
+      color: theme.colors.mutedForeground,
+      fontSize: 14,
+      lineHeight: 21,
+      marginTop: 7,
+    },
+    detailServiceCard: {
+      alignItems: "center",
+      backgroundColor: theme.colors.card,
+      borderColor: theme.colors.border,
+      borderRadius: 22,
+      borderWidth: 1,
+      flexDirection: "row",
+      gap: 12,
+      justifyContent: "space-between",
+      margin: 16,
+      padding: 14,
+    },
+    detailServiceMeta: {
+      color: theme.colors.mutedForeground,
+      fontSize: 12,
+      marginTop: 4,
+    },
+    detailServicePrice: {
+      color: theme.colors.deepGold,
+      fontSize: 13,
+      fontWeight: "900",
+    },
+    detailServiceTitle: {
+      color: theme.colors.foreground,
+      fontSize: 15,
+      fontWeight: "900",
+    },
+    detailStat: {
+      backgroundColor: theme.colors.cardElevated,
+      borderRadius: theme.radii.pill,
+      color: theme.colors.foreground,
+      fontSize: 12,
+      fontWeight: "900",
+      overflow: "hidden",
+      paddingHorizontal: 10,
+      paddingVertical: 7,
+    },
+    detailStatsRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+      marginTop: 14,
+    },
+    detailTab: {
+      alignItems: "center",
+      borderRadius: theme.radii.pill,
+      flex: 1,
+      paddingVertical: 10,
+    },
+    detailTabActive: {
+      backgroundColor: theme.colors.gold,
+    },
+    detailTabText: {
+      color: theme.colors.mutedForeground,
+      fontSize: 12,
+      fontWeight: "900",
+    },
+    detailTabTextActive: {
+      color: theme.colors.foregroundInverse,
+    },
+    detailTabs: {
+      backgroundColor: theme.colors.muted,
+      borderRadius: theme.radii.pill,
+      flexDirection: "row",
+      gap: 4,
+      margin: 16,
+      padding: 4,
+    },
+    detailTitle: {
+      color: theme.colors.foreground,
+      fontSize: 26,
+      fontWeight: "900",
+      lineHeight: 32,
+      marginTop: 42,
+    },
+    detailTopRow: {
+      alignItems: "center",
+      flexDirection: "row",
+      justifyContent: "space-between",
+    },
     editAction: {
       color: theme.colors.gold,
       fontSize: 13,
@@ -1214,6 +1653,23 @@ const createStyles = (theme: MobileTheme) =>
       paddingBottom: 12,
       paddingHorizontal: 18,
       paddingTop: 18,
+    },
+    iconAction: {
+      alignItems: "center",
+      backgroundColor: theme.colors.cardElevated,
+      borderRadius: 18,
+      height: 36,
+      justifyContent: "center",
+      width: 36,
+    },
+    iconActionRow: {
+      flexDirection: "row",
+      gap: 8,
+    },
+    iconActionText: {
+      color: theme.colors.gold,
+      fontSize: 17,
+      fontWeight: "900",
     },
     heroActions: {
       flexDirection: "row",
@@ -1473,6 +1929,10 @@ const createStyles = (theme: MobileTheme) =>
       gap: 12,
       padding: 14,
     },
+    rowCardSelected: {
+      backgroundColor: theme.colors.goldSoft,
+      borderColor: theme.colors.gold,
+    },
     rowCopy: {
       flex: 1,
     },
@@ -1518,6 +1978,39 @@ const createStyles = (theme: MobileTheme) =>
       shadowOffset: { height: 16, width: 0 },
       shadowOpacity: theme.isDark ? 0.3 : 0.08,
       shadowRadius: 26,
+    },
+    selectedServiceCard: {
+      alignItems: "center",
+      backgroundColor: theme.colors.cardElevated,
+      borderColor: theme.colors.gold,
+      borderRadius: theme.radii.card,
+      borderWidth: 1,
+      flexDirection: "row",
+      gap: 12,
+      padding: 16,
+    },
+    selectedServiceIcon: {
+      alignItems: "center",
+      backgroundColor: theme.colors.gold,
+      borderRadius: 22,
+      height: 44,
+      justifyContent: "center",
+      width: 44,
+    },
+    selectedServiceIconText: {
+      color: theme.colors.foregroundInverse,
+      fontSize: 18,
+      fontWeight: "900",
+    },
+    selectedServiceMeta: {
+      color: theme.colors.mutedForeground,
+      fontSize: 12,
+      marginTop: 4,
+    },
+    selectedServiceTitle: {
+      color: theme.colors.foreground,
+      fontSize: 16,
+      fontWeight: "900",
     },
     screenDescription: {
       color: theme.colors.mutedForeground,
@@ -1572,6 +2065,18 @@ const createStyles = (theme: MobileTheme) =>
       fontSize: 14,
       fontWeight: "900",
     },
+    secondaryIconButton: {
+      alignItems: "center",
+      backgroundColor: theme.colors.muted,
+      borderRadius: theme.radii.control,
+      justifyContent: "center",
+      paddingHorizontal: 14,
+    },
+    secondaryIconButtonText: {
+      color: theme.colors.foreground,
+      fontSize: 13,
+      fontWeight: "900",
+    },
     sectionAction: {
       color: theme.colors.gold,
       fontSize: 13,
@@ -1592,9 +2097,27 @@ const createStyles = (theme: MobileTheme) =>
       fontSize: 13,
       fontWeight: "900",
     },
+    servicePriceBlock: {
+      alignItems: "flex-end",
+      gap: 4,
+    },
     shell: {
       backgroundColor: theme.colors.background,
       flex: 1,
+    },
+    statusBadge: {
+      alignSelf: "flex-start",
+      backgroundColor: theme.colors.successSoft,
+      borderColor: theme.colors.success,
+      borderRadius: theme.radii.pill,
+      borderWidth: 1,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+    },
+    statusBadgeText: {
+      color: theme.colors.success,
+      fontSize: 11,
+      fontWeight: "900",
     },
     stepBody: {
       color: theme.colors.mutedForeground,
