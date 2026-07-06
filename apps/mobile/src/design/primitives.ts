@@ -25,10 +25,15 @@ export function createMobileSurface(
     elevated: theme.colors.cardElevated,
     hero: theme.colors.hero,
   };
+  const borderByTone = {
+    card: theme.colors.border,
+    elevated: theme.colors.border,
+    hero: theme.colors.goldSoft,
+  };
 
   return {
     backgroundColor: backgroundByTone[tone],
-    borderColor: theme.colors.border,
+    borderColor: borderByTone[tone],
     borderRadius: radius,
     borderWidth: 1,
   };
@@ -49,6 +54,7 @@ export function createMobileShadow(
   },
 ): ViewStyle {
   return {
+    elevation: Math.max(1, Math.round(radius / 7)),
     shadowColor: theme.colors.shadow,
     shadowOffset: { height, width: 0 },
     shadowOpacity: theme.isDark ? darkOpacity : lightOpacity,
