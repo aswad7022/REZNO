@@ -6,6 +6,8 @@ This checklist validates visual quality after the REZNO mobile visual redesign s
 
 It does not validate backend correctness, payments, production authentication, database integrity, real business operations, or live booking mutations unless those flows are already available in a safe test environment. Running this checklist must not change app behavior.
 
+For the repeatable EAS development build path that can unblock physical-device testing, see [eas-development-build-path.md](./eas-development-build-path.md).
+
 ## Current readiness status
 
 - Static/local validation: READY FOR STATIC/LOCAL VALIDATION.
