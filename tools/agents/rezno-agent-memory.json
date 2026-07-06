@@ -1,7 +1,7 @@
 {
   "project": "REZNO",
   "productVision": "One Platform. Every Booking.",
-  "currentApprovedMain": "b994de4b039e4f010a7f0be524fdc936a9e0351c",
+  "currentApprovedMain": "dde042ea08fa04ee4c28e404ec1937b2e061719d",
   "closedSprints": [
     {
       "name": "Agentic Delivery System MVP",
@@ -128,11 +128,23 @@
       "pr": 39,
       "mainSha": "b994de4b039e4f010a7f0be524fdc936a9e0351c",
       "decision": "APPROVE"
+    },
+    {
+      "name": "Record Mobile Visual System Phase 8 Memory",
+      "pr": 40,
+      "mainSha": "30abb351429d94eee212c57b040f62971b99efee",
+      "decision": "APPROVE"
+    },
+    {
+      "name": "Mobile Premium Visual System Phase 9 - Profile Settings and Preferences Polish",
+      "pr": 41,
+      "mainSha": "dde042ea08fa04ee4c28e404ec1937b2e061719d",
+      "decision": "APPROVE"
     }
   ],
   "activeSprint": null,
   "blockedItems": [
     "Mobile real-device runtime smoke remains blocked until an SDK 57-compatible Expo Go/TestFlight path or EAS development build path is available."
   ],
-  "nextRecommendedAction": "Continue mobile premium visual refinement or resume SDK 57 mobile runtime gate."
+  "nextRecommendedAction": "Bundle future memory updates into each completed sprint closure when technically possible, then continue mobile premium visual refinement or resume SDK 57 mobile runtime gate."
 }
