@@ -130,6 +130,8 @@ Phase 28C documented Android EAS development build success, APK artifact availab
 
 Phase 29A is a later JS/UI polish checkpoint. It is not a new native build artifact and does not replace the need for physical-device smoke or release validation.
 
+Phase 30 real-data/API boundary audit is recorded in [mobile-phase-30-real-data-api-boundary-audit.md](./mobile-phase-30-real-data-api-boundary-audit.md).
+
 ## Recommended next action
 
 Recommended next action:
