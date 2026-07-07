@@ -2,9 +2,9 @@
 
 ## Status
 
-**OWNER PROMPT REQUIRED**
+**PROJECT LINKED / ENV CONFIGURED / BUILD NOT YET RUN**
 
-The Android EAS development build was not executed because the local EAS CLI reported that the EAS project is not configured for this repository. The next step requires an owner decision through `eas init` or equivalent project linking.
+The Android EAS development build has not been executed yet. The owner completed EAS project linking and created the EAS development environment variable required for the staging API base URL.
 
 ## EAS login evidence
 
@@ -23,18 +23,22 @@ Repository configuration inspected:
 - Development profile: present.
 - Development profile `developmentClient`: `true`.
 - Development profile distribution: `internal`.
+- Development profile environment binding: `development`.
 - Android package: `com.rezno.mobile`.
 - iOS bundle identifier: `com.rezno.mobile`.
 - Scheme: `rezno`.
+- EAS project: `@alhakeem7/rezno-mobile`.
+- EAS project ID: `ef209c9c-0d04-4731-a998-6241fef1b29d`.
 - API base URL priority in `apps/mobile/src/config/api.ts`:
   1. `EXPO_PUBLIC_REZNO_API_BASE_URL`
   2. `app.json` `extra.apiBaseUrl`
   3. localhost fallback
 
-Readiness blocker:
+Previous readiness blocker, resolved by owner:
 
 - `npx.cmd eas-cli env:list development --format long` failed with: `EAS project not configured. Must configure EAS project by running 'eas init' before this command can be run in non-interactive mode.`
-- Because the EAS project is not configured, the development EAS environment could not be verified.
+- Owner ran `npx.cmd eas-cli init`, creating and linking `@alhakeem7/rezno-mobile`.
+- `apps/mobile/app.json` now records the EAS project link.
 
 ## Intended API base URL
 
@@ -44,14 +48,15 @@ Intended Android development build API base URL:
 https://rezno-staging.vercel.app
 ```
 
-Local check:
+Environment verification:
 
-- Running `npx.cmd expo config --type public` with `EXPO_PUBLIC_REZNO_API_BASE_URL` set still shows `app.json` `extra.apiBaseUrl` as `http://localhost:3000`.
-- The app code can use `EXPO_PUBLIC_REZNO_API_BASE_URL`, but the EAS remote build environment could not be verified because the EAS project is not configured.
+- Owner created `EXPO_PUBLIC_REZNO_API_BASE_URL` in the EAS development environment with value `https://rezno-staging.vercel.app`.
+- Owner verified `npx.cmd eas-cli env:list development` showed `EXPO_PUBLIC_REZNO_API_BASE_URL=https://rezno-staging.vercel.app`.
+- `apps/mobile/eas.json` now binds the development build profile to the EAS `development` environment.
 
 Result:
 
-- The build was not started to avoid creating a development build that might fall back to localhost or prompt for project-linking decisions.
+- The Android development build is prepared to use the EAS development environment, but has not been run in this phase.
 
 ## Validation results
 
@@ -68,7 +73,7 @@ Pre-build validation passed:
 
 ## Build command
 
-Approved command, not executed due to owner prompt blocker:
+Approved command for the next phase, not executed in Phase 28A:
 
 ```powershell
 $env:EXPO_PUBLIC_REZNO_API_BASE_URL="https://rezno-staging.vercel.app"
@@ -132,15 +137,15 @@ Do not mark real-device smoke complete until the owner confirms installation and
 - No mobile UI changed.
 - No API, auth, database, schema, Prisma, migration, booking, or payment behavior changed.
 - No package files changed.
-- No EAS config changed.
+- EAS config change was limited to binding the development profile to the EAS `development` environment.
 
 ## Recommended next action
 
-Owner action required:
+Next build action:
 
-1. Configure/link the EAS project for `apps/mobile` using the correct Expo account/project ownership.
-2. Configure `EXPO_PUBLIC_REZNO_API_BASE_URL` for the EAS development environment with the staging URL.
-3. Re-run Phase 28 Android development build after project/env verification.
+1. Re-run Phase 28 Android development build using the approved Android development profile.
+2. Capture build URL, build ID, status, and artifact/install URL if available.
+3. Owner installs the Android development build and completes real-device smoke.
 
 Decision recommendation:
 
@@ -149,6 +154,7 @@ Decision recommendation:
 Reason:
 
 - EAS login is available.
-- Static validation passed.
-- Android EAS development build did not start because owner project-linking configuration is required.
+- EAS project is linked.
+- EAS development environment binding is configured.
+- Android EAS development build has not been run yet.
 - Real-device smoke remains blocked until an Android development build artifact exists.
