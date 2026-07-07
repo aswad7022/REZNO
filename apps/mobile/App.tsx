@@ -72,6 +72,35 @@ type BookingStep = {
   title: string;
 };
 
+type BookingFlowStepId = "staff" | "datetime" | "payment" | "confirmation";
+
+type BookingStaffOption = {
+  experience: string;
+  id: string;
+  name: string;
+  rating: string;
+  role: string;
+};
+
+type BookingDateOption = {
+  day: string;
+  id: string;
+  label: string;
+  meta: string;
+};
+
+type BookingTimeOption = {
+  id: string;
+  label: string;
+  state: "available" | "limited" | "booked";
+};
+
+type BookingPaymentOption = {
+  id: string;
+  label: string;
+  meta: string;
+};
+
 type MobileThemeMode = "system" | "light" | "dark";
 
 type HomeCategoryTone =
@@ -257,6 +286,93 @@ const dateOptions = [
   { day: "غداً", label: "07", meta: "6 أوقات" },
   { day: "الأربعاء", label: "08", meta: "مزدحم" },
   { day: "الخميس", label: "09", meta: "أفضل" },
+];
+
+const bookingStaffOptions: BookingStaffOption[] = [
+  {
+    experience: "اختيار تلقائي حسب أقرب وقت متاح",
+    id: "any",
+    name: "بدون تفضيل",
+    rating: "4.9",
+    role: "REZNO يختار المختص المناسب",
+  },
+  {
+    experience: "خبرة 6 سنوات · قص وتصفيف",
+    id: "ahmad",
+    name: "أحمد",
+    rating: "4.9",
+    role: "خبير شعر",
+  },
+  {
+    experience: "خبرة 5 سنوات · عناية وتلوين",
+    id: "mohammad",
+    name: "محمد",
+    rating: "4.8",
+    role: "مختص تجميل",
+  },
+  {
+    experience: "خبرة 7 سنوات · باقات فاخرة",
+    id: "yusuf",
+    name: "يوسف",
+    rating: "4.7",
+    role: "خبير خدمات",
+  },
+  {
+    experience: "خبرة 4 سنوات · حجوزات سريعة",
+    id: "ali",
+    name: "علي",
+    rating: "4.9",
+    role: "مختص حجوزات",
+  },
+];
+
+const bookingDateOptions: BookingDateOption[] = [
+  { day: "اليوم", id: "today", label: "06", meta: "متاح" },
+  { day: "غداً", id: "tomorrow", label: "07", meta: "6 أوقات" },
+  { day: "الأربعاء", id: "wed", label: "08", meta: "محدود" },
+  { day: "الخميس", id: "thu", label: "09", meta: "أفضل" },
+];
+
+const bookingTimeOptions: BookingTimeOption[] = [
+  { id: "0900", label: "09:00", state: "available" },
+  { id: "0930", label: "09:30", state: "available" },
+  { id: "1000", label: "10:00", state: "limited" },
+  { id: "1030", label: "10:30", state: "available" },
+  { id: "1100", label: "11:00", state: "booked" },
+  { id: "1130", label: "11:30", state: "available" },
+  { id: "1200", label: "12:00", state: "limited" },
+  { id: "1230", label: "12:30", state: "available" },
+  { id: "1500", label: "15:00", state: "available" },
+  { id: "1530", label: "15:30", state: "limited" },
+  { id: "1600", label: "16:00", state: "available" },
+  { id: "1630", label: "16:30", state: "available" },
+  { id: "1700", label: "17:00", state: "booked" },
+  { id: "1730", label: "17:30", state: "available" },
+  { id: "1800", label: "18:00", state: "limited" },
+  { id: "1830", label: "18:30", state: "available" },
+];
+
+const paymentMethodOptions: BookingPaymentOption[] = [
+  {
+    id: "apple-pay",
+    label: "Apple Pay",
+    meta: "زر بصري فقط بدون تكامل دفع",
+  },
+  {
+    id: "card",
+    label: "بطاقة الائتمان / مدى",
+    meta: "لا يتم إدخال أو حفظ بيانات بطاقة",
+  },
+  {
+    id: "bank",
+    label: "تحويل بنكي",
+    meta: "تعليمات دفع تجريبية فقط",
+  },
+  {
+    id: "venue",
+    label: "الدفع في الموقع",
+    meta: "تأكيد بصري بدون تحصيل",
+  },
 ];
 
 const onboardingHighlights = [
@@ -503,6 +619,21 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<MobileAppTabId>("customerHome");
   const [selectedBusiness, setSelectedBusiness] =
     useState<PremiumBusiness | null>(null);
+  const [bookingFlowStep, setBookingFlowStep] =
+    useState<BookingFlowStepId | null>(null);
+  const [selectedBookingService] = useState(services[0]);
+  const [selectedStaff, setSelectedStaff] = useState<BookingStaffOption>(
+    bookingStaffOptions[0],
+  );
+  const [selectedDate, setSelectedDate] = useState<BookingDateOption>(
+    bookingDateOptions[0],
+  );
+  const [selectedTime, setSelectedTime] = useState<BookingTimeOption>(
+    bookingTimeOptions[11],
+  );
+  const [selectedPayment, setSelectedPayment] = useState<BookingPaymentOption>(
+    paymentMethodOptions[3],
+  );
   const [showOnboarding, setShowOnboarding] = useState(true);
   const [themeMode, setThemeMode] = useState<MobileThemeMode>("dark");
   const [marketplaceState, setMarketplaceState] = useState<MarketplaceState>({
@@ -539,6 +670,7 @@ export default function App() {
 
   const handleTabPress = (tabId: MobileAppTabId) => {
     setSelectedBusiness(null);
+    setBookingFlowStep(null);
 
     if (tabId === "marketplace" && marketplaceState.status === "idle") {
       loadMarketplace();
@@ -549,6 +681,47 @@ export default function App() {
 
   const handleEnterApp = () => {
     setShowOnboarding(false);
+  };
+
+  const handleStartBookingFlow = () => {
+    setSelectedStaff(bookingStaffOptions[0]);
+    setSelectedDate(bookingDateOptions[0]);
+    setSelectedTime(bookingTimeOptions[11]);
+    setSelectedPayment(paymentMethodOptions[3]);
+    setBookingFlowStep("staff");
+  };
+
+  const handleBookingBack = () => {
+    if (bookingFlowStep === "staff") {
+      setBookingFlowStep(null);
+      return;
+    }
+
+    if (bookingFlowStep === "datetime") {
+      setBookingFlowStep("staff");
+      return;
+    }
+
+    if (bookingFlowStep === "payment") {
+      setBookingFlowStep("datetime");
+      return;
+    }
+
+    if (bookingFlowStep === "confirmation") {
+      setBookingFlowStep("payment");
+    }
+  };
+
+  const handleReturnHome = () => {
+    setSelectedBusiness(null);
+    setBookingFlowStep(null);
+    setActiveTab("customerHome");
+  };
+
+  const handleViewBookings = () => {
+    setSelectedBusiness(null);
+    setBookingFlowStep(null);
+    setActiveTab("bookings");
   };
 
   if (!fontsLoaded) {
@@ -596,12 +769,39 @@ export default function App() {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {selectedBusiness ? (
+        {selectedBusiness && !bookingFlowStep ? (
           <SalonDetailScreen
             business={selectedBusiness}
             isRtl={isRtl}
-            onBack={() => setSelectedBusiness(null)}
+            onBack={() => {
+              setBookingFlowStep(null);
+              setSelectedBusiness(null);
+            }}
+            onStartBooking={handleStartBookingFlow}
             styles={styles}
+          />
+        ) : null}
+
+        {selectedBusiness && bookingFlowStep ? (
+          <BookingStepScreen
+            business={selectedBusiness}
+            date={selectedDate}
+            isRtl={isRtl}
+            onBack={handleBookingBack}
+            onConfirm={() => setBookingFlowStep("confirmation")}
+            onDateSelect={setSelectedDate}
+            onPaymentSelect={setSelectedPayment}
+            onReturnHome={handleReturnHome}
+            onStaffSelect={setSelectedStaff}
+            onStepChange={setBookingFlowStep}
+            onTimeSelect={setSelectedTime}
+            onViewBookings={handleViewBookings}
+            payment={selectedPayment}
+            service={selectedBookingService}
+            staff={selectedStaff}
+            step={bookingFlowStep}
+            styles={styles}
+            time={selectedTime}
           />
         ) : null}
 
@@ -1423,11 +1623,13 @@ function SalonDetailScreen({
   business,
   isRtl,
   onBack,
+  onStartBooking,
   styles,
 }: {
   business: PremiumBusiness;
   isRtl: boolean;
   onBack: () => void;
+  onStartBooking: () => void;
   styles: MobileStyles;
 }) {
   return (
@@ -1578,7 +1780,11 @@ function SalonDetailScreen({
       </View>
 
       <View style={styles.salonBottomCta}>
-        <PrimaryButton label="احجز الآن" styles={styles} />
+        <PrimaryButton
+          label="احجز الآن"
+          onPress={onStartBooking}
+          styles={styles}
+        />
         <View style={styles.salonCtaArrow}>
           <Text style={styles.salonCtaArrowText}>‹</Text>
         </View>
@@ -1655,6 +1861,663 @@ function VisualActionTile({
       )}
       <Text style={styles.salonActionLabel}>{label}</Text>
     </Pressable>
+  );
+}
+
+function BookingStepScreen({
+  business,
+  date,
+  isRtl,
+  onBack,
+  onConfirm,
+  onDateSelect,
+  onPaymentSelect,
+  onReturnHome,
+  onStaffSelect,
+  onStepChange,
+  onTimeSelect,
+  onViewBookings,
+  payment,
+  service,
+  staff,
+  step,
+  styles,
+  time,
+}: {
+  business: PremiumBusiness;
+  date: BookingDateOption;
+  isRtl: boolean;
+  onBack: () => void;
+  onConfirm: () => void;
+  onDateSelect: (date: BookingDateOption) => void;
+  onPaymentSelect: (payment: BookingPaymentOption) => void;
+  onReturnHome: () => void;
+  onStaffSelect: (staff: BookingStaffOption) => void;
+  onStepChange: (step: BookingFlowStepId) => void;
+  onTimeSelect: (time: BookingTimeOption) => void;
+  onViewBookings: () => void;
+  payment: BookingPaymentOption;
+  service: (typeof services)[number];
+  staff: BookingStaffOption;
+  step: BookingFlowStepId;
+  styles: MobileStyles;
+  time: BookingTimeOption;
+}) {
+  if (step === "staff") {
+    return (
+      <StaffSelectionStep
+        business={business}
+        isRtl={isRtl}
+        onBack={onBack}
+        onNext={() => onStepChange("datetime")}
+        onStaffSelect={onStaffSelect}
+        selectedStaff={staff}
+        service={service}
+        styles={styles}
+      />
+    );
+  }
+
+  if (step === "datetime") {
+    return (
+      <DateTimeSelectionStep
+        date={date}
+        isRtl={isRtl}
+        onBack={onBack}
+        onDateSelect={onDateSelect}
+        onNext={() => onStepChange("payment")}
+        onTimeSelect={onTimeSelect}
+        styles={styles}
+        time={time}
+      />
+    );
+  }
+
+  if (step === "payment") {
+    return (
+      <PaymentMethodStep
+        business={business}
+        date={date}
+        isRtl={isRtl}
+        onBack={onBack}
+        onConfirm={onConfirm}
+        onPaymentSelect={onPaymentSelect}
+        payment={payment}
+        service={service}
+        staff={staff}
+        styles={styles}
+        time={time}
+      />
+    );
+  }
+
+  return (
+    <BookingConfirmationStep
+      business={business}
+      date={date}
+      isRtl={isRtl}
+      onReturnHome={onReturnHome}
+      onViewBookings={onViewBookings}
+      payment={payment}
+      service={service}
+      staff={staff}
+      styles={styles}
+      time={time}
+    />
+  );
+}
+
+function BookingFlowHeader({
+  isRtl,
+  onBack,
+  stepLabel,
+  styles,
+  subtitle,
+  title,
+}: {
+  isRtl: boolean;
+  onBack?: () => void;
+  stepLabel: string;
+  styles: MobileStyles;
+  subtitle: string;
+  title: string;
+}) {
+  return (
+    <View style={styles.bookingStepHeader}>
+      {onBack ? (
+        <Pressable
+          accessibilityHint="يعود إلى الخطوة السابقة في تدفق الحجز المرئي."
+          accessibilityLabel="رجوع"
+          accessibilityRole="button"
+          hitSlop={TOUCH_HIT_SLOP}
+          onPress={onBack}
+          style={({ pressed }) => [
+            styles.bookingBackButton,
+            pressed && styles.iconButtonPressed,
+          ]}
+        >
+          <Image
+            alt="رجوع"
+            resizeMode="contain"
+            source={
+              isRtl
+                ? mobileIconAssets.common.backArrowRtl
+                : mobileIconAssets.common.backArrowLtr
+            }
+            style={styles.bookingBackIconImage}
+          />
+        </Pressable>
+      ) : null}
+      <View style={styles.rowCopy}>
+        <Text style={[styles.screenEyebrow, isRtl && styles.rtlText]}>
+          {stepLabel}
+        </Text>
+        <Text style={[styles.screenTitle, isRtl && styles.rtlText]}>
+          {title}
+        </Text>
+        <Text style={[styles.screenDescription, isRtl && styles.rtlText]}>
+          {subtitle}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+function BookingMiniSummary({
+  business,
+  date,
+  isRtl,
+  payment,
+  service,
+  staff,
+  styles,
+  time,
+}: {
+  business: PremiumBusiness;
+  date: BookingDateOption;
+  isRtl: boolean;
+  payment?: BookingPaymentOption;
+  service: (typeof services)[number];
+  staff: BookingStaffOption;
+  styles: MobileStyles;
+  time?: BookingTimeOption;
+}) {
+  return (
+    <View style={styles.bookingMiniSummary}>
+      <SummaryItem
+        label="النشاط"
+        styles={styles}
+        value={business.name}
+      />
+      <SummaryItem
+        label="الخدمة"
+        styles={styles}
+        value={`${service.name} · ${service.price}`}
+      />
+      <SummaryItem label="المختص" styles={styles} value={staff.name} />
+      <SummaryItem
+        label="الموعد"
+        styles={styles}
+        value={`${date.day} ${date.label}${time ? ` · ${time.label}` : ""}`}
+      />
+      {payment ? (
+        <Text style={[styles.securePaymentNote, isRtl && styles.rtlText]}>
+          {payment.label} · عملية دفع آمنة ومشفرة بصرياً فقط
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
+function StaffSelectionStep({
+  business,
+  isRtl,
+  onBack,
+  onNext,
+  onStaffSelect,
+  selectedStaff,
+  service,
+  styles,
+}: {
+  business: PremiumBusiness;
+  isRtl: boolean;
+  onBack: () => void;
+  onNext: () => void;
+  onStaffSelect: (staff: BookingStaffOption) => void;
+  selectedStaff: BookingStaffOption;
+  service: (typeof services)[number];
+  styles: MobileStyles;
+}) {
+  return (
+    <View style={styles.bookingStepScreen}>
+      <BookingFlowHeader
+        isRtl={isRtl}
+        onBack={onBack}
+        stepLabel="الخطوة 01"
+        styles={styles}
+        subtitle="اختر مختصاً أو اترك REZNO يختار أقرب وقت مناسب."
+        title="اختر المختص"
+      />
+
+      <View style={styles.bookingSearchField}>
+        <Image
+          alt=""
+          resizeMode="contain"
+          source={mobileIconAssets.common.search}
+          style={styles.bookingSearchIconImage}
+        />
+        <Text style={[styles.bookingSearchPlaceholder, isRtl && styles.rtlText]}>
+          ابحث عن مختص أو اختر بدون تفضيل
+        </Text>
+      </View>
+
+      <View style={styles.bookingOptionList}>
+        {bookingStaffOptions.map((staff) => {
+          const selected = staff.id === selectedStaff.id;
+
+          return (
+            <Pressable
+              accessibilityHint="يحدد المختص محلياً فقط ولا يرسل أي طلب."
+              accessibilityLabel={`اختيار ${staff.name}`}
+              accessibilityRole="button"
+              accessibilityState={{ selected }}
+              key={staff.id}
+              onPress={() => onStaffSelect(staff)}
+              style={({ pressed }) => [
+                styles.staffSelectionCard,
+                selected && styles.staffSelectionCardActive,
+                pressed && styles.softButtonPressed,
+              ]}
+            >
+              <View style={styles.staffAvatar}>
+                <Text style={styles.staffAvatarText}>
+                  {staff.id === "any" ? "R" : staff.name.charAt(0)}
+                </Text>
+              </View>
+              <View style={styles.rowCopy}>
+                <View style={styles.staffTitleRow}>
+                  <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>
+                    {staff.name}
+                  </Text>
+                  <View style={styles.staffRatingPill}>
+                    <Image
+                      alt=""
+                      resizeMode="contain"
+                      source={mobileIconAssets.common.starRating}
+                      style={styles.staffRatingIconImage}
+                    />
+                    <Text style={styles.staffRatingText}>{staff.rating}</Text>
+                  </View>
+                </View>
+                <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>
+                  {staff.role}
+                </Text>
+                <Text style={[styles.staffExperience, isRtl && styles.rtlText]}>
+                  {staff.experience}
+                </Text>
+              </View>
+              <View
+                style={[
+                  styles.bookingRadio,
+                  selected && styles.bookingRadioActive,
+                ]}
+              >
+                {selected ? <View style={styles.bookingRadioDot} /> : null}
+              </View>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <BookingMiniSummary
+        business={business}
+        date={bookingDateOptions[0]}
+        isRtl={isRtl}
+        service={service}
+        staff={selectedStaff}
+        styles={styles}
+      />
+
+      <View style={styles.bookingBottomAction}>
+        <PrimaryButton label="التالي" onPress={onNext} styles={styles} />
+      </View>
+    </View>
+  );
+}
+
+function DateTimeSelectionStep({
+  date,
+  isRtl,
+  onBack,
+  onDateSelect,
+  onNext,
+  onTimeSelect,
+  styles,
+  time,
+}: {
+  date: BookingDateOption;
+  isRtl: boolean;
+  onBack: () => void;
+  onDateSelect: (date: BookingDateOption) => void;
+  onNext: () => void;
+  onTimeSelect: (time: BookingTimeOption) => void;
+  styles: MobileStyles;
+  time: BookingTimeOption;
+}) {
+  return (
+    <View style={styles.bookingStepScreen}>
+      <BookingFlowHeader
+        isRtl={isRtl}
+        onBack={onBack}
+        stepLabel="الخطوة 02"
+        styles={styles}
+        subtitle="الأوقات هنا عرض محلي فقط، ولا يتم فحص التوفر الحقيقي."
+        title="اختر التاريخ والوقت"
+      />
+
+      <View style={styles.bookingDateRail}>
+        {bookingDateOptions.map((item) => {
+          const selected = item.id === date.id;
+
+          return (
+            <Pressable
+              accessibilityHint="يحدد التاريخ محلياً فقط."
+              accessibilityLabel={`اختيار ${item.day} ${item.label}`}
+              accessibilityRole="button"
+              accessibilityState={{ selected }}
+              key={item.id}
+              onPress={() => onDateSelect(item)}
+              style={({ pressed }) => [
+                styles.datePill,
+                selected && styles.datePillActive,
+                pressed && styles.softButtonPressed,
+              ]}
+            >
+              <Text style={[styles.dateDay, selected && styles.dateDayActive]}>
+                {item.day}
+              </Text>
+              <Text
+                style={[styles.dateLabel, selected && styles.dateLabelActive]}
+              >
+                {item.label}
+              </Text>
+              <Text style={[styles.dateMeta, selected && styles.dateMetaActive]}>
+                {item.meta}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <View style={styles.bookingLegendRow}>
+        <LegendItem label="متاح" styles={styles} tone="available" />
+        <LegendItem label="محدود" styles={styles} tone="limited" />
+        <LegendItem label="محجوز" styles={styles} tone="booked" />
+      </View>
+
+      <View style={styles.bookingTimeGrid}>
+        {bookingTimeOptions.map((item) => {
+          const selected = item.id === time.id;
+          const booked = item.state === "booked";
+
+          return (
+            <Pressable
+              accessibilityHint={
+                booked
+                  ? "هذا الوقت محجوز بصرياً ولا يمكن اختياره."
+                  : "يحدد الوقت محلياً فقط."
+              }
+              accessibilityLabel={`اختيار وقت ${item.label}`}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: booked, selected }}
+              disabled={booked}
+              key={item.id}
+              onPress={() => onTimeSelect(item)}
+              style={({ pressed }) => [
+                styles.bookingTimeSlot,
+                item.state === "limited" && styles.bookingTimeSlotLimited,
+                booked && styles.bookingTimeSlotBooked,
+                selected && styles.bookingTimeSlotActive,
+                pressed && !booked && styles.softButtonPressed,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.timeSlotText,
+                  selected && styles.timeSlotTextActive,
+                  booked && styles.bookingTimeSlotTextMuted,
+                ]}
+              >
+                {item.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <View style={styles.bookingBottomAction}>
+        <PrimaryButton label="التالي" onPress={onNext} styles={styles} />
+      </View>
+    </View>
+  );
+}
+
+function LegendItem({
+  label,
+  styles,
+  tone,
+}: {
+  label: string;
+  styles: MobileStyles;
+  tone: "available" | "booked" | "limited";
+}) {
+  return (
+    <View style={styles.legendItem}>
+      <View
+        style={[
+          styles.legendDot,
+          tone === "limited" && styles.legendDotLimited,
+          tone === "booked" && styles.legendDotBooked,
+        ]}
+      />
+      <Text style={styles.legendText}>{label}</Text>
+    </View>
+  );
+}
+
+function PaymentMethodStep({
+  business,
+  date,
+  isRtl,
+  onBack,
+  onConfirm,
+  onPaymentSelect,
+  payment,
+  service,
+  staff,
+  styles,
+  time,
+}: {
+  business: PremiumBusiness;
+  date: BookingDateOption;
+  isRtl: boolean;
+  onBack: () => void;
+  onConfirm: () => void;
+  onPaymentSelect: (payment: BookingPaymentOption) => void;
+  payment: BookingPaymentOption;
+  service: (typeof services)[number];
+  staff: BookingStaffOption;
+  styles: MobileStyles;
+  time: BookingTimeOption;
+}) {
+  return (
+    <View style={styles.bookingStepScreen}>
+      <BookingFlowHeader
+        isRtl={isRtl}
+        onBack={onBack}
+        stepLabel="الخطوة 03"
+        styles={styles}
+        subtitle="اختيار طريقة الدفع مرئي فقط ولا يضيف أي تكامل دفع."
+        title="طريقة الدفع"
+      />
+
+      <View style={styles.paymentOptionList}>
+        {paymentMethodOptions.map((item) => {
+          const selected = item.id === payment.id;
+
+          return (
+            <Pressable
+              accessibilityHint="يحدد طريقة دفع محلية فقط ولا يفتح أي بوابة دفع."
+              accessibilityLabel={`اختيار ${item.label}`}
+              accessibilityRole="button"
+              accessibilityState={{ selected }}
+              key={item.id}
+              onPress={() => onPaymentSelect(item)}
+              style={({ pressed }) => [
+                styles.paymentMethodCard,
+                selected && styles.paymentMethodCardActive,
+                pressed && styles.softButtonPressed,
+              ]}
+            >
+              <View style={styles.paymentMethodIcon}>
+                <Image
+                  alt=""
+                  resizeMode="contain"
+                  source={mobileIconAssets.common.paymentCard}
+                  style={styles.paymentMethodIconImage}
+                />
+              </View>
+              <View style={styles.rowCopy}>
+                <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>
+                  {item.label}
+                </Text>
+                <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>
+                  {item.meta}
+                </Text>
+              </View>
+              <View
+                style={[
+                  styles.bookingRadio,
+                  selected && styles.bookingRadioActive,
+                ]}
+              >
+                {selected ? <View style={styles.bookingRadioDot} /> : null}
+              </View>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <BookingMiniSummary
+        business={business}
+        date={date}
+        isRtl={isRtl}
+        payment={payment}
+        service={service}
+        staff={staff}
+        styles={styles}
+        time={time}
+      />
+
+      <View style={styles.securePaymentCard}>
+        <Image
+          alt=""
+          resizeMode="contain"
+          source={mobileIconAssets.common.checkSuccess}
+          style={styles.securePaymentIconImage}
+        />
+        <Text style={[styles.securePaymentText, isRtl && styles.rtlText]}>
+          عملية دفع آمنة ومشفرة — عرض بصري فقط بدون أي معالجة حقيقية.
+        </Text>
+      </View>
+
+      <View style={styles.bookingBottomAction}>
+        <PrimaryButton
+          label={payment.id === "venue" ? "تأكيد الحجز" : "ادفع الآن"}
+          onPress={onConfirm}
+          styles={styles}
+        />
+      </View>
+    </View>
+  );
+}
+
+function BookingConfirmationStep({
+  business,
+  date,
+  isRtl,
+  onReturnHome,
+  onViewBookings,
+  payment,
+  service,
+  staff,
+  styles,
+  time,
+}: {
+  business: PremiumBusiness;
+  date: BookingDateOption;
+  isRtl: boolean;
+  onReturnHome: () => void;
+  onViewBookings: () => void;
+  payment: BookingPaymentOption;
+  service: (typeof services)[number];
+  staff: BookingStaffOption;
+  styles: MobileStyles;
+  time: BookingTimeOption;
+}) {
+  return (
+    <View style={styles.bookingStepScreen}>
+      <View style={styles.confirmationHeroCard}>
+        <View style={styles.confettiLayer}>
+          <View style={styles.confettiDotGold} />
+          <View style={styles.confettiDotRose} />
+          <View style={styles.confettiDotBlue} />
+        </View>
+        <View style={styles.confirmationSuccessIcon}>
+          <Image
+            alt=""
+            resizeMode="contain"
+            source={mobileIconAssets.common.checkSuccess}
+            style={styles.confirmationSuccessIconImage}
+          />
+        </View>
+        <Text style={[styles.screenTitle, isRtl && styles.rtlText]}>
+          تم تأكيد الحجز!
+        </Text>
+        <Text style={[styles.screenDescription, isRtl && styles.rtlText]}>
+          تم إعداد ملخص الحجز بصرياً. لا يوجد حجز حقيقي أو إشعار أو بريد مرسل.
+        </Text>
+        <Text style={styles.confirmationReference}>REZNO-2406</Text>
+      </View>
+
+      <BookingMiniSummary
+        business={business}
+        date={date}
+        isRtl={isRtl}
+        payment={payment}
+        service={service}
+        staff={staff}
+        styles={styles}
+        time={time}
+      />
+
+      <View style={styles.bookingReceiptActions}>
+        <PrimaryButton label="عرض الحجز" onPress={onViewBookings} styles={styles} />
+        <Pressable
+          accessibilityHint="يعود إلى الشاشة الرئيسية دون إنشاء حجز حقيقي."
+          accessibilityLabel="العودة للرئيسية"
+          accessibilityRole="button"
+          hitSlop={TOUCH_HIT_SLOP}
+          onPress={onReturnHome}
+          style={({ pressed }) => [
+            styles.secondaryButton,
+            pressed && styles.softButtonPressed,
+          ]}
+        >
+          <Text style={styles.secondaryButtonText}>العودة للرئيسية</Text>
+        </Pressable>
+      </View>
+    </View>
   );
 }
 
@@ -2856,8 +3719,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     accountActionText: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 13,
-      fontWeight: "900",
       lineHeight: 18,
       textAlign: "center",
     },
@@ -2875,8 +3738,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     accountAvatarText: {
       color: theme.colors.foregroundInverse,
+      fontFamily: mobileTypography.uiBold,
       fontSize: 24,
-      fontWeight: "900",
     },
     accountHeroCard: {
       backgroundColor: theme.colors.hero,
@@ -2922,8 +3785,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     apiText: {
       color: theme.colors.warning,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 12,
-      fontWeight: "800",
       marginTop: 12,
     },
     avatar: {
@@ -2936,8 +3799,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     avatarText: {
       color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiBold,
       fontSize: 18,
-      fontWeight: "900",
     },
     bookingActions: {
       flexDirection: "row",
@@ -2972,6 +3835,142 @@ const createStyles = (theme: MobileTheme) =>
       shadowOffset: { height: 24, width: 0 },
       shadowOpacity: theme.isDark ? 0.36 : 0.12,
       shadowRadius: 36,
+    },
+    bookingBackButton: {
+      alignItems: "center",
+      backgroundColor: theme.colors.cardElevated,
+      borderColor: theme.colors.border,
+      borderRadius: 22,
+      borderWidth: 1,
+      height: 44,
+      justifyContent: "center",
+      width: 44,
+    },
+    bookingBackIconImage: {
+      height: 22,
+      tintColor: theme.colors.foreground,
+      width: 22,
+    },
+    bookingBottomAction: {
+      marginTop: 8,
+      paddingBottom: 18,
+    },
+    bookingDateRail: {
+      flexDirection: "row",
+      gap: 10,
+    },
+    bookingLegendRow: {
+      alignItems: "center",
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 10,
+      justifyContent: "center",
+      marginTop: -4,
+    },
+    bookingMiniSummary: {
+      backgroundColor: theme.colors.card,
+      borderColor: theme.colors.goldSoft,
+      borderRadius: theme.radii.card,
+      borderWidth: 1,
+      gap: 10,
+      padding: 18,
+      shadowColor: theme.colors.shadow,
+      shadowOffset: { height: 12, width: 0 },
+      shadowOpacity: theme.isDark ? 0.18 : 0.06,
+      shadowRadius: 20,
+    },
+    bookingOptionList: {
+      gap: 12,
+    },
+    bookingRadio: {
+      alignItems: "center",
+      borderColor: theme.colors.border,
+      borderRadius: 12,
+      borderWidth: 2,
+      height: 24,
+      justifyContent: "center",
+      width: 24,
+    },
+    bookingRadioActive: {
+      borderColor: theme.colors.gold,
+    },
+    bookingRadioDot: {
+      backgroundColor: theme.colors.gold,
+      borderRadius: 7,
+      height: 14,
+      width: 14,
+    },
+    bookingReceiptActions: {
+      gap: 12,
+      paddingBottom: 20,
+    },
+    bookingSearchField: {
+      alignItems: "center",
+      backgroundColor: theme.colors.cardElevated,
+      borderColor: theme.colors.border,
+      borderRadius: 28,
+      borderWidth: 1,
+      flexDirection: "row",
+      gap: 12,
+      minHeight: 58,
+      paddingHorizontal: 18,
+    },
+    bookingSearchIconImage: {
+      height: 22,
+      tintColor: theme.colors.mutedForeground,
+      width: 22,
+    },
+    bookingSearchPlaceholder: {
+      color: theme.colors.mutedForeground,
+      flex: 1,
+      fontFamily: mobileTypography.uiMedium,
+      fontSize: 14,
+      lineHeight: 20,
+    },
+    bookingStepHeader: {
+      alignItems: "flex-start",
+      flexDirection: "row",
+      gap: 14,
+    },
+    bookingStepScreen: {
+      gap: 18,
+      paddingHorizontal: 20,
+      paddingTop: 18,
+    },
+    bookingTimeGrid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 10,
+    },
+    bookingTimeSlot: {
+      alignItems: "center",
+      backgroundColor: theme.colors.cardElevated,
+      borderColor: theme.colors.border,
+      borderRadius: theme.radii.pill,
+      borderWidth: 1,
+      flexGrow: 1,
+      minWidth: 74,
+      paddingHorizontal: 14,
+      paddingVertical: 13,
+    },
+    bookingTimeSlotActive: {
+      backgroundColor: theme.colors.gold,
+      borderColor: theme.colors.gold,
+      shadowColor: theme.colors.deepGold,
+      shadowOffset: { height: 6, width: 0 },
+      shadowOpacity: theme.isDark ? 0.24 : 0.12,
+      shadowRadius: 12,
+    },
+    bookingTimeSlotBooked: {
+      backgroundColor: theme.colors.muted,
+      borderColor: theme.colors.border,
+      opacity: 0.5,
+    },
+    bookingTimeSlotLimited: {
+      borderColor: theme.colors.warning,
+    },
+    bookingTimeSlotTextMuted: {
+      color: theme.colors.mutedForeground,
     },
     brandCopy: {
       flex: 1,
@@ -3118,8 +4117,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     businessInitialText: {
       color: theme.colors.foregroundInverse,
+      fontFamily: mobileTypography.uiBold,
       fontSize: 19,
-      fontWeight: "900",
     },
     businessList: {
       gap: 18,
@@ -3138,8 +4137,8 @@ const createStyles = (theme: MobileTheme) =>
       borderWidth: 1,
       borderRadius: theme.radii.pill,
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 10,
-      fontWeight: "800",
       overflow: "hidden",
       paddingHorizontal: 8,
       paddingVertical: 5,
@@ -3170,8 +4169,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     businessStatusText: {
       color: theme.colors.success,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 9,
-      fontWeight: "900",
     },
     businessTitleRow: {
       alignItems: "flex-start",
@@ -3184,8 +4183,8 @@ const createStyles = (theme: MobileTheme) =>
       backgroundColor: theme.colors.goldSoft,
       borderRadius: theme.radii.pill,
       color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 11,
-      fontWeight: "900",
       overflow: "hidden",
       paddingHorizontal: 10,
       paddingVertical: 6,
@@ -3207,13 +4206,13 @@ const createStyles = (theme: MobileTheme) =>
     },
     boundaryIconText: {
       color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiBold,
       fontSize: 22,
-      fontWeight: "900",
     },
     cancelAction: {
       color: theme.colors.danger,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 13,
-      fontWeight: "900",
     },
     cardShadow: {
       shadowColor: theme.colors.shadow,
@@ -3223,22 +4222,22 @@ const createStyles = (theme: MobileTheme) =>
     },
     cardBody: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 14,
-      fontWeight: "700",
       lineHeight: 22,
       marginTop: 8,
     },
     cardTitle: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 17,
-      fontWeight: "900",
     },
     categoryBadge: {
       backgroundColor: theme.colors.goldSoft,
       borderRadius: theme.radii.pill,
       color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 10,
-      fontWeight: "900",
       overflow: "hidden",
       paddingHorizontal: 8,
       paddingVertical: 5,
@@ -3295,8 +4294,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     categoryIcon: {
       color: "#ffffff",
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 24,
-      fontWeight: "900",
       lineHeight: 28,
     },
     categoryIconImage: {
@@ -3466,8 +4465,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     categoryRailIcon: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 19,
-      fontWeight: "900",
       lineHeight: 22,
     },
     categoryRailIconImage: {
@@ -3534,6 +4533,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     centerTabIcon: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 28,
       lineHeight: 30,
     },
@@ -3550,6 +4550,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     confirmationBody: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 14,
       lineHeight: 22,
       marginTop: 10,
@@ -3576,8 +4577,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     confirmationIcon: {
       color: theme.colors.foregroundInverse,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 28,
-      fontWeight: "900",
     },
     confirmationIconImage: {
       height: 30,
@@ -3602,7 +4603,6 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.foreground,
       fontFamily: mobileTypography.kufiBold,
       fontSize: 21,
-      fontWeight: "800",
       lineHeight: 27,
       marginTop: 12,
       textAlign: "center",
@@ -3618,8 +4618,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     dataOwnershipNote: {
       color: theme.colors.success,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 12,
-      fontWeight: "800",
       lineHeight: 19,
     },
     disabledButton: {
@@ -3634,16 +4634,16 @@ const createStyles = (theme: MobileTheme) =>
     },
     dateDay: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 12,
-      fontWeight: "900",
     },
     dateDayActive: {
       color: theme.colors.foregroundInverse,
     },
     dateLabel: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 24,
-      fontWeight: "900",
       marginTop: 2,
     },
     dateLabelActive: {
@@ -3651,8 +4651,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     dateMeta: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 11,
-      fontWeight: "800",
       marginTop: 3,
     },
     dateMetaActive: {
@@ -3726,6 +4726,7 @@ const createStyles = (theme: MobileTheme) =>
     detailMeta: {
       color: theme.colors.mutedForeground,
       flexShrink: 1,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 14,
       lineHeight: 21,
       marginTop: 7,
@@ -3750,28 +4751,29 @@ const createStyles = (theme: MobileTheme) =>
     detailServiceMeta: {
       color: theme.colors.mutedForeground,
       flexShrink: 1,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 12,
       lineHeight: 18,
       marginTop: 4,
     },
     detailServicePrice: {
       color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 13,
-      fontWeight: "900",
     },
     detailServiceTitle: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 15,
       flexShrink: 1,
-      fontWeight: "900",
       lineHeight: 20,
     },
     detailStat: {
       backgroundColor: theme.colors.cardElevated,
       borderRadius: theme.radii.pill,
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 12,
-      fontWeight: "900",
       overflow: "hidden",
       paddingHorizontal: 10,
       paddingVertical: 7,
@@ -3797,8 +4799,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     detailTabText: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 12,
-      fontWeight: "900",
     },
     detailTabTextActive: {
       color: theme.colors.foregroundInverse,
@@ -3813,8 +4815,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     detailTitle: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.kufiBold,
       fontSize: 26,
-      fontWeight: "900",
       lineHeight: 32,
       marginTop: 42,
     },
@@ -3862,21 +4864,21 @@ const createStyles = (theme: MobileTheme) =>
     },
     discoveryLocationText: {
       color: theme.colors.foregroundInverse,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 18,
-      fontWeight: "900",
     },
     discoveryTitle: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.kufiBold,
       fontSize: 25,
-      fontWeight: "900",
       letterSpacing: -0.4,
       lineHeight: 32,
       marginTop: 7,
     },
     editAction: {
       color: theme.colors.gold,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 13,
-      fontWeight: "900",
     },
     favoriteButton: {
       alignItems: "center",
@@ -3893,8 +4895,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     favoriteText: {
       color: theme.colors.gold,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 20,
-      fontWeight: "900",
     },
     favoriteIconImage: {
       height: 22,
@@ -3927,8 +4929,8 @@ const createStyles = (theme: MobileTheme) =>
       borderRadius: theme.radii.pill,
       borderWidth: 1,
       color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 12,
-      fontWeight: "900",
       overflow: "hidden",
       paddingHorizontal: 12,
       paddingVertical: 7,
@@ -3959,8 +4961,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     filterChipText: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 12,
-      fontWeight: "900",
       textAlign: "center",
     },
     filterChipTextSelected: {
@@ -3974,8 +4976,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     filterText: {
       color: theme.colors.foregroundInverse,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 15,
-      fontWeight: "900",
     },
     filterIconImage: {
       height: 18,
@@ -3995,8 +4997,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     ghostButtonText: {
       color: theme.colors.gold,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 14,
-      fontWeight: "900",
     },
     header: {
       alignItems: "center",
@@ -4021,8 +5023,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     iconActionText: {
       color: theme.colors.gold,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 17,
-      fontWeight: "900",
     },
     heroActions: {
       gap: 12,
@@ -4071,6 +5073,7 @@ const createStyles = (theme: MobileTheme) =>
     integrationBody: {
       color: theme.colors.warning,
       flexShrink: 1,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 14,
       lineHeight: 21,
       marginTop: 8,
@@ -4088,8 +5091,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     integrationTitle: {
       color: theme.colors.warning,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 16,
-      fontWeight: "900",
       lineHeight: 22,
     },
     localeButton: {
@@ -4117,8 +5120,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     localeButtonText: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 8,
-      fontWeight: "800",
       lineHeight: 11,
     },
     localeButtonTextActive: {
@@ -4132,6 +5135,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     locationDot: {
       color: theme.colors.success,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 10,
     },
     locationIconImage: {
@@ -4153,8 +5157,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     locationText: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 12,
-      fontWeight: "900",
     },
     logoMark: {
       alignItems: "center",
@@ -4172,8 +5176,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     logoText: {
       color: theme.colors.foregroundInverse,
+      fontFamily: mobileTypography.uiBold,
       fontSize: 18,
-      fontWeight: "900",
     },
     mapHeaderCard: {
       backgroundColor: theme.colors.hero,
@@ -4189,8 +5193,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     mapTitle: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.kufiBold,
       fontSize: 22,
-      fontWeight: "900",
       lineHeight: 29,
       marginTop: 8,
     },
@@ -4210,8 +5214,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     chatBubbleText: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 14,
-      fontWeight: "800",
       lineHeight: 21,
     },
     chatBubbleTextCustomer: {
@@ -4219,8 +5223,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     chatBubbleTime: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 10,
-      fontWeight: "800",
       marginTop: 6,
     },
     chatBubbleTimeCustomer: {
@@ -4242,8 +5246,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     chatTitle: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.kufiBold,
       fontSize: 20,
-      fontWeight: "900",
       marginTop: 4,
     },
     conversationAvatar: {
@@ -4256,8 +5260,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     conversationAvatarText: {
       color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiBold,
       fontSize: 16,
-      fontWeight: "900",
     },
     conversationPanel: {
       backgroundColor: theme.colors.card,
@@ -4279,8 +5283,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     conversationStatus: {
       color: theme.colors.gold,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 11,
-      fontWeight: "900",
       lineHeight: 15,
       marginTop: 6,
     },
@@ -4290,8 +5294,8 @@ const createStyles = (theme: MobileTheme) =>
       borderWidth: 1,
       borderRadius: theme.radii.pill,
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 12,
-      fontWeight: "900",
       overflow: "hidden",
       paddingHorizontal: 12,
       paddingVertical: 7,
@@ -4302,8 +5306,8 @@ const createStyles = (theme: MobileTheme) =>
       borderWidth: 1,
       borderRadius: theme.radii.pill,
       color: theme.colors.foregroundInverse,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 12,
-      fontWeight: "900",
       overflow: "hidden",
       paddingHorizontal: 12,
       paddingVertical: 7,
@@ -4353,8 +5357,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     messageHeroIconText: {
       color: theme.colors.foregroundInverse,
+      fontFamily: mobileTypography.uiBold,
       fontSize: 22,
-      fontWeight: "900",
     },
     messageHeroIconImage: {
       height: 24,
@@ -4365,7 +5369,6 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.foreground,
       fontFamily: mobileTypography.kufiBold,
       fontSize: 27,
-      fontWeight: "800",
       lineHeight: 34,
       marginTop: 20,
     },
@@ -4378,8 +5381,8 @@ const createStyles = (theme: MobileTheme) =>
       backgroundColor: theme.colors.muted,
       borderRadius: theme.radii.pill,
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 12,
-      fontWeight: "900",
       overflow: "hidden",
       paddingHorizontal: 10,
       paddingVertical: 7,
@@ -4396,8 +5399,8 @@ const createStyles = (theme: MobileTheme) =>
       borderRadius: theme.radii.pill,
       borderWidth: 1,
       color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 12,
-      fontWeight: "900",
       overflow: "hidden",
       paddingHorizontal: 10,
       paddingVertical: 7,
@@ -4415,19 +5418,20 @@ const createStyles = (theme: MobileTheme) =>
     },
     myBookingMeta: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 14,
       lineHeight: 21,
       marginTop: 8,
     },
     myBookingStatus: {
       color: theme.colors.success,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 12,
-      fontWeight: "900",
     },
     myBookingTitle: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 19,
-      fontWeight: "900",
       lineHeight: 25,
       marginTop: 8,
     },
@@ -4459,8 +5463,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     notificationIconText: {
       color: theme.colors.foregroundInverse,
+      fontFamily: mobileTypography.uiBold,
       fontSize: 16,
-      fontWeight: "900",
     },
     notificationIconImage: {
       height: 20,
@@ -4482,8 +5486,8 @@ const createStyles = (theme: MobileTheme) =>
       borderRadius: theme.radii.pill,
       borderWidth: 1,
       color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 11,
-      fontWeight: "900",
       lineHeight: 15,
       marginTop: 8,
       overflow: "hidden",
@@ -4492,8 +5496,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     notificationTime: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 11,
-      fontWeight: "800",
     },
     notificationTitleRow: {
       alignItems: "flex-start",
@@ -4520,16 +5524,16 @@ const createStyles = (theme: MobileTheme) =>
     },
     onboardingBody: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 26,
-      fontWeight: "800",
       lineHeight: 40,
       marginTop: 28,
       textAlign: "center",
     },
     onboardingBrand: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.kufiBold,
       fontSize: 44,
-      fontWeight: "900",
       letterSpacing: 2,
       marginTop: 24,
       textAlign: "center",
@@ -4563,8 +5567,8 @@ const createStyles = (theme: MobileTheme) =>
       borderRadius: theme.radii.pill,
       borderWidth: 1,
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 11,
-      fontWeight: "900",
       overflow: "hidden",
       paddingHorizontal: 11,
       paddingVertical: 7,
@@ -4587,8 +5591,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     onboardingLogoText: {
       color: theme.colors.gold,
+      fontFamily: mobileTypography.uiBold,
       fontSize: 132,
-      fontWeight: "900",
       lineHeight: 142,
     },
     onboardingSecondary: {
@@ -4603,8 +5607,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     onboardingSecondaryText: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 19,
-      fontWeight: "900",
     },
     onboardingScreen: {
       backgroundColor: theme.colors.hero,
@@ -4613,8 +5617,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     onboardingSlogan: {
       color: theme.colors.gold,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 31,
-      fontWeight: "500",
       lineHeight: 38,
       marginTop: 16,
       textAlign: "center",
@@ -4663,8 +5667,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     onboardingTitle: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.kufiBold,
       fontSize: 30,
-      fontWeight: "900",
       lineHeight: 37,
       marginTop: 24,
     },
@@ -4672,8 +5676,8 @@ const createStyles = (theme: MobileTheme) =>
       backgroundColor: theme.colors.goldSoft,
       borderRadius: theme.radii.pill,
       color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 11,
-      fontWeight: "900",
       overflow: "hidden",
       paddingHorizontal: 9,
       paddingVertical: 6,
@@ -4719,15 +5723,16 @@ const createStyles = (theme: MobileTheme) =>
     ownerBusinessMeta: {
       color: theme.colors.mutedForeground,
       flexShrink: 1,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 13,
       lineHeight: 20,
       marginTop: 4,
     },
     ownerBusinessName: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.kufiBold,
       fontSize: 21,
       flexShrink: 1,
-      fontWeight: "900",
       lineHeight: 27,
       marginTop: 4,
     },
@@ -4741,8 +5746,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     ownerCustomerInitial: {
       color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiBold,
       fontSize: 16,
-      fontWeight: "900",
     },
     ownerHeaderRow: {
       alignItems: "center",
@@ -4751,6 +5756,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     ownerHeroBody: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 14,
       lineHeight: 22,
       marginTop: 16,
@@ -4791,8 +5797,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     ownerInsightsTitle: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.kufiBold,
       fontSize: 20,
-      fontWeight: "900",
       marginTop: 4,
     },
     ownerLogo: {
@@ -4805,8 +5811,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     ownerLogoText: {
       color: theme.colors.foregroundInverse,
+      fontFamily: mobileTypography.uiBold,
       fontSize: 22,
-      fontWeight: "900",
     },
     ownerMetricRow: {
       alignItems: "center",
@@ -4815,13 +5821,13 @@ const createStyles = (theme: MobileTheme) =>
     },
     ownerMetricValue: {
       color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 13,
-      fontWeight: "900",
     },
     ownerMutedActionText: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 11,
-      fontWeight: "900",
     },
     ownerOverviewCard: {
       backgroundColor: theme.colors.cardElevated,
@@ -4838,8 +5844,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     ownerOverviewDetail: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 11,
-      fontWeight: "800",
       marginTop: 6,
     },
     ownerOverviewGrid: {
@@ -4849,14 +5855,14 @@ const createStyles = (theme: MobileTheme) =>
     },
     ownerOverviewLabel: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 13,
-      fontWeight: "900",
       marginTop: 6,
     },
     ownerOverviewValue: {
       color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiBold,
       fontSize: 26,
-      fontWeight: "900",
     },
     ownerPanelCard: {
       backgroundColor: theme.colors.card,
@@ -4908,13 +5914,13 @@ const createStyles = (theme: MobileTheme) =>
     },
     ownerQuickIcon: {
       color: theme.colors.gold,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 22,
-      fontWeight: "900",
     },
     ownerQuickText: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 12,
-      fontWeight: "900",
       textAlign: "center",
     },
     ownerSafetyCard: {
@@ -4935,8 +5941,8 @@ const createStyles = (theme: MobileTheme) =>
       borderRadius: theme.radii.pill,
       borderWidth: 1,
       color: theme.colors.success,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 11,
-      fontWeight: "900",
       overflow: "hidden",
       paddingHorizontal: 9,
       paddingVertical: 6,
@@ -4950,14 +5956,15 @@ const createStyles = (theme: MobileTheme) =>
       borderRadius: theme.radii.pill,
       borderWidth: 1,
       color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 12,
-      fontWeight: "900",
       overflow: "hidden",
       paddingHorizontal: 10,
       paddingVertical: 7,
     },
     paymentBody: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 14,
       lineHeight: 21,
       marginTop: 8,
@@ -4987,7 +5994,6 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.foreground,
       fontFamily: mobileTypography.uiRegular,
       fontSize: 18,
-      fontWeight: "700",
       marginTop: 6,
     },
     policyCard: {
@@ -5000,8 +6006,8 @@ const createStyles = (theme: MobileTheme) =>
     priceText: {
       color: theme.colors.deepGold,
       flexShrink: 1,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 13,
-      fontWeight: "900",
     },
     privacyCard: {
       backgroundColor: theme.colors.successSoft,
@@ -5034,15 +6040,15 @@ const createStyles = (theme: MobileTheme) =>
     },
     preferenceNote: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 12,
-      fontWeight: "800",
       lineHeight: 19,
       marginTop: 6,
     },
     preferenceChevron: {
       color: theme.colors.gold,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 20,
-      fontWeight: "900",
     },
     preferenceCopy: {
       flex: 1,
@@ -5051,8 +6057,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     preferenceGroupTitle: {
       color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 13,
-      fontWeight: "900",
     },
     preferencesGroup: {
       gap: 10,
@@ -5104,8 +6110,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     profileMembershipText: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 12,
-      fontWeight: "800",
       marginTop: 6,
     },
     profileStatCard: {
@@ -5118,14 +6124,14 @@ const createStyles = (theme: MobileTheme) =>
     },
     profileStatLabel: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 12,
-      fontWeight: "900",
       marginTop: 4,
     },
     profileStatMeta: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 10,
-      fontWeight: "700",
       marginTop: 3,
     },
     profileStatsGrid: {
@@ -5135,8 +6141,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     profileStatValue: {
       color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 18,
-      fontWeight: "900",
     },
     profileStatusStack: {
       alignItems: "flex-end",
@@ -5167,7 +6173,6 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.foregroundInverse,
       fontFamily: mobileTypography.uiRegular,
       fontSize: 17,
-      fontWeight: "700",
     },
     promoBadge: {
       alignItems: "center",
@@ -5181,12 +6186,11 @@ const createStyles = (theme: MobileTheme) =>
     },
     promoBadgeText: {
       color: theme.colors.foregroundInverse,
-      fontWeight: "900",
     },
     promoBody: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 16,
-      fontWeight: "700",
       lineHeight: 24,
       marginTop: 8,
       maxWidth: 230,
@@ -5208,16 +6212,16 @@ const createStyles = (theme: MobileTheme) =>
     },
     promoTitle: {
       color: theme.colors.gold,
+      fontFamily: mobileTypography.kufiBold,
       fontSize: 29,
-      fontWeight: "900",
       lineHeight: 36,
     },
     quickReplyChip: {
       backgroundColor: theme.colors.goldSoft,
       borderRadius: theme.radii.pill,
       color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 12,
-      fontWeight: "900",
       overflow: "hidden",
       paddingHorizontal: 11,
       paddingVertical: 7,
@@ -5250,8 +6254,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     recommendedIconText: {
       color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 16,
-      fontWeight: "900",
     },
     recommendedItem: {
       alignItems: "flex-start",
@@ -5272,8 +6276,8 @@ const createStyles = (theme: MobileTheme) =>
       borderRadius: theme.radii.pill,
       borderWidth: 1,
       color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 12,
-      fontWeight: "900",
       overflow: "hidden",
       paddingHorizontal: 10,
       paddingVertical: 7,
@@ -5310,8 +6314,8 @@ const createStyles = (theme: MobileTheme) =>
       borderRadius: theme.radii.pill,
       borderWidth: 1,
       color: theme.colors.success,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 12,
-      fontWeight: "900",
       overflow: "hidden",
       paddingHorizontal: 10,
       paddingVertical: 7,
@@ -5320,7 +6324,6 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.foreground,
       fontFamily: mobileTypography.kufiBold,
       fontSize: 24,
-      fontWeight: "800",
       letterSpacing: 0.3,
       marginTop: 4,
     },
@@ -5332,8 +6335,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     quickBookingBody: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 15,
-      fontWeight: "700",
       lineHeight: 23,
       marginTop: 9,
     },
@@ -5361,8 +6364,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     quickBookingTitle: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.kufiBold,
       fontSize: 26,
-      fontWeight: "900",
       letterSpacing: -0.4,
       lineHeight: 33,
       marginTop: 8,
@@ -5383,8 +6386,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     ratingText: {
       color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 12,
-      fontWeight: "900",
     },
     rowCard: {
       alignItems: "center",
@@ -5424,8 +6427,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     rowIconText: {
       color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 18,
-      fontWeight: "900",
     },
     rowMeta: {
       color: theme.colors.mutedForeground,
@@ -5437,15 +6440,14 @@ const createStyles = (theme: MobileTheme) =>
     },
     rowPrice: {
       color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 13,
-      fontWeight: "900",
     },
     rowTitle: {
       color: theme.colors.foreground,
       fontFamily: mobileTypography.uiRegular,
       fontSize: 15,
       flexShrink: 1,
-      fontWeight: "700",
       lineHeight: 20,
     },
     rtlText: {
@@ -5488,8 +6490,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     selectedServiceIconText: {
       color: theme.colors.foregroundInverse,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 18,
-      fontWeight: "900",
     },
     selectedServiceIconImage: {
       height: 24,
@@ -5498,6 +6500,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     selectedServiceMeta: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 12,
       marginTop: 4,
     },
@@ -5505,7 +6508,6 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.foreground,
       fontFamily: mobileTypography.uiRegular,
       fontSize: 16,
-      fontWeight: "700",
     },
     serviceCard: {
       backgroundColor: theme.colors.cardElevated,
@@ -5534,7 +6536,6 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.mutedForeground,
       fontFamily: mobileTypography.uiRegular,
       fontSize: 12,
-      fontWeight: "500",
       lineHeight: 18,
       marginTop: 5,
     },
@@ -5542,18 +6543,17 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.foreground,
       fontFamily: mobileTypography.uiRegular,
       fontSize: 15,
-      fontWeight: "700",
       lineHeight: 21,
     },
     servicePrice: {
       color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 13,
-      fontWeight: "900",
     },
     safeActionText: {
       color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 12,
-      fontWeight: "900",
       lineHeight: 17,
       marginTop: 10,
     },
@@ -5570,7 +6570,6 @@ const createStyles = (theme: MobileTheme) =>
       fontFamily: mobileTypography.uiRegular,
       flexShrink: 1,
       fontSize: 12,
-      fontWeight: "700",
       letterSpacing: 0.5,
       lineHeight: 16,
       textTransform: "uppercase",
@@ -5580,7 +6579,6 @@ const createStyles = (theme: MobileTheme) =>
       fontFamily: mobileTypography.kufiBold,
       flexShrink: 1,
       fontSize: 28,
-      fontWeight: "800",
       letterSpacing: -0.4,
       lineHeight: 35,
       marginTop: 8,
@@ -5718,8 +6716,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     salonActionIcon: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 26,
-      fontWeight: "900",
       lineHeight: 30,
     },
     salonActionIconImage: {
@@ -5731,7 +6729,6 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.mutedForeground,
       fontFamily: mobileTypography.uiRegular,
       fontSize: 13,
-      fontWeight: "600",
       marginTop: 8,
     },
     salonActionTile: {
@@ -5762,8 +6759,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     salonBackIcon: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 43,
-      fontWeight: "700",
       lineHeight: 45,
       marginTop: -4,
     },
@@ -5797,8 +6794,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     salonCtaArrowText: {
       color: theme.colors.foregroundInverse,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 34,
-      fontWeight: "900",
       lineHeight: 36,
       marginTop: -5,
     },
@@ -5860,8 +6857,8 @@ const createStyles = (theme: MobileTheme) =>
       borderRadius: theme.radii.pill,
       borderWidth: 1,
       color: theme.colors.gold,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 16,
-      fontWeight: "900",
       overflow: "hidden",
       paddingHorizontal: 18,
       paddingVertical: 10,
@@ -5870,7 +6867,6 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.mutedForeground,
       fontFamily: mobileTypography.uiRegular,
       fontSize: 18,
-      fontWeight: "500",
       lineHeight: 25,
       marginTop: 8,
     },
@@ -5879,7 +6875,6 @@ const createStyles = (theme: MobileTheme) =>
       fontFamily: mobileTypography.kufiBold,
       flexShrink: 1,
       fontSize: 40,
-      fontWeight: "800",
       letterSpacing: -0.8,
       lineHeight: 50,
     },
@@ -5891,8 +6886,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     salonRatingStar: {
       color: theme.colors.gold,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 23,
-      fontWeight: "900",
     },
     salonRatingStarImage: {
       height: 22,
@@ -5901,8 +6896,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     salonRatingText: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 20,
-      fontWeight: "800",
     },
     salonRoundButton: {
       alignItems: "center",
@@ -5916,8 +6911,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     salonRoundButtonText: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 32,
-      fontWeight: "900",
       lineHeight: 34,
     },
     salonRoundButtonIcon: {
@@ -5936,8 +6931,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     salonServiceAddText: {
       color: theme.colors.gold,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 30,
-      fontWeight: "900",
       lineHeight: 32,
     },
     salonServiceMedia: {
@@ -5948,21 +6943,21 @@ const createStyles = (theme: MobileTheme) =>
     },
     salonServiceMeta: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 15,
-      fontWeight: "800",
       lineHeight: 21,
       marginTop: 10,
     },
     salonServiceName: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 28,
-      fontWeight: "900",
       lineHeight: 36,
     },
     salonServicePrice: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 20,
-      fontWeight: "900",
       marginTop: 8,
     },
     salonServiceRow: {
@@ -5983,8 +6978,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     salonTabText: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 15,
-      fontWeight: "900",
       paddingBottom: 14,
     },
     salonTabTextActive: {
@@ -6027,9 +7022,9 @@ const createStyles = (theme: MobileTheme) =>
       borderRadius: theme.radii.pill,
       borderWidth: 1,
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiMedium,
       flexGrow: 1,
       fontSize: 15,
-      fontWeight: "900",
       overflow: "hidden",
       paddingHorizontal: 18,
       paddingVertical: 13,
@@ -6039,9 +7034,9 @@ const createStyles = (theme: MobileTheme) =>
       backgroundColor: theme.colors.gold,
       borderRadius: theme.radii.pill,
       color: theme.colors.foregroundInverse,
+      fontFamily: mobileTypography.uiMedium,
       flexGrow: 1,
       fontSize: 16,
-      fontWeight: "900",
       overflow: "hidden",
       paddingHorizontal: 24,
       paddingVertical: 14,
@@ -6064,8 +7059,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     searchMapFilterIcon: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 26,
-      fontWeight: "900",
       lineHeight: 28,
       transform: [{ rotate: "90deg" }],
     },
@@ -6108,13 +7103,13 @@ const createStyles = (theme: MobileTheme) =>
     },
     searchResultDistance: {
       color: "#6b7280",
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 15,
-      fontWeight: "800",
     },
     searchResultHeart: {
       color: "#111827",
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 38,
-      fontWeight: "900",
       lineHeight: 40,
     },
     searchResultHeartImage: {
@@ -6130,38 +7125,38 @@ const createStyles = (theme: MobileTheme) =>
     },
     searchResultMeta: {
       color: "#6b7280",
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 16,
-      fontWeight: "700",
       lineHeight: 22,
       marginTop: 4,
     },
     searchResultName: {
       color: "#101827",
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 28,
-      fontWeight: "900",
       letterSpacing: -0.6,
       lineHeight: 34,
     },
     searchResultPrice: {
       color: "#101827",
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 17,
-      fontWeight: "900",
       marginTop: 8,
     },
     searchResultRating: {
       color: "#101827",
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 17,
-      fontWeight: "900",
     },
     searchResultReviews: {
       color: "#101827",
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 17,
-      fontWeight: "800",
     },
     searchResultShare: {
       color: "#6b7280",
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 28,
-      fontWeight: "900",
       lineHeight: 30,
     },
     searchResultShareImage: {
@@ -6193,7 +7188,6 @@ const createStyles = (theme: MobileTheme) =>
       color: "#101827",
       fontFamily: mobileTypography.kufiBold,
       fontSize: 28,
-      fontWeight: "800",
       lineHeight: 36,
       marginBottom: 6,
     },
@@ -6211,8 +7205,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     searchActionIcon: {
       color: theme.colors.gold,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 17,
-      fontWeight: "900",
     },
     searchActionRow: {
       flexDirection: "row",
@@ -6220,8 +7214,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     searchActionText: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 12,
-      fontWeight: "900",
     },
     searchBar: {
       alignItems: "center",
@@ -6246,8 +7240,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     searchIcon: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 28,
-      fontWeight: "900",
     },
     searchIconImage: {
       height: 28,
@@ -6259,7 +7253,6 @@ const createStyles = (theme: MobileTheme) =>
       fontFamily: mobileTypography.uiRegular,
       flex: 1,
       fontSize: 16,
-      fontWeight: "500",
       lineHeight: 22,
       minWidth: 0,
     },
@@ -6269,8 +7262,8 @@ const createStyles = (theme: MobileTheme) =>
       borderRadius: theme.radii.pill,
       borderWidth: 1,
       color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 12,
-      fontWeight: "900",
       overflow: "hidden",
       paddingHorizontal: 11,
       paddingVertical: 7,
@@ -6290,8 +7283,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     searchChipTitle: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 13,
-      fontWeight: "900",
     },
     secondaryButton: {
       alignItems: "center",
@@ -6310,8 +7303,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     secondaryButtonText: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 14,
-      fontWeight: "900",
     },
     secondaryIconButton: {
       alignItems: "center",
@@ -6322,13 +7315,13 @@ const createStyles = (theme: MobileTheme) =>
     },
     secondaryIconButtonText: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 13,
-      fontWeight: "900",
     },
     sectionAction: {
       color: theme.colors.gold,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 13,
-      fontWeight: "900",
     },
     sectionHeader: {
       alignItems: "center",
@@ -6341,13 +7334,12 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.foreground,
       fontFamily: mobileTypography.kufiBold,
       fontSize: 21,
-      fontWeight: "800",
       letterSpacing: -0.2,
     },
     selectText: {
       color: theme.colors.gold,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 13,
-      fontWeight: "900",
     },
     servicePriceBlock: {
       alignItems: "flex-end",
@@ -6396,8 +7388,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     supportIconText: {
       color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 18,
-      fontWeight: "900",
     },
     shell: {
       backgroundColor: theme.colors.background,
@@ -6451,8 +7443,8 @@ const createStyles = (theme: MobileTheme) =>
       backgroundColor: theme.colors.goldSoft,
       borderRadius: theme.radii.pill,
       color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 12,
-      fontWeight: "900",
       overflow: "hidden",
       paddingHorizontal: 10,
       paddingVertical: 7,
@@ -6499,8 +7491,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     stateIconText: {
       color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiBold,
       fontSize: 26,
-      fontWeight: "900",
       lineHeight: 30,
       textAlign: "center",
     },
@@ -6530,16 +7522,16 @@ const createStyles = (theme: MobileTheme) =>
     summaryLabel: {
       color: theme.colors.mutedForeground,
       flexShrink: 1,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 12,
-      fontWeight: "800",
       lineHeight: 17,
       maxWidth: "42%",
     },
     summaryValue: {
       color: theme.colors.foreground,
       flexShrink: 1,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 13,
-      fontWeight: "900",
       lineHeight: 18,
       maxWidth: "58%",
       textAlign: "right",
@@ -6550,8 +7542,8 @@ const createStyles = (theme: MobileTheme) =>
       borderRadius: theme.radii.pill,
       borderWidth: 1,
       color: theme.colors.warning,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 12,
-      fontWeight: "900",
       overflow: "hidden",
       paddingHorizontal: 10,
       paddingVertical: 7,
@@ -6564,6 +7556,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     stepBody: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 12,
       lineHeight: 18,
       marginTop: 5,
@@ -6584,13 +7577,13 @@ const createStyles = (theme: MobileTheme) =>
     },
     stepIcon: {
       color: theme.colors.gold,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 18,
-      fontWeight: "900",
     },
     stepTitle: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 15,
-      fontWeight: "900",
       marginTop: 8,
     },
     tabBar: {
@@ -6644,6 +7637,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     tabIcon: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 21,
     },
     tabIconActive: {
@@ -6661,7 +7655,6 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.foreground,
       fontFamily: mobileTypography.uiRegular,
       fontSize: 10,
-      fontWeight: "700",
       lineHeight: 13,
       maxWidth: 64,
       minWidth: 48,
@@ -6672,15 +7665,15 @@ const createStyles = (theme: MobileTheme) =>
     },
     tagText: {
       color: theme.colors.success,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 12,
-      fontWeight: "900",
     },
     verifiedBadge: {
       backgroundColor: "#3b82f6",
       borderRadius: 16,
       color: "#ffffff",
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 16,
-      fontWeight: "900",
       overflow: "hidden",
       paddingHorizontal: 7,
       paddingVertical: 3,
@@ -6760,8 +7753,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     timelineDotText: {
       color: theme.colors.foregroundInverse,
+      fontFamily: mobileTypography.uiBold,
       fontSize: 12,
-      fontWeight: "900",
     },
     timelineItem: {
       alignItems: "flex-start",
@@ -6770,16 +7763,16 @@ const createStyles = (theme: MobileTheme) =>
     },
     timelineTitle: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.kufiBold,
       fontSize: 20,
-      fontWeight: "900",
       marginTop: 4,
     },
     unreadBadge: {
       backgroundColor: theme.colors.gold,
       borderRadius: 999,
       color: theme.colors.foregroundInverse,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 11,
-      fontWeight: "900",
       overflow: "hidden",
       paddingHorizontal: 8,
       paddingVertical: 5,
@@ -6794,13 +7787,255 @@ const createStyles = (theme: MobileTheme) =>
     },
     voiceText: {
       color: theme.colors.gold,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 15,
-      fontWeight: "900",
     },
     voiceIconImage: {
       height: 18,
       tintColor: theme.colors.gold,
       width: 18,
+    },
+    confettiDotBlue: {
+      backgroundColor: "#38bdf8",
+      borderRadius: 5,
+      height: 10,
+      left: 42,
+      position: "absolute",
+      top: 72,
+      transform: [{ rotate: "18deg" }],
+      width: 10,
+    },
+    confettiDotGold: {
+      backgroundColor: theme.colors.gold,
+      borderRadius: 6,
+      height: 12,
+      position: "absolute",
+      right: 34,
+      top: 20,
+      transform: [{ rotate: "28deg" }],
+      width: 12,
+    },
+    confettiDotRose: {
+      backgroundColor: "#fb7185",
+      borderRadius: 4,
+      bottom: 30,
+      height: 8,
+      position: "absolute",
+      right: 86,
+      transform: [{ rotate: "-24deg" }],
+      width: 8,
+    },
+    confettiLayer: {
+      ...StyleSheet.absoluteFill,
+      opacity: 0.92,
+    },
+    confirmationHeroCard: {
+      alignItems: "center",
+      backgroundColor: theme.colors.hero,
+      borderColor: theme.colors.goldSoft,
+      borderRadius: theme.radii.xl,
+      borderWidth: 1,
+      overflow: "hidden",
+      padding: 30,
+      shadowColor: theme.colors.shadow,
+      shadowOffset: { height: 24, width: 0 },
+      shadowOpacity: theme.isDark ? 0.36 : 0.12,
+      shadowRadius: 36,
+    },
+    confirmationReference: {
+      backgroundColor: theme.colors.cardElevated,
+      borderColor: theme.colors.goldSoft,
+      borderRadius: theme.radii.pill,
+      borderWidth: 1,
+      color: theme.colors.gold,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: 13,
+      marginTop: 18,
+      overflow: "hidden",
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+    },
+    confirmationSuccessIcon: {
+      alignItems: "center",
+      backgroundColor: theme.colors.success,
+      borderColor: theme.colors.cardElevated,
+      borderRadius: 38,
+      borderWidth: 4,
+      height: 76,
+      justifyContent: "center",
+      marginBottom: 16,
+      shadowColor: theme.colors.success,
+      shadowOffset: { height: 12, width: 0 },
+      shadowOpacity: theme.isDark ? 0.28 : 0.12,
+      shadowRadius: 18,
+      width: 76,
+    },
+    confirmationSuccessIconImage: {
+      height: 34,
+      tintColor: theme.colors.foregroundInverse,
+      width: 34,
+    },
+    legendDot: {
+      backgroundColor: theme.colors.success,
+      borderRadius: 5,
+      height: 10,
+      width: 10,
+    },
+    legendDotBooked: {
+      backgroundColor: theme.colors.mutedForeground,
+    },
+    legendDotLimited: {
+      backgroundColor: theme.colors.warning,
+    },
+    legendItem: {
+      alignItems: "center",
+      backgroundColor: theme.colors.cardElevated,
+      borderColor: theme.colors.border,
+      borderRadius: theme.radii.pill,
+      borderWidth: 1,
+      flexDirection: "row",
+      gap: 7,
+      paddingHorizontal: 10,
+      paddingVertical: 7,
+    },
+    legendText: {
+      color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiMedium,
+      fontSize: 11,
+    },
+    paymentMethodCard: {
+      alignItems: "center",
+      backgroundColor: theme.colors.card,
+      borderColor: theme.colors.border,
+      borderRadius: 24,
+      borderWidth: 1,
+      flexDirection: "row",
+      gap: 14,
+      padding: 16,
+      shadowColor: theme.colors.shadow,
+      shadowOffset: { height: 10, width: 0 },
+      shadowOpacity: theme.isDark ? 0.14 : 0.05,
+      shadowRadius: 16,
+    },
+    paymentMethodCardActive: {
+      backgroundColor: theme.colors.cardElevated,
+      borderColor: theme.colors.gold,
+      shadowColor: theme.colors.deepGold,
+      shadowOpacity: theme.isDark ? 0.22 : 0.1,
+    },
+    paymentMethodIcon: {
+      alignItems: "center",
+      backgroundColor: theme.colors.goldSoft,
+      borderColor: theme.colors.gold,
+      borderRadius: 18,
+      borderWidth: 1,
+      height: 42,
+      justifyContent: "center",
+      width: 42,
+    },
+    paymentMethodIconImage: {
+      height: 22,
+      tintColor: theme.colors.deepGold,
+      width: 22,
+    },
+    paymentOptionList: {
+      gap: 12,
+    },
+    securePaymentCard: {
+      alignItems: "center",
+      backgroundColor: theme.colors.successSoft,
+      borderColor: theme.colors.success,
+      borderRadius: 22,
+      borderWidth: 1,
+      flexDirection: "row",
+      gap: 12,
+      padding: 16,
+    },
+    securePaymentIconImage: {
+      height: 22,
+      tintColor: theme.colors.success,
+      width: 22,
+    },
+    securePaymentNote: {
+      color: theme.colors.success,
+      fontFamily: mobileTypography.uiMedium,
+      fontSize: 12,
+      lineHeight: 18,
+      marginTop: 6,
+    },
+    securePaymentText: {
+      color: theme.colors.success,
+      flex: 1,
+      fontFamily: mobileTypography.uiMedium,
+      fontSize: 12,
+      lineHeight: 18,
+    },
+    staffAvatar: {
+      alignItems: "center",
+      backgroundColor: theme.colors.goldSoft,
+      borderColor: theme.colors.gold,
+      borderRadius: 24,
+      borderWidth: 1,
+      height: 48,
+      justifyContent: "center",
+      width: 48,
+    },
+    staffAvatarText: {
+      color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiBold,
+      fontSize: 18,
+    },
+    staffExperience: {
+      color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiRegular,
+      fontSize: 12,
+      lineHeight: 18,
+      marginTop: 3,
+    },
+    staffRatingIconImage: {
+      height: 14,
+      tintColor: theme.colors.gold,
+      width: 14,
+    },
+    staffRatingPill: {
+      alignItems: "center",
+      backgroundColor: theme.colors.goldSoft,
+      borderRadius: theme.radii.pill,
+      flexDirection: "row",
+      gap: 4,
+      paddingHorizontal: 8,
+      paddingVertical: 5,
+    },
+    staffRatingText: {
+      color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: 11,
+    },
+    staffSelectionCard: {
+      alignItems: "center",
+      backgroundColor: theme.colors.card,
+      borderColor: theme.colors.border,
+      borderRadius: 26,
+      borderWidth: 1,
+      flexDirection: "row",
+      gap: 14,
+      padding: 16,
+      shadowColor: theme.colors.shadow,
+      shadowOffset: { height: 12, width: 0 },
+      shadowOpacity: theme.isDark ? 0.16 : 0.06,
+      shadowRadius: 18,
+    },
+    staffSelectionCardActive: {
+      backgroundColor: theme.colors.cardElevated,
+      borderColor: theme.colors.gold,
+      shadowColor: theme.colors.deepGold,
+      shadowOpacity: theme.isDark ? 0.24 : 0.1,
+    },
+    staffTitleRow: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 10,
+      justifyContent: "space-between",
     },
     visualOnlyButton: {
       opacity: 0.96,
