@@ -1,4 +1,14 @@
-import { Pressable, Text, View, type StyleProp, type TextStyle, type ViewStyle } from "react-native";
+import {
+  Image,
+  Pressable,
+  Text,
+  View,
+  type ImageSourcePropType,
+  type ImageStyle,
+  type StyleProp,
+  type TextStyle,
+  type ViewStyle,
+} from "react-native";
 
 import {
   SUPPORTED_LOCALES,
@@ -20,37 +30,39 @@ type BottomNavTabId =
 
 type BottomNavTab = {
   id: BottomNavTabId;
-  icon: string;
+  icon: ImageSourcePropType;
   label: Record<MobileLocale, string>;
 };
 
+/* eslint-disable @typescript-eslint/no-require-imports -- React Native bundles static image assets through require(). */
 const BOTTOM_NAV_TABS: BottomNavTab[] = [
   {
     id: "customerHome",
-    icon: "⌂",
+    icon: require("../../assets/icons/nav/home.png"),
     label: { ar: "الرئيسية", ckb: "سەرەکی", en: "Home" },
   },
   {
     id: "favorites",
-    icon: "♡",
+    icon: require("../../assets/icons/nav/favorite.png"),
     label: { ar: "المفضلة", ckb: "دڵخوازەکان", en: "Favorites" },
   },
   {
     id: "quickBooking",
-    icon: "+",
+    icon: require("../../assets/icons/nav/quick-booking-plus.png"),
     label: { ar: "إضافة حجز", ckb: "حجز زیاد بکە", en: "Quick book" },
   },
   {
     id: "bookings",
-    icon: "◷",
+    icon: require("../../assets/icons/nav/bookings.png"),
     label: { ar: "حجوزاتي", ckb: "حجزەکانم", en: "My bookings" },
   },
   {
     id: "account",
-    icon: "◉",
+    icon: require("../../assets/icons/nav/account.png"),
     label: { ar: "الحساب", ckb: "هەژمار", en: "Account" },
   },
 ];
+/* eslint-enable @typescript-eslint/no-require-imports */
 
 type MobileChromeStyles = {
   brandCopy: StyleProp<ViewStyle>;
@@ -61,6 +73,7 @@ type MobileChromeStyles = {
   centerTabButton: StyleProp<ViewStyle>;
   centerTabButtonActive: StyleProp<ViewStyle>;
   centerTabIcon: StyleProp<TextStyle>;
+  centerTabIconImage: StyleProp<ImageStyle>;
   disabledButton: StyleProp<ViewStyle>;
   disabledButtonText: StyleProp<TextStyle>;
   header: StyleProp<ViewStyle>;
@@ -84,6 +97,8 @@ type MobileChromeStyles = {
   tabButtonPressed: StyleProp<ViewStyle>;
   tabIcon: StyleProp<TextStyle>;
   tabIconActive: StyleProp<TextStyle>;
+  tabIconImage: StyleProp<ImageStyle>;
+  tabIconImageActive: StyleProp<ImageStyle>;
   tabLabel: StyleProp<TextStyle>;
   tabLabelActive: StyleProp<TextStyle>;
   visualOnlyButton: StyleProp<ViewStyle>;
@@ -250,15 +265,16 @@ export function BottomTabBar({
               isCenterAction && active && styles.centerTabButtonActive,
             ]}
           >
-            <Text
+            <Image
+              alt={tab.label[locale]}
+              resizeMode="contain"
+              source={tab.icon}
               style={[
-                styles.tabIcon,
-                active && styles.tabIconActive,
-                isCenterAction && styles.centerTabIcon,
+                styles.tabIconImage,
+                active && styles.tabIconImageActive,
+                isCenterAction && styles.centerTabIconImage,
               ]}
-            >
-              {tab.icon}
-            </Text>
+            />
             {isCenterAction ? null : (
               <Text
                 numberOfLines={1}
