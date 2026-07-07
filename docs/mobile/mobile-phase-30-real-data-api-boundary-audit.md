@@ -308,6 +308,8 @@ Reason:
 - Read-only integration can be planned next.
 - Auth, booking mutations, payments, notifications, and messages remain gated.
 
+Phase 31 implements the first read-only business discovery slice from this plan in [mobile-phase-31-read-only-business-discovery.md](./mobile-phase-31-read-only-business-discovery.md).
+
 ## Recommended next action
 
 Recommended next action:

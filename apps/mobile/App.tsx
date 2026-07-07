@@ -14,6 +14,10 @@ import {
   type ImageSourcePropType,
 } from "react-native";
 
+import {
+  adaptMarketplaceBusinesses,
+  type MobileDiscoveryBusiness,
+} from "./src/api/marketplace-adapter";
 import { fetchMobileMarketplace } from "./src/api/marketplace";
 import {
   BottomTabBar,
@@ -44,27 +48,16 @@ import {
   lightMobileTheme,
   type MobileTheme,
 } from "./src/theme/tokens";
-import type { MobileMarketplaceBusiness } from "./src/types/marketplace";
 
 I18nManager.allowRTL(true);
+
+type PremiumBusiness = MobileDiscoveryBusiness;
 
 type MarketplaceState =
   | { status: "idle" }
   | { status: "loading" }
-  | { status: "loaded"; businesses: MobileMarketplaceBusiness[] }
+  | { status: "loaded"; businesses: PremiumBusiness[] }
   | { status: "error"; message: string };
-
-type PremiumBusiness = {
-  category: string;
-  distance: string;
-  id: string;
-  name: string;
-  price: string;
-  rating: string;
-  reviewCount: string;
-  status: string;
-  tag: string;
-};
 
 type BookingFlowStepId = "staff" | "datetime" | "payment" | "confirmation";
 
@@ -228,6 +221,7 @@ const featuredBusinesses: PremiumBusiness[] = [
     category: "صالون وتجميل",
     distance: "1.8 كم",
     id: "noura-salon",
+    location: "بغداد",
     name: "Noura Beauty Lounge",
     price: "من 25,000 د.ع",
     rating: "4.9",
@@ -239,6 +233,7 @@ const featuredBusinesses: PremiumBusiness[] = [
     category: "مطعم وحجوزات",
     distance: "2.4 كم",
     id: "mat3am-gold",
+    location: "بغداد",
     name: "Mat3am Gold",
     price: "طاولة من 4 أشخاص",
     rating: "4.8",
@@ -250,6 +245,7 @@ const featuredBusinesses: PremiumBusiness[] = [
     category: "عيادة أسنان",
     distance: "3.1 كم",
     id: "smile-clinic",
+    location: "بغداد",
     name: "Smile Studio Clinic",
     price: "استشارة من 15,000 د.ع",
     rating: "4.7",
@@ -729,19 +725,24 @@ export default function App() {
       .then((response) => {
         setMarketplaceState({
           status: "loaded",
-          businesses: response.data.businesses,
+          businesses: adaptMarketplaceBusinesses(response.data.businesses),
         });
       })
       .catch((error: unknown) => {
+        const hasKnownError = error instanceof Error && error.message.length > 0;
+
         setMarketplaceState({
           status: "error",
           message:
-            error instanceof Error
-              ? error.message
-              : "Could not load marketplace.",
+            hasKnownError
+              ? "تعذر تحميل بيانات السوق الآن. حاول مرة أخرى بعد لحظات."
+              : "تعذر تحميل بيانات السوق. تحقق من اتصال API ثم حاول مجدداً.",
         });
       });
   }, []);
+
+  const marketplaceBusinesses =
+    marketplaceState.status === "loaded" ? marketplaceState.businesses : [];
 
   const handleTabPress = (tabId: MobileAppTabId) => {
     setSelectedBusiness(null);
@@ -749,7 +750,10 @@ export default function App() {
     setSelectedBookingId(null);
     setBookingManagementPanel(null);
 
-    if (tabId === "marketplace" && marketplaceState.status === "idle") {
+    if (
+      (tabId === "marketplace" || tabId === "customerHome") &&
+      marketplaceState.status === "idle"
+    ) {
       loadMarketplace();
     }
 
@@ -757,6 +761,10 @@ export default function App() {
   };
 
   const handleEnterApp = () => {
+    if (marketplaceState.status === "idle") {
+      loadMarketplace();
+    }
+
     setShowOnboarding(false);
   };
 
@@ -909,9 +917,12 @@ export default function App() {
 
         {!selectedBusiness && activeTab === "customerHome" ? (
           <CustomerHomeScreen
+            businesses={marketplaceBusinesses}
             isRtl={isRtl}
+            marketplaceState={marketplaceState}
             onOpenBusiness={setSelectedBusiness}
             onOpenMarketplace={() => handleTabPress("marketplace")}
+            onRetry={loadMarketplace}
             styles={styles}
           />
         ) : null}
@@ -927,6 +938,7 @@ export default function App() {
 
         {!selectedBusiness && activeTab === "marketplace" ? (
           <SearchMapScreen
+            businesses={marketplaceBusinesses}
             isRtl={isRtl}
             onOpenBusiness={setSelectedBusiness}
             onRetry={loadMarketplace}
@@ -999,14 +1011,20 @@ export default function App() {
 }
 
 function CustomerHomeScreen({
+  businesses,
   isRtl,
+  marketplaceState,
   onOpenBusiness,
   onOpenMarketplace,
+  onRetry,
   styles,
 }: {
+  businesses: PremiumBusiness[];
   isRtl: boolean;
+  marketplaceState: MarketplaceState;
   onOpenBusiness: (business: PremiumBusiness) => void;
   onOpenMarketplace: () => void;
+  onRetry: () => void;
   styles: MobileStyles;
 }) {
   return (
@@ -1024,20 +1042,91 @@ function CustomerHomeScreen({
         styles={styles}
         title="قريب منك"
       />
-      <View style={styles.homeBusinessGrid}>
-        {featuredBusinesses.map((business) => (
-          <View key={business.id} style={styles.homeBusinessCardSlot}>
-            <PremiumBusinessCard
-              business={business}
-              isRtl={isRtl}
-              onPress={() => onOpenBusiness(business)}
-              styles={styles}
-            />
-          </View>
-        ))}
-      </View>
+      <BusinessDiscoverySection
+        businesses={businesses.slice(0, 3)}
+        isRtl={isRtl}
+        onOpenBusiness={onOpenBusiness}
+        onRetry={onRetry}
+        state={marketplaceState}
+        styles={styles}
+      />
       <PromoCard isRtl={isRtl} styles={styles} />
     </>
+  );
+}
+
+function BusinessDiscoverySection({
+  businesses,
+  isRtl,
+  onOpenBusiness,
+  onRetry,
+  state,
+  styles,
+}: {
+  businesses: PremiumBusiness[];
+  isRtl: boolean;
+  onOpenBusiness: (business: PremiumBusiness) => void;
+  onRetry: () => void;
+  state: MarketplaceState;
+  styles: MobileStyles;
+}) {
+  if (state.status === "idle" || state.status === "loading") {
+    return (
+      <PremiumStateCard
+        body="نحمّل الآن أنشطة السوق العامة من واجهة REZNO المخصصة للموبايل، بدون تعطيل بقية التطبيق."
+        icon="…"
+        isRtl={isRtl}
+        label="بيانات السوق"
+        styles={styles}
+        title="جاري تحميل الأماكن القريبة"
+      />
+    );
+  }
+
+  if (state.status === "error") {
+    return (
+      <PremiumStateCard
+        body={state.message}
+        cta="إعادة المحاولة"
+        icon="!"
+        isRtl={isRtl}
+        label="بيانات السوق"
+        onPress={onRetry}
+        styles={styles}
+        title="تعذر تحميل الأماكن القريبة"
+        tone="warning"
+      />
+    );
+  }
+
+  if (businesses.length === 0) {
+    return (
+      <PremiumStateCard
+        body="لم يرجع السوق أي أنشطة عامة لهذا العرض حالياً. يمكن إعادة المحاولة بدون إنشاء أو تعديل أي بيانات."
+        cta="إعادة المحاولة"
+        icon="0"
+        isRtl={isRtl}
+        label="بيانات السوق"
+        onPress={onRetry}
+        styles={styles}
+        title="لا توجد نتائج قريبة حالياً"
+      />
+    );
+  }
+
+  return (
+    <View style={styles.homeBusinessGrid}>
+      {businesses.map((business) => (
+        <View key={business.id} style={styles.homeBusinessCardSlot}>
+          <PremiumBusinessCard
+            business={business}
+            isRtl={isRtl}
+            onPress={() => onOpenBusiness(business)}
+            styles={styles}
+          />
+        </View>
+      ))}
+    </View>
   );
 }
 
@@ -1540,6 +1629,7 @@ function PremiumBusinessCard({
 }
 
 function SearchMapScreen({
+  businesses,
   isRtl,
   onOpenBusiness,
   onRetry,
@@ -1547,6 +1637,7 @@ function SearchMapScreen({
   styles,
   text,
 }: {
+  businesses: PremiumBusiness[];
   isRtl: boolean;
   onOpenBusiness: (business: PremiumBusiness) => void;
   onRetry: () => void;
@@ -1582,25 +1673,27 @@ function SearchMapScreen({
         <Text style={[styles.searchResultsTitle, isRtl && styles.rtlText]}>
           نتائج بالقرب منك
         </Text>
-        {featuredBusinesses.map((business, index) => (
-          <SearchMapResultCard
-            business={business}
-            index={index}
+        {state.status === "loaded" && businesses.length > 0 ? (
+          businesses.slice(0, 5).map((business, index) => (
+            <SearchMapResultCard
+              business={business}
+              index={index}
+              isRtl={isRtl}
+              key={business.id}
+              onPress={() => onOpenBusiness(business)}
+              styles={styles}
+            />
+          ))
+        ) : (
+          <SearchMapResultState
             isRtl={isRtl}
-            key={business.id}
-            onPress={() => onOpenBusiness(business)}
+            onRetry={onRetry}
+            state={state}
             styles={styles}
+            text={text}
           />
-        ))}
+        )}
       </View>
-
-      <SearchMapApiStatus
-        isRtl={isRtl}
-        onRetry={onRetry}
-        state={state}
-        styles={styles}
-        text={text}
-      />
     </>
   );
 }
@@ -1711,7 +1804,7 @@ function SearchMapResultCard({
   );
 }
 
-function SearchMapApiStatus({
+function SearchMapResultState({
   isRtl,
   onRetry,
   state,
@@ -1742,21 +1835,29 @@ function SearchMapApiStatus({
 
   if (state.status === "loaded") {
     return (
-      <View style={styles.searchMapBoundaryCard}>
-        <Text style={[styles.boundaryPill, isRtl && styles.rtlText]}>
-          بيانات السوق
-        </Text>
-        <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>
-          تم الحفاظ على مسار السوق الحالي
-        </Text>
-        <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>
-          {state.businesses.length} نشاط من API متاح بدون تغيير منطق الجلب.
-        </Text>
-      </View>
+      <PremiumStateCard
+        body="لم يرجع السوق أي أنشطة عامة لهذا العرض حالياً. يمكن إعادة المحاولة بدون تفعيل خريطة حقيقية أو موقع الجهاز."
+        cta={text.marketplaceRetry}
+        icon="0"
+        isRtl={isRtl}
+        label={text.marketplaceEmptyTitle}
+        onPress={onRetry}
+        styles={styles}
+        title="لا توجد نتائج قريبة حالياً"
+      />
     );
   }
 
-  return null;
+  return (
+    <PremiumStateCard
+      body="نحمّل نتائج السوق من واجهة REZNO العامة ونبقي الخريطة هنا كتصور بصري فقط."
+      icon="…"
+      isRtl={isRtl}
+      label={text.marketplaceLoading}
+      styles={styles}
+      title="جاري تحميل نتائج السوق"
+    />
+  );
 }
 
 function SalonDetailScreen({
@@ -1846,7 +1947,7 @@ function SalonDetailScreen({
               />
             </View>
             <Text style={[styles.salonMeta, isRtl && styles.rtlText]}>
-              اسطنبول · {business.category} · {business.distance}
+              {business.location} · {business.category} · {business.distance}
             </Text>
           </View>
           <Text style={styles.salonLikes}>❤ 128</Text>
