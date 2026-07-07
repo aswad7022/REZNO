@@ -2,9 +2,9 @@
 
 ## Status
 
-**PROJECT LINKED / ENV CONFIGURED / BUILD NOT YET RUN**
+**BUILD STARTED / AWAITING COMPLETION**
 
-The Android EAS development build has not been executed yet. The owner completed EAS project linking and created the EAS development environment variable required for the staging API base URL.
+The Android EAS development build was started for the linked EAS project. The latest checked status was `IN_QUEUE`, so no artifact/install URL is available yet.
 
 ## EAS login evidence
 
@@ -56,7 +56,7 @@ Environment verification:
 
 Result:
 
-- The Android development build is prepared to use the EAS development environment, but has not been run in this phase.
+- The Android development build was started using the EAS development profile and development environment.
 
 ## Validation results
 
@@ -73,30 +73,37 @@ Pre-build validation passed:
 
 ## Build command
 
-Approved command for the next phase, not executed in Phase 28A:
+Executed command:
 
 ```powershell
-$env:EXPO_PUBLIC_REZNO_API_BASE_URL="https://rezno-staging.vercel.app"
-npx.cmd eas-cli build --platform android --profile development --message "Mobile Phase 28 Android development build for real-device smoke"
+cd apps/mobile
+npx.cmd eas-cli build --platform android --profile development --message "Mobile Phase 28B Android development build for real-device smoke"
 ```
+
+The local command exceeded the local command timeout while the remote EAS build remained queued. Follow-up `build:list` / `build:view` commands confirmed that the remote build was created.
 
 ## Build evidence
 
-- Build URL: not available.
-- Build ID: not available.
+- Build URL: `https://expo.dev/accounts/alhakeem7/projects/rezno-mobile/builds/6d6e2cb3-01ee-4d55-a2ec-df3735005312`.
+- Build ID: `6d6e2cb3-01ee-4d55-a2ec-df3735005312`.
+- Platform: Android.
+- Profile: `development`.
+- Environment: `development`.
+- Distribution: `internal`.
+- SDK Version: `57.0.0`.
+- Commit: `46ca605c98dd01749834f8f6adae76f64768c11b`.
+- Status: `IN_QUEUE` at final check.
 - Artifact/install URL: not available.
-- Status: not started.
 
 ## Real-device smoke
 
-- Real-device smoke: **NOT RUN / BLOCKED**.
-- Owner install readiness: not ready because no Android development build artifact exists yet.
+- Real-device smoke: **NOT RUN / BUILD STILL RUNNING**.
+- Owner install readiness: pending until the Android development build succeeds and produces an artifact/install URL.
 
-After the owner configures the EAS project and confirms the staging API environment is available to the development build, the owner-side test path should be:
+After the build succeeds and an artifact/install URL is available, the owner-side test path should be:
 
-1. Run the approved Android development build.
-2. Install the Android development build from the EAS artifact/install link.
-3. Start dev-client Metro:
+1. Install the Android development build from the EAS artifact/install link.
+2. Start dev-client Metro:
 
    ```powershell
    cd apps/mobile
@@ -104,9 +111,9 @@ After the owner configures the EAS project and confirms the staging API environm
    npx.cmd expo start --dev-client --lan --clear
    ```
 
-4. Open the installed REZNO development build.
-5. Connect to the local dev server if prompted.
-6. Smoke test:
+3. Open the installed REZNO development build.
+4. Connect to the local dev server if prompted.
+5. Smoke test:
    - App opens without red screen.
    - Dark theme loads.
    - Home appears.
@@ -120,7 +127,7 @@ After the owner configures the EAS project and confirms the staging API environm
    - Booking Detail opens.
    - No CTA hidden behind bottom nav.
    - Staging API path does not break app shell.
-7. Record screenshots and pass/fail notes.
+6. Record screenshots and pass/fail notes.
 
 Do not mark real-device smoke complete until the owner confirms installation and test results.
 
@@ -129,6 +136,7 @@ Do not mark real-device smoke complete until the owner confirms installation and
 - No iOS build was run.
 - No production build was run.
 - No preview build was run.
+- Android development build only was started.
 - No Expo publish/update was run.
 - No EAS Update was run.
 - No EAS Submit was run.
@@ -143,9 +151,10 @@ Do not mark real-device smoke complete until the owner confirms installation and
 
 Next build action:
 
-1. Re-run Phase 28 Android development build using the approved Android development profile.
-2. Capture build URL, build ID, status, and artifact/install URL if available.
-3. Owner installs the Android development build and completes real-device smoke.
+1. Wait for EAS build `6d6e2cb3-01ee-4d55-a2ec-df3735005312` to complete.
+2. Capture final status and artifact/install URL.
+3. If the build succeeds, owner installs the Android development build and completes real-device smoke.
+4. If the build fails, inspect the EAS build logs and resolve the exact blocker.
 
 Decision recommendation:
 
@@ -156,5 +165,5 @@ Reason:
 - EAS login is available.
 - EAS project is linked.
 - EAS development environment binding is configured.
-- Android EAS development build has not been run yet.
+- Android EAS development build has started and is awaiting completion.
 - Real-device smoke remains blocked until an Android development build artifact exists.
