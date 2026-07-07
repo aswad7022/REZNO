@@ -1219,23 +1219,26 @@ function HeroCard({ isRtl, styles }: { isRtl: boolean; styles: MobileStyles }) {
   return (
     <View style={styles.heroCard}>
       <View style={styles.heroGlow} />
-      <View style={styles.locationPill}>
-        <Image
-          alt=""
-          resizeMode="contain"
-          source={mobileIconAssets.common.locationPin}
-          style={styles.locationIconImage}
-        />
-        <Text style={styles.locationText}>بغداد</Text>
+      <View style={styles.heroTopRow}>
+        <View style={styles.locationPill}>
+          <Image
+            alt=""
+            resizeMode="contain"
+            source={mobileIconAssets.common.locationPin}
+            style={styles.locationIconImage}
+          />
+          <Text style={styles.locationText}>بغداد</Text>
+        </View>
+        <View style={styles.heroProfileBadge}>
+          <Text style={styles.heroProfileText}>ع</Text>
+          <View style={styles.heroProfileStatusDot} />
+        </View>
       </View>
-      <Text style={[styles.heroEyebrow, isRtl && styles.rtlText]}>
-        ما الخدمة التي تبحث عنها اليوم؟
-      </Text>
       <Text style={[styles.heroTitle, isRtl && styles.rtlText]}>
         مرحباً علي
       </Text>
-      <Text style={[styles.heroBody, isRtl && styles.rtlText]}>
-        اكتشف أفضل الخدمات القريبة منك واحجز بثقة من REZNO.
+      <Text style={[styles.heroEyebrow, isRtl && styles.rtlText]}>
+        ما الخدمة التي تبحث عنها اليوم؟
       </Text>
     </View>
   );
@@ -1397,14 +1400,20 @@ function PromoCard({ isRtl, styles }: { isRtl: boolean; styles: MobileStyles }) 
     <View style={styles.promoCard}>
       <View>
         <Text style={[styles.promoTitle, isRtl && styles.rtlText]}>
-          باقة نهاية الأسبوع
+          خصم 15%
         </Text>
         <Text style={[styles.promoBody, isRtl && styles.rtlText]}>
-          اكتشف خدمات متاحة اليوم مع تأكيد سريع من النشاط.
+          على حجوزات التجميل
         </Text>
+        <View style={styles.promoCoupon}>
+          <Text style={styles.promoCouponText}>REZNO15</Text>
+        </View>
       </View>
       <View style={styles.promoBadge}>
-        <Text style={styles.promoBadgeText}>VIP</Text>
+        <View style={styles.promoGiftBox}>
+          <View style={styles.promoGiftRibbonVertical} />
+          <View style={styles.promoGiftRibbonHorizontal} />
+        </View>
       </View>
     </View>
   );
@@ -1421,8 +1430,16 @@ function BusinessMedia({
 }) {
   return (
     <>
+      <View style={styles.businessMediaBackdrop} />
       <View style={styles.businessMediaGlow} />
+      <View style={styles.businessMediaLightRail}>
+        <View style={styles.businessMediaLightLine} />
+        <View style={styles.businessMediaLightLineShort} />
+        <View style={styles.businessMediaLightLine} />
+      </View>
       <View style={styles.businessMediaPanel} />
+      <View style={styles.businessMediaChairBack} />
+      <View style={styles.businessMediaChairSeat} />
       <View style={styles.businessMediaAccent} />
       <View style={styles.businessMediaCutout} />
       <View style={styles.businessStatusBadge}>
@@ -1798,6 +1815,17 @@ function SalonDetailScreen({
             styles={styles}
           />
         </View>
+        <View style={styles.salonHeroCenterpiece}>
+          <View style={styles.salonHeroOrb}>
+            <Text style={styles.salonHeroOrbText}>R</Text>
+          </View>
+          <Text style={[styles.salonHeroKicker, isRtl && styles.rtlText]}>
+            تجربة صالون فاخرة
+          </Text>
+          <Text style={[styles.salonHeroCaption, isRtl && styles.rtlText]}>
+            خدمات مختارة وحجز واضح بخطوات آمنة
+          </Text>
+        </View>
         <View style={styles.salonHeroStage}>
           <BusinessMedia badge={business.status} styles={styles} />
         </View>
@@ -1878,25 +1906,29 @@ function SalonDetailScreen({
       <View style={styles.salonServicesList}>
         {services.map((service, index) => (
           <View key={service.name} style={styles.salonServiceRow}>
-            <View style={styles.salonServiceMedia}>
-              <BusinessMedia
-                badge={index === 0 ? "رائج" : service.tag}
-                styles={styles}
-              />
+            <View style={styles.salonServiceMain}>
+              <View style={styles.salonServiceMedia}>
+                <BusinessMedia
+                  badge={index === 0 ? "رائج" : service.tag}
+                  styles={styles}
+                />
+              </View>
+              <View style={styles.salonServiceCopy}>
+                <Text style={[styles.salonServiceName, isRtl && styles.rtlText]}>
+                  {index === 0 ? "قص شعر" : service.name}
+                </Text>
+                <Text style={[styles.salonServiceMeta, isRtl && styles.rtlText]}>
+                  {service.duration} · عرض مرئي
+                </Text>
+              </View>
             </View>
-            <View style={styles.rowCopy}>
-              <Text style={[styles.salonServiceName, isRtl && styles.rtlText]}>
-                {index === 0 ? "قص شعر" : service.name}
-              </Text>
-              <Text style={[styles.salonServiceMeta, isRtl && styles.rtlText]}>
-                {service.duration}
-              </Text>
+            <View style={styles.salonServiceActionBlock}>
               <Text style={styles.salonServicePrice}>
                 {index === 0 ? "250 TL" : service.price}
               </Text>
-            </View>
-            <View style={styles.salonServiceAdd}>
-              <Text style={styles.salonServiceAddText}>+</Text>
+              <View style={styles.salonServiceAdd}>
+                <Text style={styles.salonServiceAddText}>+</Text>
+              </View>
             </View>
           </View>
         ))}
@@ -2286,11 +2318,18 @@ function StaffSelectionStep({
           const selectionIndicator = (
             <View
               style={[
-                styles.bookingRadio,
-                selected && styles.bookingRadioActive,
+                styles.staffSelectionIndicator,
+                selected && styles.staffSelectionIndicatorActive,
               ]}
             >
-              {selected ? <View style={styles.bookingRadioDot} /> : null}
+              <View
+                style={[
+                  styles.bookingRadio,
+                  selected && styles.bookingRadioActive,
+                ]}
+              >
+                {selected ? <View style={styles.bookingRadioDot} /> : null}
+              </View>
             </View>
           );
 
@@ -3046,7 +3085,9 @@ function BookingDetailScreen({
       />
 
       <View style={styles.bookingDetailHero}>
-        <BusinessMedia badge={booking.statusLabel} styles={styles} />
+        <View style={styles.bookingDetailHeroMedia}>
+          <BusinessMedia badge={booking.statusLabel} styles={styles} />
+        </View>
         <View style={styles.bookingDetailHeroCopy}>
           <Text style={[styles.managedBookingTitle, isRtl && styles.rtlText]}>
             {booking.businessName}
@@ -4114,11 +4155,11 @@ const createStyles = (theme: MobileTheme) =>
       alignItems: "center",
       backgroundColor: theme.colors.cardElevated,
       borderColor: theme.colors.border,
-      borderRadius: 22,
+      borderRadius: 24,
       borderWidth: 1,
-      height: 44,
+      height: 48,
       justifyContent: "center",
-      width: 44,
+      width: 48,
     },
     bookingBackIconImage: {
       height: 22,
@@ -4126,12 +4167,12 @@ const createStyles = (theme: MobileTheme) =>
       width: 22,
     },
     bookingBottomAction: {
-      marginTop: 8,
-      paddingBottom: 78,
+      marginTop: 10,
+      paddingBottom: 112,
     },
     bookingDateRail: {
       flexDirection: "row",
-      gap: 10,
+      gap: 9,
     },
     bookingLegendRow: {
       alignItems: "center",
@@ -4144,10 +4185,10 @@ const createStyles = (theme: MobileTheme) =>
     bookingMiniSummary: {
       backgroundColor: theme.colors.card,
       borderColor: theme.colors.goldSoft,
-      borderRadius: theme.radii.card,
+      borderRadius: 28,
       borderWidth: 1,
-      gap: 10,
-      padding: 18,
+      gap: 9,
+      padding: 16,
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: 12, width: 0 },
       shadowOpacity: theme.isDark ? 0.18 : 0.06,
@@ -4176,17 +4217,17 @@ const createStyles = (theme: MobileTheme) =>
     },
     bookingReceiptActions: {
       gap: 12,
-      paddingBottom: 78,
+      paddingBottom: 112,
     },
     bookingSearchField: {
       alignItems: "center",
       backgroundColor: theme.colors.cardElevated,
       borderColor: theme.colors.border,
-      borderRadius: 28,
+      borderRadius: 30,
       borderWidth: 1,
       flexDirection: "row",
       gap: 12,
-      minHeight: 58,
+      minHeight: 56,
       paddingHorizontal: 18,
     },
     bookingSearchIconImage: {
@@ -4207,10 +4248,10 @@ const createStyles = (theme: MobileTheme) =>
       gap: 14,
     },
     bookingStepScreen: {
-      gap: 18,
-      paddingBottom: 84,
+      gap: 16,
+      paddingBottom: 124,
       paddingHorizontal: 20,
-      paddingTop: 30,
+      paddingTop: 38,
     },
     bookingTimeGrid: {
       flexDirection: "row",
@@ -4226,7 +4267,7 @@ const createStyles = (theme: MobileTheme) =>
       flexGrow: 1,
       minWidth: 74,
       paddingHorizontal: 14,
-      paddingVertical: 13,
+      paddingVertical: 12,
     },
     bookingTimeSlotActive: {
       backgroundColor: theme.colors.gold,
@@ -4258,7 +4299,7 @@ const createStyles = (theme: MobileTheme) =>
       minHeight: 38,
       minWidth: 82,
       paddingHorizontal: 11,
-      paddingVertical: 8,
+      paddingVertical: 7,
     },
     bookingActionButtonDanger: {
       backgroundColor: theme.colors.dangerSoft,
@@ -4282,16 +4323,18 @@ const createStyles = (theme: MobileTheme) =>
     },
     bookingDetailActions: {
       gap: 12,
-      paddingBottom: 84,
+      paddingBottom: 120,
     },
     bookingDetailHero: {
+      alignItems: "center",
       backgroundColor: theme.colors.hero,
       borderColor: theme.colors.goldSoft,
-      borderRadius: theme.radii.xl,
+      borderRadius: 30,
       borderWidth: 1,
-      gap: 18,
+      flexDirection: "row",
+      gap: 14,
       overflow: "hidden",
-      padding: 18,
+      padding: 16,
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: 20, width: 0 },
       shadowOpacity: theme.isDark ? 0.34 : 0.12,
@@ -4299,21 +4342,30 @@ const createStyles = (theme: MobileTheme) =>
     },
     bookingDetailHeroCopy: {
       alignItems: "flex-end",
+      flex: 1,
       gap: 8,
+      minWidth: 0,
+    },
+    bookingDetailHeroMedia: {
+      borderRadius: 24,
+      flexShrink: 0,
+      height: 112,
+      overflow: "hidden",
+      width: 116,
     },
     bookingDetailScreen: {
-      gap: 18,
-      paddingBottom: 96,
+      gap: 16,
+      paddingBottom: 124,
       paddingHorizontal: 20,
-      paddingTop: 30,
+      paddingTop: 38,
     },
     bookingDetailSummary: {
       backgroundColor: theme.colors.card,
       borderColor: theme.colors.goldSoft,
-      borderRadius: theme.radii.card,
+      borderRadius: 28,
       borderWidth: 1,
-      gap: 10,
-      padding: 18,
+      gap: 9,
+      padding: 16,
     },
     bookingInfoPill: {
       alignItems: "center",
@@ -4322,23 +4374,23 @@ const createStyles = (theme: MobileTheme) =>
       borderRadius: theme.radii.pill,
       borderWidth: 1,
       flexDirection: "row",
-      gap: 7,
-      paddingHorizontal: 10,
-      paddingVertical: 7,
+      gap: 6,
+      paddingHorizontal: 9,
+      paddingVertical: 6,
     },
     bookingInfoPillRtl: {
       flexDirection: "row-reverse",
     },
     bookingInfoPillIcon: {
-      height: 14,
+      height: 13,
       tintColor: theme.colors.gold,
-      width: 14,
+      width: 13,
     },
     bookingInfoPillText: {
       color: theme.colors.mutedForeground,
       fontFamily: mobileTypography.uiMedium,
-      fontSize: 11,
-      lineHeight: 16,
+      fontSize: 10,
+      lineHeight: 15,
     },
     bookingDetailStatusPill: {
       alignSelf: "flex-end",
@@ -4361,13 +4413,13 @@ const createStyles = (theme: MobileTheme) =>
     },
     bookingsList: {
       gap: 10,
-      paddingBottom: 84,
+      paddingBottom: 118,
     },
     bookingsScreen: {
       gap: 16,
-      paddingBottom: 112,
+      paddingBottom: 132,
       paddingHorizontal: 20,
-      paddingTop: 30,
+      paddingTop: 34,
     },
     bookingsSegment: {
       alignItems: "center",
@@ -4426,8 +4478,8 @@ const createStyles = (theme: MobileTheme) =>
     managedBookingActions: {
       flexDirection: "row",
       flexWrap: "wrap",
-      gap: 8,
-      marginTop: 12,
+      gap: 7,
+      marginTop: 10,
     },
     managedBookingActionsRtl: {
       flexDirection: "row-reverse",
@@ -4437,14 +4489,16 @@ const createStyles = (theme: MobileTheme) =>
       borderColor: theme.colors.border,
       borderRadius: 24,
       borderWidth: 1,
-      padding: 13,
+      padding: 12,
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: 16, width: 0 },
       shadowOpacity: theme.isDark ? 0.22 : 0.08,
       shadowRadius: 24,
     },
     managedBookingHeader: {
-      gap: 10,
+      alignItems: "flex-start",
+      flexDirection: "row",
+      gap: 12,
     },
     managedBookingCopy: {
       alignItems: "flex-end",
@@ -4455,16 +4509,18 @@ const createStyles = (theme: MobileTheme) =>
     managedBookingInfoGrid: {
       flexDirection: "row",
       flexWrap: "wrap",
-      gap: 8,
-      marginTop: 8,
+      gap: 6,
+      marginTop: 7,
     },
     managedBookingInfoGridRtl: {
       flexDirection: "row-reverse",
     },
     managedBookingMedia: {
-      borderRadius: 20,
-      height: 96,
+      borderRadius: 18,
+      flexShrink: 0,
+      height: 84,
       overflow: "hidden",
+      width: 96,
     },
     managedBookingMeta: {
       color: theme.colors.mutedForeground,
@@ -4483,7 +4539,7 @@ const createStyles = (theme: MobileTheme) =>
     managedBookingTitleRow: {
       alignItems: "flex-start",
       flexDirection: "row",
-      gap: 10,
+      gap: 8,
       justifyContent: "space-between",
       width: "100%",
     },
@@ -4497,7 +4553,7 @@ const createStyles = (theme: MobileTheme) =>
       fontFamily: mobileTypography.uiMedium,
       fontSize: 11,
       overflow: "hidden",
-      paddingHorizontal: 9,
+      paddingHorizontal: 10,
       paddingVertical: 6,
     },
     managedStatusPillCancelled: {
@@ -4592,12 +4648,13 @@ const createStyles = (theme: MobileTheme) =>
       marginTop: 1,
     },
     businessBody: {
-      gap: 9,
+      gap: 8,
       padding: 12,
+      paddingTop: 11,
     },
     businessCard: {
       ...createMobileSurface(theme, {
-        radius: 30,
+        radius: 28,
         tone: "elevated",
       }),
       borderColor: theme.colors.border,
@@ -4629,11 +4686,15 @@ const createStyles = (theme: MobileTheme) =>
       justifyContent: "space-between",
       paddingTop: 10,
     },
+    businessMediaBackdrop: {
+      ...StyleSheet.absoluteFill,
+      backgroundColor: "#05070a",
+    },
     businessHero: {
       backgroundColor: "#050608",
       borderBottomColor: theme.colors.border,
       borderBottomWidth: 1,
-      height: 102,
+      height: 96,
       justifyContent: "space-between",
       overflow: "hidden",
       padding: 12,
@@ -4653,11 +4714,31 @@ const createStyles = (theme: MobileTheme) =>
     businessMediaAccent: {
       backgroundColor: "rgba(255, 193, 58, 0.88)",
       borderRadius: 999,
-      bottom: 18,
-      height: 24,
-      left: 74,
+      bottom: 20,
+      height: 18,
+      left: 78,
       position: "absolute",
-      width: 24,
+      width: 18,
+    },
+    businessMediaChairBack: {
+      backgroundColor: "rgba(255, 193, 58, 0.16)",
+      borderColor: "rgba(255, 193, 58, 0.5)",
+      borderRadius: 18,
+      borderWidth: 1,
+      bottom: 25,
+      height: 44,
+      left: 42,
+      position: "absolute",
+      width: 44,
+    },
+    businessMediaChairSeat: {
+      backgroundColor: "rgba(255, 193, 58, 0.34)",
+      borderRadius: 999,
+      bottom: 15,
+      height: 13,
+      left: 30,
+      position: "absolute",
+      width: 72,
     },
     businessMediaCutout: {
       borderColor: "rgba(255, 248, 236, 0.18)",
@@ -4671,7 +4752,7 @@ const createStyles = (theme: MobileTheme) =>
       width: 94,
     },
     businessMediaGlow: {
-      backgroundColor: "rgba(255, 193, 58, 0.18)",
+      backgroundColor: "rgba(255, 193, 58, 0.24)",
       borderRadius: 999,
       height: 140,
       left: -30,
@@ -4680,17 +4761,38 @@ const createStyles = (theme: MobileTheme) =>
       top: -54,
       width: 140,
     },
-    businessMediaPanel: {
-      backgroundColor: "rgba(255, 255, 255, 0.08)",
-      borderColor: "rgba(255, 193, 58, 0.22)",
-      borderRadius: 28,
-      borderWidth: 1,
-      bottom: 14,
-      height: 54,
-      left: 28,
+    businessMediaLightLine: {
+      backgroundColor: "rgba(255, 193, 58, 0.32)",
+      borderRadius: 999,
+      height: 74,
+      width: 3,
+    },
+    businessMediaLightLineShort: {
+      backgroundColor: "rgba(255, 193, 58, 0.22)",
+      borderRadius: 999,
+      height: 52,
+      width: 3,
+    },
+    businessMediaLightRail: {
+      alignItems: "flex-start",
+      flexDirection: "row",
+      gap: 27,
+      left: 22,
+      opacity: 0.9,
       position: "absolute",
-      transform: [{ rotate: "-8deg" }],
-      width: 98,
+      top: 0,
+    },
+    businessMediaPanel: {
+      backgroundColor: "rgba(255, 255, 255, 0.05)",
+      borderColor: "rgba(255, 193, 58, 0.22)",
+      borderRadius: 24,
+      borderWidth: 1,
+      bottom: 18,
+      height: 48,
+      left: 38,
+      position: "absolute",
+      transform: [{ rotate: "-4deg" }],
+      width: 92,
     },
     businessInitial: {
       alignItems: "center",
@@ -4720,7 +4822,7 @@ const createStyles = (theme: MobileTheme) =>
     businessMeta: {
       color: theme.colors.mutedForeground,
       fontFamily: mobileTypography.uiRegular,
-      fontSize: 11,
+      fontSize: 10,
       flexShrink: 1,
       lineHeight: 15,
       marginTop: 3,
@@ -4732,7 +4834,7 @@ const createStyles = (theme: MobileTheme) =>
       borderRadius: theme.radii.pill,
       color: theme.colors.foreground,
       fontFamily: mobileTypography.uiMedium,
-      fontSize: 10,
+      fontSize: 9,
       overflow: "hidden",
       paddingHorizontal: 8,
       paddingVertical: 5,
@@ -4744,8 +4846,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     businessName: {
       color: theme.colors.foreground,
-      fontFamily: mobileTypography.uiBold,
-      fontSize: 14,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: 13,
       flexShrink: 1,
       letterSpacing: -0.3,
       lineHeight: 18,
@@ -4884,7 +4986,8 @@ const createStyles = (theme: MobileTheme) =>
       flexDirection: "row",
       flexWrap: "wrap",
       justifyContent: "space-between",
-      rowGap: 22,
+      marginTop: 2,
+      rowGap: 20,
     },
     categoryIcon: {
       color: "#ffffff",
@@ -4893,23 +4996,23 @@ const createStyles = (theme: MobileTheme) =>
       lineHeight: 28,
     },
     categoryIconImage: {
-      height: 34,
+      height: 32,
       tintColor: "#ffffff",
-      width: 34,
+      width: 32,
     },
     categoryIconTile: {
       alignItems: "center",
       backgroundColor: "#394657",
       borderColor: "rgba(255, 255, 255, 0.08)",
-      borderRadius: 21,
+      borderRadius: 20,
       borderWidth: 0,
-      height: 66,
+      height: 64,
       justifyContent: "center",
       shadowColor: "#000000",
-      shadowOffset: { height: 10, width: 0 },
-      shadowOpacity: theme.isDark ? 0.28 : 0.08,
-      shadowRadius: 16,
-      width: 66,
+      shadowOffset: { height: 12, width: 0 },
+      shadowOpacity: theme.isDark ? 0.32 : 0.08,
+      shadowRadius: 18,
+      width: 64,
     },
     categoryIconTileBlue: {
       backgroundColor: "#3ca6d3",
@@ -4932,14 +5035,14 @@ const createStyles = (theme: MobileTheme) =>
     categoryItem: {
       alignItems: "center",
       flexBasis: "24%",
-      gap: 8,
+      gap: 7,
       minWidth: 72,
     },
     categoryLabel: {
       color: "#ffffff",
-      fontFamily: mobileTypography.uiSemiBold,
-      fontSize: 13,
-      lineHeight: 19,
+      fontFamily: mobileTypography.uiMedium,
+      fontSize: 12,
+      lineHeight: 18,
       textAlign: "center",
     },
     categoryBookLine: {
@@ -5107,20 +5210,20 @@ const createStyles = (theme: MobileTheme) =>
       backgroundColor: "#153f31",
       borderColor: theme.colors.gold,
       borderWidth: 3,
-      borderRadius: 30,
+      borderRadius: 32,
       flex: 0,
-      height: 60,
+      height: 64,
       marginHorizontal: 8,
       shadowColor: theme.colors.deepGold,
       shadowOffset: { height: 8, width: 0 },
       shadowOpacity: theme.isDark ? 0.32 : 0.12,
       shadowRadius: 16,
-      transform: [{ translateY: -12 }],
-      width: 60,
+      transform: [{ translateY: -14 }],
+      width: 64,
     },
     centerTabButtonActive: {
       backgroundColor: "#174d3b",
-      transform: [{ translateY: -13 }, { scale: 1.02 }],
+      transform: [{ translateY: -15 }, { scale: 1.02 }],
     },
     centerTabActiveIndicator: {
       backgroundColor: "transparent",
@@ -5202,8 +5305,8 @@ const createStyles = (theme: MobileTheme) =>
       textAlign: "center",
     },
     content: {
-      gap: 20,
-      paddingBottom: 164,
+      gap: 18,
+      paddingBottom: 170,
       paddingHorizontal: 20,
     },
     immersiveContent: {
@@ -5229,7 +5332,7 @@ const createStyles = (theme: MobileTheme) =>
     dateDay: {
       color: theme.colors.mutedForeground,
       fontFamily: mobileTypography.uiMedium,
-      fontSize: 12,
+      fontSize: 11,
     },
     dateDayActive: {
       color: theme.colors.foregroundInverse,
@@ -5237,7 +5340,7 @@ const createStyles = (theme: MobileTheme) =>
     dateLabel: {
       color: theme.colors.foreground,
       fontFamily: mobileTypography.uiMedium,
-      fontSize: 24,
+      fontSize: 23,
       marginTop: 2,
     },
     dateLabelActive: {
@@ -5255,12 +5358,12 @@ const createStyles = (theme: MobileTheme) =>
     datePill: {
       backgroundColor: theme.colors.cardElevated,
       borderColor: theme.colors.border,
-      borderRadius: 22,
+      borderRadius: 24,
       borderWidth: 1,
       flexGrow: 1,
-      minWidth: 82,
-      padding: 12,
-      paddingVertical: 14,
+      minWidth: 78,
+      padding: 11,
+      paddingVertical: 13,
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: 6, width: 0 },
       shadowOpacity: theme.isDark ? 0.1 : 0.04,
@@ -5423,15 +5526,15 @@ const createStyles = (theme: MobileTheme) =>
     },
     discoveryCard: {
       ...createMobileSurface(theme, {
-        radius: 32,
+        radius: 34,
         tone: "elevated",
       }),
       borderColor: theme.colors.border,
       gap: 0,
       padding: 0,
       ...createMobileShadow(theme, {
-        darkOpacity: 0.28,
-        height: 12,
+      darkOpacity: 0.34,
+      height: 14,
         lightOpacity: 0.12,
         radius: 22,
       }),
@@ -5480,12 +5583,12 @@ const createStyles = (theme: MobileTheme) =>
       borderColor: theme.colors.border,
       borderRadius: 20,
       borderWidth: 1,
-      height: 40,
+      height: 36,
       justifyContent: "center",
       position: "absolute",
       right: 12,
       top: 12,
-      width: 40,
+      width: 36,
     },
     favoriteText: {
       color: theme.colors.gold,
@@ -5493,9 +5596,9 @@ const createStyles = (theme: MobileTheme) =>
       fontSize: 20,
     },
     favoriteIconImage: {
-      height: 22,
+      height: 19,
       tintColor: theme.colors.gold,
-      width: 22,
+      width: 19,
     },
     faqRow: {
       alignItems: "center",
@@ -5599,9 +5702,9 @@ const createStyles = (theme: MobileTheme) =>
       backgroundColor: theme.colors.background,
       flexDirection: "row",
       gap: 8,
-      paddingBottom: 8,
+      paddingBottom: 10,
       paddingHorizontal: 20,
-      paddingTop: 28,
+      paddingTop: 24,
     },
     iconAction: {
       alignItems: "center",
@@ -5627,33 +5730,73 @@ const createStyles = (theme: MobileTheme) =>
     heroBody: {
       color: theme.colors.mutedForeground,
       fontFamily: mobileTypography.uiRegular,
-      fontSize: 19,
-      lineHeight: 27,
+      fontSize: 16,
+      lineHeight: 24,
       marginTop: 8,
     },
     heroCard: {
       backgroundColor: "transparent",
       overflow: "hidden",
       paddingHorizontal: 4,
-      paddingTop: 8,
+      paddingTop: 4,
+      paddingBottom: 2,
     },
     heroEyebrow: {
       color: theme.colors.mutedForeground,
       fontFamily: mobileTypography.uiMedium,
-      fontSize: 17,
+      fontSize: 16,
       letterSpacing: 0,
-      marginTop: 12,
+      lineHeight: 24,
+      marginTop: 3,
     },
     heroGlow: {
       display: "none",
     },
+    heroProfileBadge: {
+      alignItems: "center",
+      backgroundColor: "#14201a",
+      borderColor: theme.colors.gold,
+      borderRadius: 30,
+      borderWidth: 2,
+      height: 60,
+      justifyContent: "center",
+      position: "relative",
+      shadowColor: theme.colors.deepGold,
+      shadowOffset: { height: 8, width: 0 },
+      shadowOpacity: theme.isDark ? 0.22 : 0.08,
+      shadowRadius: 14,
+      width: 60,
+    },
+    heroProfileStatusDot: {
+      backgroundColor: theme.colors.success,
+      borderColor: theme.colors.background,
+      borderRadius: 8,
+      borderWidth: 2,
+      bottom: 3,
+      height: 16,
+      position: "absolute",
+      right: 1,
+      width: 16,
+    },
+    heroProfileText: {
+      color: theme.colors.cream,
+      fontFamily: mobileTypography.kufiBold,
+      fontSize: 28,
+      lineHeight: 36,
+    },
     heroTitle: {
       color: theme.colors.foreground,
       fontFamily: mobileTypography.kufiBold,
-      fontSize: 36,
-      letterSpacing: -0.7,
-      lineHeight: 44,
-      marginTop: 4,
+      fontSize: 34,
+      letterSpacing: -0.6,
+      lineHeight: 42,
+      marginTop: 14,
+    },
+    heroTopRow: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 12,
+      justifyContent: "space-between",
     },
     homeBusinessCardSlot: {
       flexBasis: "31%",
@@ -5662,7 +5805,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     homeBusinessGrid: {
       flexDirection: "row",
-      gap: 14,
+      gap: 12,
     },
     integrationBody: {
       color: theme.colors.warning,
@@ -5734,7 +5877,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     locationIconImage: {
       height: 14,
-      tintColor: theme.colors.success,
+      tintColor: theme.colors.gold,
       width: 14,
     },
     locationPill: {
@@ -5746,11 +5889,11 @@ const createStyles = (theme: MobileTheme) =>
       borderRadius: theme.radii.pill,
       flexDirection: "row",
       gap: 7,
-      paddingHorizontal: 22,
+      paddingHorizontal: 20,
       paddingVertical: 10,
     },
     locationText: {
-      color: theme.colors.foreground,
+      color: theme.colors.gold,
       fontFamily: mobileTypography.uiMedium,
       fontSize: 12,
     },
@@ -6748,9 +6891,9 @@ const createStyles = (theme: MobileTheme) =>
       borderColor: theme.colors.accent,
       borderTopColor: theme.colors.accent,
       borderWidth: 1,
-      borderRadius: theme.radii.control,
+      borderRadius: theme.radii.pill,
       flex: 1,
-      minHeight: 56,
+      minHeight: 58,
       justifyContent: "center",
       paddingVertical: 16,
       shadowColor: theme.colors.deepGold,
@@ -6765,18 +6908,18 @@ const createStyles = (theme: MobileTheme) =>
     },
     primaryButtonText: {
       color: theme.colors.foregroundInverse,
-      fontFamily: mobileTypography.uiRegular,
-      fontSize: 17,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: 18,
     },
     promoBadge: {
       alignItems: "center",
-      backgroundColor: theme.colors.gold,
-      borderColor: theme.colors.accent,
-      borderRadius: 28,
+      backgroundColor: "rgba(255, 193, 58, 0.16)",
+      borderColor: "rgba(255, 193, 58, 0.5)",
+      borderRadius: 34,
       borderWidth: 1,
-      height: 56,
+      height: 68,
       justifyContent: "center",
-      width: 56,
+      width: 68,
     },
     promoBadgeText: {
       color: theme.colors.foregroundInverse,
@@ -6784,20 +6927,20 @@ const createStyles = (theme: MobileTheme) =>
     promoBody: {
       color: theme.colors.foreground,
       fontFamily: mobileTypography.uiRegular,
-      fontSize: 16,
-      lineHeight: 24,
-      marginTop: 8,
+      fontSize: 15,
+      lineHeight: 23,
+      marginTop: 4,
       maxWidth: 230,
     },
     promoCard: {
       alignItems: "center",
-      backgroundColor: "#0c251d",
-      borderColor: "#163e31",
+      backgroundColor: "#0b2019",
+      borderColor: "#183c31",
       borderRadius: 34,
       borderWidth: 1,
       flexDirection: "row",
       justifyContent: "space-between",
-      minHeight: 142,
+      minHeight: 132,
       padding: 22,
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: 20, width: 0 },
@@ -6807,8 +6950,48 @@ const createStyles = (theme: MobileTheme) =>
     promoTitle: {
       color: theme.colors.gold,
       fontFamily: mobileTypography.kufiBold,
-      fontSize: 29,
-      lineHeight: 36,
+      fontSize: 31,
+      lineHeight: 38,
+    },
+    promoCoupon: {
+      alignSelf: "flex-start",
+      backgroundColor: theme.colors.cream,
+      borderRadius: theme.radii.pill,
+      marginTop: 16,
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+    },
+    promoCouponText: {
+      color: theme.colors.foregroundInverse,
+      fontFamily: mobileTypography.uiBold,
+      fontSize: 13,
+    },
+    promoGiftBox: {
+      backgroundColor: theme.colors.cream,
+      borderColor: theme.colors.gold,
+      borderRadius: 10,
+      borderWidth: 1,
+      height: 34,
+      overflow: "hidden",
+      position: "relative",
+      transform: [{ rotate: "-8deg" }],
+      width: 38,
+    },
+    promoGiftRibbonHorizontal: {
+      backgroundColor: theme.colors.gold,
+      height: 8,
+      left: 0,
+      position: "absolute",
+      right: 0,
+      top: 10,
+    },
+    promoGiftRibbonVertical: {
+      backgroundColor: theme.colors.gold,
+      bottom: 0,
+      left: 15,
+      position: "absolute",
+      top: 0,
+      width: 8,
     },
     quickReplyChip: {
       backgroundColor: theme.colors.goldSoft,
@@ -7155,26 +7338,25 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.mutedForeground,
       fontFamily: mobileTypography.uiRegular,
       flexShrink: 1,
-      fontSize: 16,
-      lineHeight: 24,
-      marginTop: 10,
+      fontSize: 15,
+      lineHeight: 23,
+      marginTop: 8,
     },
     screenEyebrow: {
       color: theme.colors.gold,
-      fontFamily: mobileTypography.uiRegular,
+      fontFamily: mobileTypography.uiMedium,
       flexShrink: 1,
       fontSize: 12,
-      letterSpacing: 0.5,
+      letterSpacing: 0.2,
       lineHeight: 16,
-      textTransform: "uppercase",
     },
     screenTitle: {
       color: theme.colors.foreground,
       fontFamily: mobileTypography.kufiBold,
       flexShrink: 1,
-      fontSize: 28,
-      letterSpacing: -0.4,
-      lineHeight: 35,
+      fontSize: 29,
+      letterSpacing: -0.3,
+      lineHeight: 37,
       marginTop: 8,
     },
     iconButtonPressed: {
@@ -7304,9 +7486,9 @@ const createStyles = (theme: MobileTheme) =>
     salonActionGrid: {
       flexDirection: "row",
       flexWrap: "wrap",
-      gap: 14,
+      gap: 12,
       justifyContent: "space-between",
-      marginTop: 28,
+      marginTop: 24,
     },
     salonActionIcon: {
       color: theme.colors.foreground,
@@ -7315,15 +7497,15 @@ const createStyles = (theme: MobileTheme) =>
       lineHeight: 30,
     },
     salonActionIconImage: {
-      height: 28,
+      height: 24,
       tintColor: theme.colors.foreground,
-      width: 28,
+      width: 24,
     },
     salonActionLabel: {
       color: theme.colors.mutedForeground,
-      fontFamily: mobileTypography.uiRegular,
-      fontSize: 13,
-      marginTop: 8,
+      fontFamily: mobileTypography.uiMedium,
+      fontSize: 12,
+      marginTop: 7,
     },
     salonActionTile: {
       alignItems: "center",
@@ -7334,7 +7516,7 @@ const createStyles = (theme: MobileTheme) =>
       flexBasis: "22%",
       flexGrow: 1,
       justifyContent: "center",
-      minHeight: 92,
+      minHeight: 86,
       padding: 12,
     },
     salonBackButton: {
@@ -7370,7 +7552,7 @@ const createStyles = (theme: MobileTheme) =>
       flexDirection: "row",
       gap: 12,
       marginHorizontal: 28,
-      marginBottom: 38,
+      marginBottom: 112,
       marginTop: 6,
       padding: 10,
       paddingLeft: 18,
@@ -7396,7 +7578,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     salonHero: {
       backgroundColor: "#05080c",
-      height: 330,
+      height: 320,
       marginHorizontal: -20,
       overflow: "hidden",
       position: "relative",
@@ -7408,6 +7590,36 @@ const createStyles = (theme: MobileTheme) =>
       right: 30,
       top: 34,
       zIndex: 2,
+    },
+    salonHeroCaption: {
+      color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiMedium,
+      fontSize: 13,
+      lineHeight: 19,
+      marginTop: 4,
+      maxWidth: 230,
+      textAlign: "center",
+    },
+    salonHeroCenterpiece: {
+      alignItems: "center",
+      alignSelf: "center",
+      backgroundColor: "rgba(5, 8, 12, 0.54)",
+      borderColor: "rgba(255, 193, 58, 0.18)",
+      borderRadius: 30,
+      borderWidth: 1,
+      gap: 3,
+      marginTop: 92,
+      paddingHorizontal: 24,
+      paddingVertical: 18,
+      zIndex: 1,
+    },
+    salonHeroKicker: {
+      color: theme.colors.foreground,
+      fontFamily: mobileTypography.kufiBold,
+      fontSize: 20,
+      lineHeight: 28,
+      marginTop: 8,
+      textAlign: "center",
     },
     salonHeroLine: {
       backgroundColor: "rgba(255, 193, 58, 0.32)",
@@ -7421,6 +7633,26 @@ const createStyles = (theme: MobileTheme) =>
       height: 210,
       width: 5,
     },
+    salonHeroOrb: {
+      alignItems: "center",
+      backgroundColor: "rgba(255, 193, 58, 0.18)",
+      borderColor: theme.colors.gold,
+      borderRadius: 28,
+      borderWidth: 1,
+      height: 56,
+      justifyContent: "center",
+      shadowColor: theme.colors.deepGold,
+      shadowOffset: { height: 12, width: 0 },
+      shadowOpacity: theme.isDark ? 0.26 : 0.1,
+      shadowRadius: 18,
+      width: 56,
+    },
+    salonHeroOrbText: {
+      color: theme.colors.gold,
+      fontFamily: mobileTypography.uiBold,
+      fontSize: 28,
+      lineHeight: 34,
+    },
     salonHeroPattern: {
       alignItems: "flex-start",
       flexDirection: "row",
@@ -7433,9 +7665,9 @@ const createStyles = (theme: MobileTheme) =>
       top: 0,
     },
     salonHeroStage: {
-      backgroundColor: "rgba(91, 48, 29, 0.42)",
+      backgroundColor: "rgba(91, 48, 29, 0.36)",
       bottom: 0,
-      height: 130,
+      height: 118,
       left: 0,
       overflow: "hidden",
       position: "absolute",
@@ -7445,7 +7677,7 @@ const createStyles = (theme: MobileTheme) =>
       backgroundColor: theme.colors.background,
       gap: 0,
       paddingHorizontal: 28,
-      paddingTop: 22,
+      paddingTop: 20,
     },
     salonLikes: {
       borderColor: theme.colors.gold,
@@ -7461,23 +7693,23 @@ const createStyles = (theme: MobileTheme) =>
     salonMeta: {
       color: theme.colors.mutedForeground,
       fontFamily: mobileTypography.uiRegular,
-      fontSize: 18,
-      lineHeight: 25,
-      marginTop: 8,
+      fontSize: 16,
+      lineHeight: 24,
+      marginTop: 6,
     },
     salonName: {
       color: theme.colors.foreground,
       fontFamily: mobileTypography.kufiBold,
       flexShrink: 1,
-      fontSize: 40,
-      letterSpacing: -0.8,
-      lineHeight: 50,
+      fontSize: 36,
+      letterSpacing: -0.7,
+      lineHeight: 46,
     },
     salonRatingRow: {
       alignItems: "center",
       flexDirection: "row",
-      gap: 12,
-      marginTop: 22,
+      gap: 10,
+      marginTop: 18,
     },
     salonRatingStar: {
       color: theme.colors.gold,
@@ -7492,7 +7724,7 @@ const createStyles = (theme: MobileTheme) =>
     salonRatingText: {
       color: theme.colors.foreground,
       fontFamily: mobileTypography.uiSemiBold,
-      fontSize: 20,
+      fontSize: 18,
     },
     salonRoundButton: {
       alignItems: "center",
@@ -7500,9 +7732,9 @@ const createStyles = (theme: MobileTheme) =>
       borderColor: theme.colors.border,
       borderRadius: 31,
       borderWidth: 1,
-      height: 62,
+      height: 58,
       justifyContent: "center",
-      width: 62,
+      width: 58,
     },
     salonRoundButtonText: {
       color: theme.colors.foreground,
@@ -7511,60 +7743,97 @@ const createStyles = (theme: MobileTheme) =>
       lineHeight: 34,
     },
     salonRoundButtonIcon: {
-      height: 30,
+      height: 28,
       tintColor: theme.colors.foreground,
-      width: 30,
+      width: 28,
     },
     salonServiceAdd: {
       alignItems: "center",
-      borderColor: theme.colors.gold,
-      borderRadius: 27,
-      borderWidth: 2,
-      height: 54,
+      backgroundColor: theme.colors.gold,
+      borderColor: theme.colors.accent,
+      borderRadius: 22,
+      borderWidth: 1,
+      height: 44,
       justifyContent: "center",
-      width: 54,
+      width: 44,
     },
     salonServiceAddText: {
-      color: theme.colors.gold,
+      color: theme.colors.foregroundInverse,
       fontFamily: mobileTypography.uiSemiBold,
-      fontSize: 30,
-      lineHeight: 32,
+      fontSize: 28,
+      lineHeight: 30,
+    },
+    salonServiceActionBlock: {
+      alignItems: "center",
+      backgroundColor: theme.colors.goldSoft,
+      borderColor: theme.colors.gold,
+      borderRadius: 24,
+      borderWidth: 1,
+      flexShrink: 0,
+      gap: 8,
+      justifyContent: "center",
+      minWidth: 82,
+      paddingHorizontal: 12,
+      paddingVertical: 12,
+    },
+    salonServiceCopy: {
+      alignItems: "flex-end",
+      flex: 1,
+      flexShrink: 1,
+      minWidth: 0,
+    },
+    salonServiceMain: {
+      alignItems: "center",
+      flex: 1,
+      flexDirection: "row",
+      gap: 12,
+      minWidth: 0,
     },
     salonServiceMedia: {
-      borderRadius: 20,
-      height: 84,
+      borderRadius: 18,
+      height: 64,
       overflow: "hidden",
-      width: 130,
+      width: 86,
     },
     salonServiceMeta: {
       color: theme.colors.mutedForeground,
       fontFamily: mobileTypography.uiRegular,
-      fontSize: 15,
-      lineHeight: 21,
-      marginTop: 10,
+      fontSize: 13,
+      lineHeight: 19,
+      marginTop: 5,
     },
     salonServiceName: {
       color: theme.colors.foreground,
       fontFamily: mobileTypography.uiSemiBold,
-      fontSize: 28,
-      lineHeight: 36,
+      fontSize: 21,
+      lineHeight: 29,
     },
     salonServicePrice: {
-      color: theme.colors.foreground,
+      color: theme.colors.gold,
       fontFamily: mobileTypography.uiSemiBold,
-      fontSize: 20,
-      marginTop: 8,
+      fontSize: 15,
+      lineHeight: 21,
+      textAlign: "center",
     },
     salonServiceRow: {
       alignItems: "center",
       flexDirection: "row-reverse",
-      gap: 18,
+      backgroundColor: theme.colors.card,
+      borderColor: theme.colors.border,
+      borderRadius: 28,
+      borderWidth: 1,
+      gap: 12,
       justifyContent: "space-between",
+      padding: 12,
+      shadowColor: theme.colors.shadow,
+      shadowOffset: { height: 12, width: 0 },
+      shadowOpacity: theme.isDark ? 0.16 : 0.05,
+      shadowRadius: 18,
     },
     salonServicesList: {
-      gap: 34,
+      gap: 12,
       paddingHorizontal: 28,
-      paddingTop: 34,
+      paddingTop: 24,
     },
     salonTabs: {
       flexDirection: "row",
@@ -7605,8 +7874,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     searchMapCanvas: {
       backgroundColor: "#dceaf0",
-      borderRadius: 38,
-      height: 430,
+      borderRadius: 36,
+      height: 410,
       marginTop: 18,
       overflow: "hidden",
       position: "relative",
@@ -7619,10 +7888,10 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.foreground,
       fontFamily: mobileTypography.uiMedium,
       flexGrow: 1,
-      fontSize: 15,
+      fontSize: 14,
       overflow: "hidden",
       paddingHorizontal: 18,
-      paddingVertical: 13,
+      paddingVertical: 12,
       textAlign: "center",
     },
     searchMapChipActive: {
@@ -7631,10 +7900,10 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.foregroundInverse,
       fontFamily: mobileTypography.uiMedium,
       flexGrow: 1,
-      fontSize: 16,
+      fontSize: 15,
       overflow: "hidden",
       paddingHorizontal: 24,
-      paddingVertical: 14,
+      paddingVertical: 13,
       textAlign: "center",
     },
     searchMapChipRow: {
@@ -7646,11 +7915,11 @@ const createStyles = (theme: MobileTheme) =>
       alignItems: "center",
       backgroundColor: theme.colors.cardElevated,
       borderColor: theme.colors.border,
-      borderRadius: 34,
+      borderRadius: 30,
       borderWidth: 1,
-      height: 68,
+      height: 60,
       justifyContent: "center",
-      width: 68,
+      width: 60,
     },
     searchMapFilterIcon: {
       color: theme.colors.foreground,
@@ -7660,9 +7929,9 @@ const createStyles = (theme: MobileTheme) =>
       transform: [{ rotate: "90deg" }],
     },
     searchMapFilterIconImage: {
-      height: 26,
+      height: 23,
       tintColor: theme.colors.foreground,
-      width: 26,
+      width: 23,
     },
     searchMapScreen: {
       backgroundColor: theme.colors.background,
@@ -7676,17 +7945,17 @@ const createStyles = (theme: MobileTheme) =>
     },
     searchResultActions: {
       alignItems: "center",
-      gap: 16,
+      gap: 13,
       justifyContent: "center",
-      minWidth: 60,
+      minWidth: 54,
     },
     searchResultCard: {
       alignItems: "center",
       backgroundColor: "#f4f6f8",
-      borderRadius: 28,
+      borderRadius: 26,
       flexDirection: "row-reverse",
-      gap: 18,
-      paddingVertical: 12,
+      gap: 16,
+      paddingVertical: 11,
     },
     searchResultCardPressed: {
       opacity: 0.9,
@@ -7708,15 +7977,15 @@ const createStyles = (theme: MobileTheme) =>
       lineHeight: 40,
     },
     searchResultHeartImage: {
-      height: 36,
+      height: 30,
       tintColor: "#111827",
-      width: 36,
+      width: 30,
     },
     searchResultMedia: {
       borderRadius: 20,
-      height: 96,
+      height: 88,
       overflow: "hidden",
-      width: 128,
+      width: 116,
     },
     searchResultMeta: {
       color: "#6b7280",
@@ -7728,9 +7997,9 @@ const createStyles = (theme: MobileTheme) =>
     searchResultName: {
       color: "#101827",
       fontFamily: mobileTypography.uiSemiBold,
-      fontSize: 28,
-      letterSpacing: -0.6,
-      lineHeight: 34,
+      fontSize: 24,
+      letterSpacing: -0.4,
+      lineHeight: 31,
     },
     searchResultPrice: {
       color: "#101827",
@@ -7755,9 +8024,9 @@ const createStyles = (theme: MobileTheme) =>
       lineHeight: 30,
     },
     searchResultShareImage: {
-      height: 26,
+      height: 23,
       tintColor: "#6b7280",
-      width: 26,
+      width: 23,
     },
     searchResultStarImage: {
       height: 17,
@@ -7774,16 +8043,16 @@ const createStyles = (theme: MobileTheme) =>
       backgroundColor: "#f4f6f8",
       borderTopLeftRadius: 42,
       borderTopRightRadius: 42,
-      gap: 14,
+      gap: 12,
       marginTop: -42,
-      padding: 26,
-      paddingTop: 42,
+      padding: 24,
+      paddingTop: 40,
     },
     searchResultsTitle: {
       color: "#101827",
       fontFamily: mobileTypography.kufiBold,
-      fontSize: 28,
-      lineHeight: 36,
+      fontSize: 27,
+      lineHeight: 35,
       marginBottom: 6,
     },
     searchActionButton: {
@@ -7816,13 +8085,13 @@ const createStyles = (theme: MobileTheme) =>
       alignItems: "center",
       backgroundColor: theme.colors.cardElevated,
       borderColor: theme.colors.border,
-      borderRadius: 30,
+      borderRadius: 32,
       borderWidth: 1,
       flexDirection: "row",
-      gap: 14,
-      minHeight: 64,
+      gap: 12,
+      minHeight: 62,
       paddingHorizontal: 18,
-      paddingVertical: 16,
+      paddingVertical: 15,
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: 16, width: 0 },
       shadowOpacity: theme.isDark ? 0.28 : 0.08,
@@ -7924,12 +8193,14 @@ const createStyles = (theme: MobileTheme) =>
       gap: 12,
       justifyContent: "space-between",
       paddingHorizontal: 2,
+      paddingTop: 4,
     },
     sectionTitle: {
       color: theme.colors.foreground,
       fontFamily: mobileTypography.kufiBold,
-      fontSize: 21,
+      fontSize: 22,
       letterSpacing: -0.2,
+      lineHeight: 30,
     },
     selectText: {
       color: theme.colors.gold,
@@ -8433,7 +8704,7 @@ const createStyles = (theme: MobileTheme) =>
       borderRadius: theme.radii.xl,
       borderWidth: 1,
       overflow: "hidden",
-      padding: 30,
+      padding: 28,
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: 24, width: 0 },
       shadowOpacity: theme.isDark ? 0.36 : 0.12,
@@ -8456,21 +8727,21 @@ const createStyles = (theme: MobileTheme) =>
       alignItems: "center",
       backgroundColor: theme.colors.success,
       borderColor: theme.colors.cardElevated,
-      borderRadius: 38,
+      borderRadius: 42,
       borderWidth: 4,
-      height: 76,
+      height: 84,
       justifyContent: "center",
       marginBottom: 16,
       shadowColor: theme.colors.success,
       shadowOffset: { height: 12, width: 0 },
       shadowOpacity: theme.isDark ? 0.28 : 0.12,
       shadowRadius: 18,
-      width: 76,
+      width: 84,
     },
     confirmationSuccessIconImage: {
-      height: 34,
+      height: 38,
       tintColor: theme.colors.foregroundInverse,
-      width: 34,
+      width: 38,
     },
     legendDot: {
       backgroundColor: theme.colors.success,
@@ -8504,11 +8775,11 @@ const createStyles = (theme: MobileTheme) =>
       alignItems: "center",
       backgroundColor: theme.colors.card,
       borderColor: theme.colors.border,
-      borderRadius: 24,
+      borderRadius: 26,
       borderWidth: 1,
       flexDirection: "row",
       gap: 14,
-      padding: 16,
+      padding: 17,
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: 10, width: 0 },
       shadowOpacity: theme.isDark ? 0.14 : 0.05,
@@ -8542,7 +8813,7 @@ const createStyles = (theme: MobileTheme) =>
       alignItems: "center",
       backgroundColor: theme.colors.successSoft,
       borderColor: theme.colors.success,
-      borderRadius: 22,
+      borderRadius: 24,
       borderWidth: 1,
       flexDirection: "row",
       gap: 12,
@@ -8571,11 +8842,11 @@ const createStyles = (theme: MobileTheme) =>
       alignItems: "center",
       backgroundColor: theme.colors.goldSoft,
       borderColor: theme.colors.gold,
-      borderRadius: 24,
+      borderRadius: 23,
       borderWidth: 1,
-      height: 48,
+      height: 46,
       justifyContent: "center",
-      width: 48,
+      width: 46,
     },
     staffAvatarText: {
       color: theme.colors.deepGold,
@@ -8585,13 +8856,13 @@ const createStyles = (theme: MobileTheme) =>
     staffExperience: {
       color: theme.colors.mutedForeground,
       fontFamily: mobileTypography.uiRegular,
-      fontSize: 12,
-      lineHeight: 18,
+      fontSize: 11,
+      lineHeight: 17,
     },
     staffDetailsBlock: {
       alignItems: "flex-start",
       flex: 1,
-      gap: 4,
+      gap: 5,
       minWidth: 0,
     },
     staffDetailsBlockRtl: {
@@ -8601,8 +8872,8 @@ const createStyles = (theme: MobileTheme) =>
       alignItems: "center",
       flexDirection: "row",
       flexShrink: 0,
-      gap: 9,
-      maxWidth: "42%",
+      gap: 8,
+      maxWidth: "46%",
     },
     staffIdentityBlockRtl: {
       flexDirection: "row-reverse",
@@ -8611,13 +8882,13 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.foreground,
       flexShrink: 1,
       fontFamily: mobileTypography.uiSemiBold,
-      fontSize: 16,
-      lineHeight: 22,
+      fontSize: 17,
+      lineHeight: 23,
     },
     staffRatingIconImage: {
-      height: 14,
+      height: 12,
       tintColor: theme.colors.gold,
-      width: 14,
+      width: 12,
     },
     staffRatingPill: {
       alignItems: "center",
@@ -8625,7 +8896,7 @@ const createStyles = (theme: MobileTheme) =>
       borderRadius: theme.radii.pill,
       flexDirection: "row",
       gap: 4,
-      paddingHorizontal: 8,
+      paddingHorizontal: 9,
       paddingVertical: 5,
     },
     staffRatingPillRtl: {
@@ -8643,9 +8914,9 @@ const createStyles = (theme: MobileTheme) =>
       borderRadius: 26,
       borderWidth: 1,
       flexDirection: "row",
-      gap: 12,
+      gap: 10,
       justifyContent: "space-between",
-      padding: 16,
+      padding: 13,
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: 12, width: 0 },
       shadowOpacity: theme.isDark ? 0.16 : 0.06,
@@ -8656,12 +8927,27 @@ const createStyles = (theme: MobileTheme) =>
       borderColor: theme.colors.gold,
       shadowColor: theme.colors.deepGold,
       shadowOpacity: theme.isDark ? 0.24 : 0.1,
+      shadowRadius: 22,
+    },
+    staffSelectionIndicator: {
+      alignItems: "center",
+      backgroundColor: theme.colors.muted,
+      borderColor: theme.colors.border,
+      borderRadius: 17,
+      borderWidth: 1,
+      height: 34,
+      justifyContent: "center",
+      width: 34,
+    },
+    staffSelectionIndicatorActive: {
+      backgroundColor: theme.colors.goldSoft,
+      borderColor: theme.colors.gold,
     },
     staffRoleText: {
       color: theme.colors.mutedForeground,
       fontFamily: mobileTypography.uiMedium,
-      fontSize: 12,
-      lineHeight: 18,
+      fontSize: 11,
+      lineHeight: 17,
     },
     visualOnlyButton: {
       opacity: 0.96,
