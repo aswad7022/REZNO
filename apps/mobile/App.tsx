@@ -14,6 +14,7 @@ import {
 import { fetchMobileMarketplace } from "./src/api/marketplace";
 import {
   BottomTabBar,
+  type MobileAppTabId,
   PrimaryButton,
   ScreenHeader,
   TOUCH_HIT_SLOP,
@@ -30,7 +31,6 @@ import {
   labels,
   type MobileLocale,
 } from "./src/i18n/labels";
-import type { MobileTabId } from "./src/navigation/tabs";
 import {
   createMobileShadow,
   createMobileSurface,
@@ -72,12 +72,12 @@ type BookingStep = {
 type MobileThemeMode = "system" | "light" | "dark";
 
 const categories = [
-  { badge: "الأكثر حجزاً", count: "128 نشاط", icon: "✂", label: "صالونات", tone: "gold" },
-  { badge: "متاح اليوم", count: "42 مطعم", icon: "II", label: "مطاعم", tone: "green" },
-  { badge: "قريب منك", count: "31 عيادة", icon: "⚕", label: "عيادات", tone: "blue" },
+  { badge: "الأكثر حجزاً", count: "128 نشاط", icon: "✦", label: "صالونات", tone: "gold" },
+  { badge: "متاح اليوم", count: "42 مطعم", icon: "◐", label: "مطاعم", tone: "green" },
+  { badge: "قريب منك", count: "31 عيادة", icon: "◇", label: "عيادات", tone: "blue" },
   { badge: "فاخر", count: "18 سبا", icon: "✦", label: "سبا", tone: "rose" },
-  { badge: "صباحي", count: "27 مركز", icon: "H", label: "رياضة", tone: "dark" },
-  { badge: "سريع", count: "64 خدمة", icon: "▤", label: "خدمات", tone: "gold" },
+  { badge: "صباحي", count: "27 مركز", icon: "△", label: "رياضة", tone: "dark" },
+  { badge: "سريع", count: "64 خدمة", icon: "▦", label: "خدمات", tone: "gold" },
 ];
 
 const featuredBusinesses: PremiumBusiness[] = [
@@ -400,7 +400,7 @@ const accountManagementActions = [
 export default function App() {
   const colorScheme = useColorScheme();
   const [locale, setLocale] = useState<MobileLocale>(DEFAULT_LOCALE);
-  const [activeTab, setActiveTab] = useState<MobileTabId>("customerHome");
+  const [activeTab, setActiveTab] = useState<MobileAppTabId>("customerHome");
   const [showOnboarding, setShowOnboarding] = useState(true);
   const [themeMode, setThemeMode] = useState<MobileThemeMode>("dark");
   const [marketplaceState, setMarketplaceState] = useState<MarketplaceState>({
@@ -435,7 +435,7 @@ export default function App() {
       });
   }, []);
 
-  const handleTabPress = (tabId: MobileTabId) => {
+  const handleTabPress = (tabId: MobileAppTabId) => {
     if (tabId === "marketplace" && marketplaceState.status === "idle") {
       loadMarketplace();
     }
@@ -478,7 +478,19 @@ export default function App() {
         showsVerticalScrollIndicator={false}
       >
         {activeTab === "customerHome" ? (
-          <CustomerHomeScreen isRtl={isRtl} styles={styles} />
+          <CustomerHomeScreen
+            isRtl={isRtl}
+            onOpenMarketplace={() => handleTabPress("marketplace")}
+            styles={styles}
+          />
+        ) : null}
+
+        {activeTab === "favorites" ? (
+          <FavoritesScreen
+            isRtl={isRtl}
+            onOpenMarketplace={() => handleTabPress("marketplace")}
+            styles={styles}
+          />
         ) : null}
 
         {activeTab === "marketplace" ? (
@@ -488,6 +500,14 @@ export default function App() {
             state={marketplaceState}
             styles={styles}
             text={text}
+          />
+        ) : null}
+
+        {activeTab === "quickBooking" ? (
+          <QuickBookingEntryScreen
+            isRtl={isRtl}
+            onOpenMarketplace={() => handleTabPress("marketplace")}
+            styles={styles}
           />
         ) : null}
 
@@ -516,9 +536,9 @@ export default function App() {
 
       <BottomTabBar
         activeTab={activeTab}
+        locale={locale}
         onTabPress={handleTabPress}
         styles={styles}
-        text={text}
       />
     </SafeAreaView>
   );
@@ -526,15 +546,21 @@ export default function App() {
 
 function CustomerHomeScreen({
   isRtl,
+  onOpenMarketplace,
   styles,
 }: {
   isRtl: boolean;
+  onOpenMarketplace: () => void;
   styles: MobileStyles;
 }) {
   return (
     <>
       <HeroCard isRtl={isRtl} styles={styles} />
-      <SearchDiscoveryPanel isRtl={isRtl} styles={styles} />
+      <SearchDiscoveryPanel
+        isRtl={isRtl}
+        onOpenMarketplace={onOpenMarketplace}
+        styles={styles}
+      />
       <CategoryGrid styles={styles} />
       <SectionHeader
         action="عرض الكل"
@@ -554,6 +580,112 @@ function CustomerHomeScreen({
         ))}
       </View>
       <PromoCard isRtl={isRtl} styles={styles} />
+    </>
+  );
+}
+
+function FavoritesScreen({
+  isRtl,
+  onOpenMarketplace,
+  styles,
+}: {
+  isRtl: boolean;
+  onOpenMarketplace: () => void;
+  styles: MobileStyles;
+}) {
+  return (
+    <>
+      <PremiumStateCard
+        body="مساحة مرئية آمنة للمفضلة. لا تضيف حفظاً أو مزامنة أو استدعاءات API حالياً."
+        cta="استكشف السوق"
+        icon="♡"
+        isRtl={isRtl}
+        label="المفضلة"
+        onPress={onOpenMarketplace}
+        styles={styles}
+        title="أماكنك المفضلة ستكون هنا"
+      />
+      <SectionHeader
+        action="معاينة"
+        isRtl={isRtl}
+        styles={styles}
+        title="اقتراحات قريبة"
+      />
+      <View style={styles.homeBusinessGrid}>
+        {featuredBusinesses.slice(0, 2).map((business) => (
+          <View key={business.id} style={styles.homeBusinessCardSlot}>
+            <PremiumBusinessCard
+              business={business}
+              isRtl={isRtl}
+              styles={styles}
+            />
+          </View>
+        ))}
+      </View>
+    </>
+  );
+}
+
+function QuickBookingEntryScreen({
+  isRtl,
+  onOpenMarketplace,
+  styles,
+}: {
+  isRtl: boolean;
+  onOpenMarketplace: () => void;
+  styles: MobileStyles;
+}) {
+  return (
+    <>
+      <View style={styles.quickBookingHero}>
+        <View style={styles.quickBookingGlow} />
+        <Text style={[styles.screenEyebrow, isRtl && styles.rtlText]}>
+          إضافة حجز سريع
+        </Text>
+        <Text style={[styles.quickBookingTitle, isRtl && styles.rtlText]}>
+          ابدأ من البحث أو اختر خدمة قريبة
+        </Text>
+        <Text style={[styles.quickBookingBody, isRtl && styles.rtlText]}>
+          هذه بوابة مرئية آمنة فقط. لا تنشئ حجزاً ولا تغيّر الدفع أو التأكيد.
+        </Text>
+        <View style={styles.quickBookingActionRow}>
+          <PrimaryButton
+            label="فتح السوق"
+            onPress={onOpenMarketplace}
+            styles={styles}
+          />
+          <PrimaryButton label="اقتراح سريع" styles={styles} />
+        </View>
+      </View>
+      <SearchDiscoveryPanel
+        isRtl={isRtl}
+        onOpenMarketplace={onOpenMarketplace}
+        styles={styles}
+      />
+      <SectionHeader
+        action="اختيار بصري"
+        isRtl={isRtl}
+        styles={styles}
+        title="خدمات شائعة"
+      />
+      <View style={styles.serviceGrid}>
+        {services.slice(0, 3).map((service, index) => (
+          <View
+            key={service.name}
+            style={[styles.serviceCard, index === 0 && styles.serviceCardActive]}
+          >
+            <View>
+              <Text style={[styles.serviceName, isRtl && styles.rtlText]}>
+                {service.name}
+              </Text>
+              <Text style={[styles.serviceMeta, isRtl && styles.rtlText]}>
+                {service.duration} · {service.tag}
+              </Text>
+            </View>
+            <Text style={styles.servicePrice}>{service.price}</Text>
+          </View>
+        ))}
+      </View>
     </>
   );
 }
@@ -646,21 +778,47 @@ function HeroCard({ isRtl, styles }: { isRtl: boolean; styles: MobileStyles }) {
 
 function SearchDiscoveryPanel({
   isRtl,
+  onOpenMarketplace,
   styles,
 }: {
   isRtl: boolean;
+  onOpenMarketplace?: () => void;
   styles: MobileStyles;
 }) {
   return (
     <View style={styles.discoveryCard}>
-      <SearchBar isRtl={isRtl} styles={styles} />
+      <SearchBar
+        isRtl={isRtl}
+        onOpenMarketplace={onOpenMarketplace}
+        styles={styles}
+      />
     </View>
   );
 }
 
-function SearchBar({ isRtl, styles }: { isRtl: boolean; styles: MobileStyles }) {
+function SearchBar({
+  isRtl,
+  onOpenMarketplace,
+  styles,
+}: {
+  isRtl: boolean;
+  onOpenMarketplace?: () => void;
+  styles: MobileStyles;
+}) {
   return (
-    <View style={styles.searchBar}>
+    <Pressable
+      accessibilityHint="يفتح تجربة السوق والبحث الحالية بدون تغيير منطق API."
+      accessibilityLabel="فتح البحث والسوق"
+      accessibilityRole="button"
+      accessibilityState={{ disabled: !onOpenMarketplace }}
+      disabled={!onOpenMarketplace}
+      hitSlop={TOUCH_HIT_SLOP}
+      onPress={onOpenMarketplace}
+      style={({ pressed }) => [
+        styles.searchBar,
+        pressed && styles.searchBarPressed,
+      ]}
+    >
       <Text style={styles.searchIcon}>⌕</Text>
       <Text style={[styles.searchPlaceholder, isRtl && styles.rtlText]}>
         ابحث عن خدمة، مطعم، عيادة...
@@ -671,7 +829,7 @@ function SearchBar({ isRtl, styles }: { isRtl: boolean; styles: MobileStyles }) 
       <View style={styles.filterButton}>
         <Text style={styles.filterText}>⚙</Text>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -691,7 +849,14 @@ function CategoryGrid({ styles }: { styles: MobileStyles }) {
               category.tone === "dark" && styles.categoryRailCardPurple,
             ]}
           >
-            <Text style={styles.categoryRailIcon}>{category.icon}</Text>
+            <Text
+              style={[
+                styles.categoryRailIcon,
+                index === 0 && styles.categoryRailCardActiveIcon,
+              ]}
+            >
+              {category.icon}
+            </Text>
             <Text
               style={[
                 styles.categoryRailLabel,
@@ -748,6 +913,36 @@ function PromoCard({ isRtl, styles }: { isRtl: boolean; styles: MobileStyles }) 
   );
 }
 
+function BusinessMedia({
+  badge,
+  initial,
+  styles,
+}: {
+  badge: string;
+  initial?: string;
+  styles: MobileStyles;
+}) {
+  return (
+    <>
+      <View style={styles.businessMediaGlow} />
+      <View style={styles.businessMediaPanel} />
+      <View style={styles.businessMediaAccent} />
+      <View style={styles.businessMediaCutout} />
+      <View style={styles.businessStatusBadge}>
+        <Text style={styles.businessStatusText}>{badge}</Text>
+      </View>
+      {initial ? (
+        <View style={styles.businessInitial}>
+          <Text style={styles.businessInitialText}>{initial}</Text>
+        </View>
+      ) : null}
+      <View style={styles.favoriteButton}>
+        <Text style={styles.favoriteText}>♡</Text>
+      </View>
+    </>
+  );
+}
+
 function PremiumBusinessCard({
   business,
   isRtl,
@@ -760,18 +955,11 @@ function PremiumBusinessCard({
   return (
     <View style={styles.businessCard}>
       <View style={styles.businessHero}>
-        <View style={styles.businessArtLineOne} />
-        <View style={styles.businessArtLineTwo} />
-        <View style={styles.businessArtCircle} />
-        <View style={styles.businessStatusBadge}>
-          <Text style={styles.businessStatusText}>{business.status}</Text>
-        </View>
-        <View style={styles.businessInitial}>
-          <Text style={styles.businessInitialText}>{business.name.charAt(0)}</Text>
-        </View>
-        <View style={styles.favoriteButton}>
-          <Text style={styles.favoriteText}>♡</Text>
-        </View>
+        <BusinessMedia
+          badge={business.status}
+          initial={business.name.charAt(0)}
+          styles={styles}
+        />
       </View>
       <View style={styles.businessBody}>
         <View style={styles.businessTitleRow}>
@@ -971,17 +1159,10 @@ function MarketplaceStateView({
       {state.businesses.map((business) => (
         <View key={business.id} style={styles.businessCard}>
           <View style={styles.businessHeroCompact}>
-            <View style={styles.businessArtLineOne} />
-            <View style={styles.businessArtLineTwo} />
-            <View style={styles.businessArtCircle} />
-            <View style={styles.businessStatusBadge}>
-              <Text style={styles.businessStatusText}>
-                {business.serviceCount > 0 ? "حجز متاح" : "قيد الإعداد"}
-              </Text>
-            </View>
-            <View style={styles.favoriteButton}>
-              <Text style={styles.favoriteText}>♡</Text>
-            </View>
+            <BusinessMedia
+              badge={business.serviceCount > 0 ? "حجز متاح" : "قيد الإعداد"}
+              styles={styles}
+            />
           </View>
           <View style={styles.businessBody}>
             <View style={styles.businessTitleRow}>
@@ -2314,10 +2495,10 @@ const createStyles = (theme: MobileTheme) =>
     },
     brandName: {
       color: theme.colors.foreground,
-      fontSize: 18,
+      fontSize: 15,
       flexShrink: 1,
       fontWeight: "900",
-      letterSpacing: 1.4,
+      letterSpacing: -0.1,
     },
     brandRow: {
       alignItems: "center",
@@ -2327,11 +2508,11 @@ const createStyles = (theme: MobileTheme) =>
     },
     brandTagline: {
       color: theme.colors.mutedForeground,
-      fontSize: 10,
+      fontSize: 9,
       flexShrink: 1,
       fontWeight: "800",
-      lineHeight: 13,
-      marginTop: 2,
+      lineHeight: 12,
+      marginTop: 1,
     },
     businessBody: {
       gap: 9,
@@ -2371,58 +2552,76 @@ const createStyles = (theme: MobileTheme) =>
       backgroundColor: "#050608",
       borderBottomColor: theme.colors.border,
       borderBottomWidth: 1,
-      height: 88,
+      height: 102,
       justifyContent: "space-between",
       overflow: "hidden",
       padding: 12,
+      position: "relative",
     },
     businessHeroCompact: {
       backgroundColor: "#050608",
       borderBottomColor: theme.colors.border,
       borderBottomWidth: 1,
       flexDirection: "row",
-      height: 92,
+      height: 104,
       justifyContent: "space-between",
       overflow: "hidden",
       padding: 12,
+      position: "relative",
     },
-    businessArtCircle: {
-      backgroundColor: "rgba(255, 193, 58, 0.82)",
+    businessMediaAccent: {
+      backgroundColor: "rgba(255, 193, 58, 0.88)",
       borderRadius: 999,
-      bottom: 24,
-      height: 20,
-      left: 54,
+      bottom: 18,
+      height: 24,
+      left: 74,
       position: "absolute",
-      width: 20,
+      width: 24,
     },
-    businessArtLineOne: {
-      backgroundColor: "rgba(255, 193, 58, 0.42)",
+    businessMediaCutout: {
+      borderColor: "rgba(255, 248, 236, 0.18)",
       borderRadius: 999,
-      bottom: 16,
-      height: 76,
-      left: 24,
+      borderWidth: 1,
+      bottom: -34,
+      height: 94,
       position: "absolute",
-      width: 4,
+      right: -26,
+      transform: [{ rotate: "-16deg" }],
+      width: 94,
     },
-    businessArtLineTwo: {
-      borderColor: "rgba(255, 193, 58, 0.55)",
-      borderRadius: 22,
-      borderWidth: 2,
-      bottom: 22,
-      height: 48,
-      left: 54,
+    businessMediaGlow: {
+      backgroundColor: "rgba(255, 193, 58, 0.18)",
+      borderRadius: 999,
+      height: 140,
+      left: -30,
+      opacity: theme.isDark ? 0.96 : 0.7,
       position: "absolute",
-      width: 48,
+      top: -54,
+      width: 140,
+    },
+    businessMediaPanel: {
+      backgroundColor: "rgba(255, 255, 255, 0.08)",
+      borderColor: "rgba(255, 193, 58, 0.22)",
+      borderRadius: 28,
+      borderWidth: 1,
+      bottom: 14,
+      height: 54,
+      left: 28,
+      position: "absolute",
+      transform: [{ rotate: "-8deg" }],
+      width: 98,
     },
     businessInitial: {
       alignItems: "center",
-      alignSelf: "flex-start",
       backgroundColor: theme.colors.gold,
       borderColor: theme.colors.accent,
       borderRadius: 24,
       borderWidth: 1,
+      bottom: 12,
       height: 42,
       justifyContent: "center",
+      left: 12,
+      position: "absolute",
       shadowColor: theme.colors.deepGold,
       shadowOffset: { height: 10, width: 0 },
       shadowOpacity: theme.isDark ? 0.34 : 0.12,
@@ -2470,13 +2669,15 @@ const createStyles = (theme: MobileTheme) =>
       lineHeight: 18,
     },
     businessStatusBadge: {
-      alignSelf: "flex-start",
       backgroundColor: theme.colors.successSoft,
       borderColor: theme.colors.success,
       borderRadius: theme.radii.pill,
       borderWidth: 1,
+      left: 12,
       paddingHorizontal: 8,
       paddingVertical: 5,
+      position: "absolute",
+      top: 12,
     },
     businessStatusText: {
       color: theme.colors.success,
@@ -2604,8 +2805,9 @@ const createStyles = (theme: MobileTheme) =>
     },
     categoryIcon: {
       color: "#ffffff",
-      fontSize: 28,
+      fontSize: 24,
       fontWeight: "900",
+      lineHeight: 28,
     },
     categoryLabel: {
       color: "#ffffff",
@@ -2642,7 +2844,13 @@ const createStyles = (theme: MobileTheme) =>
       shadowRadius: 16,
     },
     categoryRailIcon: {
-      fontSize: 22,
+      color: theme.colors.foreground,
+      fontSize: 19,
+      fontWeight: "900",
+      lineHeight: 22,
+    },
+    categoryRailCardActiveIcon: {
+      color: theme.colors.foregroundInverse,
     },
     categoryRailLabel: {
       color: theme.colors.foreground,
@@ -2662,25 +2870,29 @@ const createStyles = (theme: MobileTheme) =>
     centerTabButton: {
       backgroundColor: "#153f31",
       borderColor: theme.colors.gold,
-      borderWidth: 4,
-      borderRadius: 34,
+      borderWidth: 3,
+      borderRadius: 30,
+      flex: 0,
+      height: 60,
+      marginHorizontal: 8,
       shadowColor: theme.colors.deepGold,
-      shadowOffset: { height: 10, width: 0 },
-      shadowOpacity: theme.isDark ? 0.38 : 0.14,
-      shadowRadius: 18,
-      transform: [{ translateY: -14 }],
+      shadowOffset: { height: 8, width: 0 },
+      shadowOpacity: theme.isDark ? 0.32 : 0.12,
+      shadowRadius: 16,
+      transform: [{ translateY: -12 }],
+      width: 60,
     },
     centerTabButtonActive: {
       backgroundColor: "#174d3b",
-      transform: [{ translateY: -16 }, { scale: 1.02 }],
+      transform: [{ translateY: -13 }, { scale: 1.02 }],
     },
     centerTabActiveIndicator: {
       backgroundColor: "transparent",
     },
     centerTabIcon: {
       color: theme.colors.foreground,
-      fontSize: 31,
-      lineHeight: 33,
+      fontSize: 28,
+      lineHeight: 30,
     },
     chipRow: {
       flexDirection: "row",
@@ -2742,9 +2954,9 @@ const createStyles = (theme: MobileTheme) =>
       textAlign: "center",
     },
     content: {
-      gap: 22,
-      paddingBottom: 150,
-      paddingHorizontal: 22,
+      gap: 20,
+      paddingBottom: 128,
+      paddingHorizontal: 20,
     },
     dataOwnershipNote: {
       color: theme.colors.success,
@@ -3010,13 +3222,15 @@ const createStyles = (theme: MobileTheme) =>
     },
     favoriteButton: {
       alignItems: "center",
-      alignSelf: "flex-end",
       backgroundColor: theme.colors.cardElevated,
       borderColor: theme.colors.border,
       borderRadius: 20,
       borderWidth: 1,
       height: 40,
       justifyContent: "center",
+      position: "absolute",
+      right: 12,
+      top: 12,
       width: 40,
     },
     favoriteText: {
@@ -3120,10 +3334,10 @@ const createStyles = (theme: MobileTheme) =>
       alignItems: "center",
       backgroundColor: theme.colors.background,
       flexDirection: "row",
-      gap: 10,
-      paddingBottom: 10,
-      paddingHorizontal: 22,
-      paddingTop: 12,
+      gap: 8,
+      paddingBottom: 6,
+      paddingHorizontal: 20,
+      paddingTop: 8,
     },
     iconAction: {
       alignItems: "center",
@@ -3217,9 +3431,9 @@ const createStyles = (theme: MobileTheme) =>
       borderRadius: theme.radii.pill,
       borderWidth: 1,
       justifyContent: "center",
-      minWidth: 34,
-      paddingHorizontal: 8,
-      paddingVertical: 5,
+      minWidth: 29,
+      paddingHorizontal: 7,
+      paddingVertical: 4,
     },
     localeButtonActive: {
       backgroundColor: theme.colors.gold,
@@ -3235,9 +3449,9 @@ const createStyles = (theme: MobileTheme) =>
     },
     localeButtonText: {
       color: theme.colors.mutedForeground,
-      fontSize: 9,
+      fontSize: 8,
       fontWeight: "800",
-      lineHeight: 12,
+      lineHeight: 11,
     },
     localeButtonTextActive: {
       color: theme.colors.foregroundInverse,
@@ -3274,18 +3488,18 @@ const createStyles = (theme: MobileTheme) =>
       backgroundColor: theme.colors.gold,
       borderColor: theme.colors.accent,
       borderWidth: 1,
-      borderRadius: 20,
-      height: 42,
+      borderRadius: 17,
+      height: 34,
       justifyContent: "center",
       shadowColor: theme.colors.deepGold,
-      shadowOffset: { height: 8, width: 0 },
-      shadowOpacity: theme.isDark ? 0.32 : 0.12,
-      shadowRadius: 14,
-      width: 42,
+      shadowOffset: { height: 6, width: 0 },
+      shadowOpacity: theme.isDark ? 0.26 : 0.1,
+      shadowRadius: 10,
+      width: 34,
     },
     logoText: {
       color: theme.colors.foregroundInverse,
-      fontSize: 20,
+      fontSize: 18,
       fontWeight: "900",
     },
     mapHeaderCard: {
@@ -4412,6 +4626,49 @@ const createStyles = (theme: MobileTheme) =>
       letterSpacing: 0.3,
       marginTop: 4,
     },
+    quickBookingActionRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 10,
+      marginTop: 20,
+    },
+    quickBookingBody: {
+      color: theme.colors.mutedForeground,
+      fontSize: 15,
+      fontWeight: "700",
+      lineHeight: 23,
+      marginTop: 9,
+    },
+    quickBookingGlow: {
+      backgroundColor: theme.colors.goldSoft,
+      borderRadius: 999,
+      height: 150,
+      opacity: theme.isDark ? 0.9 : 0.55,
+      position: "absolute",
+      right: -46,
+      top: -60,
+      width: 150,
+    },
+    quickBookingHero: {
+      backgroundColor: theme.colors.hero,
+      borderColor: theme.colors.goldSoft,
+      borderRadius: theme.radii.xl,
+      borderWidth: 1,
+      overflow: "hidden",
+      padding: 24,
+      shadowColor: theme.colors.shadow,
+      shadowOffset: { height: 20, width: 0 },
+      shadowOpacity: theme.isDark ? 0.34 : 0.1,
+      shadowRadius: 32,
+    },
+    quickBookingTitle: {
+      color: theme.colors.foreground,
+      fontSize: 26,
+      fontWeight: "900",
+      letterSpacing: -0.4,
+      lineHeight: 33,
+      marginTop: 8,
+    },
     ratingPill: {
       backgroundColor: theme.colors.goldSoft,
       borderRadius: theme.radii.pill,
@@ -4536,6 +4793,47 @@ const createStyles = (theme: MobileTheme) =>
       fontSize: 16,
       fontWeight: "900",
     },
+    serviceCard: {
+      backgroundColor: theme.colors.cardElevated,
+      borderColor: theme.colors.border,
+      borderRadius: 22,
+      borderWidth: 1,
+      flexGrow: 1,
+      gap: 12,
+      minWidth: 120,
+      padding: 16,
+      shadowColor: theme.colors.shadow,
+      shadowOffset: { height: 10, width: 0 },
+      shadowOpacity: theme.isDark ? 0.14 : 0.05,
+      shadowRadius: 16,
+    },
+    serviceCardActive: {
+      backgroundColor: theme.colors.goldSoft,
+      borderColor: theme.colors.gold,
+    },
+    serviceGrid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 12,
+    },
+    serviceMeta: {
+      color: theme.colors.mutedForeground,
+      fontSize: 12,
+      fontWeight: "800",
+      lineHeight: 18,
+      marginTop: 5,
+    },
+    serviceName: {
+      color: theme.colors.foreground,
+      fontSize: 15,
+      fontWeight: "900",
+      lineHeight: 21,
+    },
+    servicePrice: {
+      color: theme.colors.deepGold,
+      fontSize: 13,
+      fontWeight: "900",
+    },
     safeActionText: {
       color: theme.colors.deepGold,
       fontSize: 12,
@@ -4609,6 +4907,11 @@ const createStyles = (theme: MobileTheme) =>
       shadowOffset: { height: 16, width: 0 },
       shadowOpacity: theme.isDark ? 0.28 : 0.08,
       shadowRadius: 24,
+    },
+    searchBarPressed: {
+      borderColor: theme.colors.gold,
+      opacity: 0.92,
+      transform: [{ translateY: 1 }],
     },
     searchIcon: {
       color: theme.colors.mutedForeground,
@@ -4957,11 +5260,11 @@ const createStyles = (theme: MobileTheme) =>
       bottom: 0,
       elevation: 24,
       flexDirection: "row",
-      height: 104,
+      height: 92,
       left: 0,
-      paddingBottom: 18,
-      paddingHorizontal: 16,
-      paddingTop: 10,
+      paddingBottom: 14,
+      paddingHorizontal: 18,
+      paddingTop: 8,
       position: "absolute",
       right: 0,
       shadowColor: theme.colors.shadow,
@@ -4983,11 +5286,11 @@ const createStyles = (theme: MobileTheme) =>
     },
     tabButton: {
       alignItems: "center",
-      borderRadius: 24,
+      borderRadius: 22,
       flex: 1,
-      gap: 5,
+      gap: 4,
       justifyContent: "center",
-      minHeight: 58,
+      minHeight: 54,
       paddingHorizontal: 2,
     },
     tabButtonActive: {
@@ -4999,16 +5302,16 @@ const createStyles = (theme: MobileTheme) =>
     },
     tabIcon: {
       color: theme.colors.foreground,
-      fontSize: 23,
+      fontSize: 21,
     },
     tabIconActive: {
       color: theme.colors.gold,
     },
     tabLabel: {
       color: theme.colors.foreground,
-      fontSize: 11,
+      fontSize: 10,
       fontWeight: "800",
-      lineHeight: 15,
+      lineHeight: 13,
       maxWidth: 64,
       minWidth: 48,
       textAlign: "center",

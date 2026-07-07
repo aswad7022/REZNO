@@ -5,9 +5,52 @@ import {
   labels,
   type MobileLocale,
 } from "../i18n/labels";
-import { MOBILE_TABS, type MobileTabId } from "../navigation/tabs";
+import type { MobileTabId } from "../navigation/tabs";
 
 export const TOUCH_HIT_SLOP = { bottom: 8, left: 8, right: 8, top: 8 };
+
+export type MobileAppTabId = MobileTabId | "favorites" | "quickBooking";
+
+type BottomNavTabId =
+  | "customerHome"
+  | "favorites"
+  | "quickBooking"
+  | "bookings"
+  | "account";
+
+type BottomNavTab = {
+  id: BottomNavTabId;
+  icon: string;
+  label: Record<MobileLocale, string>;
+};
+
+const BOTTOM_NAV_TABS: BottomNavTab[] = [
+  {
+    id: "customerHome",
+    icon: "⌂",
+    label: { ar: "الرئيسية", ckb: "سەرەکی", en: "Home" },
+  },
+  {
+    id: "favorites",
+    icon: "♡",
+    label: { ar: "المفضلة", ckb: "دڵخوازەکان", en: "Favorites" },
+  },
+  {
+    id: "quickBooking",
+    icon: "+",
+    label: { ar: "إضافة حجز", ckb: "حجز زیاد بکە", en: "Quick book" },
+  },
+  {
+    id: "bookings",
+    icon: "◷",
+    label: { ar: "حجوزاتي", ckb: "حجزەکانم", en: "My bookings" },
+  },
+  {
+    id: "account",
+    icon: "◉",
+    label: { ar: "الحساب", ckb: "هەژمار", en: "Account" },
+  },
+];
 
 type MobileChromeStyles = {
   brandCopy: StyleProp<ViewStyle>;
@@ -65,14 +108,14 @@ export function ScreenHeader({
     <View style={styles.header}>
       <View style={styles.brandRow}>
         <View style={styles.logoMark}>
-          <Text style={styles.logoText}>R</Text>
+          <Text style={styles.logoText}>⌾</Text>
         </View>
         <View style={styles.brandCopy}>
           <Text
             numberOfLines={1}
             style={[styles.brandName, isRtl && styles.rtlText]}
           >
-            REZNO
+            بغداد
           </Text>
           <Text
             numberOfLines={2}
@@ -163,29 +206,34 @@ export function PrimaryButton({
 
 export function BottomTabBar({
   activeTab,
+  locale,
   onTabPress,
   styles,
-  text,
 }: {
-  activeTab: MobileTabId;
-  onTabPress: (tabId: MobileTabId) => void;
+  activeTab: MobileAppTabId;
+  locale: MobileLocale;
+  onTabPress: (tabId: MobileAppTabId) => void;
   styles: MobileChromeStyles;
-  text: MobileText;
 }) {
   return (
     <View style={styles.tabBar}>
-      {MOBILE_TABS.map((tab) => {
+      {BOTTOM_NAV_TABS.map((tab) => {
         const active = tab.id === activeTab;
-        const isCenterAction = tab.id === "bookings";
+        const isCenterAction = tab.id === "quickBooking";
+        const label = tab.label[locale];
 
         return (
           <Pressable
             accessibilityHint={
               active
                 ? "هذا هو التبويب المفتوح حالياً."
-                : `يفتح تبويب ${text.tabs[tab.id]}.`
+                : isCenterAction
+                  ? "يفتح مدخل إضافة حجز سريع بصري وآمن."
+                  : `يفتح تبويب ${label}.`
             }
-            accessibilityLabel={`تبويب ${text.tabs[tab.id]}`}
+            accessibilityLabel={
+              isCenterAction ? "إضافة حجز سريع" : `تبويب ${label}`
+            }
             accessibilityRole="tab"
             accessibilityState={{ selected: active }}
             hitSlop={TOUCH_HIT_SLOP}
@@ -206,14 +254,16 @@ export function BottomTabBar({
                 isCenterAction && styles.centerTabIcon,
               ]}
             >
-              {isCenterAction ? "+" : tab.icon}
+              {tab.icon}
             </Text>
-            <Text
-              numberOfLines={1}
-              style={[styles.tabLabel, active && styles.tabLabelActive]}
-            >
-              {text.tabs[tab.id]}
-            </Text>
+            {isCenterAction ? null : (
+              <Text
+                numberOfLines={1}
+                style={[styles.tabLabel, active && styles.tabLabelActive]}
+              >
+                {label}
+              </Text>
+            )}
             <View
               style={[
                 styles.tabActiveIndicator,
