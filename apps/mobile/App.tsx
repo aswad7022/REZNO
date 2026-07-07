@@ -2237,6 +2237,62 @@ function StaffSelectionStep({
       <View style={styles.bookingOptionList}>
         {bookingStaffOptions.map((staff) => {
           const selected = staff.id === selectedStaff.id;
+          const staffIdentity = (
+            <View
+              style={[
+                styles.staffIdentityBlock,
+                isRtl && styles.staffIdentityBlockRtl,
+              ]}
+            >
+              <View style={styles.staffAvatar}>
+                <Text style={styles.staffAvatarText}>
+                  {staff.id === "any" ? "R" : staff.name.charAt(0)}
+                </Text>
+              </View>
+              <Text style={[styles.staffNameText, isRtl && styles.rtlText]}>
+                {staff.name}
+              </Text>
+            </View>
+          );
+          const staffDetails = (
+            <View
+              style={[
+                styles.staffDetailsBlock,
+                isRtl && styles.staffDetailsBlockRtl,
+              ]}
+            >
+              <View
+                style={[
+                  styles.staffRatingPill,
+                  isRtl && styles.staffRatingPillRtl,
+                ]}
+              >
+                <Image
+                  alt=""
+                  resizeMode="contain"
+                  source={mobileIconAssets.common.starRating}
+                  style={styles.staffRatingIconImage}
+                />
+                <Text style={styles.staffRatingText}>{staff.rating}</Text>
+              </View>
+              <Text style={[styles.staffRoleText, isRtl && styles.rtlText]}>
+                {staff.role}
+              </Text>
+              <Text style={[styles.staffExperience, isRtl && styles.rtlText]}>
+                {staff.experience}
+              </Text>
+            </View>
+          );
+          const selectionIndicator = (
+            <View
+              style={[
+                styles.bookingRadio,
+                selected && styles.bookingRadioActive,
+              ]}
+            >
+              {selected ? <View style={styles.bookingRadioDot} /> : null}
+            </View>
+          );
 
           return (
             <Pressable
@@ -2252,41 +2308,19 @@ function StaffSelectionStep({
                 pressed && styles.softButtonPressed,
               ]}
             >
-              <View style={styles.staffAvatar}>
-                <Text style={styles.staffAvatarText}>
-                  {staff.id === "any" ? "R" : staff.name.charAt(0)}
-                </Text>
-              </View>
-              <View style={styles.rowCopy}>
-                <View style={styles.staffTitleRow}>
-                  <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>
-                    {staff.name}
-                  </Text>
-                  <View style={styles.staffRatingPill}>
-                    <Image
-                      alt=""
-                      resizeMode="contain"
-                      source={mobileIconAssets.common.starRating}
-                      style={styles.staffRatingIconImage}
-                    />
-                    <Text style={styles.staffRatingText}>{staff.rating}</Text>
-                  </View>
-                </View>
-                <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>
-                  {staff.role}
-                </Text>
-                <Text style={[styles.staffExperience, isRtl && styles.rtlText]}>
-                  {staff.experience}
-                </Text>
-              </View>
-              <View
-                style={[
-                  styles.bookingRadio,
-                  selected && styles.bookingRadioActive,
-                ]}
-              >
-                {selected ? <View style={styles.bookingRadioDot} /> : null}
-              </View>
+              {isRtl ? (
+                <>
+                  {selectionIndicator}
+                  {staffDetails}
+                  {staffIdentity}
+                </>
+              ) : (
+                <>
+                  {staffIdentity}
+                  {staffDetails}
+                  {selectionIndicator}
+                </>
+              )}
             </Pressable>
           );
         })}
@@ -8553,7 +8587,32 @@ const createStyles = (theme: MobileTheme) =>
       fontFamily: mobileTypography.uiRegular,
       fontSize: 12,
       lineHeight: 18,
-      marginTop: 3,
+    },
+    staffDetailsBlock: {
+      alignItems: "flex-start",
+      flex: 1,
+      gap: 4,
+      minWidth: 0,
+    },
+    staffDetailsBlockRtl: {
+      alignItems: "flex-end",
+    },
+    staffIdentityBlock: {
+      alignItems: "center",
+      flexDirection: "row",
+      flexShrink: 0,
+      gap: 9,
+      maxWidth: "42%",
+    },
+    staffIdentityBlockRtl: {
+      flexDirection: "row-reverse",
+    },
+    staffNameText: {
+      color: theme.colors.foreground,
+      flexShrink: 1,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: 16,
+      lineHeight: 22,
     },
     staffRatingIconImage: {
       height: 14,
@@ -8569,6 +8628,9 @@ const createStyles = (theme: MobileTheme) =>
       paddingHorizontal: 8,
       paddingVertical: 5,
     },
+    staffRatingPillRtl: {
+      flexDirection: "row-reverse",
+    },
     staffRatingText: {
       color: theme.colors.deepGold,
       fontFamily: mobileTypography.uiSemiBold,
@@ -8581,7 +8643,8 @@ const createStyles = (theme: MobileTheme) =>
       borderRadius: 26,
       borderWidth: 1,
       flexDirection: "row",
-      gap: 14,
+      gap: 12,
+      justifyContent: "space-between",
       padding: 16,
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: 12, width: 0 },
@@ -8594,11 +8657,11 @@ const createStyles = (theme: MobileTheme) =>
       shadowColor: theme.colors.deepGold,
       shadowOpacity: theme.isDark ? 0.24 : 0.1,
     },
-    staffTitleRow: {
-      alignItems: "center",
-      flexDirection: "row",
-      gap: 10,
-      justifyContent: "space-between",
+    staffRoleText: {
+      color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiMedium,
+      fontSize: 12,
+      lineHeight: 18,
     },
     visualOnlyButton: {
       opacity: 0.96,
