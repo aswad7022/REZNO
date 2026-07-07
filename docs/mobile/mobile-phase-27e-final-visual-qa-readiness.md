@@ -101,8 +101,7 @@ The current mobile visual flow does not implement:
 
 Current release-readiness blockers:
 
-- EAS development build execution remains blocked until the owner resolves EAS login/project access.
-- Physical real-device runtime smoke remains not run.
+- Physical real-device runtime smoke remains not run after Phase 28C Android development build success.
 - TestFlight/production build has not been run.
 - Full release readiness requires an installed development build or equivalent owner-approved device path.
 - Final production UI polish remains deferred.
@@ -113,6 +112,7 @@ Earlier blocked status is recorded in:
 - PR #58: real-device smoke documented as NOT RUN / BLOCKED.
 - PR #59: EAS development build path documented, but no build executed.
 - Phase 28 Android development build attempt is recorded in [mobile-phase-28-android-development-build.md](./mobile-phase-28-android-development-build.md).
+- Phase 28C records Android development build success and BlueStacks / Android emulator development-build smoke, while physical phone smoke remains not run.
 
 ## Recommended next action
 
