@@ -215,9 +215,12 @@ export function BottomTabBar({
   onTabPress: (tabId: MobileAppTabId) => void;
   styles: MobileChromeStyles;
 }) {
+  const visibleTabs =
+    locale === "en" ? BOTTOM_NAV_TABS : [...BOTTOM_NAV_TABS].reverse();
+
   return (
     <View style={styles.tabBar}>
-      {BOTTOM_NAV_TABS.map((tab) => {
+      {visibleTabs.map((tab) => {
         const active = tab.id === activeTab;
         const isCenterAction = tab.id === "quickBooking";
         const label = tab.label[locale];
