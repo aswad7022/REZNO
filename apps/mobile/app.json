@@ -1,6 +1,7 @@
 {
   "expo": {
     "name": "REZNO",
+    "owner": "alhakeem7",
     "slug": "rezno-mobile",
     "scheme": "rezno",
     "version": "1.0.0",
@@ -25,7 +26,10 @@
       "favicon": "./assets/favicon.png"
     },
     "extra": {
-      "apiBaseUrl": "http://localhost:3000"
+      "apiBaseUrl": "http://localhost:3000",
+      "eas": {
+        "projectId": "ef209c9c-0d04-4731-a998-6241fef1b29d"
+      }
     }
   }
 }
