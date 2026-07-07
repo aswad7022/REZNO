@@ -3,6 +3,7 @@ import { useCallback, useMemo, useState } from "react";
 import {
   I18nManager,
   Image,
+  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -73,6 +74,17 @@ type BookingStep = {
 
 type MobileThemeMode = "system" | "light" | "dark";
 
+const mobileTypography = {
+  displayFamily: Platform.select({
+    android: "sans-serif-medium",
+    default: undefined,
+  }),
+  uiFamily: Platform.select({
+    android: "sans-serif",
+    default: undefined,
+  }),
+};
+
 /* eslint-disable @typescript-eslint/no-require-imports -- React Native bundles static image assets through require(). */
 const mobileIconAssets = {
   categories: {
@@ -84,18 +96,22 @@ const mobileIconAssets = {
     spa: require("./assets/icons/categories/spa.png") as ImageSourcePropType,
   },
   common: {
-    backArrow: require("./assets/icons/common/back-arrow.png") as ImageSourcePropType,
+    backArrowLtr: require("./assets/icons/common/back-arrow-ltr.png") as ImageSourcePropType,
+    backArrowRtl: require("./assets/icons/common/back-arrow-rtl.png") as ImageSourcePropType,
     calendar: require("./assets/icons/common/calendar.png") as ImageSourcePropType,
     checkSuccess: require("./assets/icons/common/check-success.png") as ImageSourcePropType,
     clock: require("./assets/icons/common/clock.png") as ImageSourcePropType,
     filter: require("./assets/icons/common/filter.png") as ImageSourcePropType,
     heart: require("./assets/icons/common/heart.png") as ImageSourcePropType,
     locationPin: require("./assets/icons/common/location-pin.png") as ImageSourcePropType,
+    message: require("./assets/icons/common/message.png") as ImageSourcePropType,
     notificationBell: require("./assets/icons/common/notification-bell.png") as ImageSourcePropType,
     paymentCard: require("./assets/icons/common/payment-card.png") as ImageSourcePropType,
+    phoneCall: require("./assets/icons/common/phone-call.png") as ImageSourcePropType,
     search: require("./assets/icons/common/search.png") as ImageSourcePropType,
     share: require("./assets/icons/common/share.png") as ImageSourcePropType,
     starRating: require("./assets/icons/common/star-rating.png") as ImageSourcePropType,
+    whatsappGeneric: require("./assets/icons/common/whatsapp-generic.png") as ImageSourcePropType,
   },
 };
 /* eslint-enable @typescript-eslint/no-require-imports */
@@ -953,15 +969,22 @@ function CategoryGrid({ styles }: { styles: MobileStyles }) {
               category.tone === "dark" && styles.categoryRailCardPurple,
             ]}
           >
-            <Image
-              alt=""
-              resizeMode="contain"
-              source={category.icon}
+            <View
               style={[
-                styles.categoryRailIconImage,
-                index === 0 && styles.categoryRailIconImageActive,
+                styles.categoryRailIconTile,
+                index === 0 && styles.categoryRailIconTileActive,
               ]}
-            />
+            >
+              <Image
+                alt=""
+                resizeMode="contain"
+                source={category.icon}
+                style={[
+                  styles.categoryRailIconImage,
+                  index === 0 && styles.categoryRailIconImageActive,
+                ]}
+              />
+            </View>
             <Text
               style={[
                 styles.categoryRailLabel,
@@ -988,12 +1011,19 @@ function CategoryGrid({ styles }: { styles: MobileStyles }) {
             ]}
           >
             <View style={styles.categoryTopRow}>
-              <Image
-                alt=""
-                resizeMode="contain"
-                source={category.icon}
-                style={styles.categoryIconImage}
-              />
+              <View
+                style={[
+                  styles.categoryIconTile,
+                  index === 0 && styles.categoryIconTileActive,
+                ]}
+              >
+                <Image
+                  alt=""
+                  resizeMode="contain"
+                  source={category.icon}
+                  style={styles.categoryIconImage}
+                />
+              </View>
               <Text style={styles.categoryBadge}>{category.badge}</Text>
             </View>
             <Text style={styles.categoryLabel}>{category.label}</Text>
@@ -1389,7 +1419,11 @@ function SalonDetailScreen({
           <Image
             alt="رجوع"
             resizeMode="contain"
-            source={mobileIconAssets.common.backArrow}
+            source={
+              isRtl
+                ? mobileIconAssets.common.backArrowRtl
+                : mobileIconAssets.common.backArrowLtr
+            }
             style={styles.salonBackIconImage}
           />
         </Pressable>
@@ -1443,7 +1477,11 @@ function SalonDetailScreen({
         </View>
 
         <View style={styles.salonActionGrid}>
-          <VisualActionTile label="اتصال" styles={styles} symbol="☎" />
+          <VisualActionTile
+            iconSource={mobileIconAssets.common.phoneCall}
+            label="اتصال"
+            styles={styles}
+          />
           <VisualActionTile
             iconSource={mobileIconAssets.common.share}
             label="مشاركة"
@@ -1455,7 +1493,7 @@ function SalonDetailScreen({
             styles={styles}
           />
           <VisualActionTile
-            iconSource={mobileIconAssets.common.checkSuccess}
+            iconSource={mobileIconAssets.common.whatsappGeneric}
             label="واتساب"
             styles={styles}
           />
@@ -1688,6 +1726,15 @@ function BookingFlowScreen({
             key={slot}
             style={[styles.timeSlot, index === 3 && styles.timeSlotActive]}
           >
+            <Image
+              alt=""
+              resizeMode="contain"
+              source={mobileIconAssets.common.clock}
+              style={[
+                styles.timeSlotIconImage,
+                index === 3 && styles.timeSlotIconImageActive,
+              ]}
+            />
             <Text
               style={[
                 styles.timeSlotText,
@@ -1721,7 +1768,12 @@ function SelectedServiceCard({
   return (
     <View style={styles.selectedServiceCard}>
       <View style={styles.selectedServiceIcon}>
-        <Text style={styles.selectedServiceIconText}>✦</Text>
+        <Image
+          alt=""
+          resizeMode="contain"
+          source={mobileIconAssets.common.calendar}
+          style={styles.selectedServiceIconImage}
+        />
       </View>
       <View style={styles.rowCopy}>
         <Text style={[styles.selectedServiceTitle, isRtl && styles.rtlText]}>
@@ -1828,9 +1880,17 @@ function BookingSummaryCard({
 }) {
   return (
     <View style={styles.paymentCard}>
-      <Text style={[styles.screenEyebrow, isRtl && styles.rtlText]}>
-        ملخص الحجز
-      </Text>
+      <View style={styles.paymentHeaderRow}>
+        <Image
+          alt=""
+          resizeMode="contain"
+          source={mobileIconAssets.common.paymentCard}
+          style={styles.paymentIconImage}
+        />
+        <Text style={[styles.screenEyebrow, isRtl && styles.rtlText]}>
+          ملخص الحجز
+        </Text>
+      </View>
       <Text style={[styles.paymentTitle, isRtl && styles.rtlText]}>
         قص وتصفيف فاخر · ليان · اليوم 4:30 م
       </Text>
@@ -1858,7 +1918,12 @@ function ConfirmationCard({
   return (
     <View style={styles.confirmationCard}>
       <View style={styles.confirmationIconWrap}>
-        <Text style={styles.confirmationIcon}>✓</Text>
+        <Image
+          alt=""
+          resizeMode="contain"
+          source={mobileIconAssets.common.checkSuccess}
+          style={styles.confirmationIconImage}
+        />
       </View>
       <Text style={[styles.confirmationTitle, isRtl && styles.rtlText]}>
         تم تجهيز تأكيد الحجز
@@ -2016,7 +2081,12 @@ function MessagesNotificationsPreviewScreen({
         <View style={styles.messageHeroGlow} />
         <View style={styles.messageHeroTopRow}>
           <View style={styles.messageHeroIcon}>
-            <Text style={styles.messageHeroIconText}>✉</Text>
+            <Image
+              alt=""
+              resizeMode="contain"
+              source={mobileIconAssets.common.message}
+              style={styles.messageHeroIconImage}
+            />
           </View>
           <Text style={styles.messageSafetyBadge}>معاينة آمنة</Text>
         </View>
@@ -2064,13 +2134,18 @@ function NotificationsCenterPreview({
           ]}
         >
           <View style={styles.notificationIcon}>
-            <Text style={styles.notificationIconText}>
-              {item.tone === "success"
-                ? "✓"
-                : item.tone === "message"
-                  ? "↩"
-                  : "•"}
-            </Text>
+            <Image
+              alt=""
+              resizeMode="contain"
+              source={
+                item.tone === "success"
+                  ? mobileIconAssets.common.checkSuccess
+                  : item.tone === "message"
+                    ? mobileIconAssets.common.message
+                    : mobileIconAssets.common.notificationBell
+              }
+              style={styles.notificationIconImage}
+            />
           </View>
           <View style={styles.rowCopy}>
             <View style={styles.notificationTitleRow}>
@@ -2870,9 +2945,10 @@ const createStyles = (theme: MobileTheme) =>
     },
     brandName: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiFamily,
       fontSize: 15,
       flexShrink: 1,
-      fontWeight: "900",
+      fontWeight: "800",
       letterSpacing: -0.1,
     },
     brandRow: {
@@ -2883,9 +2959,10 @@ const createStyles = (theme: MobileTheme) =>
     },
     brandTagline: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiFamily,
       fontSize: 9,
       flexShrink: 1,
-      fontWeight: "800",
+      fontWeight: "500",
       lineHeight: 12,
       marginTop: 1,
     },
@@ -3017,6 +3094,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     businessMeta: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiFamily,
       fontSize: 11,
       flexShrink: 1,
       lineHeight: 15,
@@ -3041,9 +3119,10 @@ const createStyles = (theme: MobileTheme) =>
     },
     businessName: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiFamily,
       fontSize: 14,
       flexShrink: 1,
-      fontWeight: "900",
+      fontWeight: "800",
       letterSpacing: -0.3,
       lineHeight: 18,
     },
@@ -3173,8 +3252,9 @@ const createStyles = (theme: MobileTheme) =>
     },
     categoryCount: {
       color: "rgba(255, 255, 255, 0.74)",
+      fontFamily: mobileTypography.uiFamily,
       fontSize: 11,
-      fontWeight: "800",
+      fontWeight: "600",
       textAlign: "center",
     },
     categoryGrid: {
@@ -3189,14 +3269,29 @@ const createStyles = (theme: MobileTheme) =>
       lineHeight: 28,
     },
     categoryIconImage: {
-      height: 30,
+      height: 28,
       tintColor: "#ffffff",
-      width: 30,
+      width: 28,
+    },
+    categoryIconTile: {
+      alignItems: "center",
+      backgroundColor: "rgba(255, 255, 255, 0.16)",
+      borderColor: "rgba(255, 255, 255, 0.2)",
+      borderRadius: 18,
+      borderWidth: 1,
+      height: 54,
+      justifyContent: "center",
+      width: 54,
+    },
+    categoryIconTileActive: {
+      backgroundColor: "rgba(255, 255, 255, 0.22)",
+      borderColor: "rgba(255, 255, 255, 0.34)",
     },
     categoryLabel: {
       color: "#ffffff",
+      fontFamily: mobileTypography.uiFamily,
       fontSize: 14,
-      fontWeight: "900",
+      fontWeight: "700",
       textAlign: "center",
     },
     categoryRail: {
@@ -3234,20 +3329,35 @@ const createStyles = (theme: MobileTheme) =>
       lineHeight: 22,
     },
     categoryRailIconImage: {
-      height: 24,
+      height: 26,
       tintColor: theme.colors.foreground,
-      width: 24,
+      width: 26,
     },
     categoryRailIconImageActive: {
       tintColor: theme.colors.foregroundInverse,
+    },
+    categoryRailIconTile: {
+      alignItems: "center",
+      backgroundColor: theme.colors.muted,
+      borderColor: theme.colors.border,
+      borderRadius: 16,
+      borderWidth: 1,
+      height: 48,
+      justifyContent: "center",
+      width: 48,
+    },
+    categoryRailIconTileActive: {
+      backgroundColor: "rgba(255, 255, 255, 0.2)",
+      borderColor: "rgba(255, 255, 255, 0.32)",
     },
     categoryRailCardActiveIcon: {
       color: theme.colors.foregroundInverse,
     },
     categoryRailLabel: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiFamily,
       fontSize: 11,
-      fontWeight: "900",
+      fontWeight: "700",
     },
     categoryRailLabelActive: {
       color: theme.colors.foregroundInverse,
@@ -3328,6 +3438,11 @@ const createStyles = (theme: MobileTheme) =>
       fontSize: 28,
       fontWeight: "900",
     },
+    confirmationIconImage: {
+      height: 30,
+      tintColor: theme.colors.foregroundInverse,
+      width: 30,
+    },
     confirmationIconWrap: {
       alignItems: "center",
       backgroundColor: theme.colors.success,
@@ -3344,8 +3459,9 @@ const createStyles = (theme: MobileTheme) =>
     },
     confirmationTitle: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.displayFamily,
       fontSize: 21,
-      fontWeight: "900",
+      fontWeight: "800",
       lineHeight: 27,
       marginTop: 12,
       textAlign: "center",
@@ -3773,8 +3889,9 @@ const createStyles = (theme: MobileTheme) =>
     },
     heroBody: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiFamily,
       fontSize: 19,
-      fontWeight: "700",
+      fontWeight: "500",
       lineHeight: 27,
       marginTop: 8,
     },
@@ -3786,8 +3903,9 @@ const createStyles = (theme: MobileTheme) =>
     },
     heroEyebrow: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiFamily,
       fontSize: 17,
-      fontWeight: "700",
+      fontWeight: "600",
       letterSpacing: 0,
       marginTop: 12,
     },
@@ -3796,10 +3914,11 @@ const createStyles = (theme: MobileTheme) =>
     },
     heroTitle: {
       color: theme.colors.foreground,
-      fontSize: 38,
-      fontWeight: "900",
+      fontFamily: mobileTypography.displayFamily,
+      fontSize: 36,
+      fontWeight: "800",
       letterSpacing: -0.7,
-      lineHeight: 45,
+      lineHeight: 44,
       marginTop: 4,
     },
     homeBusinessCardSlot: {
@@ -4059,6 +4178,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     messageHeroBody: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiFamily,
       fontSize: 15,
       lineHeight: 23,
       marginTop: 10,
@@ -4098,10 +4218,16 @@ const createStyles = (theme: MobileTheme) =>
       fontSize: 22,
       fontWeight: "900",
     },
+    messageHeroIconImage: {
+      height: 24,
+      tintColor: theme.colors.foregroundInverse,
+      width: 24,
+    },
     messageHeroTitle: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.displayFamily,
       fontSize: 27,
-      fontWeight: "900",
+      fontWeight: "800",
       lineHeight: 34,
       marginTop: 20,
     },
@@ -4197,6 +4323,11 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.foregroundInverse,
       fontSize: 16,
       fontWeight: "900",
+    },
+    notificationIconImage: {
+      height: 20,
+      tintColor: theme.colors.foregroundInverse,
+      width: 20,
     },
     notificationPanel: {
       backgroundColor: theme.colors.cardElevated,
@@ -4704,10 +4835,21 @@ const createStyles = (theme: MobileTheme) =>
       shadowOpacity: theme.isDark ? 0.22 : 0.1,
       shadowRadius: 22,
     },
+    paymentHeaderRow: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 8,
+    },
+    paymentIconImage: {
+      height: 20,
+      tintColor: theme.colors.gold,
+      width: 20,
+    },
     paymentTitle: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiFamily,
       fontSize: 18,
-      fontWeight: "900",
+      fontWeight: "700",
       marginTop: 6,
     },
     policyCard: {
@@ -4885,8 +5027,9 @@ const createStyles = (theme: MobileTheme) =>
     },
     primaryButtonText: {
       color: theme.colors.foregroundInverse,
+      fontFamily: mobileTypography.uiFamily,
       fontSize: 17,
-      fontWeight: "900",
+      fontWeight: "700",
     },
     promoBadge: {
       alignItems: "center",
@@ -5037,8 +5180,9 @@ const createStyles = (theme: MobileTheme) =>
     },
     receiptTitle: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.displayFamily,
       fontSize: 24,
-      fontWeight: "900",
+      fontWeight: "800",
       letterSpacing: 0.3,
       marginTop: 4,
     },
@@ -5147,6 +5291,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     rowMeta: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiFamily,
       fontSize: 13,
       flexShrink: 1,
       lineHeight: 19,
@@ -5159,9 +5304,10 @@ const createStyles = (theme: MobileTheme) =>
     },
     rowTitle: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiFamily,
       fontSize: 15,
       flexShrink: 1,
-      fontWeight: "900",
+      fontWeight: "700",
       lineHeight: 20,
     },
     rtlText: {
@@ -5207,6 +5353,11 @@ const createStyles = (theme: MobileTheme) =>
       fontSize: 18,
       fontWeight: "900",
     },
+    selectedServiceIconImage: {
+      height: 24,
+      tintColor: theme.colors.foregroundInverse,
+      width: 24,
+    },
     selectedServiceMeta: {
       color: theme.colors.mutedForeground,
       fontSize: 12,
@@ -5214,8 +5365,9 @@ const createStyles = (theme: MobileTheme) =>
     },
     selectedServiceTitle: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiFamily,
       fontSize: 16,
-      fontWeight: "900",
+      fontWeight: "700",
     },
     serviceCard: {
       backgroundColor: theme.colors.cardElevated,
@@ -5242,15 +5394,17 @@ const createStyles = (theme: MobileTheme) =>
     },
     serviceMeta: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiFamily,
       fontSize: 12,
-      fontWeight: "800",
+      fontWeight: "500",
       lineHeight: 18,
       marginTop: 5,
     },
     serviceName: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiFamily,
       fontSize: 15,
-      fontWeight: "900",
+      fontWeight: "700",
       lineHeight: 21,
     },
     servicePrice: {
@@ -5267,6 +5421,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     screenDescription: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiFamily,
       flexShrink: 1,
       fontSize: 16,
       lineHeight: 24,
@@ -5274,18 +5429,20 @@ const createStyles = (theme: MobileTheme) =>
     },
     screenEyebrow: {
       color: theme.colors.gold,
+      fontFamily: mobileTypography.uiFamily,
       flexShrink: 1,
       fontSize: 12,
-      fontWeight: "900",
+      fontWeight: "700",
       letterSpacing: 0.5,
       lineHeight: 16,
       textTransform: "uppercase",
     },
     screenTitle: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.displayFamily,
       flexShrink: 1,
       fontSize: 28,
-      fontWeight: "900",
+      fontWeight: "800",
       letterSpacing: -0.4,
       lineHeight: 35,
       marginTop: 8,
@@ -5434,8 +5591,9 @@ const createStyles = (theme: MobileTheme) =>
     },
     salonActionLabel: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiFamily,
       fontSize: 13,
-      fontWeight: "900",
+      fontWeight: "600",
       marginTop: 8,
     },
     salonActionTile: {
@@ -5572,16 +5730,18 @@ const createStyles = (theme: MobileTheme) =>
     },
     salonMeta: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiFamily,
       fontSize: 18,
-      fontWeight: "700",
+      fontWeight: "500",
       lineHeight: 25,
       marginTop: 8,
     },
     salonName: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.displayFamily,
       flexShrink: 1,
-      fontSize: 42,
-      fontWeight: "900",
+      fontSize: 40,
+      fontWeight: "800",
       letterSpacing: -0.8,
       lineHeight: 50,
     },
@@ -5893,8 +6053,9 @@ const createStyles = (theme: MobileTheme) =>
     },
     searchResultsTitle: {
       color: "#101827",
+      fontFamily: mobileTypography.displayFamily,
       fontSize: 28,
-      fontWeight: "900",
+      fontWeight: "800",
       lineHeight: 36,
       marginBottom: 6,
     },
@@ -5957,9 +6118,10 @@ const createStyles = (theme: MobileTheme) =>
     },
     searchPlaceholder: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiFamily,
       flex: 1,
       fontSize: 16,
-      fontWeight: "800",
+      fontWeight: "500",
       lineHeight: 22,
       minWidth: 0,
     },
@@ -6039,8 +6201,9 @@ const createStyles = (theme: MobileTheme) =>
     },
     sectionTitle: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.displayFamily,
       fontSize: 21,
-      fontWeight: "900",
+      fontWeight: "800",
       letterSpacing: -0.2,
     },
     selectText: {
@@ -6113,8 +6276,9 @@ const createStyles = (theme: MobileTheme) =>
     },
     statusBadgeText: {
       color: theme.colors.success,
+      fontFamily: mobileTypography.uiFamily,
       fontSize: 11,
-      fontWeight: "900",
+      fontWeight: "700",
     },
     statusBoard: {
       backgroundColor: theme.colors.cardElevated,
@@ -6354,8 +6518,9 @@ const createStyles = (theme: MobileTheme) =>
     },
     tabLabel: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiFamily,
       fontSize: 10,
-      fontWeight: "800",
+      fontWeight: "700",
       lineHeight: 13,
       maxWidth: 64,
       minWidth: 48,
@@ -6396,6 +6561,7 @@ const createStyles = (theme: MobileTheme) =>
       borderRadius: theme.radii.pill,
       borderWidth: 1,
       flexGrow: 1,
+      gap: 6,
       minWidth: 86,
       paddingHorizontal: 20,
       paddingVertical: 13,
@@ -6409,10 +6575,19 @@ const createStyles = (theme: MobileTheme) =>
       shadowRadius: 12,
       transform: [{ translateY: -1 }],
     },
+    timeSlotIconImage: {
+      height: 16,
+      tintColor: theme.colors.mutedForeground,
+      width: 16,
+    },
+    timeSlotIconImageActive: {
+      tintColor: theme.colors.foregroundInverse,
+    },
     timeSlotText: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiFamily,
       fontSize: 14,
-      fontWeight: "900",
+      fontWeight: "700",
     },
     timeSlotTextActive: {
       color: theme.colors.foregroundInverse,
