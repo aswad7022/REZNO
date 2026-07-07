@@ -154,6 +154,8 @@ Deferred visual debt remains:
 - Placeholder media still needs real imagery.
 - Current state is acceptable for development readiness, not production UI approval.
 
+Later Phase 29A visual polish was reviewed through this development build / dev-client path and is documented in [mobile-phase-29b-visual-polish-checkpoint.md](./mobile-phase-29b-visual-polish-checkpoint.md).
+
 ## Real-device smoke
 
 - BlueStacks / Android emulator development build smoke: **PASSED**.

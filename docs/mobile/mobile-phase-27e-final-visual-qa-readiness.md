@@ -113,6 +113,7 @@ Earlier blocked status is recorded in:
 - PR #59: EAS development build path documented, but no build executed.
 - Phase 28 Android development build attempt is recorded in [mobile-phase-28-android-development-build.md](./mobile-phase-28-android-development-build.md).
 - Phase 28C records Android development build success and BlueStacks / Android emulator development-build smoke, while physical phone smoke remains not run.
+- Phase 29A visual polish checkpoint and production UI debt are recorded in [mobile-phase-29b-visual-polish-checkpoint.md](./mobile-phase-29b-visual-polish-checkpoint.md).
 
 ## Recommended next action
 
