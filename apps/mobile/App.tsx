@@ -171,15 +171,6 @@ const accountActions = [
   { label: "إنشاء حساب", tone: "secondary" },
 ];
 
-const filterChips = [
-  { label: "الأقرب", selected: true },
-  { label: "الأعلى تقييماً", selected: false },
-  { label: "متاح اليوم", selected: true },
-  { label: "السعر", selected: false },
-  { label: "للنساء", selected: false },
-  { label: "للعوائل", selected: false },
-];
-
 const bookingTimeline = [
   { label: "تم اختيار الخدمة", time: "10:24 ص" },
   { label: "تم تثبيت الوقت", time: "10:26 ص" },
@@ -401,6 +392,8 @@ export default function App() {
   const colorScheme = useColorScheme();
   const [locale, setLocale] = useState<MobileLocale>(DEFAULT_LOCALE);
   const [activeTab, setActiveTab] = useState<MobileAppTabId>("customerHome");
+  const [selectedBusiness, setSelectedBusiness] =
+    useState<PremiumBusiness | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(true);
   const [themeMode, setThemeMode] = useState<MobileThemeMode>("dark");
   const [marketplaceState, setMarketplaceState] = useState<MarketplaceState>({
@@ -436,6 +429,8 @@ export default function App() {
   }, []);
 
   const handleTabPress = (tabId: MobileAppTabId) => {
+    setSelectedBusiness(null);
+
     if (tabId === "marketplace" && marketplaceState.status === "idle") {
       loadMarketplace();
     }
@@ -465,37 +460,55 @@ export default function App() {
   return (
     <SafeAreaView style={styles.shell}>
       <StatusBar style={theme.isDark ? "light" : "dark"} />
-      <ScreenHeader
-        isRtl={isRtl}
-        locale={locale}
-        onLocaleChange={setLocale}
-        styles={styles}
-        text={text}
-      />
+      {!selectedBusiness && activeTab !== "marketplace" ? (
+        <ScreenHeader
+          isRtl={isRtl}
+          locale={locale}
+          onLocaleChange={setLocale}
+          styles={styles}
+          text={text}
+        />
+      ) : null}
 
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[
+          styles.content,
+          (selectedBusiness || activeTab === "marketplace") &&
+            styles.immersiveContent,
+        ]}
         showsVerticalScrollIndicator={false}
       >
-        {activeTab === "customerHome" ? (
+        {selectedBusiness ? (
+          <SalonDetailScreen
+            business={selectedBusiness}
+            isRtl={isRtl}
+            onBack={() => setSelectedBusiness(null)}
+            styles={styles}
+          />
+        ) : null}
+
+        {!selectedBusiness && activeTab === "customerHome" ? (
           <CustomerHomeScreen
             isRtl={isRtl}
+            onOpenBusiness={setSelectedBusiness}
             onOpenMarketplace={() => handleTabPress("marketplace")}
             styles={styles}
           />
         ) : null}
 
-        {activeTab === "favorites" ? (
+        {!selectedBusiness && activeTab === "favorites" ? (
           <FavoritesScreen
             isRtl={isRtl}
+            onOpenBusiness={setSelectedBusiness}
             onOpenMarketplace={() => handleTabPress("marketplace")}
             styles={styles}
           />
         ) : null}
 
-        {activeTab === "marketplace" ? (
-          <MarketplaceScreen
+        {!selectedBusiness && activeTab === "marketplace" ? (
+          <SearchMapScreen
             isRtl={isRtl}
+            onOpenBusiness={setSelectedBusiness}
             onRetry={loadMarketplace}
             state={marketplaceState}
             styles={styles}
@@ -503,7 +516,7 @@ export default function App() {
           />
         ) : null}
 
-        {activeTab === "quickBooking" ? (
+        {!selectedBusiness && activeTab === "quickBooking" ? (
           <QuickBookingEntryScreen
             isRtl={isRtl}
             onOpenMarketplace={() => handleTabPress("marketplace")}
@@ -511,19 +524,19 @@ export default function App() {
           />
         ) : null}
 
-        {activeTab === "bookings" ? (
+        {!selectedBusiness && activeTab === "bookings" ? (
           <BookingFlowScreen isRtl={isRtl} styles={styles} />
         ) : null}
 
-        {activeTab === "messages" ? (
+        {!selectedBusiness && activeTab === "messages" ? (
           <MessagesNotificationsPreviewScreen isRtl={isRtl} styles={styles} />
         ) : null}
 
-        {activeTab === "business" ? (
+        {!selectedBusiness && activeTab === "business" ? (
           <BusinessOwnerPreviewScreen isRtl={isRtl} styles={styles} />
         ) : null}
 
-        {activeTab === "account" ? (
+        {!selectedBusiness && activeTab === "account" ? (
           <AccountScreen
             isRtl={isRtl}
             onThemeModeChange={setThemeMode}
@@ -546,10 +559,12 @@ export default function App() {
 
 function CustomerHomeScreen({
   isRtl,
+  onOpenBusiness,
   onOpenMarketplace,
   styles,
 }: {
   isRtl: boolean;
+  onOpenBusiness: (business: PremiumBusiness) => void;
   onOpenMarketplace: () => void;
   styles: MobileStyles;
 }) {
@@ -574,6 +589,7 @@ function CustomerHomeScreen({
             <PremiumBusinessCard
               business={business}
               isRtl={isRtl}
+              onPress={() => onOpenBusiness(business)}
               styles={styles}
             />
           </View>
@@ -586,10 +602,12 @@ function CustomerHomeScreen({
 
 function FavoritesScreen({
   isRtl,
+  onOpenBusiness,
   onOpenMarketplace,
   styles,
 }: {
   isRtl: boolean;
+  onOpenBusiness: (business: PremiumBusiness) => void;
   onOpenMarketplace: () => void;
   styles: MobileStyles;
 }) {
@@ -617,6 +635,7 @@ function FavoritesScreen({
             <PremiumBusinessCard
               business={business}
               isRtl={isRtl}
+              onPress={() => onOpenBusiness(business)}
               styles={styles}
             />
           </View>
@@ -946,14 +965,16 @@ function BusinessMedia({
 function PremiumBusinessCard({
   business,
   isRtl,
+  onPress,
   styles,
 }: {
   business: PremiumBusiness;
   isRtl: boolean;
+  onPress?: () => void;
   styles: MobileStyles;
 }) {
-  return (
-    <View style={styles.businessCard}>
+  const content = (
+    <>
       <View style={styles.businessHero}>
         <BusinessMedia
           badge={business.status}
@@ -984,18 +1005,44 @@ function PremiumBusinessCard({
           <Text style={styles.tagText}>{business.tag}</Text>
         </View>
       </View>
+    </>
+  );
+
+  if (onPress) {
+    return (
+      <Pressable
+        accessibilityHint="يفتح شاشة تفاصيل النشاط المرئية بدون تنفيذ حجز حقيقي."
+        accessibilityLabel={`فتح تفاصيل ${business.name}`}
+        accessibilityRole="button"
+        hitSlop={TOUCH_HIT_SLOP}
+        onPress={onPress}
+        style={({ pressed }) => [
+          styles.businessCard,
+          pressed && styles.businessCardPressed,
+        ]}
+      >
+        {content}
+      </Pressable>
+    );
+  }
+
+  return (
+    <View style={styles.businessCard}>
+      {content}
     </View>
   );
 }
 
-function MarketplaceScreen({
+function SearchMapScreen({
   isRtl,
+  onOpenBusiness,
   onRetry,
   state,
   styles,
   text,
 }: {
   isRtl: boolean;
+  onOpenBusiness: (business: PremiumBusiness) => void;
   onRetry: () => void;
   state: MarketplaceState;
   styles: MobileStyles;
@@ -1003,22 +1050,40 @@ function MarketplaceScreen({
 }) {
   return (
     <>
-      <View style={styles.mapHeaderCard}>
-        <View style={styles.marketplaceModeRow}>
-          <Text style={styles.marketplaceModeActive}>قائمة</Text>
-          <Text style={styles.marketplaceMode}>خريطة</Text>
+      <View style={styles.searchMapScreen}>
+        <View style={styles.searchMapTopRow}>
+          <SearchBar isRtl={isRtl} styles={styles} />
+          <View style={styles.searchMapFilterButton}>
+            <Text style={styles.searchMapFilterIcon}>≡</Text>
+          </View>
         </View>
-        <Text style={[styles.screenEyebrow, isRtl && styles.rtlText]}>
-          سوق REZNO
-        </Text>
-        <Text style={[styles.mapTitle, isRtl && styles.rtlText]}>
-          اكتشف الأعمال والخدمات حسب قربك واهتماماتك
-        </Text>
-        <PremiumFilterChips styles={styles} />
+
+        <View style={styles.searchMapChipRow}>
+          <Text style={styles.searchMapChipActive}>القرب</Text>
+          <Text style={styles.searchMapChip}>الأعلى تقييماً</Text>
+          <Text style={styles.searchMapChip}>جميع الفئات</Text>
+        </View>
+
+        <SearchMapCanvas styles={styles} />
       </View>
-      <SearchDiscoveryPanel isRtl={isRtl} styles={styles} />
-      <RecommendedDiscoverySection isRtl={isRtl} styles={styles} />
-      <MarketplaceStateView
+
+      <View style={styles.searchResultsSheet}>
+        <Text style={[styles.searchResultsTitle, isRtl && styles.rtlText]}>
+          نتائج بالقرب منك
+        </Text>
+        {featuredBusinesses.map((business, index) => (
+          <SearchMapResultCard
+            business={business}
+            index={index}
+            isRtl={isRtl}
+            key={business.id}
+            onPress={() => onOpenBusiness(business)}
+            styles={styles}
+          />
+        ))}
+      </View>
+
+      <SearchMapApiStatus
         isRtl={isRtl}
         onRetry={onRetry}
         state={state}
@@ -1029,77 +1094,97 @@ function MarketplaceScreen({
   );
 }
 
-function PremiumFilterChips({ styles }: { styles: MobileStyles }) {
+function SearchMapCanvas({ styles }: { styles: MobileStyles }) {
   return (
-    <View style={styles.filterChipWrap}>
-      {filterChips.map((chip) => (
-        <Pressable
-          accessibilityHint="فلتر بصري فقط ولا يغير نتائج السوق حالياً."
-          accessibilityLabel={`فلتر ${chip.label}`}
-          accessibilityRole="button"
-          accessibilityState={{ disabled: true, selected: chip.selected }}
-          disabled
-          hitSlop={TOUCH_HIT_SLOP}
-          key={chip.label}
-          style={[
-            styles.filterChipButton,
-            chip.selected && styles.filterChipButtonSelected,
-          ]}
-        >
-          <Text
-            style={[
-              styles.filterChipText,
-              chip.selected && styles.filterChipTextSelected,
-            ]}
-          >
-            {chip.label}
-          </Text>
-        </Pressable>
-      ))}
-    </View>
-  );
-}
-
-function RecommendedDiscoverySection({
-  isRtl,
-  styles,
-}: {
-  isRtl: boolean;
-  styles: MobileStyles;
-}) {
-  return (
-    <View style={styles.recommendedCard}>
-      <SectionHeader
-        action="عرض المزيد"
-        isRtl={isRtl}
-        styles={styles}
-        title="مقترح لك"
-      />
-      <View style={styles.recommendedList}>
-        {featuredBusinesses.slice(0, 2).map((business) => (
-          <View key={business.id} style={styles.recommendedItem}>
-            <View style={styles.recommendedIcon}>
-              <Text style={styles.recommendedIconText}>
-                {business.name.charAt(0)}
-              </Text>
-            </View>
-            <View style={styles.rowCopy}>
-              <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>
-                {business.name}
-              </Text>
-              <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>
-                {business.category} · {business.distance} · ★ {business.rating}
-              </Text>
-            </View>
-            <Text style={styles.tagText}>{business.tag}</Text>
-          </View>
-        ))}
+    <View style={styles.searchMapCanvas}>
+      <View style={[styles.mapRoad, styles.mapRoadOne]} />
+      <View style={[styles.mapRoad, styles.mapRoadTwo]} />
+      <View style={[styles.mapRoad, styles.mapRoadThree]} />
+      <View style={styles.mapPulseOuter}>
+        <View style={styles.mapPulseMiddle}>
+          <View style={styles.mapPulseCore} />
+        </View>
+      </View>
+      <View style={[styles.mapPin, styles.mapPinGreen, styles.mapPinOne]}>
+        <View style={styles.mapPinDot} />
+      </View>
+      <View style={[styles.mapPin, styles.mapPinGold, styles.mapPinTwo]}>
+        <View style={styles.mapPinDot} />
+      </View>
+      <View style={[styles.mapPin, styles.mapPinRose, styles.mapPinThree]}>
+        <View style={styles.mapPinDot} />
+      </View>
+      <View style={[styles.mapPin, styles.mapPinPurple, styles.mapPinFour]}>
+        <View style={styles.mapPinDot} />
+      </View>
+      <View style={[styles.mapBusinessPin, styles.mapBusinessPinOne]}>
+        <BusinessMedia badge="متاح" styles={styles} />
+      </View>
+      <View style={[styles.mapBusinessPin, styles.mapBusinessPinTwo]}>
+        <BusinessMedia badge="قريب" styles={styles} />
+      </View>
+      <View style={[styles.mapBusinessPin, styles.mapBusinessPinThree]}>
+        <BusinessMedia badge="VIP" styles={styles} />
       </View>
     </View>
   );
 }
 
-function MarketplaceStateView({
+function SearchMapResultCard({
+  business,
+  index,
+  isRtl,
+  onPress,
+  styles,
+}: {
+  business: PremiumBusiness;
+  index: number;
+  isRtl: boolean;
+  onPress: () => void;
+  styles: MobileStyles;
+}) {
+  return (
+    <Pressable
+      accessibilityHint="يفتح شاشة تفاصيل النشاط المرئية بدون تنفيذ إجراء حقيقي."
+      accessibilityLabel={`فتح تفاصيل ${business.name}`}
+      accessibilityRole="button"
+      hitSlop={TOUCH_HIT_SLOP}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.searchResultCard,
+        pressed && styles.searchResultCardPressed,
+      ]}
+    >
+      <View style={styles.searchResultMedia}>
+        <BusinessMedia badge={business.tag} styles={styles} />
+      </View>
+      <View style={styles.searchResultCopy}>
+        <Text style={[styles.searchResultName, isRtl && styles.rtlText]}>
+          {business.name}
+        </Text>
+        <Text style={[styles.searchResultMeta, isRtl && styles.rtlText]}>
+          {business.category} · {business.status}
+        </Text>
+        <View style={styles.searchResultStats}>
+          <Text style={styles.searchResultRating}>★ {business.rating}</Text>
+          <Text style={styles.searchResultReviews}>
+            ({business.reviewCount.replace(" تقييم", "")})
+          </Text>
+        </View>
+        <Text style={styles.searchResultPrice}>{business.price}</Text>
+      </View>
+      <View style={styles.searchResultActions}>
+        <Text style={styles.searchResultHeart}>♡</Text>
+        <Text style={styles.searchResultShare}>⌯</Text>
+        <Text style={styles.searchResultDistance}>
+          {index === 0 ? "0.6 كم" : business.distance}
+        </Text>
+      </View>
+    </Pressable>
+  );
+}
+
+function SearchMapApiStatus({
   isRtl,
   onRetry,
   state,
@@ -1112,19 +1197,6 @@ function MarketplaceStateView({
   styles: MobileStyles;
   text: (typeof labels)[MobileLocale];
 }) {
-  if (state.status === "idle" || state.status === "loading") {
-    return (
-      <PremiumStateCard
-        body="نجهز قائمة الأعمال القريبة مع الحفاظ على نفس مسار API الحالي."
-        icon="⌁"
-        isRtl={isRtl}
-        label={text.tabs.marketplace}
-        styles={styles}
-        title={text.marketplaceLoading}
-      />
-    );
-  }
-
   if (state.status === "error") {
     return (
       <PremiumStateCard
@@ -1135,79 +1207,202 @@ function MarketplaceStateView({
         label={text.marketplaceErrorTitle}
         onPress={onRetry}
         styles={styles}
-        title="تعذر تحميل السوق"
+        title="تعذر تحميل السوق الحقيقي"
         tone="warning"
       />
     );
   }
 
-  if (state.businesses.length === 0) {
+  if (state.status === "loaded") {
     return (
-      <PremiumStateCard
-        body={text.marketplaceEmptyBody}
-        icon="◇"
-        isRtl={isRtl}
-        label={text.tabs.marketplace}
-        styles={styles}
-        title={text.marketplaceEmptyTitle}
-      />
+      <View style={styles.searchMapBoundaryCard}>
+        <Text style={[styles.boundaryPill, isRtl && styles.rtlText]}>
+          بيانات السوق
+        </Text>
+        <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>
+          تم الحفاظ على مسار السوق الحالي
+        </Text>
+        <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>
+          {state.businesses.length} نشاط من API متاح بدون تغيير منطق الجلب.
+        </Text>
+      </View>
     );
   }
 
+  return null;
+}
+
+function SalonDetailScreen({
+  business,
+  isRtl,
+  onBack,
+  styles,
+}: {
+  business: PremiumBusiness;
+  isRtl: boolean;
+  onBack: () => void;
+  styles: MobileStyles;
+}) {
   return (
-    <View style={styles.businessList}>
-      {state.businesses.map((business) => (
-        <View key={business.id} style={styles.businessCard}>
-          <View style={styles.businessHeroCompact}>
-            <BusinessMedia
-              badge={business.serviceCount > 0 ? "حجز متاح" : "قيد الإعداد"}
-              styles={styles}
-            />
-          </View>
-          <View style={styles.businessBody}>
-            <View style={styles.businessTitleRow}>
-              <View style={styles.businessCopy}>
-                <Text style={[styles.businessName, isRtl && styles.rtlText]}>
-                  {business.name}
-                </Text>
-                <Text style={[styles.businessMeta, isRtl && styles.rtlText]}>
-                  {[
-                    business.categoryName,
-                    business.city,
-                    business.branch.locationLabel,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </Text>
-              </View>
-              <View style={styles.ratingPill}>
-                <Text style={styles.ratingText}>
-                  ★ {business.averageRating?.toFixed(1) ?? "-"}
-                </Text>
-              </View>
-            </View>
-            <View style={styles.businessMetricsRow}>
-              <Text style={styles.businessMetric}>
-                {business.reviewCount} {text.marketplaceReviews}
-              </Text>
-              <Text style={styles.businessMetric}>
-                {business.serviceCount} {text.marketplaceServices}
-              </Text>
-            </View>
-            <View style={styles.businessFooter}>
-              <Text style={styles.priceText}>
-                {business.startingPrice
-                  ? `${text.marketplaceStartingFrom} ${business.startingPrice}`
-                  : text.marketplaceEmptyTitle}
-              </Text>
-              <Text style={styles.tagText}>
-                {business.branch.locationLabel ?? "قريب منك"}
-              </Text>
-            </View>
-          </View>
+    <>
+      <View style={styles.salonHero}>
+        <View style={styles.salonHeroPattern}>
+          <View style={styles.salonHeroLineTall} />
+          <View style={styles.salonHeroLine} />
+          <View style={styles.salonHeroLineTall} />
+          <View style={styles.salonHeroLine} />
         </View>
-      ))}
-    </View>
+        <Pressable
+          accessibilityHint="يعود إلى الشاشة السابقة."
+          accessibilityLabel="رجوع"
+          accessibilityRole="button"
+          hitSlop={TOUCH_HIT_SLOP}
+          onPress={onBack}
+          style={({ pressed }) => [
+            styles.salonBackButton,
+            pressed && styles.iconButtonPressed,
+          ]}
+        >
+          <Text style={styles.salonBackIcon}>‹</Text>
+        </Pressable>
+        <View style={styles.salonHeroActions}>
+          <VisualIconButton label="مفضلة" styles={styles} symbol="♡" />
+          <VisualIconButton label="مشاركة" styles={styles} symbol="⌯" />
+        </View>
+        <View style={styles.salonHeroStage}>
+          <BusinessMedia badge={business.status} styles={styles} />
+        </View>
+      </View>
+
+      <View style={styles.salonInfoCard}>
+        <View style={styles.salonTitleRow}>
+          <View style={styles.rowCopy}>
+            <View style={styles.salonVerifiedRow}>
+              <Text style={[styles.salonName, isRtl && styles.rtlText]}>
+                {business.name}
+              </Text>
+              <Text style={styles.verifiedBadge}>✓</Text>
+            </View>
+            <Text style={[styles.salonMeta, isRtl && styles.rtlText]}>
+              اسطنبول · {business.category} · {business.distance}
+            </Text>
+          </View>
+          <Text style={styles.salonLikes}>❤ 128</Text>
+        </View>
+        <View style={styles.salonRatingRow}>
+          <Text style={styles.salonRatingStar}>★</Text>
+          <Text style={styles.salonRatingText}>
+            {business.rating} ({business.reviewCount.replace(" تقييم", "")})
+          </Text>
+        </View>
+
+        <View style={styles.salonActionGrid}>
+          <VisualActionTile label="اتصال" styles={styles} symbol="☎" />
+          <VisualActionTile label="مشاركة" styles={styles} symbol="⌯" />
+          <VisualActionTile label="الموقع" styles={styles} symbol="⌖" />
+          <VisualActionTile label="واتساب" styles={styles} symbol="✓" />
+        </View>
+
+        <View style={styles.salonTabs}>
+          {["نبذة", "التقييمات", "العروض", "الصور", "الخدمات"].map(
+            (tab, index) => (
+              <Text
+                key={tab}
+                style={[
+                  styles.salonTabText,
+                  index === 4 && styles.salonTabTextActive,
+                ]}
+              >
+                {tab}
+              </Text>
+            ),
+          )}
+        </View>
+      </View>
+
+      <View style={styles.salonServicesList}>
+        {services.map((service, index) => (
+          <View key={service.name} style={styles.salonServiceRow}>
+            <View style={styles.salonServiceMedia}>
+              <BusinessMedia
+                badge={index === 0 ? "رائج" : service.tag}
+                styles={styles}
+              />
+            </View>
+            <View style={styles.rowCopy}>
+              <Text style={[styles.salonServiceName, isRtl && styles.rtlText]}>
+                {index === 0 ? "قص شعر" : service.name}
+              </Text>
+              <Text style={[styles.salonServiceMeta, isRtl && styles.rtlText]}>
+                {service.duration}
+              </Text>
+              <Text style={styles.salonServicePrice}>
+                {index === 0 ? "250 TL" : service.price}
+              </Text>
+            </View>
+            <View style={styles.salonServiceAdd}>
+              <Text style={styles.salonServiceAddText}>+</Text>
+            </View>
+          </View>
+        ))}
+      </View>
+
+      <View style={styles.salonBottomCta}>
+        <PrimaryButton label="احجز الآن" styles={styles} />
+        <View style={styles.salonCtaArrow}>
+          <Text style={styles.salonCtaArrowText}>‹</Text>
+        </View>
+      </View>
+    </>
+  );
+}
+
+function VisualIconButton({
+  label,
+  styles,
+  symbol,
+}: {
+  label: string;
+  styles: MobileStyles;
+  symbol: string;
+}) {
+  return (
+    <Pressable
+      accessibilityHint="زر بصري فقط ولا ينفذ إجراء حقيقياً."
+      accessibilityLabel={label}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: true }}
+      disabled
+      hitSlop={TOUCH_HIT_SLOP}
+      style={styles.salonRoundButton}
+    >
+      <Text style={styles.salonRoundButtonText}>{symbol}</Text>
+    </Pressable>
+  );
+}
+
+function VisualActionTile({
+  label,
+  styles,
+  symbol,
+}: {
+  label: string;
+  styles: MobileStyles;
+  symbol: string;
+}) {
+  return (
+    <Pressable
+      accessibilityHint="إجراء بصري فقط في هذه المعاينة."
+      accessibilityLabel={label}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: true }}
+      disabled
+      hitSlop={TOUCH_HIT_SLOP}
+      style={styles.salonActionTile}
+    >
+      <Text style={styles.salonActionIcon}>{symbol}</Text>
+      <Text style={styles.salonActionLabel}>{label}</Text>
+    </Pressable>
   );
 }
 
@@ -2533,6 +2728,10 @@ const createStyles = (theme: MobileTheme) =>
         radius: 32,
       }),
     },
+    businessCardPressed: {
+      opacity: 0.92,
+      transform: [{ translateY: 1 }, { scale: 0.99 }],
+    },
     businessCopy: {
       flex: 1,
       flexShrink: 1,
@@ -2957,6 +3156,10 @@ const createStyles = (theme: MobileTheme) =>
       gap: 20,
       paddingBottom: 128,
       paddingHorizontal: 20,
+    },
+    immersiveContent: {
+      paddingHorizontal: 0,
+      paddingTop: 0,
     },
     dataOwnershipNote: {
       color: theme.colors.success,
@@ -4866,6 +5069,574 @@ const createStyles = (theme: MobileTheme) =>
       lineHeight: 35,
       marginTop: 8,
     },
+    iconButtonPressed: {
+      opacity: 0.86,
+      transform: [{ translateY: 1 }, { scale: 0.97 }],
+    },
+    mapBusinessPin: {
+      backgroundColor: "#07090d",
+      borderColor: "#ffffff",
+      borderRadius: 45,
+      borderWidth: 6,
+      height: 90,
+      overflow: "hidden",
+      position: "absolute",
+      width: 90,
+      ...createMobileShadow(theme, {
+        darkOpacity: 0.25,
+        height: 8,
+        lightOpacity: 0.08,
+        radius: 18,
+      }),
+    },
+    mapBusinessPinOne: {
+      left: "28%",
+      top: "16%",
+    },
+    mapBusinessPinTwo: {
+      right: "27%",
+      top: "33%",
+    },
+    mapBusinessPinThree: {
+      bottom: "8%",
+      right: "22%",
+    },
+    mapPin: {
+      alignItems: "center",
+      backgroundColor: theme.colors.gold,
+      borderColor: "#ffffff",
+      borderRadius: 25,
+      borderWidth: 6,
+      height: 50,
+      justifyContent: "center",
+      position: "absolute",
+      width: 50,
+    },
+    mapPinDot: {
+      backgroundColor: "#ffffff",
+      borderRadius: 8,
+      height: 16,
+      width: 16,
+    },
+    mapPinFour: {
+      right: "10%",
+      top: "22%",
+    },
+    mapPinGold: {
+      backgroundColor: "#f59e0b",
+    },
+    mapPinGreen: {
+      backgroundColor: "#10b981",
+    },
+    mapPinOne: {
+      left: "8%",
+      top: "40%",
+    },
+    mapPinPurple: {
+      backgroundColor: "#7c3aed",
+    },
+    mapPinRose: {
+      backgroundColor: "#ec4899",
+    },
+    mapPinThree: {
+      bottom: "18%",
+      right: "8%",
+    },
+    mapPinTwo: {
+      bottom: "30%",
+      left: "22%",
+    },
+    mapPulseCore: {
+      backgroundColor: "#1473f9",
+      borderRadius: 22,
+      height: 44,
+      width: 44,
+    },
+    mapPulseMiddle: {
+      alignItems: "center",
+      backgroundColor: "rgba(20, 115, 249, 0.46)",
+      borderRadius: 76,
+      height: 104,
+      justifyContent: "center",
+      width: 104,
+    },
+    mapPulseOuter: {
+      alignItems: "center",
+      backgroundColor: "rgba(20, 115, 249, 0.24)",
+      borderRadius: 88,
+      height: 150,
+      justifyContent: "center",
+      left: "43%",
+      marginLeft: -75,
+      marginTop: -75,
+      position: "absolute",
+      top: "57%",
+      width: 150,
+    },
+    mapRoad: {
+      backgroundColor: "rgba(119, 151, 166, 0.42)",
+      borderRadius: 999,
+      height: 5,
+      left: -50,
+      position: "absolute",
+      width: "125%",
+    },
+    mapRoadOne: {
+      top: 46,
+      transform: [{ rotate: "-25deg" }],
+    },
+    mapRoadThree: {
+      bottom: 62,
+      transform: [{ rotate: "16deg" }],
+    },
+    mapRoadTwo: {
+      top: 142,
+      transform: [{ rotate: "25deg" }],
+    },
+    salonActionGrid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 14,
+      justifyContent: "space-between",
+      marginTop: 28,
+    },
+    salonActionIcon: {
+      color: theme.colors.foreground,
+      fontSize: 26,
+      fontWeight: "900",
+      lineHeight: 30,
+    },
+    salonActionLabel: {
+      color: theme.colors.mutedForeground,
+      fontSize: 13,
+      fontWeight: "900",
+      marginTop: 8,
+    },
+    salonActionTile: {
+      alignItems: "center",
+      backgroundColor: theme.colors.cardElevated,
+      borderColor: theme.colors.border,
+      borderRadius: 26,
+      borderWidth: 1,
+      flexBasis: "22%",
+      flexGrow: 1,
+      justifyContent: "center",
+      minHeight: 92,
+      padding: 12,
+    },
+    salonBackButton: {
+      alignItems: "center",
+      backgroundColor: theme.colors.cardElevated,
+      borderColor: theme.colors.border,
+      borderRadius: 28,
+      borderWidth: 1,
+      height: 58,
+      justifyContent: "center",
+      left: 30,
+      position: "absolute",
+      top: 34,
+      width: 58,
+      zIndex: 2,
+    },
+    salonBackIcon: {
+      color: theme.colors.foreground,
+      fontSize: 43,
+      fontWeight: "700",
+      lineHeight: 45,
+      marginTop: -4,
+    },
+    salonBottomCta: {
+      alignItems: "center",
+      backgroundColor: theme.colors.gold,
+      borderRadius: 999,
+      flexDirection: "row",
+      gap: 12,
+      marginHorizontal: 28,
+      marginTop: 6,
+      padding: 10,
+      paddingLeft: 18,
+      shadowColor: theme.colors.deepGold,
+      shadowOffset: { height: 16, width: 0 },
+      shadowOpacity: theme.isDark ? 0.28 : 0.12,
+      shadowRadius: 24,
+    },
+    salonCtaArrow: {
+      alignItems: "center",
+      backgroundColor: "rgba(255, 255, 255, 0.7)",
+      borderRadius: 25,
+      height: 50,
+      justifyContent: "center",
+      width: 50,
+    },
+    salonCtaArrowText: {
+      color: theme.colors.foregroundInverse,
+      fontSize: 34,
+      fontWeight: "900",
+      lineHeight: 36,
+      marginTop: -5,
+    },
+    salonHero: {
+      backgroundColor: "#05080c",
+      height: 330,
+      marginHorizontal: -20,
+      overflow: "hidden",
+      position: "relative",
+    },
+    salonHeroActions: {
+      flexDirection: "row",
+      gap: 14,
+      position: "absolute",
+      right: 30,
+      top: 34,
+      zIndex: 2,
+    },
+    salonHeroLine: {
+      backgroundColor: "rgba(255, 193, 58, 0.32)",
+      borderRadius: 999,
+      height: 82,
+      width: 4,
+    },
+    salonHeroLineTall: {
+      backgroundColor: "rgba(255, 193, 58, 0.22)",
+      borderRadius: 999,
+      height: 210,
+      width: 5,
+    },
+    salonHeroPattern: {
+      alignItems: "flex-start",
+      flexDirection: "row",
+      gap: 70,
+      justifyContent: "center",
+      left: 0,
+      opacity: 0.9,
+      position: "absolute",
+      right: 0,
+      top: 0,
+    },
+    salonHeroStage: {
+      backgroundColor: "rgba(91, 48, 29, 0.42)",
+      bottom: 0,
+      height: 130,
+      left: 0,
+      overflow: "hidden",
+      position: "absolute",
+      right: 0,
+    },
+    salonInfoCard: {
+      backgroundColor: theme.colors.background,
+      gap: 0,
+      paddingHorizontal: 28,
+      paddingTop: 22,
+    },
+    salonLikes: {
+      borderColor: theme.colors.gold,
+      borderRadius: theme.radii.pill,
+      borderWidth: 1,
+      color: theme.colors.gold,
+      fontSize: 16,
+      fontWeight: "900",
+      overflow: "hidden",
+      paddingHorizontal: 18,
+      paddingVertical: 10,
+    },
+    salonMeta: {
+      color: theme.colors.mutedForeground,
+      fontSize: 18,
+      fontWeight: "700",
+      lineHeight: 25,
+      marginTop: 8,
+    },
+    salonName: {
+      color: theme.colors.foreground,
+      flexShrink: 1,
+      fontSize: 42,
+      fontWeight: "900",
+      letterSpacing: -0.8,
+      lineHeight: 50,
+    },
+    salonRatingRow: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 12,
+      marginTop: 22,
+    },
+    salonRatingStar: {
+      color: theme.colors.gold,
+      fontSize: 23,
+      fontWeight: "900",
+    },
+    salonRatingText: {
+      color: theme.colors.foreground,
+      fontSize: 20,
+      fontWeight: "800",
+    },
+    salonRoundButton: {
+      alignItems: "center",
+      backgroundColor: theme.colors.cardElevated,
+      borderColor: theme.colors.border,
+      borderRadius: 31,
+      borderWidth: 1,
+      height: 62,
+      justifyContent: "center",
+      width: 62,
+    },
+    salonRoundButtonText: {
+      color: theme.colors.foreground,
+      fontSize: 32,
+      fontWeight: "900",
+      lineHeight: 34,
+    },
+    salonServiceAdd: {
+      alignItems: "center",
+      borderColor: theme.colors.gold,
+      borderRadius: 27,
+      borderWidth: 2,
+      height: 54,
+      justifyContent: "center",
+      width: 54,
+    },
+    salonServiceAddText: {
+      color: theme.colors.gold,
+      fontSize: 30,
+      fontWeight: "900",
+      lineHeight: 32,
+    },
+    salonServiceMedia: {
+      borderRadius: 20,
+      height: 84,
+      overflow: "hidden",
+      width: 130,
+    },
+    salonServiceMeta: {
+      color: theme.colors.mutedForeground,
+      fontSize: 15,
+      fontWeight: "800",
+      lineHeight: 21,
+      marginTop: 10,
+    },
+    salonServiceName: {
+      color: theme.colors.foreground,
+      fontSize: 28,
+      fontWeight: "900",
+      lineHeight: 36,
+    },
+    salonServicePrice: {
+      color: theme.colors.foreground,
+      fontSize: 20,
+      fontWeight: "900",
+      marginTop: 8,
+    },
+    salonServiceRow: {
+      alignItems: "center",
+      flexDirection: "row-reverse",
+      gap: 18,
+      justifyContent: "space-between",
+    },
+    salonServicesList: {
+      gap: 34,
+      paddingHorizontal: 28,
+      paddingTop: 34,
+    },
+    salonTabs: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      marginTop: 34,
+    },
+    salonTabText: {
+      color: theme.colors.mutedForeground,
+      fontSize: 15,
+      fontWeight: "900",
+      paddingBottom: 14,
+    },
+    salonTabTextActive: {
+      borderBottomColor: theme.colors.gold,
+      borderBottomWidth: 5,
+      color: theme.colors.gold,
+    },
+    salonTitleRow: {
+      alignItems: "flex-start",
+      flexDirection: "row",
+      gap: 16,
+      justifyContent: "space-between",
+    },
+    salonVerifiedRow: {
+      alignItems: "center",
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 10,
+      justifyContent: "flex-end",
+    },
+    searchMapBoundaryCard: {
+      backgroundColor: theme.colors.cardElevated,
+      borderColor: theme.colors.goldSoft,
+      borderRadius: theme.radii.card,
+      borderWidth: 1,
+      marginHorizontal: 20,
+      padding: 18,
+    },
+    searchMapCanvas: {
+      backgroundColor: "#dceaf0",
+      borderRadius: 38,
+      height: 430,
+      marginTop: 18,
+      overflow: "hidden",
+      position: "relative",
+    },
+    searchMapChip: {
+      backgroundColor: theme.colors.cardElevated,
+      borderColor: theme.colors.border,
+      borderRadius: theme.radii.pill,
+      borderWidth: 1,
+      color: theme.colors.foreground,
+      flexGrow: 1,
+      fontSize: 15,
+      fontWeight: "900",
+      overflow: "hidden",
+      paddingHorizontal: 18,
+      paddingVertical: 13,
+      textAlign: "center",
+    },
+    searchMapChipActive: {
+      backgroundColor: theme.colors.gold,
+      borderRadius: theme.radii.pill,
+      color: theme.colors.foregroundInverse,
+      flexGrow: 1,
+      fontSize: 16,
+      fontWeight: "900",
+      overflow: "hidden",
+      paddingHorizontal: 24,
+      paddingVertical: 14,
+      textAlign: "center",
+    },
+    searchMapChipRow: {
+      flexDirection: "row-reverse",
+      gap: 12,
+      marginTop: 20,
+    },
+    searchMapFilterButton: {
+      alignItems: "center",
+      backgroundColor: theme.colors.cardElevated,
+      borderColor: theme.colors.border,
+      borderRadius: 34,
+      borderWidth: 1,
+      height: 68,
+      justifyContent: "center",
+      width: 68,
+    },
+    searchMapFilterIcon: {
+      color: theme.colors.foreground,
+      fontSize: 26,
+      fontWeight: "900",
+      lineHeight: 28,
+      transform: [{ rotate: "90deg" }],
+    },
+    searchMapScreen: {
+      backgroundColor: theme.colors.background,
+      paddingHorizontal: 20,
+      paddingTop: 14,
+    },
+    searchMapTopRow: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 12,
+    },
+    searchResultActions: {
+      alignItems: "center",
+      gap: 16,
+      justifyContent: "center",
+      minWidth: 60,
+    },
+    searchResultCard: {
+      alignItems: "center",
+      backgroundColor: "#f4f6f8",
+      borderRadius: 28,
+      flexDirection: "row-reverse",
+      gap: 18,
+      paddingVertical: 12,
+    },
+    searchResultCardPressed: {
+      opacity: 0.9,
+      transform: [{ translateY: 1 }],
+    },
+    searchResultCopy: {
+      flex: 1,
+      minWidth: 0,
+    },
+    searchResultDistance: {
+      color: "#6b7280",
+      fontSize: 15,
+      fontWeight: "800",
+    },
+    searchResultHeart: {
+      color: "#111827",
+      fontSize: 38,
+      fontWeight: "900",
+      lineHeight: 40,
+    },
+    searchResultMedia: {
+      borderRadius: 20,
+      height: 96,
+      overflow: "hidden",
+      width: 128,
+    },
+    searchResultMeta: {
+      color: "#6b7280",
+      fontSize: 16,
+      fontWeight: "700",
+      lineHeight: 22,
+      marginTop: 4,
+    },
+    searchResultName: {
+      color: "#101827",
+      fontSize: 28,
+      fontWeight: "900",
+      letterSpacing: -0.6,
+      lineHeight: 34,
+    },
+    searchResultPrice: {
+      color: "#101827",
+      fontSize: 17,
+      fontWeight: "900",
+      marginTop: 8,
+    },
+    searchResultRating: {
+      color: "#101827",
+      fontSize: 17,
+      fontWeight: "900",
+    },
+    searchResultReviews: {
+      color: "#101827",
+      fontSize: 17,
+      fontWeight: "800",
+    },
+    searchResultShare: {
+      color: "#6b7280",
+      fontSize: 28,
+      fontWeight: "900",
+      lineHeight: 30,
+    },
+    searchResultStats: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 8,
+      marginTop: 10,
+    },
+    searchResultsSheet: {
+      backgroundColor: "#f4f6f8",
+      borderTopLeftRadius: 42,
+      borderTopRightRadius: 42,
+      gap: 14,
+      marginTop: -42,
+      padding: 26,
+      paddingTop: 42,
+    },
+    searchResultsTitle: {
+      color: "#101827",
+      fontSize: 28,
+      fontWeight: "900",
+      lineHeight: 36,
+      marginBottom: 6,
+    },
     searchActionButton: {
       alignItems: "center",
       backgroundColor: theme.colors.cardElevated,
@@ -5323,6 +6094,16 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.success,
       fontSize: 12,
       fontWeight: "900",
+    },
+    verifiedBadge: {
+      backgroundColor: "#3b82f6",
+      borderRadius: 16,
+      color: "#ffffff",
+      fontSize: 16,
+      fontWeight: "900",
+      overflow: "hidden",
+      paddingHorizontal: 7,
+      paddingVertical: 3,
     },
     timeGrid: {
       flexDirection: "row",
