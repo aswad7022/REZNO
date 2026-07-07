@@ -2856,8 +2856,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     accountActionText: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 13,
-      fontWeight: "900",
       lineHeight: 18,
       textAlign: "center",
     },
@@ -2875,8 +2875,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     accountAvatarText: {
       color: theme.colors.foregroundInverse,
+      fontFamily: mobileTypography.uiBold,
       fontSize: 24,
-      fontWeight: "900",
     },
     accountHeroCard: {
       backgroundColor: theme.colors.hero,
@@ -2922,8 +2922,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     apiText: {
       color: theme.colors.warning,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 12,
-      fontWeight: "800",
       marginTop: 12,
     },
     avatar: {
@@ -2936,8 +2936,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     avatarText: {
       color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiBold,
       fontSize: 18,
-      fontWeight: "900",
     },
     bookingActions: {
       flexDirection: "row",
@@ -3118,8 +3118,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     businessInitialText: {
       color: theme.colors.foregroundInverse,
+      fontFamily: mobileTypography.uiBold,
       fontSize: 19,
-      fontWeight: "900",
     },
     businessList: {
       gap: 18,
@@ -3138,8 +3138,8 @@ const createStyles = (theme: MobileTheme) =>
       borderWidth: 1,
       borderRadius: theme.radii.pill,
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 10,
-      fontWeight: "800",
       overflow: "hidden",
       paddingHorizontal: 8,
       paddingVertical: 5,
@@ -3170,8 +3170,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     businessStatusText: {
       color: theme.colors.success,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 9,
-      fontWeight: "900",
     },
     businessTitleRow: {
       alignItems: "flex-start",
@@ -3184,8 +3184,8 @@ const createStyles = (theme: MobileTheme) =>
       backgroundColor: theme.colors.goldSoft,
       borderRadius: theme.radii.pill,
       color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 11,
-      fontWeight: "900",
       overflow: "hidden",
       paddingHorizontal: 10,
       paddingVertical: 6,
@@ -3207,13 +3207,13 @@ const createStyles = (theme: MobileTheme) =>
     },
     boundaryIconText: {
       color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiBold,
       fontSize: 22,
-      fontWeight: "900",
     },
     cancelAction: {
       color: theme.colors.danger,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 13,
-      fontWeight: "900",
     },
     cardShadow: {
       shadowColor: theme.colors.shadow,
@@ -3223,22 +3223,22 @@ const createStyles = (theme: MobileTheme) =>
     },
     cardBody: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 14,
-      fontWeight: "700",
       lineHeight: 22,
       marginTop: 8,
     },
     cardTitle: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 17,
-      fontWeight: "900",
     },
     categoryBadge: {
       backgroundColor: theme.colors.goldSoft,
       borderRadius: theme.radii.pill,
       color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 10,
-      fontWeight: "900",
       overflow: "hidden",
       paddingHorizontal: 8,
       paddingVertical: 5,
@@ -3295,8 +3295,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     categoryIcon: {
       color: "#ffffff",
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 24,
-      fontWeight: "900",
       lineHeight: 28,
     },
     categoryIconImage: {
@@ -3466,8 +3466,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     categoryRailIcon: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 19,
-      fontWeight: "900",
       lineHeight: 22,
     },
     categoryRailIconImage: {
@@ -3534,6 +3534,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     centerTabIcon: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 28,
       lineHeight: 30,
     },
@@ -3550,6 +3551,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     confirmationBody: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 14,
       lineHeight: 22,
       marginTop: 10,
@@ -3576,8 +3578,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     confirmationIcon: {
       color: theme.colors.foregroundInverse,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 28,
-      fontWeight: "900",
     },
     confirmationIconImage: {
       height: 30,
@@ -3602,7 +3604,6 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.foreground,
       fontFamily: mobileTypography.kufiBold,
       fontSize: 21,
-      fontWeight: "800",
       lineHeight: 27,
       marginTop: 12,
       textAlign: "center",
@@ -3618,8 +3619,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     dataOwnershipNote: {
       color: theme.colors.success,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 12,
-      fontWeight: "800",
       lineHeight: 19,
     },
     disabledButton: {
@@ -3634,16 +3635,16 @@ const createStyles = (theme: MobileTheme) =>
     },
     dateDay: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 12,
-      fontWeight: "900",
     },
     dateDayActive: {
       color: theme.colors.foregroundInverse,
     },
     dateLabel: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 24,
-      fontWeight: "900",
       marginTop: 2,
     },
     dateLabelActive: {
@@ -3651,8 +3652,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     dateMeta: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 11,
-      fontWeight: "800",
       marginTop: 3,
     },
     dateMetaActive: {
@@ -3726,6 +3727,7 @@ const createStyles = (theme: MobileTheme) =>
     detailMeta: {
       color: theme.colors.mutedForeground,
       flexShrink: 1,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 14,
       lineHeight: 21,
       marginTop: 7,
@@ -3750,28 +3752,29 @@ const createStyles = (theme: MobileTheme) =>
     detailServiceMeta: {
       color: theme.colors.mutedForeground,
       flexShrink: 1,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 12,
       lineHeight: 18,
       marginTop: 4,
     },
     detailServicePrice: {
       color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 13,
-      fontWeight: "900",
     },
     detailServiceTitle: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 15,
       flexShrink: 1,
-      fontWeight: "900",
       lineHeight: 20,
     },
     detailStat: {
       backgroundColor: theme.colors.cardElevated,
       borderRadius: theme.radii.pill,
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 12,
-      fontWeight: "900",
       overflow: "hidden",
       paddingHorizontal: 10,
       paddingVertical: 7,
@@ -3797,8 +3800,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     detailTabText: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 12,
-      fontWeight: "900",
     },
     detailTabTextActive: {
       color: theme.colors.foregroundInverse,
@@ -3813,8 +3816,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     detailTitle: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.kufiBold,
       fontSize: 26,
-      fontWeight: "900",
       lineHeight: 32,
       marginTop: 42,
     },
@@ -3862,21 +3865,21 @@ const createStyles = (theme: MobileTheme) =>
     },
     discoveryLocationText: {
       color: theme.colors.foregroundInverse,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 18,
-      fontWeight: "900",
     },
     discoveryTitle: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.kufiBold,
       fontSize: 25,
-      fontWeight: "900",
       letterSpacing: -0.4,
       lineHeight: 32,
       marginTop: 7,
     },
     editAction: {
       color: theme.colors.gold,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 13,
-      fontWeight: "900",
     },
     favoriteButton: {
       alignItems: "center",
@@ -3893,8 +3896,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     favoriteText: {
       color: theme.colors.gold,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 20,
-      fontWeight: "900",
     },
     favoriteIconImage: {
       height: 22,
@@ -3927,8 +3930,8 @@ const createStyles = (theme: MobileTheme) =>
       borderRadius: theme.radii.pill,
       borderWidth: 1,
       color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 12,
-      fontWeight: "900",
       overflow: "hidden",
       paddingHorizontal: 12,
       paddingVertical: 7,
@@ -3959,8 +3962,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     filterChipText: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 12,
-      fontWeight: "900",
       textAlign: "center",
     },
     filterChipTextSelected: {
@@ -3974,8 +3977,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     filterText: {
       color: theme.colors.foregroundInverse,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 15,
-      fontWeight: "900",
     },
     filterIconImage: {
       height: 18,
@@ -3995,8 +3998,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     ghostButtonText: {
       color: theme.colors.gold,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 14,
-      fontWeight: "900",
     },
     header: {
       alignItems: "center",
@@ -4021,8 +4024,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     iconActionText: {
       color: theme.colors.gold,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 17,
-      fontWeight: "900",
     },
     heroActions: {
       gap: 12,
@@ -4071,6 +4074,7 @@ const createStyles = (theme: MobileTheme) =>
     integrationBody: {
       color: theme.colors.warning,
       flexShrink: 1,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 14,
       lineHeight: 21,
       marginTop: 8,
@@ -4088,8 +4092,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     integrationTitle: {
       color: theme.colors.warning,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 16,
-      fontWeight: "900",
       lineHeight: 22,
     },
     localeButton: {
@@ -4117,8 +4121,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     localeButtonText: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 8,
-      fontWeight: "800",
       lineHeight: 11,
     },
     localeButtonTextActive: {
@@ -4132,6 +4136,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     locationDot: {
       color: theme.colors.success,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 10,
     },
     locationIconImage: {
@@ -4153,8 +4158,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     locationText: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 12,
-      fontWeight: "900",
     },
     logoMark: {
       alignItems: "center",
@@ -4172,8 +4177,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     logoText: {
       color: theme.colors.foregroundInverse,
+      fontFamily: mobileTypography.uiBold,
       fontSize: 18,
-      fontWeight: "900",
     },
     mapHeaderCard: {
       backgroundColor: theme.colors.hero,
@@ -4189,8 +4194,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     mapTitle: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.kufiBold,
       fontSize: 22,
-      fontWeight: "900",
       lineHeight: 29,
       marginTop: 8,
     },
@@ -4210,8 +4215,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     chatBubbleText: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 14,
-      fontWeight: "800",
       lineHeight: 21,
     },
     chatBubbleTextCustomer: {
@@ -4219,8 +4224,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     chatBubbleTime: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 10,
-      fontWeight: "800",
       marginTop: 6,
     },
     chatBubbleTimeCustomer: {
@@ -4242,8 +4247,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     chatTitle: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.kufiBold,
       fontSize: 20,
-      fontWeight: "900",
       marginTop: 4,
     },
     conversationAvatar: {
@@ -4256,8 +4261,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     conversationAvatarText: {
       color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiBold,
       fontSize: 16,
-      fontWeight: "900",
     },
     conversationPanel: {
       backgroundColor: theme.colors.card,
@@ -4279,8 +4284,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     conversationStatus: {
       color: theme.colors.gold,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 11,
-      fontWeight: "900",
       lineHeight: 15,
       marginTop: 6,
     },
@@ -4290,8 +4295,8 @@ const createStyles = (theme: MobileTheme) =>
       borderWidth: 1,
       borderRadius: theme.radii.pill,
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 12,
-      fontWeight: "900",
       overflow: "hidden",
       paddingHorizontal: 12,
       paddingVertical: 7,
@@ -4302,8 +4307,8 @@ const createStyles = (theme: MobileTheme) =>
       borderWidth: 1,
       borderRadius: theme.radii.pill,
       color: theme.colors.foregroundInverse,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 12,
-      fontWeight: "900",
       overflow: "hidden",
       paddingHorizontal: 12,
       paddingVertical: 7,
@@ -4353,8 +4358,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     messageHeroIconText: {
       color: theme.colors.foregroundInverse,
+      fontFamily: mobileTypography.uiBold,
       fontSize: 22,
-      fontWeight: "900",
     },
     messageHeroIconImage: {
       height: 24,
@@ -4365,7 +4370,6 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.foreground,
       fontFamily: mobileTypography.kufiBold,
       fontSize: 27,
-      fontWeight: "800",
       lineHeight: 34,
       marginTop: 20,
     },
@@ -4378,8 +4382,8 @@ const createStyles = (theme: MobileTheme) =>
       backgroundColor: theme.colors.muted,
       borderRadius: theme.radii.pill,
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 12,
-      fontWeight: "900",
       overflow: "hidden",
       paddingHorizontal: 10,
       paddingVertical: 7,
@@ -4396,8 +4400,8 @@ const createStyles = (theme: MobileTheme) =>
       borderRadius: theme.radii.pill,
       borderWidth: 1,
       color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 12,
-      fontWeight: "900",
       overflow: "hidden",
       paddingHorizontal: 10,
       paddingVertical: 7,
@@ -4415,19 +4419,20 @@ const createStyles = (theme: MobileTheme) =>
     },
     myBookingMeta: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 14,
       lineHeight: 21,
       marginTop: 8,
     },
     myBookingStatus: {
       color: theme.colors.success,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 12,
-      fontWeight: "900",
     },
     myBookingTitle: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 19,
-      fontWeight: "900",
       lineHeight: 25,
       marginTop: 8,
     },
@@ -4459,8 +4464,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     notificationIconText: {
       color: theme.colors.foregroundInverse,
+      fontFamily: mobileTypography.uiBold,
       fontSize: 16,
-      fontWeight: "900",
     },
     notificationIconImage: {
       height: 20,
@@ -4482,8 +4487,8 @@ const createStyles = (theme: MobileTheme) =>
       borderRadius: theme.radii.pill,
       borderWidth: 1,
       color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 11,
-      fontWeight: "900",
       lineHeight: 15,
       marginTop: 8,
       overflow: "hidden",
@@ -4492,8 +4497,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     notificationTime: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 11,
-      fontWeight: "800",
     },
     notificationTitleRow: {
       alignItems: "flex-start",
@@ -4520,16 +4525,16 @@ const createStyles = (theme: MobileTheme) =>
     },
     onboardingBody: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 26,
-      fontWeight: "800",
       lineHeight: 40,
       marginTop: 28,
       textAlign: "center",
     },
     onboardingBrand: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.kufiBold,
       fontSize: 44,
-      fontWeight: "900",
       letterSpacing: 2,
       marginTop: 24,
       textAlign: "center",
@@ -4563,8 +4568,8 @@ const createStyles = (theme: MobileTheme) =>
       borderRadius: theme.radii.pill,
       borderWidth: 1,
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 11,
-      fontWeight: "900",
       overflow: "hidden",
       paddingHorizontal: 11,
       paddingVertical: 7,
@@ -4587,8 +4592,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     onboardingLogoText: {
       color: theme.colors.gold,
+      fontFamily: mobileTypography.uiBold,
       fontSize: 132,
-      fontWeight: "900",
       lineHeight: 142,
     },
     onboardingSecondary: {
@@ -4603,8 +4608,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     onboardingSecondaryText: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 19,
-      fontWeight: "900",
     },
     onboardingScreen: {
       backgroundColor: theme.colors.hero,
@@ -4613,8 +4618,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     onboardingSlogan: {
       color: theme.colors.gold,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 31,
-      fontWeight: "500",
       lineHeight: 38,
       marginTop: 16,
       textAlign: "center",
@@ -4663,8 +4668,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     onboardingTitle: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.kufiBold,
       fontSize: 30,
-      fontWeight: "900",
       lineHeight: 37,
       marginTop: 24,
     },
@@ -4672,8 +4677,8 @@ const createStyles = (theme: MobileTheme) =>
       backgroundColor: theme.colors.goldSoft,
       borderRadius: theme.radii.pill,
       color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 11,
-      fontWeight: "900",
       overflow: "hidden",
       paddingHorizontal: 9,
       paddingVertical: 6,
@@ -4719,15 +4724,16 @@ const createStyles = (theme: MobileTheme) =>
     ownerBusinessMeta: {
       color: theme.colors.mutedForeground,
       flexShrink: 1,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 13,
       lineHeight: 20,
       marginTop: 4,
     },
     ownerBusinessName: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.kufiBold,
       fontSize: 21,
       flexShrink: 1,
-      fontWeight: "900",
       lineHeight: 27,
       marginTop: 4,
     },
@@ -4741,8 +4747,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     ownerCustomerInitial: {
       color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiBold,
       fontSize: 16,
-      fontWeight: "900",
     },
     ownerHeaderRow: {
       alignItems: "center",
@@ -4751,6 +4757,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     ownerHeroBody: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 14,
       lineHeight: 22,
       marginTop: 16,
@@ -4791,8 +4798,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     ownerInsightsTitle: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.kufiBold,
       fontSize: 20,
-      fontWeight: "900",
       marginTop: 4,
     },
     ownerLogo: {
@@ -4805,8 +4812,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     ownerLogoText: {
       color: theme.colors.foregroundInverse,
+      fontFamily: mobileTypography.uiBold,
       fontSize: 22,
-      fontWeight: "900",
     },
     ownerMetricRow: {
       alignItems: "center",
@@ -4815,13 +4822,13 @@ const createStyles = (theme: MobileTheme) =>
     },
     ownerMetricValue: {
       color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 13,
-      fontWeight: "900",
     },
     ownerMutedActionText: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 11,
-      fontWeight: "900",
     },
     ownerOverviewCard: {
       backgroundColor: theme.colors.cardElevated,
@@ -4838,8 +4845,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     ownerOverviewDetail: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 11,
-      fontWeight: "800",
       marginTop: 6,
     },
     ownerOverviewGrid: {
@@ -4849,14 +4856,14 @@ const createStyles = (theme: MobileTheme) =>
     },
     ownerOverviewLabel: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 13,
-      fontWeight: "900",
       marginTop: 6,
     },
     ownerOverviewValue: {
       color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiBold,
       fontSize: 26,
-      fontWeight: "900",
     },
     ownerPanelCard: {
       backgroundColor: theme.colors.card,
@@ -4908,13 +4915,13 @@ const createStyles = (theme: MobileTheme) =>
     },
     ownerQuickIcon: {
       color: theme.colors.gold,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 22,
-      fontWeight: "900",
     },
     ownerQuickText: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 12,
-      fontWeight: "900",
       textAlign: "center",
     },
     ownerSafetyCard: {
@@ -4935,8 +4942,8 @@ const createStyles = (theme: MobileTheme) =>
       borderRadius: theme.radii.pill,
       borderWidth: 1,
       color: theme.colors.success,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 11,
-      fontWeight: "900",
       overflow: "hidden",
       paddingHorizontal: 9,
       paddingVertical: 6,
@@ -4950,14 +4957,15 @@ const createStyles = (theme: MobileTheme) =>
       borderRadius: theme.radii.pill,
       borderWidth: 1,
       color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 12,
-      fontWeight: "900",
       overflow: "hidden",
       paddingHorizontal: 10,
       paddingVertical: 7,
     },
     paymentBody: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 14,
       lineHeight: 21,
       marginTop: 8,
@@ -4987,7 +4995,6 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.foreground,
       fontFamily: mobileTypography.uiRegular,
       fontSize: 18,
-      fontWeight: "700",
       marginTop: 6,
     },
     policyCard: {
@@ -5000,8 +5007,8 @@ const createStyles = (theme: MobileTheme) =>
     priceText: {
       color: theme.colors.deepGold,
       flexShrink: 1,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 13,
-      fontWeight: "900",
     },
     privacyCard: {
       backgroundColor: theme.colors.successSoft,
@@ -5034,15 +5041,15 @@ const createStyles = (theme: MobileTheme) =>
     },
     preferenceNote: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 12,
-      fontWeight: "800",
       lineHeight: 19,
       marginTop: 6,
     },
     preferenceChevron: {
       color: theme.colors.gold,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 20,
-      fontWeight: "900",
     },
     preferenceCopy: {
       flex: 1,
@@ -5051,8 +5058,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     preferenceGroupTitle: {
       color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 13,
-      fontWeight: "900",
     },
     preferencesGroup: {
       gap: 10,
@@ -5104,8 +5111,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     profileMembershipText: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 12,
-      fontWeight: "800",
       marginTop: 6,
     },
     profileStatCard: {
@@ -5118,14 +5125,14 @@ const createStyles = (theme: MobileTheme) =>
     },
     profileStatLabel: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 12,
-      fontWeight: "900",
       marginTop: 4,
     },
     profileStatMeta: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 10,
-      fontWeight: "700",
       marginTop: 3,
     },
     profileStatsGrid: {
@@ -5135,8 +5142,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     profileStatValue: {
       color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 18,
-      fontWeight: "900",
     },
     profileStatusStack: {
       alignItems: "flex-end",
@@ -5167,7 +5174,6 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.foregroundInverse,
       fontFamily: mobileTypography.uiRegular,
       fontSize: 17,
-      fontWeight: "700",
     },
     promoBadge: {
       alignItems: "center",
@@ -5181,12 +5187,11 @@ const createStyles = (theme: MobileTheme) =>
     },
     promoBadgeText: {
       color: theme.colors.foregroundInverse,
-      fontWeight: "900",
     },
     promoBody: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 16,
-      fontWeight: "700",
       lineHeight: 24,
       marginTop: 8,
       maxWidth: 230,
@@ -5208,16 +5213,16 @@ const createStyles = (theme: MobileTheme) =>
     },
     promoTitle: {
       color: theme.colors.gold,
+      fontFamily: mobileTypography.kufiBold,
       fontSize: 29,
-      fontWeight: "900",
       lineHeight: 36,
     },
     quickReplyChip: {
       backgroundColor: theme.colors.goldSoft,
       borderRadius: theme.radii.pill,
       color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 12,
-      fontWeight: "900",
       overflow: "hidden",
       paddingHorizontal: 11,
       paddingVertical: 7,
@@ -5250,8 +5255,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     recommendedIconText: {
       color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 16,
-      fontWeight: "900",
     },
     recommendedItem: {
       alignItems: "flex-start",
@@ -5272,8 +5277,8 @@ const createStyles = (theme: MobileTheme) =>
       borderRadius: theme.radii.pill,
       borderWidth: 1,
       color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 12,
-      fontWeight: "900",
       overflow: "hidden",
       paddingHorizontal: 10,
       paddingVertical: 7,
@@ -5310,8 +5315,8 @@ const createStyles = (theme: MobileTheme) =>
       borderRadius: theme.radii.pill,
       borderWidth: 1,
       color: theme.colors.success,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 12,
-      fontWeight: "900",
       overflow: "hidden",
       paddingHorizontal: 10,
       paddingVertical: 7,
@@ -5320,7 +5325,6 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.foreground,
       fontFamily: mobileTypography.kufiBold,
       fontSize: 24,
-      fontWeight: "800",
       letterSpacing: 0.3,
       marginTop: 4,
     },
@@ -5332,8 +5336,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     quickBookingBody: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 15,
-      fontWeight: "700",
       lineHeight: 23,
       marginTop: 9,
     },
@@ -5361,8 +5365,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     quickBookingTitle: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.kufiBold,
       fontSize: 26,
-      fontWeight: "900",
       letterSpacing: -0.4,
       lineHeight: 33,
       marginTop: 8,
@@ -5383,8 +5387,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     ratingText: {
       color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 12,
-      fontWeight: "900",
     },
     rowCard: {
       alignItems: "center",
@@ -5424,8 +5428,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     rowIconText: {
       color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 18,
-      fontWeight: "900",
     },
     rowMeta: {
       color: theme.colors.mutedForeground,
@@ -5437,15 +5441,14 @@ const createStyles = (theme: MobileTheme) =>
     },
     rowPrice: {
       color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 13,
-      fontWeight: "900",
     },
     rowTitle: {
       color: theme.colors.foreground,
       fontFamily: mobileTypography.uiRegular,
       fontSize: 15,
       flexShrink: 1,
-      fontWeight: "700",
       lineHeight: 20,
     },
     rtlText: {
@@ -5488,8 +5491,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     selectedServiceIconText: {
       color: theme.colors.foregroundInverse,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 18,
-      fontWeight: "900",
     },
     selectedServiceIconImage: {
       height: 24,
@@ -5498,6 +5501,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     selectedServiceMeta: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 12,
       marginTop: 4,
     },
@@ -5505,7 +5509,6 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.foreground,
       fontFamily: mobileTypography.uiRegular,
       fontSize: 16,
-      fontWeight: "700",
     },
     serviceCard: {
       backgroundColor: theme.colors.cardElevated,
@@ -5534,7 +5537,6 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.mutedForeground,
       fontFamily: mobileTypography.uiRegular,
       fontSize: 12,
-      fontWeight: "500",
       lineHeight: 18,
       marginTop: 5,
     },
@@ -5542,18 +5544,17 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.foreground,
       fontFamily: mobileTypography.uiRegular,
       fontSize: 15,
-      fontWeight: "700",
       lineHeight: 21,
     },
     servicePrice: {
       color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 13,
-      fontWeight: "900",
     },
     safeActionText: {
       color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 12,
-      fontWeight: "900",
       lineHeight: 17,
       marginTop: 10,
     },
@@ -5570,7 +5571,6 @@ const createStyles = (theme: MobileTheme) =>
       fontFamily: mobileTypography.uiRegular,
       flexShrink: 1,
       fontSize: 12,
-      fontWeight: "700",
       letterSpacing: 0.5,
       lineHeight: 16,
       textTransform: "uppercase",
@@ -5580,7 +5580,6 @@ const createStyles = (theme: MobileTheme) =>
       fontFamily: mobileTypography.kufiBold,
       flexShrink: 1,
       fontSize: 28,
-      fontWeight: "800",
       letterSpacing: -0.4,
       lineHeight: 35,
       marginTop: 8,
@@ -5718,8 +5717,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     salonActionIcon: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 26,
-      fontWeight: "900",
       lineHeight: 30,
     },
     salonActionIconImage: {
@@ -5731,7 +5730,6 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.mutedForeground,
       fontFamily: mobileTypography.uiRegular,
       fontSize: 13,
-      fontWeight: "600",
       marginTop: 8,
     },
     salonActionTile: {
@@ -5762,8 +5760,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     salonBackIcon: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 43,
-      fontWeight: "700",
       lineHeight: 45,
       marginTop: -4,
     },
@@ -5797,8 +5795,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     salonCtaArrowText: {
       color: theme.colors.foregroundInverse,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 34,
-      fontWeight: "900",
       lineHeight: 36,
       marginTop: -5,
     },
@@ -5860,8 +5858,8 @@ const createStyles = (theme: MobileTheme) =>
       borderRadius: theme.radii.pill,
       borderWidth: 1,
       color: theme.colors.gold,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 16,
-      fontWeight: "900",
       overflow: "hidden",
       paddingHorizontal: 18,
       paddingVertical: 10,
@@ -5870,7 +5868,6 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.mutedForeground,
       fontFamily: mobileTypography.uiRegular,
       fontSize: 18,
-      fontWeight: "500",
       lineHeight: 25,
       marginTop: 8,
     },
@@ -5879,7 +5876,6 @@ const createStyles = (theme: MobileTheme) =>
       fontFamily: mobileTypography.kufiBold,
       flexShrink: 1,
       fontSize: 40,
-      fontWeight: "800",
       letterSpacing: -0.8,
       lineHeight: 50,
     },
@@ -5891,8 +5887,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     salonRatingStar: {
       color: theme.colors.gold,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 23,
-      fontWeight: "900",
     },
     salonRatingStarImage: {
       height: 22,
@@ -5901,8 +5897,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     salonRatingText: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 20,
-      fontWeight: "800",
     },
     salonRoundButton: {
       alignItems: "center",
@@ -5916,8 +5912,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     salonRoundButtonText: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 32,
-      fontWeight: "900",
       lineHeight: 34,
     },
     salonRoundButtonIcon: {
@@ -5936,8 +5932,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     salonServiceAddText: {
       color: theme.colors.gold,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 30,
-      fontWeight: "900",
       lineHeight: 32,
     },
     salonServiceMedia: {
@@ -5948,21 +5944,21 @@ const createStyles = (theme: MobileTheme) =>
     },
     salonServiceMeta: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 15,
-      fontWeight: "800",
       lineHeight: 21,
       marginTop: 10,
     },
     salonServiceName: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 28,
-      fontWeight: "900",
       lineHeight: 36,
     },
     salonServicePrice: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 20,
-      fontWeight: "900",
       marginTop: 8,
     },
     salonServiceRow: {
@@ -5983,8 +5979,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     salonTabText: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 15,
-      fontWeight: "900",
       paddingBottom: 14,
     },
     salonTabTextActive: {
@@ -6027,9 +6023,9 @@ const createStyles = (theme: MobileTheme) =>
       borderRadius: theme.radii.pill,
       borderWidth: 1,
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiMedium,
       flexGrow: 1,
       fontSize: 15,
-      fontWeight: "900",
       overflow: "hidden",
       paddingHorizontal: 18,
       paddingVertical: 13,
@@ -6039,9 +6035,9 @@ const createStyles = (theme: MobileTheme) =>
       backgroundColor: theme.colors.gold,
       borderRadius: theme.radii.pill,
       color: theme.colors.foregroundInverse,
+      fontFamily: mobileTypography.uiMedium,
       flexGrow: 1,
       fontSize: 16,
-      fontWeight: "900",
       overflow: "hidden",
       paddingHorizontal: 24,
       paddingVertical: 14,
@@ -6064,8 +6060,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     searchMapFilterIcon: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 26,
-      fontWeight: "900",
       lineHeight: 28,
       transform: [{ rotate: "90deg" }],
     },
@@ -6108,13 +6104,13 @@ const createStyles = (theme: MobileTheme) =>
     },
     searchResultDistance: {
       color: "#6b7280",
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 15,
-      fontWeight: "800",
     },
     searchResultHeart: {
       color: "#111827",
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 38,
-      fontWeight: "900",
       lineHeight: 40,
     },
     searchResultHeartImage: {
@@ -6130,38 +6126,38 @@ const createStyles = (theme: MobileTheme) =>
     },
     searchResultMeta: {
       color: "#6b7280",
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 16,
-      fontWeight: "700",
       lineHeight: 22,
       marginTop: 4,
     },
     searchResultName: {
       color: "#101827",
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 28,
-      fontWeight: "900",
       letterSpacing: -0.6,
       lineHeight: 34,
     },
     searchResultPrice: {
       color: "#101827",
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 17,
-      fontWeight: "900",
       marginTop: 8,
     },
     searchResultRating: {
       color: "#101827",
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 17,
-      fontWeight: "900",
     },
     searchResultReviews: {
       color: "#101827",
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 17,
-      fontWeight: "800",
     },
     searchResultShare: {
       color: "#6b7280",
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 28,
-      fontWeight: "900",
       lineHeight: 30,
     },
     searchResultShareImage: {
@@ -6193,7 +6189,6 @@ const createStyles = (theme: MobileTheme) =>
       color: "#101827",
       fontFamily: mobileTypography.kufiBold,
       fontSize: 28,
-      fontWeight: "800",
       lineHeight: 36,
       marginBottom: 6,
     },
@@ -6211,8 +6206,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     searchActionIcon: {
       color: theme.colors.gold,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 17,
-      fontWeight: "900",
     },
     searchActionRow: {
       flexDirection: "row",
@@ -6220,8 +6215,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     searchActionText: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 12,
-      fontWeight: "900",
     },
     searchBar: {
       alignItems: "center",
@@ -6246,8 +6241,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     searchIcon: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 28,
-      fontWeight: "900",
     },
     searchIconImage: {
       height: 28,
@@ -6259,7 +6254,6 @@ const createStyles = (theme: MobileTheme) =>
       fontFamily: mobileTypography.uiRegular,
       flex: 1,
       fontSize: 16,
-      fontWeight: "500",
       lineHeight: 22,
       minWidth: 0,
     },
@@ -6269,8 +6263,8 @@ const createStyles = (theme: MobileTheme) =>
       borderRadius: theme.radii.pill,
       borderWidth: 1,
       color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 12,
-      fontWeight: "900",
       overflow: "hidden",
       paddingHorizontal: 11,
       paddingVertical: 7,
@@ -6290,8 +6284,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     searchChipTitle: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 13,
-      fontWeight: "900",
     },
     secondaryButton: {
       alignItems: "center",
@@ -6310,8 +6304,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     secondaryButtonText: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 14,
-      fontWeight: "900",
     },
     secondaryIconButton: {
       alignItems: "center",
@@ -6322,13 +6316,13 @@ const createStyles = (theme: MobileTheme) =>
     },
     secondaryIconButtonText: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 13,
-      fontWeight: "900",
     },
     sectionAction: {
       color: theme.colors.gold,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 13,
-      fontWeight: "900",
     },
     sectionHeader: {
       alignItems: "center",
@@ -6341,13 +6335,12 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.foreground,
       fontFamily: mobileTypography.kufiBold,
       fontSize: 21,
-      fontWeight: "800",
       letterSpacing: -0.2,
     },
     selectText: {
       color: theme.colors.gold,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 13,
-      fontWeight: "900",
     },
     servicePriceBlock: {
       alignItems: "flex-end",
@@ -6396,8 +6389,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     supportIconText: {
       color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 18,
-      fontWeight: "900",
     },
     shell: {
       backgroundColor: theme.colors.background,
@@ -6451,8 +6444,8 @@ const createStyles = (theme: MobileTheme) =>
       backgroundColor: theme.colors.goldSoft,
       borderRadius: theme.radii.pill,
       color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 12,
-      fontWeight: "900",
       overflow: "hidden",
       paddingHorizontal: 10,
       paddingVertical: 7,
@@ -6499,8 +6492,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     stateIconText: {
       color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiBold,
       fontSize: 26,
-      fontWeight: "900",
       lineHeight: 30,
       textAlign: "center",
     },
@@ -6530,16 +6523,16 @@ const createStyles = (theme: MobileTheme) =>
     summaryLabel: {
       color: theme.colors.mutedForeground,
       flexShrink: 1,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 12,
-      fontWeight: "800",
       lineHeight: 17,
       maxWidth: "42%",
     },
     summaryValue: {
       color: theme.colors.foreground,
       flexShrink: 1,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 13,
-      fontWeight: "900",
       lineHeight: 18,
       maxWidth: "58%",
       textAlign: "right",
@@ -6550,8 +6543,8 @@ const createStyles = (theme: MobileTheme) =>
       borderRadius: theme.radii.pill,
       borderWidth: 1,
       color: theme.colors.warning,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 12,
-      fontWeight: "900",
       overflow: "hidden",
       paddingHorizontal: 10,
       paddingVertical: 7,
@@ -6564,6 +6557,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     stepBody: {
       color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 12,
       lineHeight: 18,
       marginTop: 5,
@@ -6584,13 +6578,13 @@ const createStyles = (theme: MobileTheme) =>
     },
     stepIcon: {
       color: theme.colors.gold,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 18,
-      fontWeight: "900",
     },
     stepTitle: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 15,
-      fontWeight: "900",
       marginTop: 8,
     },
     tabBar: {
@@ -6644,6 +6638,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     tabIcon: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 21,
     },
     tabIconActive: {
@@ -6661,7 +6656,6 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.foreground,
       fontFamily: mobileTypography.uiRegular,
       fontSize: 10,
-      fontWeight: "700",
       lineHeight: 13,
       maxWidth: 64,
       minWidth: 48,
@@ -6672,15 +6666,15 @@ const createStyles = (theme: MobileTheme) =>
     },
     tagText: {
       color: theme.colors.success,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 12,
-      fontWeight: "900",
     },
     verifiedBadge: {
       backgroundColor: "#3b82f6",
       borderRadius: 16,
       color: "#ffffff",
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 16,
-      fontWeight: "900",
       overflow: "hidden",
       paddingHorizontal: 7,
       paddingVertical: 3,
@@ -6760,8 +6754,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     timelineDotText: {
       color: theme.colors.foregroundInverse,
+      fontFamily: mobileTypography.uiBold,
       fontSize: 12,
-      fontWeight: "900",
     },
     timelineItem: {
       alignItems: "flex-start",
@@ -6770,16 +6764,16 @@ const createStyles = (theme: MobileTheme) =>
     },
     timelineTitle: {
       color: theme.colors.foreground,
+      fontFamily: mobileTypography.kufiBold,
       fontSize: 20,
-      fontWeight: "900",
       marginTop: 4,
     },
     unreadBadge: {
       backgroundColor: theme.colors.gold,
       borderRadius: 999,
       color: theme.colors.foregroundInverse,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 11,
-      fontWeight: "900",
       overflow: "hidden",
       paddingHorizontal: 8,
       paddingVertical: 5,
@@ -6794,8 +6788,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     voiceText: {
       color: theme.colors.gold,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 15,
-      fontWeight: "900",
     },
     voiceIconImage: {
       height: 18,
