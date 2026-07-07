@@ -66,12 +66,6 @@ type PremiumBusiness = {
   tag: string;
 };
 
-type BookingStep = {
-  body: string;
-  icon: string;
-  title: string;
-};
-
 type BookingFlowStepId = "staff" | "datetime" | "payment" | "confirmation";
 
 type BookingStaffOption = {
@@ -99,6 +93,27 @@ type BookingPaymentOption = {
   id: string;
   label: string;
   meta: string;
+};
+
+type BookingListFilter = "upcoming" | "past" | "cancelled";
+
+type BookingManagementPanel = "cancel" | "edit" | null;
+
+type VisualBookingStatus = "cancelled" | "completed" | "confirmed" | "pending";
+
+type VisualBooking = {
+  businessName: string;
+  category: string;
+  date: string;
+  id: string;
+  paymentMethod: string;
+  price: string;
+  reference: string;
+  serviceName: string;
+  staff: string;
+  status: VisualBookingStatus;
+  statusLabel: string;
+  time: string;
 };
 
 type MobileThemeMode = "system" | "light" | "dark";
@@ -244,48 +259,10 @@ const featuredBusinesses: PremiumBusiness[] = [
   },
 ];
 
-const bookingSteps: BookingStep[] = [
-  {
-    body: "اختيار الخدمة المناسبة من قائمة واضحة مع السعر والمدة.",
-    icon: "01",
-    title: "اختر الخدمة",
-  },
-  {
-    body: "اختيار الموظف أو ترك REZNO يقترح المتاحين.",
-    icon: "02",
-    title: "اختر المختص",
-  },
-  {
-    body: "تحديد اليوم والوقت من شرائح سهلة اللمس.",
-    icon: "03",
-    title: "حدد الموعد",
-  },
-  {
-    body: "مراجعة الملخص والتأكيد بدون إضافة أي منطق دفع حقيقي.",
-    icon: "04",
-    title: "تأكيد الحجز",
-  },
-];
-
-const staffMembers = [
-  { name: "ليان", role: "خبيرة شعر", time: "متاحة 4:30 م", topRated: true },
-  { name: "سارة", role: "مختصة بشرة", time: "متاحة غداً", topRated: false },
-  { name: "آدم", role: "مدير حجوزات", time: "أقرب وقت 6:00 م", topRated: false },
-];
-
 const services = [
   { duration: "45 دقيقة", name: "قص وتصفيف", price: "25,000 د.ع", tag: "الأكثر طلباً" },
   { duration: "60 دقيقة", name: "عناية بشرة", price: "35,000 د.ع", tag: "عناية فاخرة" },
   { duration: "90 دقيقة", name: "باقة فاخرة", price: "55,000 د.ع", tag: "VIP" },
-];
-
-const timeSlots = ["10:00", "12:30", "14:00", "16:30", "18:00"];
-
-const dateOptions = [
-  { day: "اليوم", label: "06", meta: "متاح" },
-  { day: "غداً", label: "07", meta: "6 أوقات" },
-  { day: "الأربعاء", label: "08", meta: "مزدحم" },
-  { day: "الخميس", label: "09", meta: "أفضل" },
 ];
 
 const bookingStaffOptions: BookingStaffOption[] = [
@@ -386,33 +363,61 @@ const accountActions = [
   { label: "إنشاء حساب", tone: "secondary" },
 ];
 
-const bookingTimeline = [
-  { label: "تم اختيار الخدمة", time: "10:24 ص" },
-  { label: "تم تثبيت الوقت", time: "10:26 ص" },
-  { label: "جاهز للتأكيد", time: "الآن" },
+const bookingFilterTabs: { id: BookingListFilter; label: string }[] = [
+  { id: "upcoming", label: "القادمة" },
+  { id: "past", label: "السابقة" },
+  { id: "cancelled", label: "ملغاة" },
 ];
 
-const bookingStatusCards = [
+const visualBookingStatusLabels: Record<VisualBookingStatus, string> = {
+  cancelled: "ملغى",
+  completed: "مكتمل",
+  confirmed: "مؤكد",
+  pending: "قيد الانتظار",
+};
+
+const demoManagedBookings: VisualBooking[] = [
   {
-    action: "تعديل الموعد",
-    business: "Noura Beauty Lounge",
-    meta: "الخميس · 4:30 م · قص وتصفيف",
-    status: "upcoming",
-    statusLabel: "قادم",
+    businessName: "Noura Beauty Lounge",
+    category: "صالون وتجميل",
+    date: "اليوم 06",
+    id: "noura-2406",
+    paymentMethod: "الدفع في الموقع",
+    price: "25,000 د.ع",
+    reference: "REZNO-2406",
+    serviceName: "قص وتصفيف فاخر",
+    staff: "أحمد",
+    status: "confirmed",
+    statusLabel: "مؤكد",
+    time: "15:00",
   },
   {
-    action: "عرض الإيصال",
-    business: "Mat3am Gold",
-    meta: "الأحد الماضي · طاولة عائلية · مكتمل",
+    businessName: "Mat3am Gold",
+    category: "مطعم وحجوزات",
+    date: "غداً 07",
+    id: "mat3am-2407",
+    paymentMethod: "حسب العرض البصري",
+    price: "حسب العرض البصري",
+    reference: "REZNO-2407",
+    serviceName: "طاولة لـ 4 أشخاص",
+    staff: "بدون تفضيل",
+    status: "pending",
+    statusLabel: "قيد الانتظار",
+    time: "20:30",
+  },
+  {
+    businessName: "Smile Studio Clinic",
+    category: "عيادة أسنان",
+    date: "أمس",
+    id: "smile-2405",
+    paymentMethod: "بطاقة الائتمان / مدى",
+    price: "15,000 د.ع",
+    reference: "REZNO-2405",
+    serviceName: "استشارة أسنان",
+    staff: "يوسف",
     status: "completed",
     statusLabel: "مكتمل",
-  },
-  {
-    action: "إعادة الحجز",
-    business: "Smile Studio Clinic",
-    meta: "الثلاثاء · استشارة · تم الإلغاء",
-    status: "cancelled",
-    statusLabel: "ملغي",
+    time: "11:30",
   },
 ];
 
@@ -634,6 +639,16 @@ export default function App() {
   const [selectedPayment, setSelectedPayment] = useState<BookingPaymentOption>(
     paymentMethodOptions[3],
   );
+  const [bookingFilter, setBookingFilter] =
+    useState<BookingListFilter>("upcoming");
+  const [selectedBookingId, setSelectedBookingId] = useState<string | null>(
+    null,
+  );
+  const [bookingManagementPanel, setBookingManagementPanel] =
+    useState<BookingManagementPanel>(null);
+  const [visualCancelledBookingIds, setVisualCancelledBookingIds] = useState<
+    string[]
+  >([]);
   const [showOnboarding, setShowOnboarding] = useState(true);
   const [themeMode, setThemeMode] = useState<MobileThemeMode>("dark");
   const [marketplaceState, setMarketplaceState] = useState<MarketplaceState>({
@@ -646,6 +661,52 @@ export default function App() {
   const styles = useMemo(() => createStyles(theme), [theme]);
   const text = labels[locale];
   const isRtl = getTextDirection(locale) === "rtl";
+  const confirmedVisualBooking = useMemo<VisualBooking>(
+    () => ({
+      businessName: selectedBusiness?.name ?? "Noura Beauty Lounge",
+      category: selectedBusiness?.category ?? "صالون وتجميل",
+      date: `${selectedDate.day} ${selectedDate.label}`,
+      id: "visual-confirmed-booking",
+      paymentMethod: selectedPayment.label,
+      price: selectedBookingService.price,
+      reference: "REZNO-2406",
+      serviceName: selectedBookingService.name,
+      staff: selectedStaff.name,
+      status: "confirmed",
+      statusLabel: "مؤكد",
+      time: selectedTime.label,
+    }),
+    [
+      selectedBookingService.name,
+      selectedBookingService.price,
+      selectedBusiness?.category,
+      selectedBusiness?.name,
+      selectedDate.day,
+      selectedDate.label,
+      selectedPayment.label,
+      selectedStaff.name,
+      selectedTime.label,
+    ],
+  );
+  const managedBookings = useMemo<VisualBooking[]>(
+    () =>
+      [confirmedVisualBooking, ...demoManagedBookings].map((booking) => {
+        if (!visualCancelledBookingIds.includes(booking.id)) {
+          return booking;
+        }
+
+        return {
+          ...booking,
+          status: "cancelled",
+          statusLabel: visualBookingStatusLabels.cancelled,
+        };
+      }),
+    [confirmedVisualBooking, visualCancelledBookingIds],
+  );
+  const selectedManagedBooking = selectedBookingId
+    ? managedBookings.find((booking) => booking.id === selectedBookingId) ??
+      null
+    : null;
 
   const loadMarketplace = useCallback(() => {
     setMarketplaceState({ status: "loading" });
@@ -671,6 +732,8 @@ export default function App() {
   const handleTabPress = (tabId: MobileAppTabId) => {
     setSelectedBusiness(null);
     setBookingFlowStep(null);
+    setSelectedBookingId(null);
+    setBookingManagementPanel(null);
 
     if (tabId === "marketplace" && marketplaceState.status === "idle") {
       loadMarketplace();
@@ -715,13 +778,38 @@ export default function App() {
   const handleReturnHome = () => {
     setSelectedBusiness(null);
     setBookingFlowStep(null);
+    setSelectedBookingId(null);
+    setBookingManagementPanel(null);
     setActiveTab("customerHome");
   };
 
   const handleViewBookings = () => {
     setSelectedBusiness(null);
     setBookingFlowStep(null);
+    setBookingFilter("upcoming");
+    setSelectedBookingId(confirmedVisualBooking.id);
+    setBookingManagementPanel(null);
     setActiveTab("bookings");
+  };
+
+  const handleOpenBooking = (booking: VisualBooking) => {
+    setSelectedBookingId(booking.id);
+    setBookingManagementPanel(null);
+  };
+
+  const handleBackToBookings = () => {
+    setSelectedBookingId(null);
+    setBookingManagementPanel(null);
+  };
+
+  const handleConfirmVisualCancel = (booking: VisualBooking) => {
+    setVisualCancelledBookingIds((currentIds) =>
+      currentIds.includes(booking.id)
+        ? currentIds
+        : [...currentIds, booking.id],
+    );
+    setBookingFilter("cancelled");
+    setBookingManagementPanel(null);
   };
 
   if (!fontsLoaded) {
@@ -843,7 +931,28 @@ export default function App() {
         ) : null}
 
         {!selectedBusiness && activeTab === "bookings" ? (
-          <BookingFlowScreen isRtl={isRtl} styles={styles} />
+          <MyBookingsScreen
+            bookings={managedBookings}
+            filter={bookingFilter}
+            isRtl={isRtl}
+            managementPanel={bookingManagementPanel}
+            onBackToList={handleBackToBookings}
+            onCancelBooking={(booking) => {
+              setSelectedBookingId(booking.id);
+              setBookingManagementPanel("cancel");
+            }}
+            onClosePanel={() => setBookingManagementPanel(null)}
+            onConfirmCancel={handleConfirmVisualCancel}
+            onEditBooking={(booking) => {
+              setSelectedBookingId(booking.id);
+              setBookingManagementPanel("edit");
+            }}
+            onOpenBooking={handleOpenBooking}
+            onReturnHome={handleReturnHome}
+            onSelectFilter={setBookingFilter}
+            selectedBooking={selectedManagedBooking}
+            styles={styles}
+          />
         ) : null}
 
         {!selectedBusiness && activeTab === "messages" ? (
@@ -2521,446 +2630,509 @@ function BookingConfirmationStep({
   );
 }
 
-function BookingFlowScreen({
+function MyBookingsScreen({
+  bookings,
+  filter,
   isRtl,
+  managementPanel,
+  onBackToList,
+  onCancelBooking,
+  onClosePanel,
+  onConfirmCancel,
+  onEditBooking,
+  onOpenBooking,
+  onReturnHome,
+  onSelectFilter,
+  selectedBooking,
   styles,
 }: {
+  bookings: VisualBooking[];
+  filter: BookingListFilter;
   isRtl: boolean;
+  managementPanel: BookingManagementPanel;
+  onBackToList: () => void;
+  onCancelBooking: (booking: VisualBooking) => void;
+  onClosePanel: () => void;
+  onConfirmCancel: (booking: VisualBooking) => void;
+  onEditBooking: (booking: VisualBooking) => void;
+  onOpenBooking: (booking: VisualBooking) => void;
+  onReturnHome: () => void;
+  onSelectFilter: (filter: BookingListFilter) => void;
+  selectedBooking: VisualBooking | null;
   styles: MobileStyles;
 }) {
+  if (selectedBooking) {
+    return (
+      <BookingDetailScreen
+        booking={selectedBooking}
+        isRtl={isRtl}
+        managementPanel={managementPanel}
+        onBack={onBackToList}
+        onCancelBooking={onCancelBooking}
+        onClosePanel={onClosePanel}
+        onConfirmCancel={onConfirmCancel}
+        onEditBooking={onEditBooking}
+        onReturnHome={onReturnHome}
+        styles={styles}
+      />
+    );
+  }
+
+  const filteredBookings = bookings.filter((booking) => {
+    if (filter === "upcoming") {
+      return booking.status === "confirmed" || booking.status === "pending";
+    }
+
+    if (filter === "past") {
+      return booking.status === "completed";
+    }
+
+    return booking.status === "cancelled";
+  });
+
   return (
-    <>
-      <View style={styles.bookingSummaryCard}>
-        <View style={styles.bookingHeroAccent} />
-        <Text style={[styles.screenEyebrow, isRtl && styles.rtlText]}>
-          رحلة الحجز
-        </Text>
-        <Text style={[styles.screenTitle, isRtl && styles.rtlText]}>
-          تجربة حجز واضحة من الخدمة إلى التأكيد
-        </Text>
-        <Text style={[styles.screenDescription, isRtl && styles.rtlText]}>
-          هذه واجهة عرض فقط. لا تضيف دفعاً أو تغير منطق الحجز الحقيقي.
-        </Text>
-      </View>
-
-      <SelectedServiceCard isRtl={isRtl} styles={styles} />
-
-      <View style={styles.stepGrid}>
-        {bookingSteps.map((step) => (
-          <View key={step.title} style={styles.stepCard}>
-            <Text style={styles.stepIcon}>{step.icon}</Text>
-            <Text style={[styles.stepTitle, isRtl && styles.rtlText]}>
-              {step.title}
-            </Text>
-            <Text style={[styles.stepBody, isRtl && styles.rtlText]}>
-              {step.body}
-            </Text>
-          </View>
-        ))}
-      </View>
-
-      <SectionHeader isRtl={isRtl} styles={styles} title="اختر الخدمة" />
-      {services.map((service, index) => (
-        <ServiceRow
-          isRtl={isRtl}
-          key={service.name}
-          selected={index === 0}
-          service={service}
-          styles={styles}
-        />
-      ))}
-
-      <SectionHeader isRtl={isRtl} styles={styles} title="اختر المختص" />
-      {staffMembers.map((staff, index) => (
-        <StaffRow
-          isRtl={isRtl}
-          key={staff.name}
-          selected={index === 0}
-          staff={staff}
-          styles={styles}
-        />
-      ))}
-
-      <SectionHeader isRtl={isRtl} styles={styles} title="اختر اليوم" />
-      <View style={styles.dateStrip}>
-        {dateOptions.map((date, index) => (
-          <View
-            key={date.day}
-            style={[styles.datePill, index === 0 && styles.datePillActive]}
-          >
-            <Text
-              style={[
-                styles.dateDay,
-                index === 0 && styles.dateDayActive,
-              ]}
-            >
-              {date.day}
-            </Text>
-            <Text
-              style={[
-                styles.dateLabel,
-                index === 0 && styles.dateLabelActive,
-              ]}
-            >
-              {date.label}
-            </Text>
-            <Text
-              style={[
-                styles.dateMeta,
-                index === 0 && styles.dateMetaActive,
-              ]}
-            >
-              {date.meta}
-            </Text>
-          </View>
-        ))}
-      </View>
-
-      <SectionHeader isRtl={isRtl} styles={styles} title="اختر الوقت" />
-      <View style={styles.timeGrid}>
-        {timeSlots.map((slot, index) => (
-          <View
-            key={slot}
-            style={[styles.timeSlot, index === 3 && styles.timeSlotActive]}
-          >
-            <Image
-              alt=""
-              resizeMode="contain"
-              source={mobileIconAssets.common.clock}
-              style={[
-                styles.timeSlotIconImage,
-                index === 3 && styles.timeSlotIconImageActive,
-              ]}
-            />
-            <Text
-              style={[
-                styles.timeSlotText,
-                index === 3 && styles.timeSlotTextActive,
-              ]}
-            >
-              {slot}
-            </Text>
-          </View>
-        ))}
-      </View>
-
-      <BookingSummaryCard isRtl={isRtl} styles={styles} />
-      <ConfirmationCard isRtl={isRtl} styles={styles} />
-      <BookingReceiptCard isRtl={isRtl} styles={styles} />
-      <BookingTimelineCard isRtl={isRtl} styles={styles} />
-      <PolicySupportCard isRtl={isRtl} styles={styles} />
-      <BookingStatusBoard isRtl={isRtl} styles={styles} />
-      <BookingsEmptyState isRtl={isRtl} styles={styles} />
-    </>
-  );
-}
-
-function SelectedServiceCard({
-  isRtl,
-  styles,
-}: {
-  isRtl: boolean;
-  styles: MobileStyles;
-}) {
-  return (
-    <View style={styles.selectedServiceCard}>
-      <View style={styles.selectedServiceIcon}>
-        <Image
-          alt=""
-          resizeMode="contain"
-          source={mobileIconAssets.common.calendar}
-          style={styles.selectedServiceIconImage}
-        />
-      </View>
-      <View style={styles.rowCopy}>
-        <Text style={[styles.selectedServiceTitle, isRtl && styles.rtlText]}>
-          قص وتصفيف فاخر
-        </Text>
-        <Text style={[styles.selectedServiceMeta, isRtl && styles.rtlText]}>
-          Noura Beauty Lounge · ليان · اليوم 4:30 م
-        </Text>
-      </View>
-      <View style={styles.statusBadge}>
-        <Text style={styles.statusBadgeText}>مختار</Text>
-      </View>
-    </View>
-  );
-}
-
-function ServiceRow({
-  isRtl,
-  selected,
-  service,
-  styles,
-}: {
-  isRtl: boolean;
-  selected?: boolean;
-  service: { duration: string; name: string; price: string; tag: string };
-  styles: MobileStyles;
-}) {
-  return (
-    <View style={[styles.rowCard, selected && styles.rowCardSelected]}>
-      <View style={styles.rowIcon}>
-        <Text style={styles.rowIconText}>✦</Text>
-      </View>
-      <View style={styles.rowCopy}>
-        <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>
-          {service.name}
-        </Text>
-        <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>
-          {service.duration} · {service.tag}
-        </Text>
-      </View>
-      <View style={styles.servicePriceBlock}>
-        <Text style={styles.rowPrice}>{service.price}</Text>
-        {selected ? <Text style={styles.selectText}>مختارة</Text> : null}
-      </View>
-    </View>
-  );
-}
-
-function StaffRow({
-  isRtl,
-  selected,
-  staff,
-  styles,
-}: {
-  isRtl: boolean;
-  selected?: boolean;
-  staff: { name: string; role: string; time: string; topRated: boolean };
-  styles: MobileStyles;
-}) {
-  return (
-    <View style={[styles.rowCard, selected && styles.rowCardSelected]}>
-      <View style={styles.avatar}>
-        <Text style={styles.avatarText}>{staff.name.charAt(0)}</Text>
-      </View>
-      <View style={styles.rowCopy}>
-        <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>
-          {staff.name}
-        </Text>
-        <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>
-          {staff.role} · {staff.time}
-          {staff.topRated ? " · الأعلى تقييماً" : ""}
-        </Text>
-      </View>
-      <Text style={styles.selectText}>{selected ? "مختارة" : "اختيار"}</Text>
-    </View>
-  );
-}
-
-function BookingsEmptyState({
-  isRtl,
-  styles,
-}: {
-  isRtl: boolean;
-  styles: MobileStyles;
-}) {
-  return (
-    <PremiumStateCard
-      body="عند ربط الحساب الحقيقي ستظهر هنا الحجوزات القادمة والسابقة. حالياً هذه بطاقة عرض آمنة فقط."
-      icon="⌛"
-      isRtl={isRtl}
-      label="حجوزاتي"
-      styles={styles}
-      title="لا توجد حجوزات حقيقية بعد"
-    />
-  );
-}
-
-function BookingSummaryCard({
-  isRtl,
-  styles,
-}: {
-  isRtl: boolean;
-  styles: MobileStyles;
-}) {
-  return (
-    <View style={styles.paymentCard}>
-      <View style={styles.paymentHeaderRow}>
-        <Image
-          alt=""
-          resizeMode="contain"
-          source={mobileIconAssets.common.paymentCard}
-          style={styles.paymentIconImage}
-        />
-        <Text style={[styles.screenEyebrow, isRtl && styles.rtlText]}>
-          ملخص الحجز
-        </Text>
-      </View>
-      <Text style={[styles.paymentTitle, isRtl && styles.rtlText]}>
-        قص وتصفيف فاخر · ليان · اليوم 4:30 م
-      </Text>
-      <Text style={[styles.paymentBody, isRtl && styles.rtlText]}>
-        الدفع عند الحضور كعنصر عرض فقط. لا يوجد تكامل دفع حقيقي أو إنشاء حجز
-        في هذه المرحلة.
-      </Text>
-      <View style={styles.summaryGrid}>
-        <SummaryItem label="النشاط" value="Noura Beauty Lounge" styles={styles} />
-        <SummaryItem label="المختص" value="ليان" styles={styles} />
-        <SummaryItem label="الموقع" value="بغداد · الكرادة" styles={styles} />
-        <SummaryItem label="الطريقة" value="الدفع في المكان" styles={styles} />
-      </View>
-    </View>
-  );
-}
-
-function ConfirmationCard({
-  isRtl,
-  styles,
-}: {
-  isRtl: boolean;
-  styles: MobileStyles;
-}) {
-  return (
-    <View style={styles.confirmationCard}>
-      <View style={styles.confirmationIconWrap}>
-        <Image
-          alt=""
-          resizeMode="contain"
-          source={mobileIconAssets.common.checkSuccess}
-          style={styles.confirmationIconImage}
-        />
-      </View>
-      <Text style={[styles.confirmationTitle, isRtl && styles.rtlText]}>
-        تم تجهيز تأكيد الحجز
-      </Text>
-      <Text style={[styles.confirmationBody, isRtl && styles.rtlText]}>
-        رقم التأكيد التجريبي RZ-2406-183. لا يتم إنشاء حجز حقيقي أو إرسال
-        إشعارات.
-      </Text>
-      <View style={styles.confirmationActions}>
-        <Text style={styles.receiptAction}>إضافة للتقويم</Text>
-        <Text style={styles.receiptAction}>مشاركة الإيصال</Text>
-      </View>
-    </View>
-  );
-}
-
-function BookingReceiptCard({
-  isRtl,
-  styles,
-}: {
-  isRtl: boolean;
-  styles: MobileStyles;
-}) {
-  return (
-    <View style={styles.receiptCard}>
-      <View style={styles.receiptHeader}>
-        <View>
+    <View style={styles.bookingsScreen}>
+      <View style={styles.bookingsTopRow}>
+        <View style={styles.rowCopy}>
           <Text style={[styles.screenEyebrow, isRtl && styles.rtlText]}>
-            إيصال الحجز
+            إدارة الحجز
           </Text>
-          <Text style={[styles.receiptTitle, isRtl && styles.rtlText]}>
-            RZ-2406-183
+          <Text style={[styles.screenTitle, isRtl && styles.rtlText]}>
+            حجوزاتي
+          </Text>
+          <Text style={[styles.screenDescription, isRtl && styles.rtlText]}>
+            بطاقات عرض محلية لإدارة الحجوزات بصرياً بدون أي تعديل حقيقي.
           </Text>
         </View>
-        <Text style={styles.receiptStatus}>مؤكد</Text>
-      </View>
-      <View style={styles.receiptLine} />
-      <SummaryItem label="الخدمة" value="قص وتصفيف فاخر" styles={styles} />
-      <SummaryItem label="التاريخ" value="الخميس، 06 يوليو" styles={styles} />
-      <SummaryItem label="الوقت" value="4:30 م" styles={styles} />
-      <SummaryItem label="الإجمالي" value="25,000 د.ع" styles={styles} />
-    </View>
-  );
-}
-
-function BookingTimelineCard({
-  isRtl,
-  styles,
-}: {
-  isRtl: boolean;
-  styles: MobileStyles;
-}) {
-  return (
-    <View style={styles.timelineCard}>
-      <Text style={[styles.screenEyebrow, isRtl && styles.rtlText]}>
-        مسار الحجز
-      </Text>
-      <Text style={[styles.timelineTitle, isRtl && styles.rtlText]}>
-        خطوات واضحة حتى الوصول
-      </Text>
-      {bookingTimeline.map((item, index) => (
-        <View key={item.label} style={styles.timelineItem}>
-          <View style={styles.timelineDot}>
-            <Text style={styles.timelineDotText}>{index + 1}</Text>
-          </View>
-          <View style={styles.rowCopy}>
-            <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>
-              {item.label}
-            </Text>
-            <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>
-              {item.time}
-            </Text>
-          </View>
+        <View style={styles.bookingsBell}>
+          <Image
+            alt=""
+            resizeMode="contain"
+            source={mobileIconAssets.common.notificationBell}
+            style={styles.bookingsBellIcon}
+          />
         </View>
-      ))}
-    </View>
-  );
-}
+      </View>
 
-function PolicySupportCard({
-  isRtl,
-  styles,
-}: {
-  isRtl: boolean;
-  styles: MobileStyles;
-}) {
-  return (
-    <View style={styles.policyCard}>
-      <Text style={[styles.integrationTitle, isRtl && styles.rtlText]}>
-        سياسة آمنة للعرض
-      </Text>
-      <Text style={[styles.integrationBody, isRtl && styles.rtlText]}>
-        أزرار التعديل والإلغاء والدعم في هذه الشاشة عناصر بصرية فقط. لا توجد
-        عمليات حقيقية على الحجوزات.
-      </Text>
-      <View style={styles.supportRow}>
-        <Text style={styles.supportPill}>مساعدة</Text>
-        <Text style={styles.supportPill}>سياسة الإلغاء</Text>
-        <Text style={styles.supportPill}>تواصل مع النشاط</Text>
+      <View style={styles.bookingsSegmentedTabs}>
+        {bookingFilterTabs.map((tab) => {
+          const selected = tab.id === filter;
+
+          return (
+            <Pressable
+              accessibilityHint="يغير فلتر حجوزاتي محلياً فقط."
+              accessibilityLabel={`عرض الحجوزات ${tab.label}`}
+              accessibilityRole="tab"
+              accessibilityState={{ selected }}
+              key={tab.id}
+              onPress={() => onSelectFilter(tab.id)}
+              style={({ pressed }) => [
+                styles.bookingsSegment,
+                selected && styles.bookingsSegmentActive,
+                pressed && styles.softButtonPressed,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.bookingsSegmentText,
+                  selected && styles.bookingsSegmentTextActive,
+                ]}
+              >
+                {tab.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <View style={styles.bookingsList}>
+        {filteredBookings.length > 0 ? (
+          filteredBookings.map((booking) => (
+            <BookingCard
+              booking={booking}
+              isRtl={isRtl}
+              key={booking.id}
+              onCancelBooking={onCancelBooking}
+              onEditBooking={onEditBooking}
+              onOpenBooking={onOpenBooking}
+              styles={styles}
+            />
+          ))
+        ) : (
+          <PremiumStateCard
+            body="لا توجد بطاقات في هذا التصنيف حالياً. أي تغيير هنا مرئي فقط ولا يقرأ بيانات حقيقية."
+            icon="0"
+            isRtl={isRtl}
+            label="حالة فارغة"
+            styles={styles}
+            title="لا توجد حجوزات هنا"
+          />
+        )}
       </View>
     </View>
   );
 }
 
-function BookingStatusBoard({
+function BookingCard({
+  booking,
   isRtl,
+  onCancelBooking,
+  onEditBooking,
+  onOpenBooking,
   styles,
 }: {
+  booking: VisualBooking;
   isRtl: boolean;
+  onCancelBooking: (booking: VisualBooking) => void;
+  onEditBooking: (booking: VisualBooking) => void;
+  onOpenBooking: (booking: VisualBooking) => void;
   styles: MobileStyles;
 }) {
+  const cancelled = booking.status === "cancelled";
+
   return (
-    <View style={styles.statusBoard}>
-      <SectionHeader isRtl={isRtl} styles={styles} title="حجوزاتي" />
-      {bookingStatusCards.map((booking) => (
-        <View key={booking.business} style={styles.statusBookingCard}>
-          <View style={styles.statusBookingHeader}>
+    <Pressable
+      accessibilityHint="يفتح تفاصيل حجز مرئي فقط."
+      accessibilityLabel={`عرض حجز ${booking.businessName}`}
+      accessibilityRole="button"
+      onPress={() => onOpenBooking(booking)}
+      style={({ pressed }) => [
+        styles.managedBookingCard,
+        pressed && styles.softButtonPressed,
+      ]}
+    >
+      <View style={styles.managedBookingHeader}>
+        <View style={styles.managedBookingMedia}>
+          <BusinessMedia badge={booking.statusLabel} styles={styles} />
+        </View>
+        <View style={styles.rowCopy}>
+          <View style={styles.managedBookingTitleRow}>
+            <Text style={[styles.managedBookingTitle, isRtl && styles.rtlText]}>
+              {booking.businessName}
+            </Text>
             <Text
               style={[
-                styles.statusChip,
-                booking.status === "completed" && styles.statusChipCompleted,
-                booking.status === "cancelled" && styles.statusChipCancelled,
+                styles.managedStatusPill,
+                booking.status === "pending" && styles.managedStatusPillWarning,
+                booking.status === "completed" && styles.managedStatusPillSuccess,
+                cancelled && styles.managedStatusPillCancelled,
               ]}
             >
               {booking.statusLabel}
             </Text>
-            <Text style={styles.receiptAction}>{booking.action}</Text>
           </View>
-          <Text style={[styles.myBookingTitle, isRtl && styles.rtlText]}>
-            {booking.business}
+          <Text style={[styles.managedBookingMeta, isRtl && styles.rtlText]}>
+            {booking.serviceName} · {booking.category}
           </Text>
-          <Text style={[styles.myBookingMeta, isRtl && styles.rtlText]}>
-            {booking.meta}
-          </Text>
-          <View style={styles.bookingActions}>
-            <Text style={styles.editAction}>عرض التفاصيل</Text>
-            <Text style={styles.cancelAction}>إلغاء بصري</Text>
+          <View style={styles.managedBookingInfoGrid}>
+            <BookingInfoPill
+              iconSource={mobileIconAssets.common.calendar}
+              label={`${booking.date} · ${booking.time}`}
+              styles={styles}
+            />
+            <BookingInfoPill
+              iconSource={mobileIconAssets.common.paymentCard}
+              label={booking.price}
+              styles={styles}
+            />
           </View>
+          <Text style={[styles.managedBookingMeta, isRtl && styles.rtlText]}>
+            المختص: {booking.staff}
+          </Text>
         </View>
-      ))}
+      </View>
+
+      <View style={styles.managedBookingActions}>
+        <BookingActionButton
+          label="عرض"
+          onPress={() => onOpenBooking(booking)}
+          styles={styles}
+          tone="primary"
+        />
+        <BookingActionButton
+          label="تعديل"
+          onPress={() => onEditBooking(booking)}
+          styles={styles}
+          tone="neutral"
+        />
+        <BookingActionButton
+          disabled={cancelled}
+          label="إلغاء"
+          onPress={() => onCancelBooking(booking)}
+          styles={styles}
+          tone="danger"
+        />
+      </View>
+    </Pressable>
+  );
+}
+
+function BookingInfoPill({
+  iconSource,
+  label,
+  styles,
+}: {
+  iconSource: ImageSourcePropType;
+  label: string;
+  styles: MobileStyles;
+}) {
+  return (
+    <View style={styles.bookingInfoPill}>
+      <Image
+        alt=""
+        resizeMode="contain"
+        source={iconSource}
+        style={styles.bookingInfoPillIcon}
+      />
+      <Text style={styles.bookingInfoPillText}>{label}</Text>
+    </View>
+  );
+}
+
+function BookingActionButton({
+  disabled,
+  label,
+  onPress,
+  styles,
+  tone,
+}: {
+  disabled?: boolean;
+  label: string;
+  onPress: () => void;
+  styles: MobileStyles;
+  tone: "danger" | "neutral" | "primary";
+}) {
+  return (
+    <Pressable
+      accessibilityHint="إجراء إدارة مرئي فقط ولا يغير حجزاً حقيقياً."
+      accessibilityLabel={label}
+      accessibilityRole="button"
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      hitSlop={TOUCH_HIT_SLOP}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.bookingActionButton,
+        tone === "primary" && styles.bookingActionButtonPrimary,
+        tone === "danger" && styles.bookingActionButtonDanger,
+        disabled && styles.disabledButton,
+        pressed && !disabled && styles.softButtonPressed,
+      ]}
+    >
+      <Text
+        style={[
+          styles.bookingActionButtonText,
+          tone === "primary" && styles.bookingActionButtonTextPrimary,
+          tone === "danger" && styles.bookingActionButtonTextDanger,
+        ]}
+      >
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+function BookingDetailScreen({
+  booking,
+  isRtl,
+  managementPanel,
+  onBack,
+  onCancelBooking,
+  onClosePanel,
+  onConfirmCancel,
+  onEditBooking,
+  onReturnHome,
+  styles,
+}: {
+  booking: VisualBooking;
+  isRtl: boolean;
+  managementPanel: BookingManagementPanel;
+  onBack: () => void;
+  onCancelBooking: (booking: VisualBooking) => void;
+  onClosePanel: () => void;
+  onConfirmCancel: (booking: VisualBooking) => void;
+  onEditBooking: (booking: VisualBooking) => void;
+  onReturnHome: () => void;
+  styles: MobileStyles;
+}) {
+  return (
+    <View style={styles.bookingDetailScreen}>
+      <BookingFlowHeader
+        isRtl={isRtl}
+        onBack={onBack}
+        stepLabel="عرض الحجز"
+        styles={styles}
+        subtitle="واجهة عرض فقط، لا يوجد حجز حقيقي في هذه المرحلة."
+        title="تفاصيل الحجز"
+      />
+
+      <View style={styles.bookingDetailHero}>
+        <BusinessMedia badge={booking.statusLabel} styles={styles} />
+        <View style={styles.bookingDetailHeroCopy}>
+          <Text style={[styles.managedBookingTitle, isRtl && styles.rtlText]}>
+            {booking.businessName}
+          </Text>
+          <Text style={[styles.managedBookingMeta, isRtl && styles.rtlText]}>
+            {booking.category} · {booking.reference}
+          </Text>
+          <Text
+            style={[
+              styles.managedStatusPill,
+              booking.status === "pending" && styles.managedStatusPillWarning,
+              booking.status === "completed" && styles.managedStatusPillSuccess,
+              booking.status === "cancelled" && styles.managedStatusPillCancelled,
+            ]}
+          >
+            {booking.statusLabel}
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.bookingDetailSummary}>
+        <SummaryItem label="النشاط" styles={styles} value={booking.businessName} />
+        <SummaryItem label="الخدمة" styles={styles} value={booking.serviceName} />
+        <SummaryItem label="المختص" styles={styles} value={booking.staff} />
+        <SummaryItem
+          label="الموعد"
+          styles={styles}
+          value={`${booking.date} · ${booking.time}`}
+        />
+        <SummaryItem
+          label="طريقة الدفع"
+          styles={styles}
+          value={booking.paymentMethod}
+        />
+        <SummaryItem label="الإجمالي" styles={styles} value={booking.price} />
+        <SummaryItem label="المرجع" styles={styles} value={booking.reference} />
+      </View>
+
+      <View style={styles.safeManagementNote}>
+        <Image
+          alt=""
+          resizeMode="contain"
+          source={mobileIconAssets.common.checkSuccess}
+          style={styles.safeManagementIcon}
+        />
+        <Text style={[styles.securePaymentText, isRtl && styles.rtlText]}>
+          واجهة عرض فقط، لا يوجد حجز حقيقي ولا يتم إرسال تعديل أو إلغاء.
+        </Text>
+      </View>
+
+      <View style={styles.bookingDetailActions}>
+        <PrimaryButton
+          label="تعديل الحجز"
+          onPress={() => onEditBooking(booking)}
+          styles={styles}
+        />
+        <Pressable
+          accessibilityHint="يفتح تأكيد إلغاء بصري فقط."
+          accessibilityLabel="إلغاء الحجز"
+          accessibilityRole="button"
+          disabled={booking.status === "cancelled"}
+          hitSlop={TOUCH_HIT_SLOP}
+          onPress={() => onCancelBooking(booking)}
+          style={({ pressed }) => [
+            styles.cancelBookingButton,
+            booking.status === "cancelled" && styles.disabledButton,
+            pressed && booking.status !== "cancelled" && styles.softButtonPressed,
+          ]}
+        >
+          <Text style={styles.cancelBookingButtonText}>إلغاء الحجز</Text>
+        </Pressable>
+        <Pressable
+          accessibilityHint="يعود إلى الرئيسية دون تغيير أي بيانات."
+          accessibilityLabel="العودة للرئيسية"
+          accessibilityRole="button"
+          hitSlop={TOUCH_HIT_SLOP}
+          onPress={onReturnHome}
+          style={({ pressed }) => [
+            styles.secondaryButton,
+            pressed && styles.softButtonPressed,
+          ]}
+        >
+          <Text style={styles.secondaryButtonText}>العودة للرئيسية</Text>
+        </Pressable>
+      </View>
+
+      {managementPanel ? (
+        <BookingManagementPanelCard
+          booking={booking}
+          mode={managementPanel}
+          onClose={onClosePanel}
+          onConfirmCancel={onConfirmCancel}
+          styles={styles}
+        />
+      ) : null}
+    </View>
+  );
+}
+
+function BookingManagementPanelCard({
+  booking,
+  mode,
+  onClose,
+  onConfirmCancel,
+  styles,
+}: {
+  booking: VisualBooking;
+  mode: Exclude<BookingManagementPanel, null>;
+  onClose: () => void;
+  onConfirmCancel: (booking: VisualBooking) => void;
+  styles: MobileStyles;
+}) {
+  if (mode === "edit") {
+    return (
+      <View style={styles.managementPanel}>
+        <Text style={styles.managementPanelTitle}>تعديل الحجز</Text>
+        <Text style={styles.managementPanelBody}>
+          يمكنك تعديل الخدمة أو الوقت بصرياً في هذه المعاينة فقط. لا يتم حفظ أي
+          تغيير ولا يتم إرسال أي طلب.
+        </Text>
+        <View style={styles.managementPanelActions}>
+          <BookingActionButton
+            label="تغيير الوقت"
+            onPress={onClose}
+            styles={styles}
+            tone="neutral"
+          />
+          <BookingActionButton
+            label="تغيير المختص"
+            onPress={onClose}
+            styles={styles}
+            tone="neutral"
+          />
+          <BookingActionButton
+            label="إغلاق"
+            onPress={onClose}
+            styles={styles}
+            tone="primary"
+          />
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.managementPanel}>
+      <Text style={styles.managementPanelTitle}>إلغاء الحجز؟</Text>
+      <Text style={styles.managementPanelBody}>
+        هذا إجراء بصري فقط ولا يلغي أي حجز حقيقي. سيظهر هذا الحجز كملغى داخل
+        المعاينة المحلية فقط.
+      </Text>
+      <View style={styles.managementPanelActions}>
+        <BookingActionButton
+          label="تراجع"
+          onPress={onClose}
+          styles={styles}
+          tone="neutral"
+        />
+        <BookingActionButton
+          label="إلغاء الحجز"
+          onPress={() => onConfirmCancel(booking)}
+          styles={styles}
+          tone="danger"
+        />
+      </View>
     </View>
   );
 }
@@ -3853,7 +4025,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     bookingBottomAction: {
       marginTop: 8,
-      paddingBottom: 18,
+      paddingBottom: 44,
     },
     bookingDateRail: {
       flexDirection: "row",
@@ -3902,7 +4074,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     bookingReceiptActions: {
       gap: 12,
-      paddingBottom: 20,
+      paddingBottom: 48,
     },
     bookingSearchField: {
       alignItems: "center",
@@ -3934,6 +4106,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     bookingStepScreen: {
       gap: 18,
+      paddingBottom: 48,
       paddingHorizontal: 20,
       paddingTop: 18,
     },
@@ -3971,6 +4144,296 @@ const createStyles = (theme: MobileTheme) =>
     },
     bookingTimeSlotTextMuted: {
       color: theme.colors.mutedForeground,
+    },
+    bookingActionButton: {
+      alignItems: "center",
+      backgroundColor: theme.colors.cardElevated,
+      borderColor: theme.colors.border,
+      borderRadius: theme.radii.pill,
+      borderWidth: 1,
+      flex: 1,
+      justifyContent: "center",
+      minHeight: 42,
+      minWidth: 82,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+    },
+    bookingActionButtonDanger: {
+      backgroundColor: theme.colors.dangerSoft,
+      borderColor: theme.colors.danger,
+    },
+    bookingActionButtonPrimary: {
+      backgroundColor: theme.colors.gold,
+      borderColor: theme.colors.gold,
+    },
+    bookingActionButtonText: {
+      color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: 12,
+      textAlign: "center",
+    },
+    bookingActionButtonTextDanger: {
+      color: theme.colors.danger,
+    },
+    bookingActionButtonTextPrimary: {
+      color: theme.colors.foregroundInverse,
+    },
+    bookingDetailActions: {
+      gap: 12,
+      paddingBottom: 48,
+    },
+    bookingDetailHero: {
+      backgroundColor: theme.colors.hero,
+      borderColor: theme.colors.goldSoft,
+      borderRadius: theme.radii.xl,
+      borderWidth: 1,
+      gap: 18,
+      overflow: "hidden",
+      padding: 18,
+      shadowColor: theme.colors.shadow,
+      shadowOffset: { height: 20, width: 0 },
+      shadowOpacity: theme.isDark ? 0.34 : 0.12,
+      shadowRadius: 30,
+    },
+    bookingDetailHeroCopy: {
+      gap: 8,
+    },
+    bookingDetailScreen: {
+      gap: 18,
+      paddingBottom: 54,
+      paddingHorizontal: 20,
+      paddingTop: 18,
+    },
+    bookingDetailSummary: {
+      backgroundColor: theme.colors.card,
+      borderColor: theme.colors.goldSoft,
+      borderRadius: theme.radii.card,
+      borderWidth: 1,
+      gap: 10,
+      padding: 18,
+    },
+    bookingInfoPill: {
+      alignItems: "center",
+      backgroundColor: theme.colors.cardElevated,
+      borderColor: theme.colors.border,
+      borderRadius: theme.radii.pill,
+      borderWidth: 1,
+      flexDirection: "row",
+      gap: 7,
+      paddingHorizontal: 10,
+      paddingVertical: 7,
+    },
+    bookingInfoPillIcon: {
+      height: 14,
+      tintColor: theme.colors.gold,
+      width: 14,
+    },
+    bookingInfoPillText: {
+      color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiMedium,
+      fontSize: 11,
+    },
+    bookingsBell: {
+      alignItems: "center",
+      backgroundColor: theme.colors.cardElevated,
+      borderColor: theme.colors.border,
+      borderRadius: 22,
+      borderWidth: 1,
+      height: 44,
+      justifyContent: "center",
+      width: 44,
+    },
+    bookingsBellIcon: {
+      height: 22,
+      tintColor: theme.colors.gold,
+      width: 22,
+    },
+    bookingsList: {
+      gap: 14,
+    },
+    bookingsScreen: {
+      gap: 18,
+      paddingBottom: 54,
+      paddingHorizontal: 20,
+      paddingTop: 18,
+    },
+    bookingsSegment: {
+      alignItems: "center",
+      borderRadius: theme.radii.pill,
+      flex: 1,
+      justifyContent: "center",
+      minHeight: 44,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+    },
+    bookingsSegmentActive: {
+      backgroundColor: theme.colors.gold,
+    },
+    bookingsSegmentText: {
+      color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiMedium,
+      fontSize: 12,
+      textAlign: "center",
+    },
+    bookingsSegmentTextActive: {
+      color: theme.colors.foregroundInverse,
+      fontFamily: mobileTypography.uiSemiBold,
+    },
+    bookingsSegmentedTabs: {
+      backgroundColor: theme.colors.cardElevated,
+      borderColor: theme.colors.border,
+      borderRadius: theme.radii.pill,
+      borderWidth: 1,
+      flexDirection: "row",
+      gap: 4,
+      padding: 4,
+    },
+    bookingsTopRow: {
+      alignItems: "flex-start",
+      flexDirection: "row",
+      gap: 12,
+      justifyContent: "space-between",
+    },
+    cancelBookingButton: {
+      alignItems: "center",
+      backgroundColor: theme.colors.dangerSoft,
+      borderColor: theme.colors.danger,
+      borderRadius: theme.radii.control,
+      borderWidth: 1,
+      minHeight: 54,
+      justifyContent: "center",
+      paddingHorizontal: 18,
+      paddingVertical: 14,
+    },
+    cancelBookingButtonText: {
+      color: theme.colors.danger,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: 14,
+      textAlign: "center",
+    },
+    managedBookingActions: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+      marginTop: 16,
+    },
+    managedBookingCard: {
+      backgroundColor: theme.colors.card,
+      borderColor: theme.colors.border,
+      borderRadius: 28,
+      borderWidth: 1,
+      padding: 16,
+      shadowColor: theme.colors.shadow,
+      shadowOffset: { height: 16, width: 0 },
+      shadowOpacity: theme.isDark ? 0.22 : 0.08,
+      shadowRadius: 24,
+    },
+    managedBookingHeader: {
+      gap: 14,
+    },
+    managedBookingInfoGrid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+      marginTop: 12,
+    },
+    managedBookingMedia: {
+      borderRadius: 24,
+      height: 128,
+      overflow: "hidden",
+    },
+    managedBookingMeta: {
+      color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiRegular,
+      fontSize: 13,
+      lineHeight: 20,
+      marginTop: 4,
+    },
+    managedBookingTitle: {
+      color: theme.colors.foreground,
+      flexShrink: 1,
+      fontFamily: mobileTypography.kufiBold,
+      fontSize: 20,
+      lineHeight: 27,
+    },
+    managedBookingTitleRow: {
+      alignItems: "flex-start",
+      flexDirection: "row",
+      gap: 10,
+      justifyContent: "space-between",
+    },
+    managedStatusPill: {
+      backgroundColor: theme.colors.goldSoft,
+      borderColor: theme.colors.gold,
+      borderRadius: theme.radii.pill,
+      borderWidth: 1,
+      color: theme.colors.deepGold,
+      flexShrink: 0,
+      fontFamily: mobileTypography.uiMedium,
+      fontSize: 11,
+      overflow: "hidden",
+      paddingHorizontal: 9,
+      paddingVertical: 6,
+    },
+    managedStatusPillCancelled: {
+      backgroundColor: theme.colors.dangerSoft,
+      borderColor: theme.colors.danger,
+      color: theme.colors.danger,
+    },
+    managedStatusPillSuccess: {
+      backgroundColor: theme.colors.successSoft,
+      borderColor: theme.colors.success,
+      color: theme.colors.success,
+    },
+    managedStatusPillWarning: {
+      backgroundColor: theme.colors.warningSoft,
+      borderColor: theme.colors.warning,
+      color: theme.colors.warning,
+    },
+    managementPanel: {
+      backgroundColor: theme.colors.cardElevated,
+      borderColor: theme.colors.goldSoft,
+      borderRadius: theme.radii.card,
+      borderWidth: 1,
+      gap: 12,
+      padding: 18,
+      shadowColor: theme.colors.shadow,
+      shadowOffset: { height: 18, width: 0 },
+      shadowOpacity: theme.isDark ? 0.3 : 0.1,
+      shadowRadius: 28,
+    },
+    managementPanelActions: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+      marginTop: 4,
+    },
+    managementPanelBody: {
+      color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiRegular,
+      fontSize: 13,
+      lineHeight: 21,
+    },
+    managementPanelTitle: {
+      color: theme.colors.foreground,
+      fontFamily: mobileTypography.kufiBold,
+      fontSize: 20,
+      lineHeight: 27,
+    },
+    safeManagementIcon: {
+      height: 22,
+      tintColor: theme.colors.success,
+      width: 22,
+    },
+    safeManagementNote: {
+      alignItems: "center",
+      backgroundColor: theme.colors.successSoft,
+      borderColor: theme.colors.success,
+      borderRadius: 22,
+      borderWidth: 1,
+      flexDirection: "row",
+      gap: 12,
+      padding: 16,
     },
     brandCopy: {
       flex: 1,
@@ -4609,7 +5072,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     content: {
       gap: 20,
-      paddingBottom: 128,
+      paddingBottom: 164,
       paddingHorizontal: 20,
     },
     immersiveContent: {
