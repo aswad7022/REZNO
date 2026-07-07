@@ -2,6 +2,7 @@ import { StatusBar } from "expo-status-bar";
 import { useCallback, useMemo, useState } from "react";
 import {
   I18nManager,
+  Image,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -9,6 +10,7 @@ import {
   Text,
   useColorScheme,
   View,
+  type ImageSourcePropType,
 } from "react-native";
 
 import { fetchMobileMarketplace } from "./src/api/marketplace";
@@ -71,13 +73,76 @@ type BookingStep = {
 
 type MobileThemeMode = "system" | "light" | "dark";
 
+/* eslint-disable @typescript-eslint/no-require-imports -- React Native bundles static image assets through require(). */
+const mobileIconAssets = {
+  categories: {
+    clinic: require("./assets/icons/categories/clinic.png") as ImageSourcePropType,
+    gym: require("./assets/icons/categories/gym.png") as ImageSourcePropType,
+    restaurant: require("./assets/icons/categories/restaurant.png") as ImageSourcePropType,
+    salon: require("./assets/icons/categories/salon.png") as ImageSourcePropType,
+    services: require("./assets/icons/categories/services.png") as ImageSourcePropType,
+    spa: require("./assets/icons/categories/spa.png") as ImageSourcePropType,
+  },
+  common: {
+    backArrow: require("./assets/icons/common/back-arrow.png") as ImageSourcePropType,
+    calendar: require("./assets/icons/common/calendar.png") as ImageSourcePropType,
+    checkSuccess: require("./assets/icons/common/check-success.png") as ImageSourcePropType,
+    clock: require("./assets/icons/common/clock.png") as ImageSourcePropType,
+    filter: require("./assets/icons/common/filter.png") as ImageSourcePropType,
+    heart: require("./assets/icons/common/heart.png") as ImageSourcePropType,
+    locationPin: require("./assets/icons/common/location-pin.png") as ImageSourcePropType,
+    notificationBell: require("./assets/icons/common/notification-bell.png") as ImageSourcePropType,
+    paymentCard: require("./assets/icons/common/payment-card.png") as ImageSourcePropType,
+    search: require("./assets/icons/common/search.png") as ImageSourcePropType,
+    share: require("./assets/icons/common/share.png") as ImageSourcePropType,
+    starRating: require("./assets/icons/common/star-rating.png") as ImageSourcePropType,
+  },
+};
+/* eslint-enable @typescript-eslint/no-require-imports */
+
 const categories = [
-  { badge: "الأكثر حجزاً", count: "128 نشاط", icon: "✦", label: "صالونات", tone: "gold" },
-  { badge: "متاح اليوم", count: "42 مطعم", icon: "◐", label: "مطاعم", tone: "green" },
-  { badge: "قريب منك", count: "31 عيادة", icon: "◇", label: "عيادات", tone: "blue" },
-  { badge: "فاخر", count: "18 سبا", icon: "✦", label: "سبا", tone: "rose" },
-  { badge: "صباحي", count: "27 مركز", icon: "△", label: "رياضة", tone: "dark" },
-  { badge: "سريع", count: "64 خدمة", icon: "▦", label: "خدمات", tone: "gold" },
+  {
+    badge: "الأكثر حجزاً",
+    count: "128 نشاط",
+    icon: mobileIconAssets.categories.salon,
+    label: "صالونات",
+    tone: "gold",
+  },
+  {
+    badge: "متاح اليوم",
+    count: "42 مطعم",
+    icon: mobileIconAssets.categories.restaurant,
+    label: "مطاعم",
+    tone: "green",
+  },
+  {
+    badge: "قريب منك",
+    count: "31 عيادة",
+    icon: mobileIconAssets.categories.clinic,
+    label: "عيادات",
+    tone: "blue",
+  },
+  {
+    badge: "فاخر",
+    count: "18 سبا",
+    icon: mobileIconAssets.categories.spa,
+    label: "سبا",
+    tone: "rose",
+  },
+  {
+    badge: "صباحي",
+    count: "27 مركز",
+    icon: mobileIconAssets.categories.gym,
+    label: "رياضة",
+    tone: "dark",
+  },
+  {
+    badge: "سريع",
+    count: "64 خدمة",
+    icon: mobileIconAssets.categories.services,
+    label: "خدمات",
+    tone: "gold",
+  },
 ];
 
 const featuredBusinesses: PremiumBusiness[] = [
@@ -779,7 +844,12 @@ function HeroCard({ isRtl, styles }: { isRtl: boolean; styles: MobileStyles }) {
     <View style={styles.heroCard}>
       <View style={styles.heroGlow} />
       <View style={styles.locationPill}>
-        <Text style={styles.locationDot}>●</Text>
+        <Image
+          alt=""
+          resizeMode="contain"
+          source={mobileIconAssets.common.locationPin}
+          style={styles.locationIconImage}
+        />
         <Text style={styles.locationText}>بغداد</Text>
       </View>
       <Text style={[styles.heroEyebrow, isRtl && styles.rtlText]}>
@@ -838,15 +908,30 @@ function SearchBar({
         pressed && styles.searchBarPressed,
       ]}
     >
-      <Text style={styles.searchIcon}>⌕</Text>
+      <Image
+        alt=""
+        resizeMode="contain"
+        source={mobileIconAssets.common.search}
+        style={styles.searchIconImage}
+      />
       <Text style={[styles.searchPlaceholder, isRtl && styles.rtlText]}>
         ابحث عن خدمة، مطعم، عيادة...
       </Text>
       <View style={styles.voiceButton}>
-        <Text style={styles.voiceText}>◌</Text>
+        <Image
+          alt=""
+          resizeMode="contain"
+          source={mobileIconAssets.common.locationPin}
+          style={styles.voiceIconImage}
+        />
       </View>
       <View style={styles.filterButton}>
-        <Text style={styles.filterText}>⚙</Text>
+        <Image
+          alt=""
+          resizeMode="contain"
+          source={mobileIconAssets.common.filter}
+          style={styles.filterIconImage}
+        />
       </View>
     </Pressable>
   );
@@ -868,14 +953,15 @@ function CategoryGrid({ styles }: { styles: MobileStyles }) {
               category.tone === "dark" && styles.categoryRailCardPurple,
             ]}
           >
-            <Text
+            <Image
+              alt=""
+              resizeMode="contain"
+              source={category.icon}
               style={[
-                styles.categoryRailIcon,
-                index === 0 && styles.categoryRailCardActiveIcon,
+                styles.categoryRailIconImage,
+                index === 0 && styles.categoryRailIconImageActive,
               ]}
-            >
-              {category.icon}
-            </Text>
+            />
             <Text
               style={[
                 styles.categoryRailLabel,
@@ -902,7 +988,12 @@ function CategoryGrid({ styles }: { styles: MobileStyles }) {
             ]}
           >
             <View style={styles.categoryTopRow}>
-              <Text style={styles.categoryIcon}>{category.icon}</Text>
+              <Image
+                alt=""
+                resizeMode="contain"
+                source={category.icon}
+                style={styles.categoryIconImage}
+              />
               <Text style={styles.categoryBadge}>{category.badge}</Text>
             </View>
             <Text style={styles.categoryLabel}>{category.label}</Text>
@@ -956,7 +1047,12 @@ function BusinessMedia({
         </View>
       ) : null}
       <View style={styles.favoriteButton}>
-        <Text style={styles.favoriteText}>♡</Text>
+        <Image
+          alt=""
+          resizeMode="contain"
+          source={mobileIconAssets.common.heart}
+          style={styles.favoriteIconImage}
+        />
       </View>
     </>
   );
@@ -993,7 +1089,13 @@ function PremiumBusinessCard({
             </Text>
           </View>
           <View style={styles.ratingPill}>
-            <Text style={styles.ratingText}>★ {business.rating}</Text>
+            <Image
+              alt=""
+              resizeMode="contain"
+              source={mobileIconAssets.common.starRating}
+              style={styles.ratingIconImage}
+            />
+            <Text style={styles.ratingText}>{business.rating}</Text>
           </View>
         </View>
         <View style={styles.businessMetricsRow}>
@@ -1054,7 +1156,12 @@ function SearchMapScreen({
         <View style={styles.searchMapTopRow}>
           <SearchBar isRtl={isRtl} styles={styles} />
           <View style={styles.searchMapFilterButton}>
-            <Text style={styles.searchMapFilterIcon}>≡</Text>
+            <Image
+              alt=""
+              resizeMode="contain"
+              source={mobileIconAssets.common.filter}
+              style={styles.searchMapFilterIconImage}
+            />
           </View>
         </View>
 
@@ -1166,7 +1273,13 @@ function SearchMapResultCard({
           {business.category} · {business.status}
         </Text>
         <View style={styles.searchResultStats}>
-          <Text style={styles.searchResultRating}>★ {business.rating}</Text>
+          <Image
+            alt=""
+            resizeMode="contain"
+            source={mobileIconAssets.common.starRating}
+            style={styles.searchResultStarImage}
+          />
+          <Text style={styles.searchResultRating}>{business.rating}</Text>
           <Text style={styles.searchResultReviews}>
             ({business.reviewCount.replace(" تقييم", "")})
           </Text>
@@ -1174,8 +1287,18 @@ function SearchMapResultCard({
         <Text style={styles.searchResultPrice}>{business.price}</Text>
       </View>
       <View style={styles.searchResultActions}>
-        <Text style={styles.searchResultHeart}>♡</Text>
-        <Text style={styles.searchResultShare}>⌯</Text>
+        <Image
+          alt=""
+          resizeMode="contain"
+          source={mobileIconAssets.common.heart}
+          style={styles.searchResultHeartImage}
+        />
+        <Image
+          alt=""
+          resizeMode="contain"
+          source={mobileIconAssets.common.share}
+          style={styles.searchResultShareImage}
+        />
         <Text style={styles.searchResultDistance}>
           {index === 0 ? "0.6 كم" : business.distance}
         </Text>
@@ -1263,11 +1386,24 @@ function SalonDetailScreen({
             pressed && styles.iconButtonPressed,
           ]}
         >
-          <Text style={styles.salonBackIcon}>‹</Text>
+          <Image
+            alt="رجوع"
+            resizeMode="contain"
+            source={mobileIconAssets.common.backArrow}
+            style={styles.salonBackIconImage}
+          />
         </Pressable>
         <View style={styles.salonHeroActions}>
-          <VisualIconButton label="مفضلة" styles={styles} symbol="♡" />
-          <VisualIconButton label="مشاركة" styles={styles} symbol="⌯" />
+          <VisualIconButton
+            iconSource={mobileIconAssets.common.heart}
+            label="مفضلة"
+            styles={styles}
+          />
+          <VisualIconButton
+            iconSource={mobileIconAssets.common.share}
+            label="مشاركة"
+            styles={styles}
+          />
         </View>
         <View style={styles.salonHeroStage}>
           <BusinessMedia badge={business.status} styles={styles} />
@@ -1281,7 +1417,12 @@ function SalonDetailScreen({
               <Text style={[styles.salonName, isRtl && styles.rtlText]}>
                 {business.name}
               </Text>
-              <Text style={styles.verifiedBadge}>✓</Text>
+              <Image
+                alt=""
+                resizeMode="contain"
+                source={mobileIconAssets.common.checkSuccess}
+                style={styles.verifiedBadgeImage}
+              />
             </View>
             <Text style={[styles.salonMeta, isRtl && styles.rtlText]}>
               اسطنبول · {business.category} · {business.distance}
@@ -1290,7 +1431,12 @@ function SalonDetailScreen({
           <Text style={styles.salonLikes}>❤ 128</Text>
         </View>
         <View style={styles.salonRatingRow}>
-          <Text style={styles.salonRatingStar}>★</Text>
+          <Image
+            alt=""
+            resizeMode="contain"
+            source={mobileIconAssets.common.starRating}
+            style={styles.salonRatingStarImage}
+          />
           <Text style={styles.salonRatingText}>
             {business.rating} ({business.reviewCount.replace(" تقييم", "")})
           </Text>
@@ -1298,9 +1444,21 @@ function SalonDetailScreen({
 
         <View style={styles.salonActionGrid}>
           <VisualActionTile label="اتصال" styles={styles} symbol="☎" />
-          <VisualActionTile label="مشاركة" styles={styles} symbol="⌯" />
-          <VisualActionTile label="الموقع" styles={styles} symbol="⌖" />
-          <VisualActionTile label="واتساب" styles={styles} symbol="✓" />
+          <VisualActionTile
+            iconSource={mobileIconAssets.common.share}
+            label="مشاركة"
+            styles={styles}
+          />
+          <VisualActionTile
+            iconSource={mobileIconAssets.common.locationPin}
+            label="الموقع"
+            styles={styles}
+          />
+          <VisualActionTile
+            iconSource={mobileIconAssets.common.checkSuccess}
+            label="واتساب"
+            styles={styles}
+          />
         </View>
 
         <View style={styles.salonTabs}>
@@ -1358,13 +1516,15 @@ function SalonDetailScreen({
 }
 
 function VisualIconButton({
+  iconSource,
   label,
   styles,
   symbol,
 }: {
+  iconSource?: ImageSourcePropType;
   label: string;
   styles: MobileStyles;
-  symbol: string;
+  symbol?: string;
 }) {
   return (
     <Pressable
@@ -1376,19 +1536,30 @@ function VisualIconButton({
       hitSlop={TOUCH_HIT_SLOP}
       style={styles.salonRoundButton}
     >
-      <Text style={styles.salonRoundButtonText}>{symbol}</Text>
+      {iconSource ? (
+        <Image
+          alt={label}
+          resizeMode="contain"
+          source={iconSource}
+          style={styles.salonRoundButtonIcon}
+        />
+      ) : (
+        <Text style={styles.salonRoundButtonText}>{symbol}</Text>
+      )}
     </Pressable>
   );
 }
 
 function VisualActionTile({
+  iconSource,
   label,
   styles,
   symbol,
 }: {
+  iconSource?: ImageSourcePropType;
   label: string;
   styles: MobileStyles;
-  symbol: string;
+  symbol?: string;
 }) {
   return (
     <Pressable
@@ -1400,7 +1571,16 @@ function VisualActionTile({
       hitSlop={TOUCH_HIT_SLOP}
       style={styles.salonActionTile}
     >
-      <Text style={styles.salonActionIcon}>{symbol}</Text>
+      {iconSource ? (
+        <Image
+          alt=""
+          resizeMode="contain"
+          source={iconSource}
+          style={styles.salonActionIconImage}
+        />
+      ) : (
+        <Text style={styles.salonActionIcon}>{symbol}</Text>
+      )}
       <Text style={styles.salonActionLabel}>{label}</Text>
     </Pressable>
   );
@@ -3008,6 +3188,11 @@ const createStyles = (theme: MobileTheme) =>
       fontWeight: "900",
       lineHeight: 28,
     },
+    categoryIconImage: {
+      height: 30,
+      tintColor: "#ffffff",
+      width: 30,
+    },
     categoryLabel: {
       color: "#ffffff",
       fontSize: 14,
@@ -3047,6 +3232,14 @@ const createStyles = (theme: MobileTheme) =>
       fontSize: 19,
       fontWeight: "900",
       lineHeight: 22,
+    },
+    categoryRailIconImage: {
+      height: 24,
+      tintColor: theme.colors.foreground,
+      width: 24,
+    },
+    categoryRailIconImageActive: {
+      tintColor: theme.colors.foregroundInverse,
     },
     categoryRailCardActiveIcon: {
       color: theme.colors.foregroundInverse,
@@ -3092,6 +3285,11 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.foreground,
       fontSize: 28,
       lineHeight: 30,
+    },
+    centerTabIconImage: {
+      height: 32,
+      tintColor: theme.colors.foreground,
+      width: 32,
     },
     chipRow: {
       flexDirection: "row",
@@ -3441,6 +3639,11 @@ const createStyles = (theme: MobileTheme) =>
       fontSize: 20,
       fontWeight: "900",
     },
+    favoriteIconImage: {
+      height: 22,
+      tintColor: theme.colors.gold,
+      width: 22,
+    },
     faqRow: {
       alignItems: "center",
       backgroundColor: theme.colors.cardElevated,
@@ -3516,6 +3719,11 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.foregroundInverse,
       fontSize: 15,
       fontWeight: "900",
+    },
+    filterIconImage: {
+      height: 18,
+      tintColor: theme.colors.foregroundInverse,
+      width: 18,
     },
     ghostButton: {
       alignItems: "center",
@@ -3668,6 +3876,11 @@ const createStyles = (theme: MobileTheme) =>
     locationDot: {
       color: theme.colors.success,
       fontSize: 10,
+    },
+    locationIconImage: {
+      height: 14,
+      tintColor: theme.colors.success,
+      width: 14,
     },
     locationPill: {
       alignItems: "center",
@@ -4873,10 +5086,18 @@ const createStyles = (theme: MobileTheme) =>
       marginTop: 8,
     },
     ratingPill: {
+      alignItems: "center",
       backgroundColor: theme.colors.goldSoft,
       borderRadius: theme.radii.pill,
+      flexDirection: "row",
+      gap: 5,
       paddingHorizontal: 10,
       paddingVertical: 6,
+    },
+    ratingIconImage: {
+      height: 13,
+      tintColor: theme.colors.deepGold,
+      width: 13,
     },
     ratingText: {
       color: theme.colors.deepGold,
@@ -5206,6 +5427,11 @@ const createStyles = (theme: MobileTheme) =>
       fontWeight: "900",
       lineHeight: 30,
     },
+    salonActionIconImage: {
+      height: 28,
+      tintColor: theme.colors.foreground,
+      width: 28,
+    },
     salonActionLabel: {
       color: theme.colors.mutedForeground,
       fontSize: 13,
@@ -5244,6 +5470,11 @@ const createStyles = (theme: MobileTheme) =>
       fontWeight: "700",
       lineHeight: 45,
       marginTop: -4,
+    },
+    salonBackIconImage: {
+      height: 28,
+      tintColor: theme.colors.foreground,
+      width: 28,
     },
     salonBottomCta: {
       alignItems: "center",
@@ -5365,6 +5596,11 @@ const createStyles = (theme: MobileTheme) =>
       fontSize: 23,
       fontWeight: "900",
     },
+    salonRatingStarImage: {
+      height: 22,
+      tintColor: theme.colors.gold,
+      width: 22,
+    },
     salonRatingText: {
       color: theme.colors.foreground,
       fontSize: 20,
@@ -5385,6 +5621,11 @@ const createStyles = (theme: MobileTheme) =>
       fontSize: 32,
       fontWeight: "900",
       lineHeight: 34,
+    },
+    salonRoundButtonIcon: {
+      height: 30,
+      tintColor: theme.colors.foreground,
+      width: 30,
     },
     salonServiceAdd: {
       alignItems: "center",
@@ -5530,6 +5771,11 @@ const createStyles = (theme: MobileTheme) =>
       lineHeight: 28,
       transform: [{ rotate: "90deg" }],
     },
+    searchMapFilterIconImage: {
+      height: 26,
+      tintColor: theme.colors.foreground,
+      width: 26,
+    },
     searchMapScreen: {
       backgroundColor: theme.colors.background,
       paddingHorizontal: 20,
@@ -5573,6 +5819,11 @@ const createStyles = (theme: MobileTheme) =>
       fontWeight: "900",
       lineHeight: 40,
     },
+    searchResultHeartImage: {
+      height: 36,
+      tintColor: "#111827",
+      width: 36,
+    },
     searchResultMedia: {
       borderRadius: 20,
       height: 96,
@@ -5614,6 +5865,16 @@ const createStyles = (theme: MobileTheme) =>
       fontSize: 28,
       fontWeight: "900",
       lineHeight: 30,
+    },
+    searchResultShareImage: {
+      height: 26,
+      tintColor: "#6b7280",
+      width: 26,
+    },
+    searchResultStarImage: {
+      height: 17,
+      tintColor: theme.colors.deepGold,
+      width: 17,
     },
     searchResultStats: {
       alignItems: "center",
@@ -5688,6 +5949,11 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.mutedForeground,
       fontSize: 28,
       fontWeight: "900",
+    },
+    searchIconImage: {
+      height: 28,
+      tintColor: theme.colors.mutedForeground,
+      width: 28,
     },
     searchPlaceholder: {
       color: theme.colors.mutedForeground,
@@ -6078,6 +6344,14 @@ const createStyles = (theme: MobileTheme) =>
     tabIconActive: {
       color: theme.colors.gold,
     },
+    tabIconImage: {
+      height: 22,
+      tintColor: theme.colors.foreground,
+      width: 22,
+    },
+    tabIconImageActive: {
+      tintColor: theme.colors.gold,
+    },
     tabLabel: {
       color: theme.colors.foreground,
       fontSize: 10,
@@ -6104,6 +6378,11 @@ const createStyles = (theme: MobileTheme) =>
       overflow: "hidden",
       paddingHorizontal: 7,
       paddingVertical: 3,
+    },
+    verifiedBadgeImage: {
+      height: 24,
+      tintColor: "#3b82f6",
+      width: 24,
     },
     timeGrid: {
       flexDirection: "row",
@@ -6202,6 +6481,11 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.gold,
       fontSize: 15,
       fontWeight: "900",
+    },
+    voiceIconImage: {
+      height: 18,
+      tintColor: theme.colors.gold,
+      width: 18,
     },
     visualOnlyButton: {
       opacity: 0.96,
