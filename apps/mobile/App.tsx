@@ -2803,6 +2803,23 @@ function BookingCard({
   styles: MobileStyles;
 }) {
   const cancelled = booking.status === "cancelled";
+  const statusPill = (
+    <Text
+      style={[
+        styles.managedStatusPill,
+        booking.status === "pending" && styles.managedStatusPillWarning,
+        booking.status === "completed" && styles.managedStatusPillSuccess,
+        cancelled && styles.managedStatusPillCancelled,
+      ]}
+    >
+      {booking.statusLabel}
+    </Text>
+  );
+  const bookingTitle = (
+    <Text style={[styles.managedBookingTitle, isRtl && styles.rtlText]}>
+      {booking.businessName}
+    </Text>
+  );
 
   return (
     <Pressable
@@ -2819,33 +2836,38 @@ function BookingCard({
         <View style={styles.managedBookingMedia}>
           <BusinessMedia badge={booking.statusLabel} styles={styles} />
         </View>
-        <View style={styles.rowCopy}>
+        <View style={styles.managedBookingCopy}>
           <View style={styles.managedBookingTitleRow}>
-            <Text style={[styles.managedBookingTitle, isRtl && styles.rtlText]}>
-              {booking.businessName}
-            </Text>
-            <Text
-              style={[
-                styles.managedStatusPill,
-                booking.status === "pending" && styles.managedStatusPillWarning,
-                booking.status === "completed" && styles.managedStatusPillSuccess,
-                cancelled && styles.managedStatusPillCancelled,
-              ]}
-            >
-              {booking.statusLabel}
-            </Text>
+            {isRtl ? (
+              <>
+                {statusPill}
+                {bookingTitle}
+              </>
+            ) : (
+              <>
+                {bookingTitle}
+                {statusPill}
+              </>
+            )}
           </View>
           <Text style={[styles.managedBookingMeta, isRtl && styles.rtlText]}>
             {booking.serviceName} · {booking.category}
           </Text>
-          <View style={styles.managedBookingInfoGrid}>
+          <View
+            style={[
+              styles.managedBookingInfoGrid,
+              isRtl && styles.managedBookingInfoGridRtl,
+            ]}
+          >
             <BookingInfoPill
               iconSource={mobileIconAssets.common.calendar}
+              isRtl={isRtl}
               label={`${booking.date} · ${booking.time}`}
               styles={styles}
             />
             <BookingInfoPill
               iconSource={mobileIconAssets.common.paymentCard}
+              isRtl={isRtl}
               label={booking.price}
               styles={styles}
             />
@@ -2856,7 +2878,12 @@ function BookingCard({
         </View>
       </View>
 
-      <View style={styles.managedBookingActions}>
+      <View
+        style={[
+          styles.managedBookingActions,
+          isRtl && styles.managedBookingActionsRtl,
+        ]}
+      >
         <BookingActionButton
           label="عرض"
           onPress={() => onOpenBooking(booking)}
@@ -2883,22 +2910,26 @@ function BookingCard({
 
 function BookingInfoPill({
   iconSource,
+  isRtl,
   label,
   styles,
 }: {
   iconSource: ImageSourcePropType;
+  isRtl: boolean;
   label: string;
   styles: MobileStyles;
 }) {
   return (
-    <View style={styles.bookingInfoPill}>
+    <View style={[styles.bookingInfoPill, isRtl && styles.bookingInfoPillRtl]}>
       <Image
         alt=""
         resizeMode="contain"
         source={iconSource}
         style={styles.bookingInfoPillIcon}
       />
-      <Text style={styles.bookingInfoPillText}>{label}</Text>
+      <Text style={[styles.bookingInfoPillText, isRtl && styles.rtlText]}>
+        {label}
+      </Text>
     </View>
   );
 }
@@ -2995,6 +3026,7 @@ function BookingDetailScreen({
               booking.status === "pending" && styles.managedStatusPillWarning,
               booking.status === "completed" && styles.managedStatusPillSuccess,
               booking.status === "cancelled" && styles.managedStatusPillCancelled,
+              styles.bookingDetailStatusPill,
             ]}
           >
             {booking.statusLabel}
@@ -3020,7 +3052,12 @@ function BookingDetailScreen({
         <SummaryItem label="المرجع" styles={styles} value={booking.reference} />
       </View>
 
-      <View style={styles.safeManagementNote}>
+      <View
+        style={[
+          styles.safeManagementNote,
+          isRtl && styles.safeManagementNoteRtl,
+        ]}
+      >
         <Image
           alt=""
           resizeMode="contain"
@@ -3071,6 +3108,7 @@ function BookingDetailScreen({
       {managementPanel ? (
         <BookingManagementPanelCard
           booking={booking}
+          isRtl={isRtl}
           mode={managementPanel}
           onClose={onClosePanel}
           onConfirmCancel={onConfirmCancel}
@@ -3083,12 +3121,14 @@ function BookingDetailScreen({
 
 function BookingManagementPanelCard({
   booking,
+  isRtl,
   mode,
   onClose,
   onConfirmCancel,
   styles,
 }: {
   booking: VisualBooking;
+  isRtl: boolean;
   mode: Exclude<BookingManagementPanel, null>;
   onClose: () => void;
   onConfirmCancel: (booking: VisualBooking) => void;
@@ -3097,12 +3137,19 @@ function BookingManagementPanelCard({
   if (mode === "edit") {
     return (
       <View style={styles.managementPanel}>
-        <Text style={styles.managementPanelTitle}>تعديل الحجز</Text>
-        <Text style={styles.managementPanelBody}>
+        <Text style={[styles.managementPanelTitle, isRtl && styles.rtlText]}>
+          تعديل الحجز
+        </Text>
+        <Text style={[styles.managementPanelBody, isRtl && styles.rtlText]}>
           يمكنك تعديل الخدمة أو الوقت بصرياً في هذه المعاينة فقط. لا يتم حفظ أي
           تغيير ولا يتم إرسال أي طلب.
         </Text>
-        <View style={styles.managementPanelActions}>
+        <View
+          style={[
+            styles.managementPanelActions,
+            isRtl && styles.managementPanelActionsRtl,
+          ]}
+        >
           <BookingActionButton
             label="تغيير الوقت"
             onPress={onClose}
@@ -3128,12 +3175,19 @@ function BookingManagementPanelCard({
 
   return (
     <View style={styles.managementPanel}>
-      <Text style={styles.managementPanelTitle}>إلغاء الحجز؟</Text>
-      <Text style={styles.managementPanelBody}>
+      <Text style={[styles.managementPanelTitle, isRtl && styles.rtlText]}>
+        إلغاء الحجز؟
+      </Text>
+      <Text style={[styles.managementPanelBody, isRtl && styles.rtlText]}>
         هذا إجراء بصري فقط ولا يلغي أي حجز حقيقي. سيظهر هذا الحجز كملغى داخل
         المعاينة المحلية فقط.
       </Text>
-      <View style={styles.managementPanelActions}>
+      <View
+        style={[
+          styles.managementPanelActions,
+          isRtl && styles.managementPanelActionsRtl,
+        ]}
+      >
         <BookingActionButton
           label="تراجع"
           onPress={onClose}
@@ -4210,6 +4264,7 @@ const createStyles = (theme: MobileTheme) =>
       shadowRadius: 30,
     },
     bookingDetailHeroCopy: {
+      alignItems: "flex-end",
       gap: 8,
     },
     bookingDetailScreen: {
@@ -4237,6 +4292,9 @@ const createStyles = (theme: MobileTheme) =>
       paddingHorizontal: 10,
       paddingVertical: 7,
     },
+    bookingInfoPillRtl: {
+      flexDirection: "row-reverse",
+    },
     bookingInfoPillIcon: {
       height: 14,
       tintColor: theme.colors.gold,
@@ -4246,6 +4304,11 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.mutedForeground,
       fontFamily: mobileTypography.uiMedium,
       fontSize: 11,
+      lineHeight: 16,
+    },
+    bookingDetailStatusPill: {
+      alignSelf: "flex-end",
+      textAlign: "center",
     },
     bookingsBell: {
       alignItems: "center",
@@ -4332,6 +4395,9 @@ const createStyles = (theme: MobileTheme) =>
       gap: 8,
       marginTop: 12,
     },
+    managedBookingActionsRtl: {
+      flexDirection: "row-reverse",
+    },
     managedBookingCard: {
       backgroundColor: theme.colors.card,
       borderColor: theme.colors.border,
@@ -4346,11 +4412,20 @@ const createStyles = (theme: MobileTheme) =>
     managedBookingHeader: {
       gap: 10,
     },
+    managedBookingCopy: {
+      alignItems: "flex-end",
+      flex: 1,
+      flexShrink: 1,
+      minWidth: 0,
+    },
     managedBookingInfoGrid: {
       flexDirection: "row",
       flexWrap: "wrap",
       gap: 8,
       marginTop: 8,
+    },
+    managedBookingInfoGridRtl: {
+      flexDirection: "row-reverse",
     },
     managedBookingMedia: {
       borderRadius: 20,
@@ -4376,6 +4451,7 @@ const createStyles = (theme: MobileTheme) =>
       flexDirection: "row",
       gap: 10,
       justifyContent: "space-between",
+      width: "100%",
     },
     managedStatusPill: {
       backgroundColor: theme.colors.goldSoft,
@@ -4423,6 +4499,9 @@ const createStyles = (theme: MobileTheme) =>
       gap: 8,
       marginTop: 4,
     },
+    managementPanelActionsRtl: {
+      flexDirection: "row-reverse",
+    },
     managementPanelBody: {
       color: theme.colors.mutedForeground,
       fontFamily: mobileTypography.uiRegular,
@@ -4432,8 +4511,8 @@ const createStyles = (theme: MobileTheme) =>
     managementPanelTitle: {
       color: theme.colors.foreground,
       fontFamily: mobileTypography.kufiBold,
-      fontSize: 20,
-      lineHeight: 27,
+      fontSize: 19,
+      lineHeight: 26,
     },
     safeManagementIcon: {
       height: 22,
@@ -4449,6 +4528,9 @@ const createStyles = (theme: MobileTheme) =>
       flexDirection: "row",
       gap: 12,
       padding: 16,
+    },
+    safeManagementNoteRtl: {
+      flexDirection: "row-reverse",
     },
     brandCopy: {
       flex: 1,
@@ -7987,7 +8069,7 @@ const createStyles = (theme: MobileTheme) =>
       marginTop: 16,
     },
     summaryItem: {
-      alignItems: "flex-start",
+      alignItems: "center",
       backgroundColor: theme.colors.cardElevated,
       borderColor: theme.colors.goldSoft,
       borderRadius: 18,
@@ -8005,15 +8087,17 @@ const createStyles = (theme: MobileTheme) =>
       fontSize: 12,
       lineHeight: 17,
       maxWidth: "42%",
+      textAlign: "left",
     },
     summaryValue: {
       color: theme.colors.foreground,
       flexShrink: 1,
       fontFamily: mobileTypography.uiSemiBold,
-      fontSize: 13,
-      lineHeight: 18,
+      fontSize: 14,
+      lineHeight: 19,
       maxWidth: "58%",
       textAlign: "right",
+      writingDirection: "rtl",
     },
     supportPill: {
       backgroundColor: theme.colors.cardElevated,
