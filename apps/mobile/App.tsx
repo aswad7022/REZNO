@@ -1,9 +1,9 @@
 import { StatusBar } from "expo-status-bar";
+import { useFonts } from "expo-font";
 import { useCallback, useMemo, useState } from "react";
 import {
   I18nManager,
   Image,
-  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -75,14 +75,13 @@ type BookingStep = {
 type MobileThemeMode = "system" | "light" | "dark";
 
 const mobileTypography = {
-  displayFamily: Platform.select({
-    android: "sans-serif-medium",
-    default: undefined,
-  }),
-  uiFamily: Platform.select({
-    android: "sans-serif",
-    default: undefined,
-  }),
+  fallback: "NotoSansArabic",
+  kufiBold: "NotoKufiArabic-Bold",
+  kufiRegular: "NotoKufiArabic-Regular",
+  uiBold: "NotoSansArabicUI-Bold",
+  uiMedium: "NotoSansArabicUI-Medium",
+  uiRegular: "NotoSansArabicUI-Regular",
+  uiSemiBold: "NotoSansArabicUI-SemiBold",
 };
 
 /* eslint-disable @typescript-eslint/no-require-imports -- React Native bundles static image assets through require(). */
@@ -122,14 +121,14 @@ const categories = [
     count: "128 نشاط",
     icon: mobileIconAssets.categories.salon,
     label: "صالونات",
-    tone: "gold",
+    tone: "rose",
   },
   {
     badge: "متاح اليوم",
     count: "42 مطعم",
     icon: mobileIconAssets.categories.restaurant,
     label: "مطاعم",
-    tone: "green",
+    tone: "gold",
   },
   {
     badge: "قريب منك",
@@ -143,21 +142,21 @@ const categories = [
     count: "18 سبا",
     icon: mobileIconAssets.categories.spa,
     label: "سبا",
-    tone: "rose",
+    tone: "dark",
   },
   {
     badge: "صباحي",
     count: "27 مركز",
     icon: mobileIconAssets.categories.gym,
     label: "رياضة",
-    tone: "dark",
+    tone: "green",
   },
   {
     badge: "سريع",
     count: "64 خدمة",
     icon: mobileIconAssets.categories.services,
     label: "خدمات",
-    tone: "gold",
+    tone: "neutral",
   },
 ];
 
@@ -470,6 +469,17 @@ const accountManagementActions = [
 ];
 
 export default function App() {
+  /* eslint-disable @typescript-eslint/no-require-imports -- Expo Font loads local TTF assets through static require(). */
+  const [fontsLoaded] = useFonts({
+    [mobileTypography.fallback]: require("./assets/fonts/NotoSansArabic-Variable.ttf"),
+    [mobileTypography.kufiBold]: require("./assets/fonts/NotoKufiArabic-Bold.ttf"),
+    [mobileTypography.kufiRegular]: require("./assets/fonts/NotoKufiArabic-Regular.ttf"),
+    [mobileTypography.uiBold]: require("./assets/fonts/NotoSansArabicUI-Bold.ttf"),
+    [mobileTypography.uiMedium]: require("./assets/fonts/NotoSansArabicUI-Medium.ttf"),
+    [mobileTypography.uiRegular]: require("./assets/fonts/NotoSansArabicUI-Regular.ttf"),
+    [mobileTypography.uiSemiBold]: require("./assets/fonts/NotoSansArabicUI-SemiBold.ttf"),
+  });
+  /* eslint-enable @typescript-eslint/no-require-imports */
   const colorScheme = useColorScheme();
   const [locale, setLocale] = useState<MobileLocale>(DEFAULT_LOCALE);
   const [activeTab, setActiveTab] = useState<MobileAppTabId>("customerHome");
@@ -522,6 +532,15 @@ export default function App() {
   const handleEnterApp = () => {
     setShowOnboarding(false);
   };
+
+  if (!fontsLoaded) {
+    return (
+      <SafeAreaView style={styles.shell}>
+        <StatusBar style={theme.isDark ? "light" : "dark"} />
+        <View style={styles.fontLoadingScreen} />
+      </SafeAreaView>
+    );
+  }
 
   if (showOnboarding) {
     return (
@@ -955,83 +974,30 @@ function SearchBar({
 
 function CategoryGrid({ styles }: { styles: MobileStyles }) {
   return (
-    <>
-      <View style={styles.categoryRail}>
-        {categories.slice(0, 4).map((category, index) => (
+    <View style={styles.categoryGrid}>
+      {categories.map((category) => (
+        <View key={category.label} style={styles.categoryItem}>
           <View
-            key={category.label}
             style={[
-              styles.categoryRailCard,
-              index === 0 && styles.categoryRailCardActive,
-              category.tone === "green" && styles.categoryRailCardGreen,
-              category.tone === "blue" && styles.categoryRailCardBlue,
-              category.tone === "rose" && styles.categoryRailCardRose,
-              category.tone === "dark" && styles.categoryRailCardPurple,
+              styles.categoryIconTile,
+              category.tone === "green" && styles.categoryIconTileGreen,
+              category.tone === "blue" && styles.categoryIconTileBlue,
+              category.tone === "rose" && styles.categoryIconTileRose,
+              category.tone === "dark" && styles.categoryIconTilePurple,
+              category.tone === "gold" && styles.categoryIconTileGold,
             ]}
           >
-            <View
-              style={[
-                styles.categoryRailIconTile,
-                index === 0 && styles.categoryRailIconTileActive,
-              ]}
-            >
-              <Image
-                alt=""
-                resizeMode="contain"
-                source={category.icon}
-                style={[
-                  styles.categoryRailIconImage,
-                  index === 0 && styles.categoryRailIconImageActive,
-                ]}
-              />
-            </View>
-            <Text
-              style={[
-                styles.categoryRailLabel,
-                index === 0 && styles.categoryRailLabelActive,
-              ]}
-            >
-              {category.label}
-            </Text>
+            <Image
+              alt=""
+              resizeMode="contain"
+              source={category.icon}
+              style={styles.categoryIconImage}
+            />
           </View>
-        ))}
-      </View>
-
-      <View style={styles.categoryGrid}>
-        {categories.map((category, index) => (
-          <View
-            key={category.label}
-            style={[
-              styles.categoryCard,
-              index === 0 && styles.categoryCardActive,
-              category.tone === "green" && styles.categoryCardGreen,
-              category.tone === "blue" && styles.categoryCardBlue,
-              category.tone === "rose" && styles.categoryCardRose,
-              category.tone === "dark" && styles.categoryCardPurple,
-            ]}
-          >
-            <View style={styles.categoryTopRow}>
-              <View
-                style={[
-                  styles.categoryIconTile,
-                  index === 0 && styles.categoryIconTileActive,
-                ]}
-              >
-                <Image
-                  alt=""
-                  resizeMode="contain"
-                  source={category.icon}
-                  style={styles.categoryIconImage}
-                />
-              </View>
-              <Text style={styles.categoryBadge}>{category.badge}</Text>
-            </View>
-            <Text style={styles.categoryLabel}>{category.label}</Text>
-            <Text style={styles.categoryCount}>{category.count}</Text>
-          </View>
-        ))}
-      </View>
-    </>
+          <Text style={styles.categoryLabel}>{category.label}</Text>
+        </View>
+      ))}
+    </View>
   );
 }
 
@@ -2945,10 +2911,9 @@ const createStyles = (theme: MobileTheme) =>
     },
     brandName: {
       color: theme.colors.foreground,
-      fontFamily: mobileTypography.uiFamily,
+      fontFamily: mobileTypography.uiBold,
       fontSize: 15,
       flexShrink: 1,
-      fontWeight: "800",
       letterSpacing: -0.1,
     },
     brandRow: {
@@ -2959,10 +2924,9 @@ const createStyles = (theme: MobileTheme) =>
     },
     brandTagline: {
       color: theme.colors.mutedForeground,
-      fontFamily: mobileTypography.uiFamily,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 9,
       flexShrink: 1,
-      fontWeight: "500",
       lineHeight: 12,
       marginTop: 1,
     },
@@ -3094,7 +3058,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     businessMeta: {
       color: theme.colors.mutedForeground,
-      fontFamily: mobileTypography.uiFamily,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 11,
       flexShrink: 1,
       lineHeight: 15,
@@ -3119,10 +3083,9 @@ const createStyles = (theme: MobileTheme) =>
     },
     businessName: {
       color: theme.colors.foreground,
-      fontFamily: mobileTypography.uiFamily,
+      fontFamily: mobileTypography.uiBold,
       fontSize: 14,
       flexShrink: 1,
-      fontWeight: "800",
       letterSpacing: -0.3,
       lineHeight: 18,
     },
@@ -3252,15 +3215,15 @@ const createStyles = (theme: MobileTheme) =>
     },
     categoryCount: {
       color: "rgba(255, 255, 255, 0.74)",
-      fontFamily: mobileTypography.uiFamily,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 11,
-      fontWeight: "600",
       textAlign: "center",
     },
     categoryGrid: {
       flexDirection: "row",
       flexWrap: "wrap",
-      gap: 14,
+      justifyContent: "space-between",
+      rowGap: 26,
     },
     categoryIcon: {
       color: "#ffffff",
@@ -3269,29 +3232,46 @@ const createStyles = (theme: MobileTheme) =>
       lineHeight: 28,
     },
     categoryIconImage: {
-      height: 28,
+      height: 27,
       tintColor: "#ffffff",
-      width: 28,
+      width: 27,
     },
     categoryIconTile: {
       alignItems: "center",
-      backgroundColor: "rgba(255, 255, 255, 0.16)",
-      borderColor: "rgba(255, 255, 255, 0.2)",
-      borderRadius: 18,
-      borderWidth: 1,
-      height: 54,
+      backgroundColor: "#394657",
+      borderColor: "rgba(255, 255, 255, 0.08)",
+      borderRadius: 20,
+      borderWidth: 0,
+      height: 58,
       justifyContent: "center",
-      width: 54,
+      width: 58,
     },
-    categoryIconTileActive: {
-      backgroundColor: "rgba(255, 255, 255, 0.22)",
-      borderColor: "rgba(255, 255, 255, 0.34)",
+    categoryIconTileBlue: {
+      backgroundColor: "#3ca6d3",
+    },
+    categoryIconTileGold: {
+      backgroundColor: "#f59e0b",
+    },
+    categoryIconTileGreen: {
+      backgroundColor: "#22a66f",
+    },
+    categoryIconTilePurple: {
+      backgroundColor: "#7c3aed",
+    },
+    categoryIconTileRose: {
+      backgroundColor: "#d94676",
+    },
+    categoryItem: {
+      alignItems: "center",
+      flexBasis: "23%",
+      gap: 9,
+      minWidth: 66,
     },
     categoryLabel: {
       color: "#ffffff",
-      fontFamily: mobileTypography.uiFamily,
-      fontSize: 14,
-      fontWeight: "700",
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: 15,
+      lineHeight: 22,
       textAlign: "center",
     },
     categoryRail: {
@@ -3355,9 +3335,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     categoryRailLabel: {
       color: theme.colors.foreground,
-      fontFamily: mobileTypography.uiFamily,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 11,
-      fontWeight: "700",
     },
     categoryRailLabelActive: {
       color: theme.colors.foregroundInverse,
@@ -3459,7 +3438,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     confirmationTitle: {
       color: theme.colors.foreground,
-      fontFamily: mobileTypography.displayFamily,
+      fontFamily: mobileTypography.kufiBold,
       fontSize: 21,
       fontWeight: "800",
       lineHeight: 27,
@@ -3889,9 +3868,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     heroBody: {
       color: theme.colors.mutedForeground,
-      fontFamily: mobileTypography.uiFamily,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 19,
-      fontWeight: "500",
       lineHeight: 27,
       marginTop: 8,
     },
@@ -3903,9 +3881,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     heroEyebrow: {
       color: theme.colors.mutedForeground,
-      fontFamily: mobileTypography.uiFamily,
+      fontFamily: mobileTypography.uiMedium,
       fontSize: 17,
-      fontWeight: "600",
       letterSpacing: 0,
       marginTop: 12,
     },
@@ -3914,9 +3891,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     heroTitle: {
       color: theme.colors.foreground,
-      fontFamily: mobileTypography.displayFamily,
+      fontFamily: mobileTypography.kufiBold,
       fontSize: 36,
-      fontWeight: "800",
       letterSpacing: -0.7,
       lineHeight: 44,
       marginTop: 4,
@@ -4178,7 +4154,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     messageHeroBody: {
       color: theme.colors.mutedForeground,
-      fontFamily: mobileTypography.uiFamily,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 15,
       lineHeight: 23,
       marginTop: 10,
@@ -4225,7 +4201,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     messageHeroTitle: {
       color: theme.colors.foreground,
-      fontFamily: mobileTypography.displayFamily,
+      fontFamily: mobileTypography.kufiBold,
       fontSize: 27,
       fontWeight: "800",
       lineHeight: 34,
@@ -4847,7 +4823,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     paymentTitle: {
       color: theme.colors.foreground,
-      fontFamily: mobileTypography.uiFamily,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 18,
       fontWeight: "700",
       marginTop: 6,
@@ -5027,7 +5003,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     primaryButtonText: {
       color: theme.colors.foregroundInverse,
-      fontFamily: mobileTypography.uiFamily,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 17,
       fontWeight: "700",
     },
@@ -5180,7 +5156,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     receiptTitle: {
       color: theme.colors.foreground,
-      fontFamily: mobileTypography.displayFamily,
+      fontFamily: mobileTypography.kufiBold,
       fontSize: 24,
       fontWeight: "800",
       letterSpacing: 0.3,
@@ -5291,7 +5267,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     rowMeta: {
       color: theme.colors.mutedForeground,
-      fontFamily: mobileTypography.uiFamily,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 13,
       flexShrink: 1,
       lineHeight: 19,
@@ -5304,7 +5280,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     rowTitle: {
       color: theme.colors.foreground,
-      fontFamily: mobileTypography.uiFamily,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 15,
       flexShrink: 1,
       fontWeight: "700",
@@ -5365,7 +5341,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     selectedServiceTitle: {
       color: theme.colors.foreground,
-      fontFamily: mobileTypography.uiFamily,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 16,
       fontWeight: "700",
     },
@@ -5394,7 +5370,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     serviceMeta: {
       color: theme.colors.mutedForeground,
-      fontFamily: mobileTypography.uiFamily,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 12,
       fontWeight: "500",
       lineHeight: 18,
@@ -5402,7 +5378,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     serviceName: {
       color: theme.colors.foreground,
-      fontFamily: mobileTypography.uiFamily,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 15,
       fontWeight: "700",
       lineHeight: 21,
@@ -5421,7 +5397,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     screenDescription: {
       color: theme.colors.mutedForeground,
-      fontFamily: mobileTypography.uiFamily,
+      fontFamily: mobileTypography.uiRegular,
       flexShrink: 1,
       fontSize: 16,
       lineHeight: 24,
@@ -5429,7 +5405,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     screenEyebrow: {
       color: theme.colors.gold,
-      fontFamily: mobileTypography.uiFamily,
+      fontFamily: mobileTypography.uiRegular,
       flexShrink: 1,
       fontSize: 12,
       fontWeight: "700",
@@ -5439,7 +5415,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     screenTitle: {
       color: theme.colors.foreground,
-      fontFamily: mobileTypography.displayFamily,
+      fontFamily: mobileTypography.kufiBold,
       flexShrink: 1,
       fontSize: 28,
       fontWeight: "800",
@@ -5591,7 +5567,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     salonActionLabel: {
       color: theme.colors.mutedForeground,
-      fontFamily: mobileTypography.uiFamily,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 13,
       fontWeight: "600",
       marginTop: 8,
@@ -5730,7 +5706,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     salonMeta: {
       color: theme.colors.mutedForeground,
-      fontFamily: mobileTypography.uiFamily,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 18,
       fontWeight: "500",
       lineHeight: 25,
@@ -5738,7 +5714,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     salonName: {
       color: theme.colors.foreground,
-      fontFamily: mobileTypography.displayFamily,
+      fontFamily: mobileTypography.kufiBold,
       flexShrink: 1,
       fontSize: 40,
       fontWeight: "800",
@@ -6053,7 +6029,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     searchResultsTitle: {
       color: "#101827",
-      fontFamily: mobileTypography.displayFamily,
+      fontFamily: mobileTypography.kufiBold,
       fontSize: 28,
       fontWeight: "800",
       lineHeight: 36,
@@ -6118,7 +6094,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     searchPlaceholder: {
       color: theme.colors.mutedForeground,
-      fontFamily: mobileTypography.uiFamily,
+      fontFamily: mobileTypography.uiRegular,
       flex: 1,
       fontSize: 16,
       fontWeight: "500",
@@ -6201,7 +6177,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     sectionTitle: {
       color: theme.colors.foreground,
-      fontFamily: mobileTypography.displayFamily,
+      fontFamily: mobileTypography.kufiBold,
       fontSize: 21,
       fontWeight: "800",
       letterSpacing: -0.2,
@@ -6265,6 +6241,10 @@ const createStyles = (theme: MobileTheme) =>
       backgroundColor: theme.colors.background,
       flex: 1,
     },
+    fontLoadingScreen: {
+      backgroundColor: theme.colors.background,
+      flex: 1,
+    },
     statusBadge: {
       alignSelf: "flex-start",
       backgroundColor: theme.colors.successSoft,
@@ -6276,9 +6256,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     statusBadgeText: {
       color: theme.colors.success,
-      fontFamily: mobileTypography.uiFamily,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 11,
-      fontWeight: "700",
     },
     statusBoard: {
       backgroundColor: theme.colors.cardElevated,
@@ -6518,7 +6497,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     tabLabel: {
       color: theme.colors.foreground,
-      fontFamily: mobileTypography.uiFamily,
+      fontFamily: mobileTypography.uiRegular,
       fontSize: 10,
       fontWeight: "700",
       lineHeight: 13,
@@ -6585,9 +6564,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     timeSlotText: {
       color: theme.colors.foreground,
-      fontFamily: mobileTypography.uiFamily,
+      fontFamily: mobileTypography.uiSemiBold,
       fontSize: 14,
-      fontWeight: "700",
     },
     timeSlotTextActive: {
       color: theme.colors.foregroundInverse,
