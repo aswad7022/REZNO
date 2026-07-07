@@ -74,8 +74,29 @@ type BookingStep = {
 
 type MobileThemeMode = "system" | "light" | "dark";
 
+type HomeCategoryTone =
+  | "blue"
+  | "gold"
+  | "green"
+  | "neutral"
+  | "purple"
+  | "rose";
+
+type HomeCategory =
+  | {
+      icon: ImageSourcePropType;
+      label: string;
+      mark?: never;
+      tone: HomeCategoryTone;
+    }
+  | {
+      icon?: never;
+      label: string;
+      mark: "book" | "car" | "more";
+      tone: HomeCategoryTone;
+    };
+
 const mobileTypography = {
-  fallback: "NotoSansArabic",
   kufiBold: "NotoKufiArabic-Bold",
   kufiRegular: "NotoKufiArabic-Regular",
   uiBold: "NotoSansArabicUI-Bold",
@@ -115,47 +136,45 @@ const mobileIconAssets = {
 };
 /* eslint-enable @typescript-eslint/no-require-imports */
 
-const categories = [
+const categories: HomeCategory[] = [
   {
-    badge: "الأكثر حجزاً",
-    count: "128 نشاط",
     icon: mobileIconAssets.categories.salon,
-    label: "صالونات",
+    label: "صالون",
     tone: "rose",
   },
   {
-    badge: "متاح اليوم",
-    count: "42 مطعم",
     icon: mobileIconAssets.categories.restaurant,
     label: "مطاعم",
     tone: "gold",
   },
   {
-    badge: "قريب منك",
-    count: "31 عيادة",
     icon: mobileIconAssets.categories.clinic,
     label: "عيادات",
     tone: "blue",
   },
   {
-    badge: "فاخر",
-    count: "18 سبا",
-    icon: mobileIconAssets.categories.spa,
-    label: "سبا",
-    tone: "dark",
-  },
-  {
-    badge: "صباحي",
-    count: "27 مركز",
     icon: mobileIconAssets.categories.gym,
     label: "رياضة",
     tone: "green",
   },
   {
-    badge: "سريع",
-    count: "64 خدمة",
-    icon: mobileIconAssets.categories.services,
-    label: "خدمات",
+    icon: mobileIconAssets.categories.spa,
+    label: "سبا",
+    tone: "purple",
+  },
+  {
+    label: "تعليم",
+    mark: "book",
+    tone: "blue",
+  },
+  {
+    label: "سيارات",
+    mark: "car",
+    tone: "gold",
+  },
+  {
+    label: "المزيد",
+    mark: "more",
     tone: "neutral",
   },
 ];
@@ -471,7 +490,6 @@ const accountManagementActions = [
 export default function App() {
   /* eslint-disable @typescript-eslint/no-require-imports -- Expo Font loads local TTF assets through static require(). */
   const [fontsLoaded] = useFonts({
-    [mobileTypography.fallback]: require("./assets/fonts/NotoSansArabic-Variable.ttf"),
     [mobileTypography.kufiBold]: require("./assets/fonts/NotoKufiArabic-Bold.ttf"),
     [mobileTypography.kufiRegular]: require("./assets/fonts/NotoKufiArabic-Regular.ttf"),
     [mobileTypography.uiBold]: require("./assets/fonts/NotoSansArabicUI-Bold.ttf"),
@@ -983,20 +1001,70 @@ function CategoryGrid({ styles }: { styles: MobileStyles }) {
               category.tone === "green" && styles.categoryIconTileGreen,
               category.tone === "blue" && styles.categoryIconTileBlue,
               category.tone === "rose" && styles.categoryIconTileRose,
-              category.tone === "dark" && styles.categoryIconTilePurple,
+              category.tone === "purple" && styles.categoryIconTilePurple,
               category.tone === "gold" && styles.categoryIconTileGold,
+              category.tone === "neutral" && styles.categoryIconTileNeutral,
             ]}
           >
-            <Image
-              alt=""
-              resizeMode="contain"
-              source={category.icon}
-              style={styles.categoryIconImage}
-            />
+            {"icon" in category ? (
+              <Image
+                alt=""
+                resizeMode="contain"
+                source={category.icon}
+                style={styles.categoryIconImage}
+              />
+            ) : (
+              <CategoryFallbackMark mark={category.mark} styles={styles} />
+            )}
           </View>
           <Text style={styles.categoryLabel}>{category.label}</Text>
         </View>
       ))}
+    </View>
+  );
+}
+
+function CategoryFallbackMark({
+  mark,
+  styles,
+}: {
+  mark: "book" | "car" | "more";
+  styles: MobileStyles;
+}) {
+  if (mark === "book") {
+    return (
+      <View style={styles.categoryBookMark}>
+        <View style={styles.categoryBookPage}>
+          <View style={styles.categoryBookLine} />
+          <View style={styles.categoryBookLineShort} />
+          <View style={styles.categoryBookLine} />
+        </View>
+        <View style={styles.categoryBookPageRight} />
+      </View>
+    );
+  }
+
+  if (mark === "car") {
+    return (
+      <View style={styles.categoryCarMark}>
+        <View style={styles.categoryCarRoof} />
+        <View style={styles.categoryCarBody}>
+          <View style={styles.categoryCarLight} />
+          <View style={styles.categoryCarLight} />
+        </View>
+        <View style={styles.categoryCarWheelRow}>
+          <View style={styles.categoryCarWheel} />
+          <View style={styles.categoryCarWheel} />
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.categoryMoreMark}>
+      <View style={styles.categoryMoreDot} />
+      <View style={styles.categoryMoreDot} />
+      <View style={styles.categoryMoreDot} />
     </View>
   );
 }
@@ -3223,7 +3291,7 @@ const createStyles = (theme: MobileTheme) =>
       flexDirection: "row",
       flexWrap: "wrap",
       justifyContent: "space-between",
-      rowGap: 26,
+      rowGap: 22,
     },
     categoryIcon: {
       color: "#ffffff",
@@ -3232,19 +3300,23 @@ const createStyles = (theme: MobileTheme) =>
       lineHeight: 28,
     },
     categoryIconImage: {
-      height: 27,
+      height: 34,
       tintColor: "#ffffff",
-      width: 27,
+      width: 34,
     },
     categoryIconTile: {
       alignItems: "center",
       backgroundColor: "#394657",
       borderColor: "rgba(255, 255, 255, 0.08)",
-      borderRadius: 20,
+      borderRadius: 21,
       borderWidth: 0,
-      height: 58,
+      height: 66,
       justifyContent: "center",
-      width: 58,
+      shadowColor: "#000000",
+      shadowOffset: { height: 10, width: 0 },
+      shadowOpacity: theme.isDark ? 0.28 : 0.08,
+      shadowRadius: 16,
+      width: 66,
     },
     categoryIconTileBlue: {
       backgroundColor: "#3ca6d3",
@@ -3255,6 +3327,9 @@ const createStyles = (theme: MobileTheme) =>
     categoryIconTileGreen: {
       backgroundColor: "#22a66f",
     },
+    categoryIconTileNeutral: {
+      backgroundColor: "#364152",
+    },
     categoryIconTilePurple: {
       backgroundColor: "#7c3aed",
     },
@@ -3263,16 +3338,103 @@ const createStyles = (theme: MobileTheme) =>
     },
     categoryItem: {
       alignItems: "center",
-      flexBasis: "23%",
-      gap: 9,
-      minWidth: 66,
+      flexBasis: "24%",
+      gap: 8,
+      minWidth: 72,
     },
     categoryLabel: {
       color: "#ffffff",
       fontFamily: mobileTypography.uiSemiBold,
-      fontSize: 15,
-      lineHeight: 22,
+      fontSize: 13,
+      lineHeight: 19,
       textAlign: "center",
+    },
+    categoryBookLine: {
+      backgroundColor: "#ffffff",
+      borderRadius: 999,
+      height: 2,
+      opacity: 0.92,
+      width: 12,
+    },
+    categoryBookLineShort: {
+      backgroundColor: "#ffffff",
+      borderRadius: 999,
+      height: 2,
+      opacity: 0.92,
+      width: 9,
+    },
+    categoryBookMark: {
+      flexDirection: "row",
+      gap: 3,
+    },
+    categoryBookPage: {
+      backgroundColor: "#ffffff",
+      borderBottomLeftRadius: 4,
+      borderTopLeftRadius: 9,
+      gap: 3,
+      height: 30,
+      justifyContent: "center",
+      paddingHorizontal: 5,
+      width: 18,
+    },
+    categoryBookPageRight: {
+      backgroundColor: "#ffffff",
+      borderBottomRightRadius: 4,
+      borderTopRightRadius: 9,
+      height: 30,
+      width: 18,
+    },
+    categoryCarBody: {
+      alignItems: "center",
+      backgroundColor: "#ffffff",
+      borderRadius: 6,
+      flexDirection: "row",
+      height: 15,
+      justifyContent: "space-between",
+      paddingHorizontal: 6,
+      width: 38,
+    },
+    categoryCarLight: {
+      backgroundColor: "rgba(245, 158, 11, 0.55)",
+      borderRadius: 3,
+      height: 4,
+      width: 4,
+    },
+    categoryCarMark: {
+      alignItems: "center",
+      justifyContent: "center",
+      paddingTop: 3,
+    },
+    categoryCarRoof: {
+      backgroundColor: "#ffffff",
+      borderTopLeftRadius: 8,
+      borderTopRightRadius: 8,
+      height: 12,
+      marginBottom: -2,
+      width: 27,
+    },
+    categoryCarWheel: {
+      backgroundColor: "#ffffff",
+      borderColor: "rgba(0, 0, 0, 0.16)",
+      borderRadius: 5,
+      borderWidth: 1,
+      height: 9,
+      width: 9,
+    },
+    categoryCarWheelRow: {
+      flexDirection: "row",
+      gap: 16,
+      marginTop: -2,
+    },
+    categoryMoreDot: {
+      backgroundColor: "#ffffff",
+      borderRadius: 4,
+      height: 8,
+      width: 8,
+    },
+    categoryMoreMark: {
+      flexDirection: "row",
+      gap: 6,
     },
     categoryRail: {
       flexDirection: "row",
