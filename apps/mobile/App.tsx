@@ -1430,8 +1430,16 @@ function BusinessMedia({
 }) {
   return (
     <>
+      <View style={styles.businessMediaBackdrop} />
       <View style={styles.businessMediaGlow} />
+      <View style={styles.businessMediaLightRail}>
+        <View style={styles.businessMediaLightLine} />
+        <View style={styles.businessMediaLightLineShort} />
+        <View style={styles.businessMediaLightLine} />
+      </View>
       <View style={styles.businessMediaPanel} />
+      <View style={styles.businessMediaChairBack} />
+      <View style={styles.businessMediaChairSeat} />
       <View style={styles.businessMediaAccent} />
       <View style={styles.businessMediaCutout} />
       <View style={styles.businessStatusBadge}>
@@ -1807,6 +1815,17 @@ function SalonDetailScreen({
             styles={styles}
           />
         </View>
+        <View style={styles.salonHeroCenterpiece}>
+          <View style={styles.salonHeroOrb}>
+            <Text style={styles.salonHeroOrbText}>R</Text>
+          </View>
+          <Text style={[styles.salonHeroKicker, isRtl && styles.rtlText]}>
+            تجربة صالون فاخرة
+          </Text>
+          <Text style={[styles.salonHeroCaption, isRtl && styles.rtlText]}>
+            خدمات مختارة وحجز واضح بخطوات آمنة
+          </Text>
+        </View>
         <View style={styles.salonHeroStage}>
           <BusinessMedia badge={business.status} styles={styles} />
         </View>
@@ -1887,25 +1906,29 @@ function SalonDetailScreen({
       <View style={styles.salonServicesList}>
         {services.map((service, index) => (
           <View key={service.name} style={styles.salonServiceRow}>
-            <View style={styles.salonServiceMedia}>
-              <BusinessMedia
-                badge={index === 0 ? "رائج" : service.tag}
-                styles={styles}
-              />
+            <View style={styles.salonServiceMain}>
+              <View style={styles.salonServiceMedia}>
+                <BusinessMedia
+                  badge={index === 0 ? "رائج" : service.tag}
+                  styles={styles}
+                />
+              </View>
+              <View style={styles.salonServiceCopy}>
+                <Text style={[styles.salonServiceName, isRtl && styles.rtlText]}>
+                  {index === 0 ? "قص شعر" : service.name}
+                </Text>
+                <Text style={[styles.salonServiceMeta, isRtl && styles.rtlText]}>
+                  {service.duration} · عرض مرئي
+                </Text>
+              </View>
             </View>
-            <View style={styles.rowCopy}>
-              <Text style={[styles.salonServiceName, isRtl && styles.rtlText]}>
-                {index === 0 ? "قص شعر" : service.name}
-              </Text>
-              <Text style={[styles.salonServiceMeta, isRtl && styles.rtlText]}>
-                {service.duration}
-              </Text>
+            <View style={styles.salonServiceActionBlock}>
               <Text style={styles.salonServicePrice}>
                 {index === 0 ? "250 TL" : service.price}
               </Text>
-            </View>
-            <View style={styles.salonServiceAdd}>
-              <Text style={styles.salonServiceAddText}>+</Text>
+              <View style={styles.salonServiceAdd}>
+                <Text style={styles.salonServiceAddText}>+</Text>
+              </View>
             </View>
           </View>
         ))}
@@ -2295,11 +2318,18 @@ function StaffSelectionStep({
           const selectionIndicator = (
             <View
               style={[
-                styles.bookingRadio,
-                selected && styles.bookingRadioActive,
+                styles.staffSelectionIndicator,
+                selected && styles.staffSelectionIndicatorActive,
               ]}
             >
-              {selected ? <View style={styles.bookingRadioDot} /> : null}
+              <View
+                style={[
+                  styles.bookingRadio,
+                  selected && styles.bookingRadioActive,
+                ]}
+              >
+                {selected ? <View style={styles.bookingRadioDot} /> : null}
+              </View>
             </View>
           );
 
@@ -3055,7 +3085,9 @@ function BookingDetailScreen({
       />
 
       <View style={styles.bookingDetailHero}>
-        <BusinessMedia badge={booking.statusLabel} styles={styles} />
+        <View style={styles.bookingDetailHeroMedia}>
+          <BusinessMedia badge={booking.statusLabel} styles={styles} />
+        </View>
         <View style={styles.bookingDetailHeroCopy}>
           <Text style={[styles.managedBookingTitle, isRtl && styles.rtlText]}>
             {booking.businessName}
@@ -4264,10 +4296,10 @@ const createStyles = (theme: MobileTheme) =>
       borderWidth: 1,
       flex: 1,
       justifyContent: "center",
-      minHeight: 40,
+      minHeight: 38,
       minWidth: 82,
       paddingHorizontal: 11,
-      paddingVertical: 8,
+      paddingVertical: 7,
     },
     bookingActionButtonDanger: {
       backgroundColor: theme.colors.dangerSoft,
@@ -4294,11 +4326,13 @@ const createStyles = (theme: MobileTheme) =>
       paddingBottom: 120,
     },
     bookingDetailHero: {
+      alignItems: "center",
       backgroundColor: theme.colors.hero,
       borderColor: theme.colors.goldSoft,
       borderRadius: 30,
       borderWidth: 1,
-      gap: 18,
+      flexDirection: "row",
+      gap: 14,
       overflow: "hidden",
       padding: 16,
       shadowColor: theme.colors.shadow,
@@ -4308,7 +4342,16 @@ const createStyles = (theme: MobileTheme) =>
     },
     bookingDetailHeroCopy: {
       alignItems: "flex-end",
+      flex: 1,
       gap: 8,
+      minWidth: 0,
+    },
+    bookingDetailHeroMedia: {
+      borderRadius: 24,
+      flexShrink: 0,
+      height: 112,
+      overflow: "hidden",
+      width: 116,
     },
     bookingDetailScreen: {
       gap: 16,
@@ -4331,23 +4374,23 @@ const createStyles = (theme: MobileTheme) =>
       borderRadius: theme.radii.pill,
       borderWidth: 1,
       flexDirection: "row",
-      gap: 7,
-      paddingHorizontal: 10,
-      paddingVertical: 7,
+      gap: 6,
+      paddingHorizontal: 9,
+      paddingVertical: 6,
     },
     bookingInfoPillRtl: {
       flexDirection: "row-reverse",
     },
     bookingInfoPillIcon: {
-      height: 14,
+      height: 13,
       tintColor: theme.colors.gold,
-      width: 14,
+      width: 13,
     },
     bookingInfoPillText: {
       color: theme.colors.mutedForeground,
       fontFamily: mobileTypography.uiMedium,
-      fontSize: 11,
-      lineHeight: 16,
+      fontSize: 10,
+      lineHeight: 15,
     },
     bookingDetailStatusPill: {
       alignSelf: "flex-end",
@@ -4435,8 +4478,8 @@ const createStyles = (theme: MobileTheme) =>
     managedBookingActions: {
       flexDirection: "row",
       flexWrap: "wrap",
-      gap: 8,
-      marginTop: 12,
+      gap: 7,
+      marginTop: 10,
     },
     managedBookingActionsRtl: {
       flexDirection: "row-reverse",
@@ -4444,16 +4487,18 @@ const createStyles = (theme: MobileTheme) =>
     managedBookingCard: {
       backgroundColor: theme.colors.card,
       borderColor: theme.colors.border,
-      borderRadius: 26,
+      borderRadius: 24,
       borderWidth: 1,
-      padding: 14,
+      padding: 12,
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: 16, width: 0 },
       shadowOpacity: theme.isDark ? 0.22 : 0.08,
       shadowRadius: 24,
     },
     managedBookingHeader: {
-      gap: 9,
+      alignItems: "flex-start",
+      flexDirection: "row",
+      gap: 12,
     },
     managedBookingCopy: {
       alignItems: "flex-end",
@@ -4464,16 +4509,18 @@ const createStyles = (theme: MobileTheme) =>
     managedBookingInfoGrid: {
       flexDirection: "row",
       flexWrap: "wrap",
-      gap: 8,
-      marginTop: 8,
+      gap: 6,
+      marginTop: 7,
     },
     managedBookingInfoGridRtl: {
       flexDirection: "row-reverse",
     },
     managedBookingMedia: {
-      borderRadius: 20,
-      height: 88,
+      borderRadius: 18,
+      flexShrink: 0,
+      height: 84,
       overflow: "hidden",
+      width: 96,
     },
     managedBookingMeta: {
       color: theme.colors.mutedForeground,
@@ -4486,13 +4533,13 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.foreground,
       flexShrink: 1,
       fontFamily: mobileTypography.kufiBold,
-      fontSize: 19,
-      lineHeight: 25,
+      fontSize: 18,
+      lineHeight: 24,
     },
     managedBookingTitleRow: {
       alignItems: "flex-start",
       flexDirection: "row",
-      gap: 10,
+      gap: 8,
       justifyContent: "space-between",
       width: "100%",
     },
@@ -4639,6 +4686,10 @@ const createStyles = (theme: MobileTheme) =>
       justifyContent: "space-between",
       paddingTop: 10,
     },
+    businessMediaBackdrop: {
+      ...StyleSheet.absoluteFill,
+      backgroundColor: "#05070a",
+    },
     businessHero: {
       backgroundColor: "#050608",
       borderBottomColor: theme.colors.border,
@@ -4663,11 +4714,31 @@ const createStyles = (theme: MobileTheme) =>
     businessMediaAccent: {
       backgroundColor: "rgba(255, 193, 58, 0.88)",
       borderRadius: 999,
-      bottom: 15,
-      height: 22,
-      left: 70,
+      bottom: 20,
+      height: 18,
+      left: 78,
       position: "absolute",
-      width: 22,
+      width: 18,
+    },
+    businessMediaChairBack: {
+      backgroundColor: "rgba(255, 193, 58, 0.16)",
+      borderColor: "rgba(255, 193, 58, 0.5)",
+      borderRadius: 18,
+      borderWidth: 1,
+      bottom: 25,
+      height: 44,
+      left: 42,
+      position: "absolute",
+      width: 44,
+    },
+    businessMediaChairSeat: {
+      backgroundColor: "rgba(255, 193, 58, 0.34)",
+      borderRadius: 999,
+      bottom: 15,
+      height: 13,
+      left: 30,
+      position: "absolute",
+      width: 72,
     },
     businessMediaCutout: {
       borderColor: "rgba(255, 248, 236, 0.18)",
@@ -4681,7 +4752,7 @@ const createStyles = (theme: MobileTheme) =>
       width: 94,
     },
     businessMediaGlow: {
-      backgroundColor: "rgba(255, 193, 58, 0.18)",
+      backgroundColor: "rgba(255, 193, 58, 0.24)",
       borderRadius: 999,
       height: 140,
       left: -30,
@@ -4690,17 +4761,38 @@ const createStyles = (theme: MobileTheme) =>
       top: -54,
       width: 140,
     },
+    businessMediaLightLine: {
+      backgroundColor: "rgba(255, 193, 58, 0.32)",
+      borderRadius: 999,
+      height: 74,
+      width: 3,
+    },
+    businessMediaLightLineShort: {
+      backgroundColor: "rgba(255, 193, 58, 0.22)",
+      borderRadius: 999,
+      height: 52,
+      width: 3,
+    },
+    businessMediaLightRail: {
+      alignItems: "flex-start",
+      flexDirection: "row",
+      gap: 27,
+      left: 22,
+      opacity: 0.9,
+      position: "absolute",
+      top: 0,
+    },
     businessMediaPanel: {
-      backgroundColor: "rgba(255, 255, 255, 0.08)",
+      backgroundColor: "rgba(255, 255, 255, 0.05)",
       borderColor: "rgba(255, 193, 58, 0.22)",
       borderRadius: 24,
       borderWidth: 1,
-      bottom: 12,
+      bottom: 18,
       height: 48,
-      left: 25,
+      left: 38,
       position: "absolute",
-      transform: [{ rotate: "-8deg" }],
-      width: 88,
+      transform: [{ rotate: "-4deg" }],
+      width: 92,
     },
     businessInitial: {
       alignItems: "center",
@@ -7499,6 +7591,36 @@ const createStyles = (theme: MobileTheme) =>
       top: 34,
       zIndex: 2,
     },
+    salonHeroCaption: {
+      color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiMedium,
+      fontSize: 13,
+      lineHeight: 19,
+      marginTop: 4,
+      maxWidth: 230,
+      textAlign: "center",
+    },
+    salonHeroCenterpiece: {
+      alignItems: "center",
+      alignSelf: "center",
+      backgroundColor: "rgba(5, 8, 12, 0.54)",
+      borderColor: "rgba(255, 193, 58, 0.18)",
+      borderRadius: 30,
+      borderWidth: 1,
+      gap: 3,
+      marginTop: 92,
+      paddingHorizontal: 24,
+      paddingVertical: 18,
+      zIndex: 1,
+    },
+    salonHeroKicker: {
+      color: theme.colors.foreground,
+      fontFamily: mobileTypography.kufiBold,
+      fontSize: 20,
+      lineHeight: 28,
+      marginTop: 8,
+      textAlign: "center",
+    },
     salonHeroLine: {
       backgroundColor: "rgba(255, 193, 58, 0.32)",
       borderRadius: 999,
@@ -7510,6 +7632,26 @@ const createStyles = (theme: MobileTheme) =>
       borderRadius: 999,
       height: 210,
       width: 5,
+    },
+    salonHeroOrb: {
+      alignItems: "center",
+      backgroundColor: "rgba(255, 193, 58, 0.18)",
+      borderColor: theme.colors.gold,
+      borderRadius: 28,
+      borderWidth: 1,
+      height: 56,
+      justifyContent: "center",
+      shadowColor: theme.colors.deepGold,
+      shadowOffset: { height: 12, width: 0 },
+      shadowOpacity: theme.isDark ? 0.26 : 0.1,
+      shadowRadius: 18,
+      width: 56,
+    },
+    salonHeroOrbText: {
+      color: theme.colors.gold,
+      fontFamily: mobileTypography.uiBold,
+      fontSize: 28,
+      lineHeight: 34,
     },
     salonHeroPattern: {
       alignItems: "flex-start",
@@ -7523,9 +7665,9 @@ const createStyles = (theme: MobileTheme) =>
       top: 0,
     },
     salonHeroStage: {
-      backgroundColor: "rgba(91, 48, 29, 0.42)",
+      backgroundColor: "rgba(91, 48, 29, 0.36)",
       bottom: 0,
-      height: 124,
+      height: 118,
       left: 0,
       overflow: "hidden",
       position: "absolute",
@@ -7607,54 +7749,91 @@ const createStyles = (theme: MobileTheme) =>
     },
     salonServiceAdd: {
       alignItems: "center",
-      borderColor: theme.colors.gold,
-      borderRadius: 27,
-      borderWidth: 2,
-      height: 50,
+      backgroundColor: theme.colors.gold,
+      borderColor: theme.colors.accent,
+      borderRadius: 22,
+      borderWidth: 1,
+      height: 44,
       justifyContent: "center",
-      width: 50,
+      width: 44,
     },
     salonServiceAddText: {
-      color: theme.colors.gold,
+      color: theme.colors.foregroundInverse,
       fontFamily: mobileTypography.uiSemiBold,
-      fontSize: 30,
-      lineHeight: 32,
+      fontSize: 28,
+      lineHeight: 30,
+    },
+    salonServiceActionBlock: {
+      alignItems: "center",
+      backgroundColor: theme.colors.goldSoft,
+      borderColor: theme.colors.gold,
+      borderRadius: 24,
+      borderWidth: 1,
+      flexShrink: 0,
+      gap: 8,
+      justifyContent: "center",
+      minWidth: 82,
+      paddingHorizontal: 12,
+      paddingVertical: 12,
+    },
+    salonServiceCopy: {
+      alignItems: "flex-end",
+      flex: 1,
+      flexShrink: 1,
+      minWidth: 0,
+    },
+    salonServiceMain: {
+      alignItems: "center",
+      flex: 1,
+      flexDirection: "row",
+      gap: 12,
+      minWidth: 0,
     },
     salonServiceMedia: {
-      borderRadius: 20,
-      height: 78,
+      borderRadius: 18,
+      height: 64,
       overflow: "hidden",
-      width: 118,
+      width: 86,
     },
     salonServiceMeta: {
       color: theme.colors.mutedForeground,
       fontFamily: mobileTypography.uiRegular,
-      fontSize: 15,
-      lineHeight: 21,
-      marginTop: 8,
+      fontSize: 13,
+      lineHeight: 19,
+      marginTop: 5,
     },
     salonServiceName: {
       color: theme.colors.foreground,
       fontFamily: mobileTypography.uiSemiBold,
-      fontSize: 25,
-      lineHeight: 33,
+      fontSize: 21,
+      lineHeight: 29,
     },
     salonServicePrice: {
-      color: theme.colors.foreground,
+      color: theme.colors.gold,
       fontFamily: mobileTypography.uiSemiBold,
-      fontSize: 20,
-      marginTop: 8,
+      fontSize: 15,
+      lineHeight: 21,
+      textAlign: "center",
     },
     salonServiceRow: {
       alignItems: "center",
       flexDirection: "row-reverse",
-      gap: 16,
+      backgroundColor: theme.colors.card,
+      borderColor: theme.colors.border,
+      borderRadius: 28,
+      borderWidth: 1,
+      gap: 12,
       justifyContent: "space-between",
+      padding: 12,
+      shadowColor: theme.colors.shadow,
+      shadowOffset: { height: 12, width: 0 },
+      shadowOpacity: theme.isDark ? 0.16 : 0.05,
+      shadowRadius: 18,
     },
     salonServicesList: {
-      gap: 28,
+      gap: 12,
       paddingHorizontal: 28,
-      paddingTop: 30,
+      paddingTop: 24,
     },
     salonTabs: {
       flexDirection: "row",
@@ -8663,11 +8842,11 @@ const createStyles = (theme: MobileTheme) =>
       alignItems: "center",
       backgroundColor: theme.colors.goldSoft,
       borderColor: theme.colors.gold,
-      borderRadius: 25,
+      borderRadius: 23,
       borderWidth: 1,
-      height: 50,
+      height: 46,
       justifyContent: "center",
-      width: 50,
+      width: 46,
     },
     staffAvatarText: {
       color: theme.colors.deepGold,
@@ -8677,8 +8856,8 @@ const createStyles = (theme: MobileTheme) =>
     staffExperience: {
       color: theme.colors.mutedForeground,
       fontFamily: mobileTypography.uiRegular,
-      fontSize: 12,
-      lineHeight: 18,
+      fontSize: 11,
+      lineHeight: 17,
     },
     staffDetailsBlock: {
       alignItems: "flex-start",
@@ -8693,8 +8872,8 @@ const createStyles = (theme: MobileTheme) =>
       alignItems: "center",
       flexDirection: "row",
       flexShrink: 0,
-      gap: 9,
-      maxWidth: "42%",
+      gap: 8,
+      maxWidth: "46%",
     },
     staffIdentityBlockRtl: {
       flexDirection: "row-reverse",
@@ -8703,13 +8882,13 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.foreground,
       flexShrink: 1,
       fontFamily: mobileTypography.uiSemiBold,
-      fontSize: 18,
-      lineHeight: 24,
+      fontSize: 17,
+      lineHeight: 23,
     },
     staffRatingIconImage: {
-      height: 14,
+      height: 12,
       tintColor: theme.colors.gold,
-      width: 14,
+      width: 12,
     },
     staffRatingPill: {
       alignItems: "center",
@@ -8717,7 +8896,7 @@ const createStyles = (theme: MobileTheme) =>
       borderRadius: theme.radii.pill,
       flexDirection: "row",
       gap: 4,
-      paddingHorizontal: 8,
+      paddingHorizontal: 9,
       paddingVertical: 5,
     },
     staffRatingPillRtl: {
@@ -8732,12 +8911,12 @@ const createStyles = (theme: MobileTheme) =>
       alignItems: "center",
       backgroundColor: theme.colors.card,
       borderColor: theme.colors.border,
-      borderRadius: 28,
+      borderRadius: 26,
       borderWidth: 1,
       flexDirection: "row",
-      gap: 12,
+      gap: 10,
       justifyContent: "space-between",
-      padding: 15,
+      padding: 13,
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: 12, width: 0 },
       shadowOpacity: theme.isDark ? 0.16 : 0.06,
@@ -8750,11 +8929,25 @@ const createStyles = (theme: MobileTheme) =>
       shadowOpacity: theme.isDark ? 0.24 : 0.1,
       shadowRadius: 22,
     },
+    staffSelectionIndicator: {
+      alignItems: "center",
+      backgroundColor: theme.colors.muted,
+      borderColor: theme.colors.border,
+      borderRadius: 17,
+      borderWidth: 1,
+      height: 34,
+      justifyContent: "center",
+      width: 34,
+    },
+    staffSelectionIndicatorActive: {
+      backgroundColor: theme.colors.goldSoft,
+      borderColor: theme.colors.gold,
+    },
     staffRoleText: {
       color: theme.colors.mutedForeground,
       fontFamily: mobileTypography.uiMedium,
-      fontSize: 12,
-      lineHeight: 18,
+      fontSize: 11,
+      lineHeight: 17,
     },
     visualOnlyButton: {
       opacity: 0.96,
