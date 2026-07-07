@@ -3335,9 +3335,9 @@ const createStyles = (theme: MobileTheme) =>
       backgroundColor: theme.colors.background,
       flexDirection: "row",
       gap: 8,
-      paddingBottom: 6,
+      paddingBottom: 8,
       paddingHorizontal: 20,
-      paddingTop: 8,
+      paddingTop: 28,
     },
     iconAction: {
       alignItems: "center",
