@@ -2,9 +2,11 @@
 
 ## Status
 
-**BUILD STARTED / AWAITING COMPLETION**
+**BUILD SUCCEEDED / DEVELOPMENT BUILD SMOKE PASSED ON BLUESTACKS / PHYSICAL DEVICE SMOKE NOT RUN**
 
-The Android EAS development build was started for the linked EAS project. The latest checked status was `IN_QUEUE`, so no artifact/install URL is available yet.
+The Android EAS development build finished successfully. The owner installed/opened the Android development build in BlueStacks / Android emulator and connected it to Metro dev-client.
+
+This confirms development-build runtime smoke at the BlueStacks / Android emulator level only. Physical Android phone smoke remains **NOT RUN** until the owner confirms installation and testing on a real phone.
 
 ## EAS login evidence
 
@@ -80,7 +82,7 @@ cd apps/mobile
 npx.cmd eas-cli build --platform android --profile development --message "Mobile Phase 28B Android development build for real-device smoke"
 ```
 
-The local command exceeded the local command timeout while the remote EAS build remained queued. Follow-up `build:list` / `build:view` commands confirmed that the remote build was created.
+The local command exceeded the local command timeout while the remote EAS build was queued. Follow-up `build:list` / `build:view` commands confirmed that the remote build was created. A later `build:view` check confirmed the build finished successfully.
 
 ## Build evidence
 
@@ -91,18 +93,76 @@ The local command exceeded the local command timeout while the remote EAS build 
 - Environment: `development`.
 - Distribution: `internal`.
 - SDK Version: `57.0.0`.
+- Version: `1.0.0`.
+- Version code: `1`.
 - Commit: `46ca605c98dd01749834f8f6adae76f64768c11b`.
-- Status: `IN_QUEUE` at final check.
-- Artifact/install URL: not available.
+- Started by: `alhakeem7`.
+- Started at: `7/7/2026, 2:15:32 PM`.
+- Finished at: `7/7/2026, 2:38:13 PM`.
+- Status: `finished`.
+- APK artifact URL: `https://expo.dev/artifacts/eas/_YirV6Q5TWn3599Ha1ucR8Qj2noPoJUg_VMt_Kwliy8.apk`.
+
+## Development build install/runtime evidence
+
+Owner-side evidence:
+
+- Owner opened the installed Android development build in BlueStacks / Android emulator.
+- Development client screen appeared.
+- Metro dev-client server was started with:
+
+  ```powershell
+  cd apps/mobile
+  $env:EXPO_PUBLIC_REZNO_API_BASE_URL="https://rezno-staging.vercel.app"
+  npx.cmd expo start --dev-client --lan --clear
+  ```
+
+- Metro URL observed: `exp+rezno-mobile://expo-development-client/?url=http%3A%2F%2F192.168.1.165%3A8081`.
+- Development build initially failed to connect to old IP `192.168.1.103:8081`.
+- Development build succeeded after connecting to current Metro IP `192.168.1.165:8081`.
+- App opened after the correct Metro connection.
+
+## Smoke checklist result
+
+Passed for BlueStacks / Android emulator development build:
+
+- App opens without red screen.
+- Dark theme loads.
+- Home appears.
+- Category icons appear.
+- Arabic fonts appear.
+- Bottom nav works.
+- Favorites opens.
+- Account opens.
+- Quick booking opens.
+- Salon Detail opens.
+- Staff Selection opens.
+- Date/Time opens.
+- Payment opens.
+- Confirmation opens.
+- Confirmation summary appears.
+- My Bookings opens.
+- Booking Detail opens.
+- No crash observed.
+- No Metro error after the correct IP was used.
+
+## Known visual debt
+
+Deferred visual debt remains:
+
+- UI still needs full production visual polish.
+- Some RTL/card/detail compositions still need final polish.
+- Placeholder media still needs real imagery.
+- Current state is acceptable for development readiness, not production UI approval.
 
 ## Real-device smoke
 
-- Real-device smoke: **NOT RUN / BUILD STILL RUNNING**.
-- Owner install readiness: pending until the Android development build succeeds and produces an artifact/install URL.
+- BlueStacks / Android emulator development build smoke: **PASSED**.
+- Physical Android phone smoke: **NOT RUN** unless the owner later confirms real phone installation and testing.
+- Owner install readiness for real Android phone: APK artifact exists and can be used for a future physical-device smoke.
 
-After the build succeeds and an artifact/install URL is available, the owner-side test path should be:
+For physical Android phone smoke, the owner-side test path should be:
 
-1. Install the Android development build from the EAS artifact/install link.
+1. Install the Android development build from the APK artifact URL.
 2. Start dev-client Metro:
 
    ```powershell
@@ -131,6 +191,12 @@ After the build succeeds and an artifact/install URL is available, the owner-sid
 
 Do not mark real-device smoke complete until the owner confirms installation and test results.
 
+## Release readiness
+
+**NOT PRODUCTION RELEASE READY**
+
+Production readiness requires physical-device smoke and future release-specific validation. This development-build smoke supports development readiness only.
+
 ## Safety confirmations
 
 - No iOS build was run.
@@ -149,12 +215,13 @@ Do not mark real-device smoke complete until the owner confirms installation and
 
 ## Recommended next action
 
-Next build action:
+Recommended next action:
 
-1. Wait for EAS build `6d6e2cb3-01ee-4d55-a2ec-df3735005312` to complete.
-2. Capture final status and artifact/install URL.
-3. If the build succeeds, owner installs the Android development build and completes real-device smoke.
-4. If the build fails, inspect the EAS build logs and resolve the exact blocker.
+**Mobile Visual Polish Phase — Full Figma Fidelity and Production UI Polish**
+
+Alternative:
+
+**Physical Android Phone Smoke — Install APK on real Android device and repeat the checklist**
 
 Decision recommendation:
 
@@ -165,5 +232,7 @@ Reason:
 - EAS login is available.
 - EAS project is linked.
 - EAS development environment binding is configured.
-- Android EAS development build has started and is awaiting completion.
-- Real-device smoke remains blocked until an Android development build artifact exists.
+- Android EAS development build succeeded.
+- BlueStacks / Android emulator development-build smoke passed.
+- Physical phone smoke remains not run.
+- Release readiness still requires a QA gate before production.
