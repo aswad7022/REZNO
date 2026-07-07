@@ -8,6 +8,8 @@ It does not validate backend correctness, payments, production authentication, d
 
 For the repeatable EAS development build path that can unblock physical-device testing, see [eas-development-build-path.md](./eas-development-build-path.md).
 
+For the final Phase 27E visual checkpoint and release-readiness status, see [mobile-phase-27e-final-visual-qa-readiness.md](./mobile-phase-27e-final-visual-qa-readiness.md).
+
 ## Current readiness status
 
 - Static/local validation: READY FOR STATIC/LOCAL VALIDATION.

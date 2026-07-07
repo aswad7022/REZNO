@@ -16,6 +16,8 @@ It supports the real-device visual smoke checklist in [real-device-visual-smoke-
 
 Phase 26 execution evidence is recorded in [eas-development-build-execution.md](./eas-development-build-execution.md).
 
+Phase 27E final visual checkpoint and release-readiness status is recorded in [mobile-phase-27e-final-visual-qa-readiness.md](./mobile-phase-27e-final-visual-qa-readiness.md).
+
 ## Repo evidence
 
 Repo inspection found:
