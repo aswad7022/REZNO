@@ -689,8 +689,21 @@ export default function App() {
     ],
   );
   const managedBookings = useMemo<VisualBooking[]>(
-    () =>
-      [confirmedVisualBooking, ...demoManagedBookings].map((booking) => {
+    () => {
+      const visualBookingFeed = [
+        confirmedVisualBooking,
+        ...demoManagedBookings.filter(
+          (booking) =>
+            booking.id !== confirmedVisualBooking.id &&
+            booking.businessName !== confirmedVisualBooking.businessName &&
+            !(
+              booking.businessName === confirmedVisualBooking.businessName &&
+              booking.serviceName === confirmedVisualBooking.serviceName
+            ),
+        ),
+      ];
+
+      return visualBookingFeed.map((booking) => {
         if (!visualCancelledBookingIds.includes(booking.id)) {
           return booking;
         }
@@ -700,7 +713,8 @@ export default function App() {
           status: "cancelled",
           statusLabel: visualBookingStatusLabels.cancelled,
         };
-      }),
+      });
+    },
     [confirmedVisualBooking, visualCancelledBookingIds],
   );
   const selectedManagedBooking = selectedBookingId
@@ -4025,7 +4039,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     bookingBottomAction: {
       marginTop: 8,
-      paddingBottom: 44,
+      paddingBottom: 78,
     },
     bookingDateRail: {
       flexDirection: "row",
@@ -4074,7 +4088,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     bookingReceiptActions: {
       gap: 12,
-      paddingBottom: 48,
+      paddingBottom: 78,
     },
     bookingSearchField: {
       alignItems: "center",
@@ -4106,9 +4120,9 @@ const createStyles = (theme: MobileTheme) =>
     },
     bookingStepScreen: {
       gap: 18,
-      paddingBottom: 48,
+      paddingBottom: 84,
       paddingHorizontal: 20,
-      paddingTop: 18,
+      paddingTop: 30,
     },
     bookingTimeGrid: {
       flexDirection: "row",
@@ -4153,10 +4167,10 @@ const createStyles = (theme: MobileTheme) =>
       borderWidth: 1,
       flex: 1,
       justifyContent: "center",
-      minHeight: 42,
+      minHeight: 38,
       minWidth: 82,
-      paddingHorizontal: 12,
-      paddingVertical: 10,
+      paddingHorizontal: 11,
+      paddingVertical: 8,
     },
     bookingActionButtonDanger: {
       backgroundColor: theme.colors.dangerSoft,
@@ -4180,7 +4194,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     bookingDetailActions: {
       gap: 12,
-      paddingBottom: 48,
+      paddingBottom: 84,
     },
     bookingDetailHero: {
       backgroundColor: theme.colors.hero,
@@ -4200,9 +4214,9 @@ const createStyles = (theme: MobileTheme) =>
     },
     bookingDetailScreen: {
       gap: 18,
-      paddingBottom: 54,
+      paddingBottom: 96,
       paddingHorizontal: 20,
-      paddingTop: 18,
+      paddingTop: 30,
     },
     bookingDetailSummary: {
       backgroundColor: theme.colors.card,
@@ -4249,13 +4263,14 @@ const createStyles = (theme: MobileTheme) =>
       width: 22,
     },
     bookingsList: {
-      gap: 14,
+      gap: 10,
+      paddingBottom: 84,
     },
     bookingsScreen: {
-      gap: 18,
-      paddingBottom: 54,
+      gap: 16,
+      paddingBottom: 112,
       paddingHorizontal: 20,
-      paddingTop: 18,
+      paddingTop: 30,
     },
     bookingsSegment: {
       alignItems: "center",
@@ -4300,10 +4315,10 @@ const createStyles = (theme: MobileTheme) =>
       borderColor: theme.colors.danger,
       borderRadius: theme.radii.control,
       borderWidth: 1,
-      minHeight: 54,
+      minHeight: 48,
       justifyContent: "center",
-      paddingHorizontal: 18,
-      paddingVertical: 14,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
     },
     cancelBookingButtonText: {
       color: theme.colors.danger,
@@ -4315,46 +4330,46 @@ const createStyles = (theme: MobileTheme) =>
       flexDirection: "row",
       flexWrap: "wrap",
       gap: 8,
-      marginTop: 16,
+      marginTop: 12,
     },
     managedBookingCard: {
       backgroundColor: theme.colors.card,
       borderColor: theme.colors.border,
-      borderRadius: 28,
+      borderRadius: 24,
       borderWidth: 1,
-      padding: 16,
+      padding: 13,
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: 16, width: 0 },
       shadowOpacity: theme.isDark ? 0.22 : 0.08,
       shadowRadius: 24,
     },
     managedBookingHeader: {
-      gap: 14,
+      gap: 10,
     },
     managedBookingInfoGrid: {
       flexDirection: "row",
       flexWrap: "wrap",
       gap: 8,
-      marginTop: 12,
+      marginTop: 8,
     },
     managedBookingMedia: {
-      borderRadius: 24,
-      height: 128,
+      borderRadius: 20,
+      height: 96,
       overflow: "hidden",
     },
     managedBookingMeta: {
       color: theme.colors.mutedForeground,
       fontFamily: mobileTypography.uiRegular,
-      fontSize: 13,
-      lineHeight: 20,
-      marginTop: 4,
+      fontSize: 12,
+      lineHeight: 18,
+      marginTop: 3,
     },
     managedBookingTitle: {
       color: theme.colors.foreground,
       flexShrink: 1,
       fontFamily: mobileTypography.kufiBold,
-      fontSize: 20,
-      lineHeight: 27,
+      fontSize: 18,
+      lineHeight: 24,
     },
     managedBookingTitleRow: {
       alignItems: "flex-start",
@@ -7239,6 +7254,7 @@ const createStyles = (theme: MobileTheme) =>
       flexDirection: "row",
       gap: 12,
       marginHorizontal: 28,
+      marginBottom: 38,
       marginTop: 6,
       padding: 10,
       paddingLeft: 18,
