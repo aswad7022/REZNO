@@ -112,6 +112,7 @@ Earlier blocked status is recorded in:
 - PR #60: EAS LOGIN UNAVAILABLE / no Android development build executed.
 - PR #58: real-device smoke documented as NOT RUN / BLOCKED.
 - PR #59: EAS development build path documented, but no build executed.
+- Phase 28 Android development build attempt is recorded in [mobile-phase-28-android-development-build.md](./mobile-phase-28-android-development-build.md).
 
 ## Recommended next action
 
