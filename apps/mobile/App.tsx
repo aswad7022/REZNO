@@ -259,6 +259,27 @@ const featuredBusinesses: PremiumBusiness[] = [
   },
 ];
 
+const homeRecommendations = [
+  {
+    badge: "اختيار REZNO",
+    category: "مطاعم ومشاوي",
+    id: "recommend-mazaj",
+    meta: "تجربة عشاء فاخرة هذا الأسبوع",
+    price: "حجز يبدأ من 15,000 د.ع",
+    rating: "4.8",
+    title: "مطعم مزاج الذهبي",
+  },
+  {
+    badge: "الأكثر حجزاً",
+    category: "صالونات وتجميل",
+    id: "recommend-noura",
+    meta: "باقة عناية وتصفيف مختارة",
+    price: "خصم خاص للحجوزات المبكرة",
+    rating: "4.9",
+    title: "Noura Beauty Lounge",
+  },
+];
+
 const newOnReznoItems = [
   {
     label: "منضم حديثاً",
@@ -1054,6 +1075,7 @@ function CustomerHomeScreen({
         onOpenMarketplace={onOpenMarketplace}
         styles={styles}
       />
+      <PromoCard isRtl={isRtl} styles={styles} />
       <CategoryGrid styles={styles} />
       <HomeSectionHeader
         action="عرض الكل"
@@ -1061,9 +1083,9 @@ function CustomerHomeScreen({
         styles={styles}
         title="توصياتنا"
       />
-      <PromoCard isRtl={isRtl} styles={styles} />
+      <HomeRecommendationsSection isRtl={isRtl} styles={styles} />
       <HomeSectionHeader
-        action="عرض الكل ›"
+        action="عرض الكل"
         isRtl={isRtl}
         styles={styles}
         title="قريب منك"
@@ -1378,6 +1400,53 @@ function HeroCard({
           ما الخدمة التي تحتاجها اليوم؟
         </Text>
       </View>
+    </View>
+  );
+}
+
+function HomeRecommendationsSection({
+  isRtl,
+  styles,
+}: {
+  isRtl: boolean;
+  styles: MobileStyles;
+}) {
+  return (
+    <View style={styles.homeRecommendationGrid}>
+      {homeRecommendations.map((item) => (
+        <View key={item.id} style={styles.homeRecommendationCard}>
+          <View style={styles.homeRecommendationMedia}>
+            <BusinessMedia badge={item.badge} styles={styles} />
+          </View>
+          <View style={styles.homeRecommendationCopy}>
+            <View style={styles.homeRecommendationTopRow}>
+              <Text style={styles.homeRecommendationRating}>★ {item.rating}</Text>
+              <Text
+                style={[
+                  styles.homeRecommendationBadge,
+                  isRtl && styles.rtlText,
+                ]}
+              >
+                {item.badge}
+              </Text>
+            </View>
+            <Text
+              style={[styles.homeRecommendationTitle, isRtl && styles.rtlText]}
+            >
+              {item.title}
+            </Text>
+            <Text style={[styles.homeRecommendationMeta, isRtl && styles.rtlText]}>
+              {item.category}
+            </Text>
+            <Text style={[styles.homeRecommendationNote, isRtl && styles.rtlText]}>
+              {item.meta}
+            </Text>
+            <Text style={[styles.homeRecommendationPrice, isRtl && styles.rtlText]}>
+              {item.price}
+            </Text>
+          </View>
+        </View>
+      ))}
     </View>
   );
 }
@@ -5285,7 +5354,9 @@ const createStyles = (theme: MobileTheme) =>
     },
     categoryIconTile: {
       alignItems: "center",
-      backgroundColor: "transparent",
+      backgroundColor: theme.isDark
+        ? "transparent"
+        : "rgba(255, 193, 58, 0.08)",
       borderColor: "transparent",
       borderRadius: 16,
       borderWidth: 0,
@@ -5315,10 +5386,10 @@ const createStyles = (theme: MobileTheme) =>
       alignItems: "center",
       backgroundColor: theme.isDark
         ? "rgba(9, 25, 20, 0.9)"
-        : "rgba(255, 250, 239, 0.82)",
+        : "rgba(255, 253, 248, 0.98)",
       borderColor: theme.isDark
         ? "rgba(235, 178, 80, 0.25)"
-        : "rgba(199, 138, 18, 0.2)",
+        : "rgba(184, 117, 11, 0.24)",
       borderRadius: 14,
       borderWidth: 1,
       flexBasis: "23.4%",
@@ -5328,9 +5399,13 @@ const createStyles = (theme: MobileTheme) =>
       minWidth: 0,
       paddingHorizontal: 5,
       paddingVertical: 13,
+      shadowColor: theme.colors.shadow,
+      shadowOffset: { height: 10, width: 0 },
+      shadowOpacity: theme.isDark ? 0.16 : 0.08,
+      shadowRadius: 16,
     },
     categoryLabel: {
-      color: theme.colors.cream,
+      color: theme.isDark ? theme.colors.cream : theme.colors.foreground,
       fontFamily: mobileTypography.uiMedium,
       fontSize: 12,
       lineHeight: 18,
@@ -5539,8 +5614,12 @@ const createStyles = (theme: MobileTheme) =>
     },
     centerTabHalo: {
       alignItems: "center",
-      backgroundColor: "rgba(255, 193, 58, 0.82)",
-      borderColor: "rgba(255, 246, 205, 0.7)",
+      backgroundColor: theme.isDark
+        ? "rgba(255, 193, 58, 0.82)"
+        : "rgba(246, 195, 67, 0.96)",
+      borderColor: theme.isDark
+        ? "rgba(255, 246, 205, 0.7)"
+        : "rgba(184, 117, 11, 0.28)",
       borderRadius: 35,
       borderWidth: 2,
       height: 70,
@@ -5553,8 +5632,10 @@ const createStyles = (theme: MobileTheme) =>
     },
     centerTabInner: {
       alignItems: "center",
-      backgroundColor: "#103a2b",
-      borderColor: "rgba(255, 248, 220, 0.28)",
+      backgroundColor: theme.isDark ? "#103a2b" : "#f7c24a",
+      borderColor: theme.isDark
+        ? "rgba(255, 248, 220, 0.28)"
+        : "rgba(255, 253, 248, 0.56)",
       borderRadius: 28,
       borderWidth: 1,
       height: 56,
@@ -5562,7 +5643,7 @@ const createStyles = (theme: MobileTheme) =>
       width: 56,
     },
     centerTabPlusText: {
-      color: theme.colors.cream,
+      color: theme.isDark ? theme.colors.cream : theme.colors.foregroundInverse,
       fontFamily: mobileTypography.uiRegular,
       fontSize: 41,
       lineHeight: 44,
@@ -6172,6 +6253,95 @@ const createStyles = (theme: MobileTheme) =>
       flexDirection: "row",
       gap: 10,
     },
+    homeRecommendationBadge: {
+      color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiMedium,
+      fontSize: 10,
+      lineHeight: 15,
+      textAlign: "right",
+    },
+    homeRecommendationCard: {
+      backgroundColor: theme.isDark
+        ? "rgba(8, 27, 21, 0.92)"
+        : "rgba(255, 253, 248, 0.98)",
+      borderColor: theme.isDark
+        ? "rgba(255, 193, 58, 0.24)"
+        : "rgba(184, 117, 11, 0.22)",
+      borderRadius: 22,
+      borderWidth: 1,
+      flex: 1,
+      minWidth: 0,
+      overflow: "hidden",
+      shadowColor: theme.colors.shadow,
+      shadowOffset: { height: 14, width: 0 },
+      shadowOpacity: theme.isDark ? 0.24 : 0.1,
+      shadowRadius: 22,
+    },
+    homeRecommendationCopy: {
+      gap: 5,
+      padding: 13,
+    },
+    homeRecommendationGrid: {
+      flexDirection: "row",
+      gap: 10,
+    },
+    homeRecommendationMedia: {
+      backgroundColor: "#050907",
+      borderBottomColor: theme.isDark
+        ? "rgba(255, 193, 58, 0.16)"
+        : "rgba(184, 117, 11, 0.16)",
+      borderBottomWidth: 1,
+      height: 92,
+      overflow: "hidden",
+      position: "relative",
+    },
+    homeRecommendationMeta: {
+      color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiRegular,
+      fontSize: 11,
+      lineHeight: 16,
+      textAlign: "right",
+    },
+    homeRecommendationNote: {
+      color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiMedium,
+      fontSize: 11,
+      lineHeight: 17,
+      marginTop: 2,
+      textAlign: "right",
+    },
+    homeRecommendationPrice: {
+      color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: 11,
+      lineHeight: 16,
+      marginTop: 3,
+      textAlign: "right",
+    },
+    homeRecommendationRating: {
+      backgroundColor: theme.colors.goldSoft,
+      borderRadius: theme.radii.pill,
+      color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: 10,
+      lineHeight: 15,
+      overflow: "hidden",
+      paddingHorizontal: 7,
+      paddingVertical: 3,
+    },
+    homeRecommendationTitle: {
+      color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: 14,
+      lineHeight: 20,
+      textAlign: "right",
+    },
+    homeRecommendationTopRow: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 8,
+      justifyContent: "space-between",
+    },
     homeSectionAction: {
       color: theme.colors.gold,
       fontFamily: mobileTypography.uiSemiBold,
@@ -6241,8 +6411,12 @@ const createStyles = (theme: MobileTheme) =>
       paddingHorizontal: 9,
     },
     homeThemeOptionActive: {
-      backgroundColor: "rgba(255, 193, 58, 0.16)",
-      borderColor: "rgba(255, 193, 58, 0.46)",
+      backgroundColor: theme.isDark
+        ? "rgba(255, 193, 58, 0.16)"
+        : "rgba(246, 195, 67, 0.28)",
+      borderColor: theme.isDark
+        ? "rgba(255, 193, 58, 0.46)"
+        : "rgba(184, 117, 11, 0.34)",
       borderWidth: 1,
     },
     homeThemeSegment: {
@@ -7522,8 +7696,12 @@ const createStyles = (theme: MobileTheme) =>
     },
     promoBadge: {
       alignItems: "center",
-      backgroundColor: "rgba(255, 193, 58, 0.13)",
-      borderColor: "rgba(255, 221, 135, 0.68)",
+      backgroundColor: theme.isDark
+        ? "rgba(255, 193, 58, 0.13)"
+        : "rgba(255, 246, 219, 0.96)",
+      borderColor: theme.isDark
+        ? "rgba(255, 221, 135, 0.68)"
+        : "rgba(184, 117, 11, 0.34)",
       borderRadius: 44,
       borderWidth: 1,
       height: 88,
@@ -7538,7 +7716,7 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.foregroundInverse,
     },
     promoBody: {
-      color: theme.colors.foreground,
+      color: theme.isDark ? theme.colors.foreground : "#3d3323",
       fontFamily: mobileTypography.uiRegular,
       fontSize: 15,
       lineHeight: 23,
@@ -7547,10 +7725,10 @@ const createStyles = (theme: MobileTheme) =>
     },
     promoCard: {
       alignItems: "center",
-      backgroundColor: theme.isDark ? "#06281f" : "#f7ebc9",
+      backgroundColor: theme.isDark ? "#06281f" : "#fff6de",
       borderColor: theme.isDark
         ? "rgba(55, 122, 90, 0.72)"
-        : "rgba(199, 138, 18, 0.26)",
+        : "rgba(184, 117, 11, 0.28)",
       borderRadius: 21,
       borderWidth: 1,
       flexDirection: "row-reverse",
@@ -7562,11 +7740,11 @@ const createStyles = (theme: MobileTheme) =>
       position: "relative",
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: 20, width: 0 },
-      shadowOpacity: theme.isDark ? 0.34 : 0.1,
+      shadowOpacity: theme.isDark ? 0.34 : 0.14,
       shadowRadius: 30,
     },
     promoTitle: {
-      color: theme.colors.gold,
+      color: theme.isDark ? theme.colors.gold : theme.colors.deepGold,
       fontFamily: mobileTypography.kufiBold,
       fontSize: 30,
       lineHeight: 36,
@@ -7577,7 +7755,9 @@ const createStyles = (theme: MobileTheme) =>
       minWidth: 0,
     },
     promoGlow: {
-      backgroundColor: "rgba(18, 142, 88, 0.38)",
+      backgroundColor: theme.isDark
+        ? "rgba(18, 142, 88, 0.38)"
+        : "rgba(18, 142, 88, 0.12)",
       borderRadius: 140,
       height: 210,
       position: "absolute",
@@ -7586,7 +7766,9 @@ const createStyles = (theme: MobileTheme) =>
       width: 210,
     },
     promoGoldGlow: {
-      backgroundColor: "rgba(255, 193, 58, 0.18)",
+      backgroundColor: theme.isDark
+        ? "rgba(255, 193, 58, 0.18)"
+        : "rgba(246, 195, 67, 0.26)",
       borderRadius: 120,
       height: 154,
       position: "absolute",
@@ -7595,7 +7777,9 @@ const createStyles = (theme: MobileTheme) =>
       width: 154,
     },
     promoPatternLine: {
-      backgroundColor: "rgba(255, 255, 255, 0.05)",
+      backgroundColor: theme.isDark
+        ? "rgba(255, 255, 255, 0.05)"
+        : "rgba(184, 117, 11, 0.08)",
       height: 1,
       position: "absolute",
       right: 42,
@@ -7604,7 +7788,9 @@ const createStyles = (theme: MobileTheme) =>
       width: 190,
     },
     promoPatternLineAlt: {
-      backgroundColor: "rgba(255, 193, 58, 0.09)",
+      backgroundColor: theme.isDark
+        ? "rgba(255, 193, 58, 0.09)"
+        : "rgba(18, 142, 88, 0.08)",
       height: 1,
       position: "absolute",
       right: 22,
@@ -7623,7 +7809,7 @@ const createStyles = (theme: MobileTheme) =>
       width: 58,
     },
     promoTicketCutLeft: {
-      backgroundColor: theme.isDark ? "#08281f" : "#f7ebc9",
+      backgroundColor: theme.isDark ? "#08281f" : "#fff6de",
       borderRadius: 8,
       height: 14,
       left: -7,
@@ -7631,7 +7817,7 @@ const createStyles = (theme: MobileTheme) =>
       width: 14,
     },
     promoTicketCutRight: {
-      backgroundColor: theme.isDark ? "#08281f" : "#f7ebc9",
+      backgroundColor: theme.isDark ? "#08281f" : "#fff6de",
       borderRadius: 8,
       height: 14,
       position: "absolute",
@@ -7646,14 +7832,16 @@ const createStyles = (theme: MobileTheme) =>
     },
     promoCoupon: {
       alignSelf: "flex-end",
-      backgroundColor: theme.colors.cream,
+      backgroundColor: theme.isDark ? theme.colors.cream : "#ffffff",
+      borderColor: theme.isDark ? "transparent" : "rgba(184, 117, 11, 0.16)",
+      borderWidth: 1,
       borderRadius: theme.radii.pill,
       marginTop: 16,
       paddingHorizontal: 16,
       paddingVertical: 8,
     },
     promoCouponText: {
-      color: theme.colors.foregroundInverse,
+      color: theme.isDark ? theme.colors.foregroundInverse : theme.colors.foreground,
       fontFamily: mobileTypography.uiBold,
       fontSize: 13,
     },
@@ -8776,10 +8964,10 @@ const createStyles = (theme: MobileTheme) =>
       alignItems: "center",
       backgroundColor: theme.isDark
         ? "rgba(9, 24, 21, 0.96)"
-        : "rgba(255, 250, 239, 0.9)",
+        : "rgba(255, 253, 248, 0.98)",
       borderColor: theme.isDark
         ? "rgba(255, 193, 58, 0.13)"
-        : "rgba(199, 138, 18, 0.18)",
+        : "rgba(184, 117, 11, 0.24)",
       borderRadius: 34,
       borderWidth: 1,
       flexDirection: "row",
@@ -8789,7 +8977,7 @@ const createStyles = (theme: MobileTheme) =>
       paddingVertical: 7,
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: 16, width: 0 },
-      shadowOpacity: theme.isDark ? 0.34 : 0.08,
+      shadowOpacity: theme.isDark ? 0.34 : 0.12,
       shadowRadius: 24,
     },
     searchBarPressed: {
@@ -9152,8 +9340,12 @@ const createStyles = (theme: MobileTheme) =>
     },
     tabBar: {
       alignItems: "center",
-      backgroundColor: "rgba(5, 18, 15, 0.84)",
-      borderColor: "rgba(255, 193, 58, 0.26)",
+      backgroundColor: theme.isDark
+        ? "rgba(5, 18, 15, 0.84)"
+        : "rgba(255, 253, 248, 0.94)",
+      borderColor: theme.isDark
+        ? "rgba(255, 193, 58, 0.26)"
+        : "rgba(184, 117, 11, 0.22)",
       borderRadius: 23,
       borderWidth: 1,
       bottom: 18,
@@ -9168,7 +9360,7 @@ const createStyles = (theme: MobileTheme) =>
       right: 28,
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: -10, width: 0 },
-      shadowOpacity: theme.isDark ? 0.54 : 0.16,
+      shadowOpacity: theme.isDark ? 0.54 : 0.14,
       shadowRadius: 28,
       zIndex: 20,
     },

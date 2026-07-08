@@ -12,6 +12,8 @@ Focused fix pass 2: PR #90 was tightened again for the bottom navigation icon sy
 
 Focused fix pass 4: Home language selection was removed from the header and kept in Account/settings. Home now uses a local `ليلي / نهاري` theme selector, with night remaining the default and day mode wired to the existing light theme. Home content order is now `توصياتنا`, then `قريب منك`, then `جديد على REZNO`, with RTL section headers and the promo card copy aligned right opposite the ticket visual.
 
+Focused fix pass 5: The owner-provided day-theme reference screenshot was used for the final Home ordering and day-mode correction. Home now renders Search, then the discount/ad card, then Categories, then `توصياتنا`, then `قريب منك`, then `جديد على REZNO`. The discount card is now a primary future ad slot directly below search, recommendations are a separate static curated section, language remains only in Account/settings, and Home keeps the `ليلي / نهاري` theme selector. No API, backend, database, package, or deployment behavior changed.
+
 ## Reference
 
 - Visual source of truth: attached owner Home screenshot from July 8, 2026.
