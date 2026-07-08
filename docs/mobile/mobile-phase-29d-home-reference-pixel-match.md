@@ -20,6 +20,8 @@ Focused fix pass 7: The floating bottom navigation surface was made near-opaque 
 
 Focused fix pass 8: The floating bottom navigation now uses solid dark and ivory surfaces instead of translucent glass, while preserving the rounded floating pill, border, shadow, and center plus. Home now includes an explicit final spacer after `جديد على REZNO` so the last section can clear the nav independently of generic scroll padding. Any remaining gray gear-like control in BlueStacks screenshots remains classified as likely external emulator/development overlay unless a real app-rendered component is identified.
 
+Phase 29D.1 hotfix: Day-theme typography colors were tuned against the owner light reference. Light mode now uses warmer charcoal primary text, warmer gray secondary text, and a restrained gold accent palette so normal labels, section titles, business names, category labels, promo body copy, and inactive navigation text remain readable without excessive gold. Night theme values were preserved.
+
 ## Reference
 
 - Visual source of truth: attached owner Home screenshot from July 8, 2026.
