@@ -869,6 +869,9 @@ export default function App() {
       <ScrollView
         contentContainerStyle={[
           styles.content,
+          activeTab === "customerHome" &&
+            !selectedBusiness &&
+            styles.homeContent,
           (selectedBusiness || activeTab === "marketplace") &&
             styles.immersiveContent,
         ]}
@@ -1466,6 +1469,9 @@ function PromoCard({ isRtl, styles }: { isRtl: boolean; styles: MobileStyles }) 
   return (
     <View style={styles.promoCard}>
       <View style={styles.promoGlow} />
+      <View style={styles.promoGoldGlow} />
+      <View style={styles.promoPatternLine} />
+      <View style={styles.promoPatternLineAlt} />
       <View>
         <Text style={[styles.promoTitle, isRtl && styles.rtlText]}>
           خصم 15%
@@ -1500,11 +1506,18 @@ function BusinessMedia({
   return (
     <>
       <View style={styles.businessMediaBackdrop} />
+      <View style={styles.businessMediaPhotoShade} />
       <View style={styles.businessMediaGlow} />
+      <View style={styles.businessMediaWarmGlow} />
       <View style={styles.businessMediaLightRail}>
         <View style={styles.businessMediaLightLine} />
         <View style={styles.businessMediaLightLineShort} />
         <View style={styles.businessMediaLightLine} />
+      </View>
+      <View style={styles.businessMediaVenueArchRow}>
+        <View style={styles.businessMediaVenueArch} />
+        <View style={styles.businessMediaVenueArch} />
+        <View style={styles.businessMediaVenueArchSmall} />
       </View>
       <View style={styles.businessMediaPanel} />
       <View style={styles.businessMediaChairBack} />
@@ -4802,7 +4815,16 @@ const createStyles = (theme: MobileTheme) =>
     },
     businessMediaBackdrop: {
       ...StyleSheet.absoluteFill,
-      backgroundColor: "#05070a",
+      backgroundColor: "#050806",
+    },
+    businessMediaPhotoShade: {
+      ...StyleSheet.absoluteFill,
+      backgroundColor: "rgba(0, 0, 0, 0.28)",
+      borderRadius: 16,
+      bottom: 6,
+      left: 6,
+      right: 6,
+      top: 6,
     },
     businessHero: {
       backgroundColor: "#050907",
@@ -4875,6 +4897,15 @@ const createStyles = (theme: MobileTheme) =>
       top: -74,
       width: 170,
     },
+    businessMediaWarmGlow: {
+      backgroundColor: "rgba(10, 82, 55, 0.28)",
+      borderRadius: 999,
+      bottom: -58,
+      height: 150,
+      position: "absolute",
+      right: -54,
+      width: 150,
+    },
     businessMediaLightLine: {
       backgroundColor: "rgba(255, 193, 58, 0.44)",
       borderRadius: 999,
@@ -4907,6 +4938,29 @@ const createStyles = (theme: MobileTheme) =>
       position: "absolute",
       transform: [{ rotate: "-4deg" }],
       width: 92,
+    },
+    businessMediaVenueArch: {
+      backgroundColor: "rgba(255, 193, 58, 0.07)",
+      borderColor: "rgba(255, 193, 58, 0.32)",
+      borderRadius: 20,
+      borderWidth: 1,
+      height: 48,
+      width: 34,
+    },
+    businessMediaVenueArchRow: {
+      bottom: 29,
+      flexDirection: "row",
+      gap: 12,
+      position: "absolute",
+      right: 14,
+    },
+    businessMediaVenueArchSmall: {
+      backgroundColor: "rgba(255, 193, 58, 0.05)",
+      borderColor: "rgba(255, 193, 58, 0.24)",
+      borderRadius: 18,
+      borderWidth: 1,
+      height: 42,
+      width: 30,
     },
     businessInitial: {
       alignItems: "center",
@@ -5110,19 +5164,19 @@ const createStyles = (theme: MobileTheme) =>
       lineHeight: 28,
     },
     categoryIconImage: {
-      height: 36,
+      height: 39,
       tintColor: theme.colors.gold,
-      width: 36,
+      width: 39,
     },
     categoryIconTile: {
       alignItems: "center",
-      backgroundColor: "rgba(255, 193, 58, 0.06)",
-      borderColor: "rgba(255, 193, 58, 0.16)",
-      borderRadius: 17,
-      borderWidth: 1,
-      height: 54,
+      backgroundColor: "transparent",
+      borderColor: "transparent",
+      borderRadius: 16,
+      borderWidth: 0,
+      height: 50,
       justifyContent: "center",
-      width: 54,
+      width: 50,
     },
     categoryIconTileBlue: {
       backgroundColor: "rgba(255, 193, 58, 0.06)",
@@ -5149,9 +5203,9 @@ const createStyles = (theme: MobileTheme) =>
       borderRadius: 14,
       borderWidth: 1,
       flexBasis: "23.4%",
-      gap: 7,
+      gap: 6,
       justifyContent: "center",
-      minHeight: 118,
+      minHeight: 112,
       minWidth: 0,
       paddingHorizontal: 5,
       paddingVertical: 13,
@@ -5333,23 +5387,23 @@ const createStyles = (theme: MobileTheme) =>
       width: "100%",
     },
     centerTabButton: {
-      backgroundColor: theme.colors.gold,
-      borderColor: "rgba(255, 238, 170, 0.82)",
-      borderWidth: 2,
+      backgroundColor: "transparent",
+      borderColor: "transparent",
+      borderWidth: 0,
       borderRadius: 34,
       flex: 0,
-      height: 66,
+      height: 68,
       marginHorizontal: 8,
       shadowColor: theme.colors.deepGold,
       shadowOffset: { height: 8, width: 0 },
-      shadowOpacity: theme.isDark ? 0.32 : 0.12,
-      shadowRadius: 16,
-      transform: [{ translateY: -16 }],
-      width: 66,
+      shadowOpacity: theme.isDark ? 0.4 : 0.12,
+      shadowRadius: 18,
+      transform: [{ translateY: -14 }],
+      width: 68,
     },
     centerTabButtonActive: {
-      backgroundColor: theme.colors.gold,
-      transform: [{ translateY: -17 }, { scale: 1.02 }],
+      backgroundColor: "transparent",
+      transform: [{ translateY: -15 }, { scale: 1.02 }],
     },
     centerTabActiveIndicator: {
       backgroundColor: "transparent",
@@ -5364,6 +5418,60 @@ const createStyles = (theme: MobileTheme) =>
       height: 34,
       tintColor: theme.colors.foregroundInverse,
       width: 34,
+    },
+    centerTabHalo: {
+      alignItems: "center",
+      backgroundColor: "rgba(255, 193, 58, 0.82)",
+      borderColor: "rgba(255, 246, 205, 0.7)",
+      borderRadius: 34,
+      borderWidth: 2,
+      height: 68,
+      justifyContent: "center",
+      shadowColor: theme.colors.deepGold,
+      shadowOffset: { height: 10, width: 0 },
+      shadowOpacity: theme.isDark ? 0.44 : 0.14,
+      shadowRadius: 18,
+      width: 68,
+    },
+    centerTabInner: {
+      alignItems: "center",
+      backgroundColor: "#103a2b",
+      borderColor: "rgba(255, 248, 220, 0.28)",
+      borderRadius: 27,
+      borderWidth: 1,
+      height: 54,
+      justifyContent: "center",
+      width: 54,
+    },
+    centerTabPlusText: {
+      color: theme.colors.cream,
+      fontFamily: mobileTypography.uiRegular,
+      fontSize: 38,
+      lineHeight: 42,
+      marginTop: -2,
+    },
+    exploreCompassIcon: {
+      alignItems: "center",
+      borderColor: theme.colors.foreground,
+      borderRadius: 13,
+      borderWidth: 2,
+      height: 25,
+      justifyContent: "center",
+      transform: [{ rotate: "-18deg" }],
+      width: 25,
+    },
+    exploreCompassIconActive: {
+      borderColor: theme.colors.gold,
+    },
+    exploreCompassNeedle: {
+      backgroundColor: theme.colors.foreground,
+      borderRadius: 999,
+      height: 11,
+      transform: [{ rotate: "45deg" }],
+      width: 3,
+    },
+    exploreCompassNeedleActive: {
+      backgroundColor: theme.colors.gold,
     },
     chipRow: {
       flexDirection: "row",
@@ -5434,6 +5542,9 @@ const createStyles = (theme: MobileTheme) =>
       gap: 18,
       paddingBottom: 170,
       paddingHorizontal: 20,
+    },
+    homeContent: {
+      paddingBottom: 128,
     },
     immersiveContent: {
       paddingHorizontal: 0,
@@ -7153,13 +7264,17 @@ const createStyles = (theme: MobileTheme) =>
     },
     promoBadge: {
       alignItems: "center",
-      backgroundColor: "rgba(255, 193, 58, 0.16)",
-      borderColor: "rgba(255, 193, 58, 0.5)",
-      borderRadius: 42,
+      backgroundColor: "rgba(255, 193, 58, 0.13)",
+      borderColor: "rgba(255, 221, 135, 0.68)",
+      borderRadius: 44,
       borderWidth: 1,
-      height: 84,
+      height: 88,
       justifyContent: "center",
-      width: 84,
+      shadowColor: theme.colors.deepGold,
+      shadowOffset: { height: 12, width: 0 },
+      shadowOpacity: theme.isDark ? 0.28 : 0.1,
+      shadowRadius: 18,
+      width: 88,
     },
     promoBadgeText: {
       color: theme.colors.foregroundInverse,
@@ -7174,16 +7289,16 @@ const createStyles = (theme: MobileTheme) =>
     },
     promoCard: {
       alignItems: "center",
-      backgroundColor: "#08281f",
-      borderColor: "rgba(42, 104, 78, 0.78)",
+      backgroundColor: "#06281f",
+      borderColor: "rgba(55, 122, 90, 0.72)",
       borderRadius: 21,
       borderWidth: 1,
       flexDirection: "row",
       justifyContent: "space-between",
-      minHeight: 134,
+      minHeight: 130,
       overflow: "hidden",
       paddingHorizontal: 24,
-      paddingVertical: 20,
+      paddingVertical: 18,
       position: "relative",
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: 20, width: 0 },
@@ -7197,23 +7312,50 @@ const createStyles = (theme: MobileTheme) =>
       lineHeight: 36,
     },
     promoGlow: {
-      backgroundColor: "rgba(21, 125, 84, 0.34)",
+      backgroundColor: "rgba(18, 142, 88, 0.38)",
       borderRadius: 140,
-      height: 190,
+      height: 210,
       position: "absolute",
-      right: -55,
-      top: -68,
+      left: -76,
+      top: -72,
+      width: 210,
+    },
+    promoGoldGlow: {
+      backgroundColor: "rgba(255, 193, 58, 0.18)",
+      borderRadius: 120,
+      height: 154,
+      position: "absolute",
+      right: -22,
+      top: -16,
+      width: 154,
+    },
+    promoPatternLine: {
+      backgroundColor: "rgba(255, 255, 255, 0.05)",
+      height: 1,
+      position: "absolute",
+      right: 42,
+      top: 26,
+      transform: [{ rotate: "-36deg" }],
       width: 190,
+    },
+    promoPatternLineAlt: {
+      backgroundColor: "rgba(255, 193, 58, 0.09)",
+      height: 1,
+      position: "absolute",
+      right: 22,
+      top: 76,
+      transform: [{ rotate: "-36deg" }],
+      width: 170,
     },
     promoTicket: {
       alignItems: "center",
-      backgroundColor: theme.colors.gold,
+      backgroundColor: "#f6c35a",
       borderRadius: 13,
-      height: 40,
+      height: 42,
       justifyContent: "center",
       position: "relative",
       transform: [{ rotate: "-12deg" }],
-      width: 54,
+      width: 58,
     },
     promoTicketCutLeft: {
       backgroundColor: "#08281f",
@@ -8741,20 +8883,20 @@ const createStyles = (theme: MobileTheme) =>
     },
     tabBar: {
       alignItems: "center",
-      backgroundColor: "rgba(5, 17, 14, 0.88)",
-      borderColor: "rgba(255, 193, 58, 0.22)",
-      borderRadius: 24,
+      backgroundColor: "rgba(5, 18, 15, 0.84)",
+      borderColor: "rgba(255, 193, 58, 0.26)",
+      borderRadius: 23,
       borderWidth: 1,
-      bottom: 22,
+      bottom: 18,
       elevation: 24,
       flexDirection: "row",
-      height: 100,
-      left: 26,
-      paddingBottom: 10,
-      paddingHorizontal: 18,
-      paddingTop: 12,
+      height: 92,
+      left: 28,
+      paddingBottom: 8,
+      paddingHorizontal: 20,
+      paddingTop: 10,
       position: "absolute",
-      right: 26,
+      right: 28,
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: -10, width: 0 },
       shadowOpacity: theme.isDark ? 0.54 : 0.16,
@@ -8776,9 +8918,9 @@ const createStyles = (theme: MobileTheme) =>
       alignItems: "center",
       borderRadius: 22,
       flex: 1,
-      gap: 3,
+      gap: 2,
       justifyContent: "center",
-      minHeight: 52,
+      minHeight: 48,
       paddingHorizontal: 2,
     },
     tabButtonActive: {
@@ -8797,9 +8939,9 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.gold,
     },
     tabIconImage: {
-      height: 23,
+      height: 24,
       tintColor: theme.colors.foreground,
-      width: 23,
+      width: 24,
     },
     tabIconImageActive: {
       tintColor: theme.colors.gold,
@@ -8807,8 +8949,8 @@ const createStyles = (theme: MobileTheme) =>
     tabLabel: {
       color: theme.colors.foreground,
       fontFamily: mobileTypography.uiRegular,
-      fontSize: 11,
-      lineHeight: 15,
+      fontSize: 10,
+      lineHeight: 14,
       maxWidth: 64,
       minWidth: 48,
       textAlign: "center",

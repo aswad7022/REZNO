@@ -72,10 +72,17 @@ type MobileChromeStyles = {
   centerTabActiveIndicator: StyleProp<ViewStyle>;
   centerTabButton: StyleProp<ViewStyle>;
   centerTabButtonActive: StyleProp<ViewStyle>;
+  centerTabHalo: StyleProp<ViewStyle>;
   centerTabIcon: StyleProp<TextStyle>;
   centerTabIconImage: StyleProp<ImageStyle>;
+  centerTabInner: StyleProp<ViewStyle>;
+  centerTabPlusText: StyleProp<TextStyle>;
   disabledButton: StyleProp<ViewStyle>;
   disabledButtonText: StyleProp<TextStyle>;
+  exploreCompassIcon: StyleProp<ViewStyle>;
+  exploreCompassIconActive: StyleProp<ViewStyle>;
+  exploreCompassNeedle: StyleProp<ViewStyle>;
+  exploreCompassNeedleActive: StyleProp<ViewStyle>;
   header: StyleProp<ViewStyle>;
   localeButton: StyleProp<ViewStyle>;
   localeButtonActive: StyleProp<ViewStyle>;
@@ -265,16 +272,37 @@ export function BottomTabBar({
               isCenterAction && active && styles.centerTabButtonActive,
             ]}
           >
-            <Image
-              alt={tab.label[locale]}
-              resizeMode="contain"
-              source={tab.icon}
-              style={[
-                styles.tabIconImage,
-                active && styles.tabIconImageActive,
-                isCenterAction && styles.centerTabIconImage,
-              ]}
-            />
+            {isCenterAction ? (
+              <View style={styles.centerTabHalo}>
+                <View style={styles.centerTabInner}>
+                  <Text style={styles.centerTabPlusText}>+</Text>
+                </View>
+              </View>
+            ) : tab.id === "marketplace" ? (
+              <View
+                style={[
+                  styles.exploreCompassIcon,
+                  active && styles.exploreCompassIconActive,
+                ]}
+              >
+                <View
+                  style={[
+                    styles.exploreCompassNeedle,
+                    active && styles.exploreCompassNeedleActive,
+                  ]}
+                />
+              </View>
+            ) : (
+              <Image
+                alt={tab.label[locale]}
+                resizeMode="contain"
+                source={tab.icon}
+                style={[
+                  styles.tabIconImage,
+                  active && styles.tabIconImageActive,
+                ]}
+              />
+            )}
             {isCenterAction ? null : (
               <Text
                 numberOfLines={1}

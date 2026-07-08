@@ -8,6 +8,8 @@ This phase rebuilds the mobile Home screen presentation against the owner-provid
 
 Focused fix pass: after CTO visual review, PR #90 was tightened further for the Home header/location composition, compact top-right controls, greeting/search rhythm, dark glass category card scale, venue-like native media panels, promo card proportions, and floating bottom navigation pill.
 
+Focused fix pass 2: PR #90 was tightened again for the bottom navigation icon system, native compass Explore mark, layered premium center plus button, shorter floating glass nav pill, promo gradient/ticket treatment, reduced Home bottom whitespace, lighter category icon containers, and stronger native venue-like business media.
+
 ## Reference
 
 - Visual source of truth: attached owner Home screenshot from July 8, 2026.
