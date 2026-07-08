@@ -6,6 +6,8 @@ HOME REFERENCE VISUAL PASS / NO RUNTIME DATA INTEGRATION
 
 This phase rebuilds the mobile Home screen presentation against the owner-provided Home screenshot. It does not approve production release, does not connect real marketplace data, and does not change runtime backend behavior.
 
+Focused fix pass: after CTO visual review, PR #90 was tightened further for the Home header/location composition, compact top-right controls, greeting/search rhythm, dark glass category card scale, venue-like native media panels, promo card proportions, and floating bottom navigation pill.
+
 ## Reference
 
 - Visual source of truth: attached owner Home screenshot from July 8, 2026.
