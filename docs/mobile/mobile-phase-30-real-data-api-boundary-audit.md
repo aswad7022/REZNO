@@ -314,6 +314,8 @@ Recommended next action:
 
 **Mobile Phase 31 - Integrate Read-Only Business Discovery Data**
 
+Phase 31A staging data readiness is tracked in [mobile-phase-31a-marketplace-staging-data-readiness.md](./mobile-phase-31a-marketplace-staging-data-readiness.md) to verify staging marketplace data before relying on the mobile success-with-data path.
+
 Reason:
 
 - Existing `GET /api/mobile/marketplace` endpoint and mobile client already exist.
