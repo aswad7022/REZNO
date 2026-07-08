@@ -5743,7 +5743,7 @@ const createStyles = (theme: MobileTheme) =>
       paddingHorizontal: 20,
     },
     homeContent: {
-      paddingBottom: 128,
+      paddingBottom: 190,
     },
     immersiveContent: {
       paddingHorizontal: 0,

@@ -14,6 +14,8 @@ Focused fix pass 4: Home language selection was removed from the header and kept
 
 Focused fix pass 5: The owner-provided day-theme reference screenshot was used for the final Home ordering and day-mode correction. Home now renders Search, then the discount/ad card, then Categories, then `توصياتنا`, then `قريب منك`, then `جديد على REZNO`. The discount card is now a primary future ad slot directly below search, recommendations are a separate static curated section, language remains only in Account/settings, and Home keeps the `ليلي / نهاري` theme selector. No API, backend, database, package, or deployment behavior changed.
 
+Focused fix pass 6: Home bottom scroll clearance was increased so `قريب منك` and `جديد على REZNO` can clear the floating bottom navigation. The residual Home gear-like circular Explore control was suppressed on Home while preserving the five-tab navigation and Account/settings access. Account language settings remain available, Home still has no language selector, and the default visual review locale remains Arabic. No data, API, backend, database, package, or deployment behavior changed.
+
 ## Reference
 
 - Visual source of truth: attached owner Home screenshot from July 8, 2026.

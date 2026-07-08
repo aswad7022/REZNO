@@ -246,7 +246,7 @@ export function BottomTabBar({
                   <Text style={styles.centerTabPlusText}>+</Text>
                 </View>
               </View>
-            ) : tab.id === "marketplace" ? (
+            ) : tab.id === "marketplace" && activeTab !== "customerHome" ? (
               <View
                 style={[
                   styles.exploreCompassIcon,
