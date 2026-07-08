@@ -5743,7 +5743,7 @@ const createStyles = (theme: MobileTheme) =>
       paddingHorizontal: 20,
     },
     homeContent: {
-      paddingBottom: 190,
+      paddingBottom: 250,
     },
     immersiveContent: {
       paddingHorizontal: 0,
@@ -9341,8 +9341,8 @@ const createStyles = (theme: MobileTheme) =>
     tabBar: {
       alignItems: "center",
       backgroundColor: theme.isDark
-        ? "rgba(5, 18, 15, 0.84)"
-        : "rgba(255, 253, 248, 0.94)",
+        ? "rgba(5, 18, 15, 0.97)"
+        : "rgba(255, 253, 248, 0.97)",
       borderColor: theme.isDark
         ? "rgba(255, 193, 58, 0.26)"
         : "rgba(184, 117, 11, 0.22)",

@@ -16,6 +16,8 @@ Focused fix pass 5: The owner-provided day-theme reference screenshot was used f
 
 Focused fix pass 6: Home bottom scroll clearance was increased so `قريب منك` and `جديد على REZNO` can clear the floating bottom navigation. The residual Home gear-like circular Explore control was suppressed on Home while preserving the five-tab navigation and Account/settings access. Account language settings remain available, Home still has no language selector, and the default visual review locale remains Arabic. No data, API, backend, database, package, or deployment behavior changed.
 
+Focused fix pass 7: The floating bottom navigation surface was made near-opaque in both night and day themes so Home card text no longer reads through the nav. Home-only bottom scroll clearance was increased again so the final `جديد على REZNO` section can scroll fully above the floating pill. No app-rendered Home settings gear was identified beyond previously suppressed Home nav chrome; any remaining gray gear-like control in emulator screenshots is treated as likely external development/emulator overlay.
+
 ## Reference
 
 - Visual source of truth: attached owner Home screenshot from July 8, 2026.
