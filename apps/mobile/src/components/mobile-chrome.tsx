@@ -11,7 +11,6 @@ import {
 } from "react-native";
 
 import {
-  SUPPORTED_LOCALES,
   labels,
   type MobileLocale,
 } from "../i18n/labels";
@@ -23,7 +22,7 @@ export type MobileAppTabId = MobileTabId | "favorites" | "quickBooking";
 
 type BottomNavTabId =
   | "customerHome"
-  | "favorites"
+  | "marketplace"
   | "quickBooking"
   | "bookings"
   | "account";
@@ -42,9 +41,9 @@ const BOTTOM_NAV_TABS: BottomNavTab[] = [
     label: { ar: "الرئيسية", ckb: "سەرەکی", en: "Home" },
   },
   {
-    id: "favorites",
-    icon: require("../../assets/icons/nav/favorite.png"),
-    label: { ar: "المفضلة", ckb: "دڵخوازەکان", en: "Favorites" },
+    id: "marketplace",
+    icon: require("../../assets/icons/common/search.png"),
+    label: { ar: "استكشف", ckb: "بگەڕێ", en: "Explore" },
   },
   {
     id: "quickBooking",
@@ -72,10 +71,17 @@ type MobileChromeStyles = {
   centerTabActiveIndicator: StyleProp<ViewStyle>;
   centerTabButton: StyleProp<ViewStyle>;
   centerTabButtonActive: StyleProp<ViewStyle>;
+  centerTabHalo: StyleProp<ViewStyle>;
   centerTabIcon: StyleProp<TextStyle>;
   centerTabIconImage: StyleProp<ImageStyle>;
+  centerTabInner: StyleProp<ViewStyle>;
+  centerTabPlusText: StyleProp<TextStyle>;
   disabledButton: StyleProp<ViewStyle>;
   disabledButtonText: StyleProp<TextStyle>;
+  exploreCompassIcon: StyleProp<ViewStyle>;
+  exploreCompassIconActive: StyleProp<ViewStyle>;
+  exploreCompassNeedle: StyleProp<ViewStyle>;
+  exploreCompassNeedleActive: StyleProp<ViewStyle>;
   header: StyleProp<ViewStyle>;
   localeButton: StyleProp<ViewStyle>;
   localeButtonActive: StyleProp<ViewStyle>;
@@ -108,14 +114,12 @@ type MobileText = (typeof labels)[MobileLocale];
 
 export function ScreenHeader({
   isRtl,
-  locale,
-  onLocaleChange,
   styles,
   text,
 }: {
   isRtl: boolean;
-  locale: MobileLocale;
-  onLocaleChange: (locale: MobileLocale) => void;
+  locale?: MobileLocale;
+  onLocaleChange?: (locale: MobileLocale) => void;
   styles: MobileChromeStyles;
   text: MobileText;
 }) {
@@ -139,35 +143,6 @@ export function ScreenHeader({
             {text.appTagline}
           </Text>
         </View>
-      </View>
-
-      <View style={styles.localeRow}>
-        {SUPPORTED_LOCALES.map((item) => (
-          <Pressable
-            accessibilityHint="يغير لغة الواجهة داخل هذه المعاينة فقط."
-            accessibilityLabel={`تغيير اللغة إلى ${item.toUpperCase()}`}
-            accessibilityRole="button"
-            accessibilityState={{ selected: item === locale }}
-            hitSlop={TOUCH_HIT_SLOP}
-            key={item}
-            onPress={() => onLocaleChange(item)}
-            style={({ pressed }) => [
-              styles.localeButton,
-              item === locale && styles.localeButtonActive,
-              pressed && styles.localeButtonPressed,
-            ]}
-          >
-            <Text
-              numberOfLines={1}
-              style={[
-                styles.localeButtonText,
-                item === locale && styles.localeButtonTextActive,
-              ]}
-            >
-              {item.toUpperCase()}
-            </Text>
-          </Pressable>
-        ))}
       </View>
     </View>
   );
@@ -265,16 +240,37 @@ export function BottomTabBar({
               isCenterAction && active && styles.centerTabButtonActive,
             ]}
           >
-            <Image
-              alt={tab.label[locale]}
-              resizeMode="contain"
-              source={tab.icon}
-              style={[
-                styles.tabIconImage,
-                active && styles.tabIconImageActive,
-                isCenterAction && styles.centerTabIconImage,
-              ]}
-            />
+            {isCenterAction ? (
+              <View style={styles.centerTabHalo}>
+                <View style={styles.centerTabInner}>
+                  <Text style={styles.centerTabPlusText}>+</Text>
+                </View>
+              </View>
+            ) : tab.id === "marketplace" && activeTab !== "customerHome" ? (
+              <View
+                style={[
+                  styles.exploreCompassIcon,
+                  active && styles.exploreCompassIconActive,
+                ]}
+              >
+                <View
+                  style={[
+                    styles.exploreCompassNeedle,
+                    active && styles.exploreCompassNeedleActive,
+                  ]}
+                />
+              </View>
+            ) : (
+              <Image
+                alt={tab.label[locale]}
+                resizeMode="contain"
+                source={tab.icon}
+                style={[
+                  styles.tabIconImage,
+                  active && styles.tabIconImageActive,
+                ]}
+              />
+            )}
             {isCenterAction ? null : (
               <Text
                 numberOfLines={1}

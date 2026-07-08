@@ -259,6 +259,45 @@ const featuredBusinesses: PremiumBusiness[] = [
   },
 ];
 
+const homeRecommendations = [
+  {
+    badge: "اختيار REZNO",
+    category: "مطاعم ومشاوي",
+    id: "recommend-mazaj",
+    meta: "تجربة عشاء فاخرة هذا الأسبوع",
+    price: "حجز يبدأ من 15,000 د.ع",
+    rating: "4.8",
+    title: "مطعم مزاج الذهبي",
+  },
+  {
+    badge: "الأكثر حجزاً",
+    category: "صالونات وتجميل",
+    id: "recommend-noura",
+    meta: "باقة عناية وتصفيف مختارة",
+    price: "خصم خاص للحجوزات المبكرة",
+    rating: "4.9",
+    title: "Noura Beauty Lounge",
+  },
+];
+
+const newOnReznoItems = [
+  {
+    label: "منضم حديثاً",
+    meta: "صالونات مختارة تنضم إلى التجربة المرئية",
+    title: "REZNO Beauty Club",
+  },
+  {
+    label: "خدمة جديدة",
+    meta: "حجوزات عائلية بواجهة آمنة لاحقاً",
+    title: "حجوزات العوائل",
+  },
+  {
+    label: "متاح الآن",
+    meta: "تجربة استكشاف محسّنة بدون بيانات حقيقية",
+    title: "اكتشاف قريب منك",
+  },
+];
+
 const services = [
   { duration: "45 دقيقة", name: "قص وتصفيف", price: "25,000 د.ع", tag: "الأكثر طلباً" },
   { duration: "60 دقيقة", name: "عناية بشرة", price: "35,000 د.ع", tag: "عناية فاخرة" },
@@ -569,10 +608,10 @@ const profileOverviewStats = [
 ];
 
 const languagePreferenceRows = [
-  { label: "العربية", meta: "الواجهة الأساسية", selected: true },
-  { label: "English", meta: "Available visually", selected: false },
-  { label: "کوردی", meta: "پشتیوانی کراوە", selected: false },
-];
+  { label: "العربية", locale: "ar", meta: "الواجهة الأساسية" },
+  { label: "English", locale: "en", meta: "Available visually" },
+  { label: "کوردی", locale: "ckb", meta: "پشتیوانی کراوە" },
+] as const;
 
 const themePreferenceRows = [
   { label: "حسب النظام", meta: "يتبع إعدادات الجهاز", mode: "system" },
@@ -853,7 +892,9 @@ export default function App() {
   return (
     <SafeAreaView style={styles.shell}>
       <StatusBar style={theme.isDark ? "light" : "dark"} />
-      {!selectedBusiness && activeTab !== "marketplace" ? (
+      {!selectedBusiness &&
+      activeTab !== "marketplace" &&
+      activeTab !== "customerHome" ? (
         <ScreenHeader
           isRtl={isRtl}
           locale={locale}
@@ -866,6 +907,9 @@ export default function App() {
       <ScrollView
         contentContainerStyle={[
           styles.content,
+          activeTab === "customerHome" &&
+            !selectedBusiness &&
+            styles.homeContent,
           (selectedBusiness || activeTab === "marketplace") &&
             styles.immersiveContent,
         ]}
@@ -912,7 +956,9 @@ export default function App() {
             isRtl={isRtl}
             onOpenBusiness={setSelectedBusiness}
             onOpenMarketplace={() => handleTabPress("marketplace")}
+            onThemeModeChange={setThemeMode}
             styles={styles}
+            themeMode={themeMode}
           />
         ) : null}
 
@@ -980,6 +1026,8 @@ export default function App() {
         {!selectedBusiness && activeTab === "account" ? (
           <AccountScreen
             isRtl={isRtl}
+            locale={locale}
+            onLocaleChange={setLocale}
             onThemeModeChange={setThemeMode}
             styles={styles}
             text={text}
@@ -1002,23 +1050,41 @@ function CustomerHomeScreen({
   isRtl,
   onOpenBusiness,
   onOpenMarketplace,
+  onThemeModeChange,
   styles,
+  themeMode,
 }: {
   isRtl: boolean;
   onOpenBusiness: (business: PremiumBusiness) => void;
   onOpenMarketplace: () => void;
+  onThemeModeChange: (mode: MobileThemeMode) => void;
   styles: MobileStyles;
+  themeMode: MobileThemeMode;
 }) {
   return (
-    <>
-      <HeroCard isRtl={isRtl} styles={styles} />
-      <SearchDiscoveryPanel
+    <View style={styles.homeReferenceScreen}>
+      <View style={styles.homeReferenceGlow} />
+      <HeroCard
+        isRtl={isRtl}
+        onThemeModeChange={onThemeModeChange}
+        styles={styles}
+        themeMode={themeMode}
+      />
+      <SearchBar
         isRtl={isRtl}
         onOpenMarketplace={onOpenMarketplace}
         styles={styles}
       />
+      <PromoCard isRtl={isRtl} styles={styles} />
       <CategoryGrid styles={styles} />
-      <SectionHeader
+      <HomeSectionHeader
+        action="عرض الكل"
+        isRtl={isRtl}
+        styles={styles}
+        title="توصياتنا"
+      />
+      <HomeRecommendationsSection isRtl={isRtl} styles={styles} />
+      <HomeSectionHeader
         action="عرض الكل"
         isRtl={isRtl}
         styles={styles}
@@ -1036,8 +1102,15 @@ function CustomerHomeScreen({
           </View>
         ))}
       </View>
-      <PromoCard isRtl={isRtl} styles={styles} />
-    </>
+      <HomeSectionHeader
+        action="عرض الكل"
+        isRtl={isRtl}
+        styles={styles}
+        title="جديد على REZNO"
+      />
+      <NewOnReznoSection isRtl={isRtl} styles={styles} />
+      <View style={styles.homeBottomSpacer} />
+    </View>
   );
 }
 
@@ -1215,31 +1288,197 @@ function WelcomeOnboardingCard({
   );
 }
 
-function HeroCard({ isRtl, styles }: { isRtl: boolean; styles: MobileStyles }) {
+function HomeSectionHeader({
+  isRtl,
+  styles,
+  title,
+  action,
+}: {
+  isRtl: boolean;
+  styles: MobileStyles;
+  title: string;
+  action?: string;
+}) {
+  return (
+    <View style={styles.homeSectionHeader}>
+      <Text style={[styles.homeSectionAction, !action && styles.hiddenText]}>
+        {action ?? " "}
+      </Text>
+      <Text style={[styles.homeSectionTitle, isRtl && styles.rtlText]}>
+        {title}
+      </Text>
+    </View>
+  );
+}
+
+function HeroCard({
+  isRtl,
+  onThemeModeChange,
+  styles,
+  themeMode,
+}: {
+  isRtl: boolean;
+  onThemeModeChange: (mode: MobileThemeMode) => void;
+  styles: MobileStyles;
+  themeMode: MobileThemeMode;
+}) {
   return (
     <View style={styles.heroCard}>
       <View style={styles.heroGlow} />
       <View style={styles.heroTopRow}>
-        <View style={styles.locationPill}>
+        <View style={styles.homeLocationBlock}>
           <Image
             alt=""
             resizeMode="contain"
             source={mobileIconAssets.common.locationPin}
             style={styles.locationIconImage}
           />
-          <Text style={styles.locationText}>بغداد</Text>
+          <View style={styles.homeLocationCopy}>
+            <View style={styles.homeLocationTitleRow}>
+              <Text style={styles.locationText}>بغداد</Text>
+              <Text style={styles.homeLocationChevron}>⌄</Text>
+            </View>
+            <Text style={styles.homeLocationMeta}>تغيير الموقع</Text>
+          </View>
         </View>
-        <View style={styles.heroProfileBadge}>
-          <Text style={styles.heroProfileText}>ع</Text>
-          <View style={styles.heroProfileStatusDot} />
+        <View style={styles.homeTopControls}>
+          <View style={styles.homeNotificationButton}>
+            <Image
+              alt=""
+              resizeMode="contain"
+              source={mobileIconAssets.common.notificationBell}
+              style={styles.homeNotificationIcon}
+            />
+            <View style={styles.homeNotificationDot} />
+          </View>
+          <View style={styles.homeThemeSegment}>
+            {[
+              { label: "ليلي", mode: "dark" as const },
+              { label: "نهاري", mode: "light" as const },
+            ].map((item) => {
+              const active =
+                item.mode === "dark"
+                  ? themeMode !== "light"
+                  : themeMode === "light";
+
+              return (
+                <Pressable
+                  accessibilityHint="يغير نمط ألوان المعاينة محلياً فقط."
+                  accessibilityLabel={`اختيار نمط ${item.label}`}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: active }}
+                  hitSlop={TOUCH_HIT_SLOP}
+                  key={item.mode}
+                  onPress={() => onThemeModeChange(item.mode)}
+                  style={({ pressed }) => [
+                    styles.homeThemeOption,
+                    active && styles.homeThemeOptionActive,
+                    pressed && styles.tabButtonPressed,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.homeThemeText,
+                      active && styles.homeThemeTextActive,
+                    ]}
+                  >
+                    {item.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          <View style={styles.heroProfileBadge}>
+            <Text style={styles.heroProfileText}>ع</Text>
+          </View>
         </View>
       </View>
-      <Text style={[styles.heroTitle, isRtl && styles.rtlText]}>
-        مرحباً علي
-      </Text>
-      <Text style={[styles.heroEyebrow, isRtl && styles.rtlText]}>
-        ما الخدمة التي تبحث عنها اليوم؟
-      </Text>
+      <View style={styles.homeGreetingBlock}>
+        <Text style={[styles.heroTitle, isRtl && styles.rtlText]}>
+          مرحباً، علي
+        </Text>
+        <Text style={[styles.heroEyebrow, isRtl && styles.rtlText]}>
+          ما الخدمة التي تحتاجها اليوم؟
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+function HomeRecommendationsSection({
+  isRtl,
+  styles,
+}: {
+  isRtl: boolean;
+  styles: MobileStyles;
+}) {
+  return (
+    <View style={styles.homeRecommendationGrid}>
+      {homeRecommendations.map((item) => (
+        <View key={item.id} style={styles.homeRecommendationCard}>
+          <View style={styles.homeRecommendationMedia}>
+            <BusinessMedia badge={item.badge} styles={styles} />
+          </View>
+          <View style={styles.homeRecommendationCopy}>
+            <View style={styles.homeRecommendationTopRow}>
+              <Text style={styles.homeRecommendationRating}>★ {item.rating}</Text>
+              <Text
+                style={[
+                  styles.homeRecommendationBadge,
+                  isRtl && styles.rtlText,
+                ]}
+              >
+                {item.badge}
+              </Text>
+            </View>
+            <Text
+              style={[styles.homeRecommendationTitle, isRtl && styles.rtlText]}
+            >
+              {item.title}
+            </Text>
+            <Text style={[styles.homeRecommendationMeta, isRtl && styles.rtlText]}>
+              {item.category}
+            </Text>
+            <Text style={[styles.homeRecommendationNote, isRtl && styles.rtlText]}>
+              {item.meta}
+            </Text>
+            <Text style={[styles.homeRecommendationPrice, isRtl && styles.rtlText]}>
+              {item.price}
+            </Text>
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function NewOnReznoSection({
+  isRtl,
+  styles,
+}: {
+  isRtl: boolean;
+  styles: MobileStyles;
+}) {
+  return (
+    <View style={styles.newReznoGrid}>
+      {newOnReznoItems.map((item) => (
+        <View key={item.title} style={styles.newReznoCard}>
+          <View style={styles.newReznoIcon}>
+            <Text style={styles.newReznoIconText}>R</Text>
+          </View>
+          <View style={styles.newReznoCopy}>
+            <Text style={[styles.newReznoLabel, isRtl && styles.rtlText]}>
+              {item.label}
+            </Text>
+            <Text style={[styles.newReznoTitle, isRtl && styles.rtlText]}>
+              {item.title}
+            </Text>
+            <Text style={[styles.newReznoMeta, isRtl && styles.rtlText]}>
+              {item.meta}
+            </Text>
+          </View>
+        </View>
+      ))}
     </View>
   );
 }
@@ -1294,16 +1533,8 @@ function SearchBar({
         style={styles.searchIconImage}
       />
       <Text style={[styles.searchPlaceholder, isRtl && styles.rtlText]}>
-        ابحث عن خدمة، مطعم، عيادة...
+        ابحث عن مطعم، عيادة، صالون...
       </Text>
-      <View style={styles.voiceButton}>
-        <Image
-          alt=""
-          resizeMode="contain"
-          source={mobileIconAssets.common.locationPin}
-          style={styles.voiceIconImage}
-        />
-      </View>
       <View style={styles.filterButton}>
         <Image
           alt=""
@@ -1398,7 +1629,11 @@ function CategoryFallbackMark({
 function PromoCard({ isRtl, styles }: { isRtl: boolean; styles: MobileStyles }) {
   return (
     <View style={styles.promoCard}>
-      <View>
+      <View style={styles.promoGlow} />
+      <View style={styles.promoGoldGlow} />
+      <View style={styles.promoPatternLine} />
+      <View style={styles.promoPatternLineAlt} />
+      <View style={styles.promoCopy}>
         <Text style={[styles.promoTitle, isRtl && styles.rtlText]}>
           خصم 15%
         </Text>
@@ -1410,9 +1645,10 @@ function PromoCard({ isRtl, styles }: { isRtl: boolean; styles: MobileStyles }) 
         </View>
       </View>
       <View style={styles.promoBadge}>
-        <View style={styles.promoGiftBox}>
-          <View style={styles.promoGiftRibbonVertical} />
-          <View style={styles.promoGiftRibbonHorizontal} />
+        <View style={styles.promoTicket}>
+          <View style={styles.promoTicketCutLeft} />
+          <View style={styles.promoTicketCutRight} />
+          <Text style={styles.promoTicketText}>%</Text>
         </View>
       </View>
     </View>
@@ -1431,11 +1667,18 @@ function BusinessMedia({
   return (
     <>
       <View style={styles.businessMediaBackdrop} />
+      <View style={styles.businessMediaPhotoShade} />
       <View style={styles.businessMediaGlow} />
+      <View style={styles.businessMediaWarmGlow} />
       <View style={styles.businessMediaLightRail}>
         <View style={styles.businessMediaLightLine} />
         <View style={styles.businessMediaLightLineShort} />
         <View style={styles.businessMediaLightLine} />
+      </View>
+      <View style={styles.businessMediaVenueArchRow}>
+        <View style={styles.businessMediaVenueArch} />
+        <View style={styles.businessMediaVenueArch} />
+        <View style={styles.businessMediaVenueArchSmall} />
       </View>
       <View style={styles.businessMediaPanel} />
       <View style={styles.businessMediaChairBack} />
@@ -1478,7 +1721,6 @@ function PremiumBusinessCard({
       <View style={styles.businessHero}>
         <BusinessMedia
           badge={business.status}
-          initial={business.name.charAt(0)}
           styles={styles}
         />
       </View>
@@ -1489,7 +1731,7 @@ function PremiumBusinessCard({
               {business.name}
             </Text>
             <Text style={[styles.businessMeta, isRtl && styles.rtlText]}>
-              {business.category} · {business.distance}
+              {business.category}
             </Text>
           </View>
           <View style={styles.ratingPill}>
@@ -1502,13 +1744,21 @@ function PremiumBusinessCard({
             <Text style={styles.ratingText}>{business.rating}</Text>
           </View>
         </View>
-        <View style={styles.businessMetricsRow}>
-          <Text style={styles.businessMetric}>{business.reviewCount}</Text>
-          <Text style={styles.businessMetric}>{business.price}</Text>
+        <View style={styles.businessDetailsLine}>
+          <View style={styles.businessDistanceGroup}>
+            <Image
+              alt=""
+              resizeMode="contain"
+              source={mobileIconAssets.common.locationPin}
+              style={styles.businessDistanceIcon}
+            />
+            <Text style={styles.priceText}>{business.distance}</Text>
+          </View>
+          <Text style={styles.businessDetailsDot}>•</Text>
+          <Text style={styles.priceText}>{business.price}</Text>
         </View>
-        <View style={styles.businessFooter}>
-          <Text style={styles.priceText}>{business.distance}</Text>
-          <Text style={styles.tagText}>{business.tag}</Text>
+        <View style={styles.businessCta}>
+          <Text style={styles.businessCtaText}>احجز الآن</Text>
         </View>
       </View>
     </>
@@ -3720,12 +3970,16 @@ function BusinessInsightsPreview({
 
 function AccountScreen({
   isRtl,
+  locale,
+  onLocaleChange,
   onThemeModeChange,
   styles,
   text,
   themeMode,
 }: {
   isRtl: boolean;
+  locale: MobileLocale;
+  onLocaleChange: (locale: MobileLocale) => void;
   onThemeModeChange: (mode: MobileThemeMode) => void;
   styles: MobileStyles;
   text: (typeof labels)[MobileLocale];
@@ -3808,27 +4062,43 @@ function AccountScreen({
           <Text style={[styles.preferenceGroupTitle, isRtl && styles.rtlText]}>
             اللغة
           </Text>
-          {languagePreferenceRows.map((row) => (
-            <View key={row.label} style={styles.accountPreferenceRow}>
-              <View
-                style={[
-                  styles.accountPreferenceDot,
-                  row.selected && styles.accountPreferenceDotActive,
+          {languagePreferenceRows.map((row) => {
+            const selected = row.locale === locale;
+
+            return (
+              <Pressable
+                accessibilityHint="يغير لغة واجهة المعاينة فقط."
+                accessibilityLabel={`اختيار اللغة ${row.label}`}
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
+                hitSlop={TOUCH_HIT_SLOP}
+                key={row.locale}
+                onPress={() => onLocaleChange(row.locale)}
+                style={({ pressed }) => [
+                  styles.accountPreferenceRow,
+                  pressed && styles.softButtonPressed,
                 ]}
-              />
-              <View style={styles.preferenceCopy}>
-                <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>
-                  {row.label}
+              >
+                <View
+                  style={[
+                    styles.accountPreferenceDot,
+                    selected && styles.accountPreferenceDotActive,
+                  ]}
+                />
+                <View style={styles.preferenceCopy}>
+                  <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>
+                    {row.label}
+                  </Text>
+                  <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>
+                    {row.meta}
+                  </Text>
+                </View>
+                <Text style={styles.preferenceChevron}>
+                  {selected ? "✓" : "›"}
                 </Text>
-                <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>
-                  {row.meta}
-                </Text>
-              </View>
-              <Text style={styles.preferenceChevron}>
-                {row.selected ? "✓" : "›"}
-              </Text>
-            </View>
-          ))}
+              </Pressable>
+            );
+          })}
         </View>
         <View style={styles.preferencesGroup}>
           <Text style={[styles.preferenceGroupTitle, isRtl && styles.rtlText]}>
@@ -4653,18 +4923,21 @@ const createStyles = (theme: MobileTheme) =>
       paddingTop: 11,
     },
     businessCard: {
-      ...createMobileSurface(theme, {
-        radius: 28,
-        tone: "elevated",
-      }),
-      borderColor: theme.colors.border,
+      backgroundColor: theme.isDark
+        ? "rgba(7, 24, 19, 0.96)"
+        : "rgba(255, 250, 239, 0.98)",
+      borderColor: theme.isDark
+        ? "rgba(235, 178, 80, 0.36)"
+        : "rgba(199, 138, 18, 0.28)",
+      borderRadius: 17,
+      borderWidth: 1,
       flex: 1,
       overflow: "hidden",
       ...createMobileShadow(theme, {
-        darkOpacity: 0.42,
-        height: 20,
+        darkOpacity: 0.36,
+        height: 18,
         lightOpacity: 0.12,
-        radius: 32,
+        radius: 24,
       }),
     },
     businessCardPressed: {
@@ -4675,6 +4948,45 @@ const createStyles = (theme: MobileTheme) =>
       flex: 1,
       flexShrink: 1,
       minWidth: 0,
+    },
+    businessCta: {
+      alignItems: "center",
+      borderColor: theme.colors.gold,
+      borderRadius: theme.radii.pill,
+      borderWidth: 1,
+      justifyContent: "center",
+      marginTop: 3,
+      minHeight: 35,
+      paddingHorizontal: 10,
+    },
+    businessCtaText: {
+      color: theme.colors.gold,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: 12,
+      lineHeight: 18,
+      textAlign: "center",
+    },
+    businessDetailsDot: {
+      color: theme.isDark ? "rgba(255, 248, 236, 0.44)" : "#9a7a39",
+      fontFamily: mobileTypography.uiMedium,
+      fontSize: 12,
+      lineHeight: 18,
+    },
+    businessDetailsLine: {
+      alignItems: "center",
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 5,
+    },
+    businessDistanceGroup: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 4,
+    },
+    businessDistanceIcon: {
+      height: 12,
+      tintColor: theme.colors.gold,
+      width: 12,
     },
     businessFooter: {
       alignItems: "flex-start",
@@ -4688,13 +5000,22 @@ const createStyles = (theme: MobileTheme) =>
     },
     businessMediaBackdrop: {
       ...StyleSheet.absoluteFill,
-      backgroundColor: "#05070a",
+      backgroundColor: "#050806",
+    },
+    businessMediaPhotoShade: {
+      ...StyleSheet.absoluteFill,
+      backgroundColor: "rgba(0, 0, 0, 0.28)",
+      borderRadius: 16,
+      bottom: 6,
+      left: 6,
+      right: 6,
+      top: 6,
     },
     businessHero: {
-      backgroundColor: "#050608",
-      borderBottomColor: theme.colors.border,
+      backgroundColor: "#050907",
+      borderBottomColor: "rgba(235, 178, 80, 0.2)",
       borderBottomWidth: 1,
-      height: 96,
+      height: 120,
       justifyContent: "space-between",
       overflow: "hidden",
       padding: 12,
@@ -4712,33 +5033,33 @@ const createStyles = (theme: MobileTheme) =>
       position: "relative",
     },
     businessMediaAccent: {
-      backgroundColor: "rgba(255, 193, 58, 0.88)",
+      backgroundColor: "rgba(255, 193, 58, 0.92)",
       borderRadius: 999,
-      bottom: 20,
-      height: 18,
-      left: 78,
+      bottom: 24,
+      height: 16,
+      left: 80,
       position: "absolute",
-      width: 18,
+      width: 16,
     },
     businessMediaChairBack: {
-      backgroundColor: "rgba(255, 193, 58, 0.16)",
-      borderColor: "rgba(255, 193, 58, 0.5)",
-      borderRadius: 18,
+      backgroundColor: "rgba(12, 17, 15, 0.58)",
+      borderColor: "rgba(255, 193, 58, 0.38)",
+      borderRadius: 20,
       borderWidth: 1,
-      bottom: 25,
-      height: 44,
+      bottom: 28,
+      height: 50,
       left: 42,
       position: "absolute",
-      width: 44,
+      width: 52,
     },
     businessMediaChairSeat: {
-      backgroundColor: "rgba(255, 193, 58, 0.34)",
+      backgroundColor: "rgba(255, 193, 58, 0.28)",
       borderRadius: 999,
-      bottom: 15,
-      height: 13,
-      left: 30,
+      bottom: 18,
+      height: 14,
+      left: 27,
       position: "absolute",
-      width: 72,
+      width: 80,
     },
     businessMediaCutout: {
       borderColor: "rgba(255, 248, 236, 0.18)",
@@ -4752,25 +5073,34 @@ const createStyles = (theme: MobileTheme) =>
       width: 94,
     },
     businessMediaGlow: {
-      backgroundColor: "rgba(255, 193, 58, 0.24)",
+      backgroundColor: "rgba(255, 193, 58, 0.18)",
       borderRadius: 999,
-      height: 140,
-      left: -30,
+      height: 170,
+      left: -44,
       opacity: theme.isDark ? 0.96 : 0.7,
       position: "absolute",
-      top: -54,
-      width: 140,
+      top: -74,
+      width: 170,
+    },
+    businessMediaWarmGlow: {
+      backgroundColor: "rgba(10, 82, 55, 0.28)",
+      borderRadius: 999,
+      bottom: -58,
+      height: 150,
+      position: "absolute",
+      right: -54,
+      width: 150,
     },
     businessMediaLightLine: {
-      backgroundColor: "rgba(255, 193, 58, 0.32)",
+      backgroundColor: "rgba(255, 193, 58, 0.44)",
       borderRadius: 999,
-      height: 74,
+      height: 96,
       width: 3,
     },
     businessMediaLightLineShort: {
-      backgroundColor: "rgba(255, 193, 58, 0.22)",
+      backgroundColor: "rgba(255, 193, 58, 0.3)",
       borderRadius: 999,
-      height: 52,
+      height: 68,
       width: 3,
     },
     businessMediaLightRail: {
@@ -4783,16 +5113,39 @@ const createStyles = (theme: MobileTheme) =>
       top: 0,
     },
     businessMediaPanel: {
-      backgroundColor: "rgba(255, 255, 255, 0.05)",
-      borderColor: "rgba(255, 193, 58, 0.22)",
-      borderRadius: 24,
+      backgroundColor: "rgba(7, 13, 12, 0.62)",
+      borderColor: "rgba(255, 193, 58, 0.18)",
+      borderRadius: 18,
       borderWidth: 1,
       bottom: 18,
-      height: 48,
+      height: 56,
       left: 38,
       position: "absolute",
       transform: [{ rotate: "-4deg" }],
       width: 92,
+    },
+    businessMediaVenueArch: {
+      backgroundColor: "rgba(255, 193, 58, 0.07)",
+      borderColor: "rgba(255, 193, 58, 0.32)",
+      borderRadius: 20,
+      borderWidth: 1,
+      height: 48,
+      width: 34,
+    },
+    businessMediaVenueArchRow: {
+      bottom: 29,
+      flexDirection: "row",
+      gap: 12,
+      position: "absolute",
+      right: 14,
+    },
+    businessMediaVenueArchSmall: {
+      backgroundColor: "rgba(255, 193, 58, 0.05)",
+      borderColor: "rgba(255, 193, 58, 0.24)",
+      borderRadius: 18,
+      borderWidth: 1,
+      height: 42,
+      width: 30,
     },
     businessInitial: {
       alignItems: "center",
@@ -4822,9 +5175,9 @@ const createStyles = (theme: MobileTheme) =>
     businessMeta: {
       color: theme.colors.mutedForeground,
       fontFamily: mobileTypography.uiRegular,
-      fontSize: 10,
+      fontSize: 11,
       flexShrink: 1,
-      lineHeight: 15,
+      lineHeight: 16,
       marginTop: 3,
     },
     businessMetric: {
@@ -4850,18 +5203,18 @@ const createStyles = (theme: MobileTheme) =>
       fontSize: 13,
       flexShrink: 1,
       letterSpacing: -0.3,
-      lineHeight: 18,
+      lineHeight: 19,
     },
     businessStatusBadge: {
-      backgroundColor: theme.colors.successSoft,
+      backgroundColor: "rgba(10, 110, 76, 0.78)",
       borderColor: theme.colors.success,
       borderRadius: theme.radii.pill,
       borderWidth: 1,
-      left: 12,
+      left: 10,
       paddingHorizontal: 8,
-      paddingVertical: 5,
+      paddingVertical: 4,
       position: "absolute",
-      top: 12,
+      top: 10,
     },
     businessStatusText: {
       color: theme.colors.success,
@@ -4987,73 +5340,87 @@ const createStyles = (theme: MobileTheme) =>
       flexWrap: "wrap",
       justifyContent: "space-between",
       marginTop: 2,
-      rowGap: 20,
+      rowGap: 12,
     },
     categoryIcon: {
-      color: "#ffffff",
+      color: theme.colors.gold,
       fontFamily: mobileTypography.uiSemiBold,
       fontSize: 24,
       lineHeight: 28,
     },
     categoryIconImage: {
-      height: 32,
-      tintColor: "#ffffff",
-      width: 32,
+      height: 39,
+      tintColor: theme.colors.gold,
+      width: 39,
     },
     categoryIconTile: {
       alignItems: "center",
-      backgroundColor: "#394657",
-      borderColor: "rgba(255, 255, 255, 0.08)",
-      borderRadius: 20,
+      backgroundColor: theme.isDark
+        ? "transparent"
+        : "rgba(255, 193, 58, 0.08)",
+      borderColor: "transparent",
+      borderRadius: 16,
       borderWidth: 0,
-      height: 64,
+      height: 50,
       justifyContent: "center",
-      shadowColor: "#000000",
-      shadowOffset: { height: 12, width: 0 },
-      shadowOpacity: theme.isDark ? 0.32 : 0.08,
-      shadowRadius: 18,
-      width: 64,
+      width: 50,
     },
     categoryIconTileBlue: {
-      backgroundColor: "#3ca6d3",
+      backgroundColor: "rgba(255, 193, 58, 0.06)",
     },
     categoryIconTileGold: {
-      backgroundColor: "#f59e0b",
+      backgroundColor: "rgba(255, 193, 58, 0.06)",
     },
     categoryIconTileGreen: {
-      backgroundColor: "#22a66f",
+      backgroundColor: "rgba(255, 193, 58, 0.06)",
     },
     categoryIconTileNeutral: {
-      backgroundColor: "#364152",
+      backgroundColor: "rgba(255, 193, 58, 0.06)",
     },
     categoryIconTilePurple: {
-      backgroundColor: "#7c3aed",
+      backgroundColor: "rgba(255, 193, 58, 0.06)",
     },
     categoryIconTileRose: {
-      backgroundColor: "#d94676",
+      backgroundColor: "rgba(255, 193, 58, 0.06)",
     },
     categoryItem: {
       alignItems: "center",
-      flexBasis: "24%",
-      gap: 7,
-      minWidth: 72,
+      backgroundColor: theme.isDark
+        ? "rgba(9, 25, 20, 0.9)"
+        : "rgba(255, 253, 248, 0.98)",
+      borderColor: theme.isDark
+        ? "rgba(235, 178, 80, 0.25)"
+        : "rgba(184, 117, 11, 0.24)",
+      borderRadius: 14,
+      borderWidth: 1,
+      flexBasis: "23.4%",
+      gap: 6,
+      justifyContent: "center",
+      minHeight: 112,
+      minWidth: 0,
+      paddingHorizontal: 5,
+      paddingVertical: 13,
+      shadowColor: theme.colors.shadow,
+      shadowOffset: { height: 10, width: 0 },
+      shadowOpacity: theme.isDark ? 0.16 : 0.08,
+      shadowRadius: 16,
     },
     categoryLabel: {
-      color: "#ffffff",
+      color: theme.isDark ? theme.colors.cream : theme.colors.foreground,
       fontFamily: mobileTypography.uiMedium,
       fontSize: 12,
       lineHeight: 18,
       textAlign: "center",
     },
     categoryBookLine: {
-      backgroundColor: "#ffffff",
+      backgroundColor: theme.colors.gold,
       borderRadius: 999,
       height: 2,
       opacity: 0.92,
       width: 12,
     },
     categoryBookLineShort: {
-      backgroundColor: "#ffffff",
+      backgroundColor: theme.colors.gold,
       borderRadius: 999,
       height: 2,
       opacity: 0.92,
@@ -5064,9 +5431,11 @@ const createStyles = (theme: MobileTheme) =>
       gap: 3,
     },
     categoryBookPage: {
-      backgroundColor: "#ffffff",
+      backgroundColor: "rgba(255, 193, 58, 0.1)",
+      borderColor: theme.colors.gold,
       borderBottomLeftRadius: 4,
       borderTopLeftRadius: 9,
+      borderWidth: 1,
       gap: 3,
       height: 30,
       justifyContent: "center",
@@ -5074,16 +5443,20 @@ const createStyles = (theme: MobileTheme) =>
       width: 18,
     },
     categoryBookPageRight: {
-      backgroundColor: "#ffffff",
+      backgroundColor: "rgba(255, 193, 58, 0.1)",
+      borderColor: theme.colors.gold,
       borderBottomRightRadius: 4,
       borderTopRightRadius: 9,
+      borderWidth: 1,
       height: 30,
       width: 18,
     },
     categoryCarBody: {
       alignItems: "center",
-      backgroundColor: "#ffffff",
+      backgroundColor: "transparent",
+      borderColor: theme.colors.gold,
       borderRadius: 6,
+      borderWidth: 2,
       flexDirection: "row",
       height: 15,
       justifyContent: "space-between",
@@ -5091,7 +5464,7 @@ const createStyles = (theme: MobileTheme) =>
       width: 38,
     },
     categoryCarLight: {
-      backgroundColor: "rgba(245, 158, 11, 0.55)",
+      backgroundColor: theme.colors.gold,
       borderRadius: 3,
       height: 4,
       width: 4,
@@ -5102,16 +5475,18 @@ const createStyles = (theme: MobileTheme) =>
       paddingTop: 3,
     },
     categoryCarRoof: {
-      backgroundColor: "#ffffff",
+      backgroundColor: "transparent",
+      borderColor: theme.colors.gold,
       borderTopLeftRadius: 8,
       borderTopRightRadius: 8,
+      borderWidth: 2,
       height: 12,
       marginBottom: -2,
       width: 27,
     },
     categoryCarWheel: {
-      backgroundColor: "#ffffff",
-      borderColor: "rgba(0, 0, 0, 0.16)",
+      backgroundColor: theme.colors.gold,
+      borderColor: theme.colors.gold,
       borderRadius: 5,
       borderWidth: 1,
       height: 9,
@@ -5123,7 +5498,7 @@ const createStyles = (theme: MobileTheme) =>
       marginTop: -2,
     },
     categoryMoreDot: {
-      backgroundColor: "#ffffff",
+      backgroundColor: theme.colors.gold,
       borderRadius: 4,
       height: 8,
       width: 8,
@@ -5207,23 +5582,22 @@ const createStyles = (theme: MobileTheme) =>
       width: "100%",
     },
     centerTabButton: {
-      backgroundColor: "#153f31",
-      borderColor: theme.colors.gold,
-      borderWidth: 3,
-      borderRadius: 32,
-      flex: 0,
-      height: 64,
-      marginHorizontal: 8,
+      backgroundColor: "transparent",
+      borderColor: "transparent",
+      borderWidth: 0,
+      borderRadius: 36,
+      flex: 1,
+      height: 72,
+      marginHorizontal: 0,
       shadowColor: theme.colors.deepGold,
       shadowOffset: { height: 8, width: 0 },
-      shadowOpacity: theme.isDark ? 0.32 : 0.12,
-      shadowRadius: 16,
-      transform: [{ translateY: -14 }],
-      width: 64,
+      shadowOpacity: theme.isDark ? 0.4 : 0.12,
+      shadowRadius: 18,
+      transform: [{ translateY: -8 }],
     },
     centerTabButtonActive: {
-      backgroundColor: "#174d3b",
-      transform: [{ translateY: -15 }, { scale: 1.02 }],
+      backgroundColor: "transparent",
+      transform: [{ translateY: -9 }, { scale: 1.02 }],
     },
     centerTabActiveIndicator: {
       backgroundColor: "transparent",
@@ -5235,9 +5609,69 @@ const createStyles = (theme: MobileTheme) =>
       lineHeight: 30,
     },
     centerTabIconImage: {
-      height: 32,
-      tintColor: theme.colors.foreground,
-      width: 32,
+      height: 34,
+      tintColor: theme.colors.foregroundInverse,
+      width: 34,
+    },
+    centerTabHalo: {
+      alignItems: "center",
+      backgroundColor: theme.isDark
+        ? "rgba(255, 193, 58, 0.82)"
+        : "rgba(246, 195, 67, 0.96)",
+      borderColor: theme.isDark
+        ? "rgba(255, 246, 205, 0.7)"
+        : "rgba(184, 117, 11, 0.28)",
+      borderRadius: 35,
+      borderWidth: 2,
+      height: 70,
+      justifyContent: "center",
+      shadowColor: theme.colors.deepGold,
+      shadowOffset: { height: 10, width: 0 },
+      shadowOpacity: theme.isDark ? 0.44 : 0.14,
+      shadowRadius: 18,
+      width: 70,
+    },
+    centerTabInner: {
+      alignItems: "center",
+      backgroundColor: theme.isDark ? "#103a2b" : "#f7c24a",
+      borderColor: theme.isDark
+        ? "rgba(255, 248, 220, 0.28)"
+        : "rgba(255, 253, 248, 0.56)",
+      borderRadius: 28,
+      borderWidth: 1,
+      height: 56,
+      justifyContent: "center",
+      width: 56,
+    },
+    centerTabPlusText: {
+      color: theme.isDark ? theme.colors.cream : theme.colors.foregroundInverse,
+      fontFamily: mobileTypography.uiRegular,
+      fontSize: 41,
+      lineHeight: 44,
+      marginTop: -2,
+    },
+    exploreCompassIcon: {
+      alignItems: "center",
+      borderColor: theme.colors.foreground,
+      borderRadius: 15,
+      borderWidth: 2,
+      height: 29,
+      justifyContent: "center",
+      transform: [{ rotate: "-18deg" }],
+      width: 29,
+    },
+    exploreCompassIconActive: {
+      borderColor: theme.colors.gold,
+    },
+    exploreCompassNeedle: {
+      backgroundColor: theme.colors.foreground,
+      borderRadius: 999,
+      height: 14,
+      transform: [{ rotate: "45deg" }],
+      width: 4,
+    },
+    exploreCompassNeedleActive: {
+      backgroundColor: theme.colors.gold,
     },
     chipRow: {
       flexDirection: "row",
@@ -5308,6 +5742,9 @@ const createStyles = (theme: MobileTheme) =>
       gap: 18,
       paddingBottom: 170,
       paddingHorizontal: 20,
+    },
+    homeContent: {
+      paddingBottom: 128,
     },
     immersiveContent: {
       paddingHorizontal: 0,
@@ -5614,11 +6051,15 @@ const createStyles = (theme: MobileTheme) =>
       alignItems: "center",
       backgroundColor: theme.colors.gold,
       borderColor: theme.colors.accent,
-      borderRadius: 20,
+      borderRadius: 27,
       borderWidth: 1,
-      height: 36,
+      height: 52,
       justifyContent: "center",
-      width: 36,
+      shadowColor: theme.colors.deepGold,
+      shadowOffset: { height: 8, width: 0 },
+      shadowOpacity: theme.isDark ? 0.28 : 0.1,
+      shadowRadius: 14,
+      width: 52,
     },
     filterChip: {
       backgroundColor: theme.colors.goldSoft,
@@ -5736,6 +6177,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     heroCard: {
       backgroundColor: "transparent",
+      marginBottom: 2,
       overflow: "hidden",
       paddingHorizontal: 4,
       paddingTop: 4,
@@ -5744,28 +6186,30 @@ const createStyles = (theme: MobileTheme) =>
     heroEyebrow: {
       color: theme.colors.mutedForeground,
       fontFamily: mobileTypography.uiMedium,
-      fontSize: 16,
+      fontSize: 15,
       letterSpacing: 0,
-      lineHeight: 24,
-      marginTop: 3,
+      lineHeight: 22,
+      marginTop: 2,
     },
     heroGlow: {
       display: "none",
     },
     heroProfileBadge: {
       alignItems: "center",
-      backgroundColor: "#14201a",
+      backgroundColor: theme.isDark
+        ? "rgba(8, 22, 18, 0.94)"
+        : "rgba(255, 250, 239, 0.94)",
       borderColor: theme.colors.gold,
-      borderRadius: 30,
+      borderRadius: 27,
       borderWidth: 2,
-      height: 60,
+      height: 54,
       justifyContent: "center",
       position: "relative",
       shadowColor: theme.colors.deepGold,
       shadowOffset: { height: 8, width: 0 },
       shadowOpacity: theme.isDark ? 0.22 : 0.08,
       shadowRadius: 14,
-      width: 60,
+      width: 54,
     },
     heroProfileStatusDot: {
       backgroundColor: theme.colors.success,
@@ -5779,24 +6223,27 @@ const createStyles = (theme: MobileTheme) =>
       width: 16,
     },
     heroProfileText: {
-      color: theme.colors.cream,
+      color: theme.isDark ? theme.colors.cream : theme.colors.deepGold,
       fontFamily: mobileTypography.kufiBold,
-      fontSize: 28,
-      lineHeight: 36,
+      fontSize: 25,
+      lineHeight: 32,
     },
     heroTitle: {
       color: theme.colors.foreground,
       fontFamily: mobileTypography.kufiBold,
       fontSize: 34,
       letterSpacing: -0.6,
-      lineHeight: 42,
-      marginTop: 14,
+      lineHeight: 40,
     },
     heroTopRow: {
       alignItems: "center",
       flexDirection: "row",
       gap: 12,
       justifyContent: "space-between",
+    },
+    homeGreetingBlock: {
+      alignItems: "flex-end",
+      marginTop: 20,
     },
     homeBusinessCardSlot: {
       flexBasis: "31%",
@@ -5805,7 +6252,346 @@ const createStyles = (theme: MobileTheme) =>
     },
     homeBusinessGrid: {
       flexDirection: "row",
+      gap: 10,
+    },
+    homeBottomSpacer: {
+      height: 220,
+    },
+    homeRecommendationBadge: {
+      color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiMedium,
+      fontSize: 10,
+      lineHeight: 15,
+      textAlign: "right",
+    },
+    homeRecommendationCard: {
+      backgroundColor: theme.isDark
+        ? "rgba(8, 27, 21, 0.92)"
+        : "rgba(255, 253, 248, 0.98)",
+      borderColor: theme.isDark
+        ? "rgba(255, 193, 58, 0.24)"
+        : "rgba(184, 117, 11, 0.22)",
+      borderRadius: 22,
+      borderWidth: 1,
+      flex: 1,
+      minWidth: 0,
+      overflow: "hidden",
+      shadowColor: theme.colors.shadow,
+      shadowOffset: { height: 14, width: 0 },
+      shadowOpacity: theme.isDark ? 0.24 : 0.1,
+      shadowRadius: 22,
+    },
+    homeRecommendationCopy: {
+      gap: 5,
+      padding: 13,
+    },
+    homeRecommendationGrid: {
+      flexDirection: "row",
+      gap: 10,
+    },
+    homeRecommendationMedia: {
+      backgroundColor: "#050907",
+      borderBottomColor: theme.isDark
+        ? "rgba(255, 193, 58, 0.16)"
+        : "rgba(184, 117, 11, 0.16)",
+      borderBottomWidth: 1,
+      height: 92,
+      overflow: "hidden",
+      position: "relative",
+    },
+    homeRecommendationMeta: {
+      color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiRegular,
+      fontSize: 11,
+      lineHeight: 16,
+      textAlign: "right",
+    },
+    homeRecommendationNote: {
+      color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiMedium,
+      fontSize: 11,
+      lineHeight: 17,
+      marginTop: 2,
+      textAlign: "right",
+    },
+    homeRecommendationPrice: {
+      color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: 11,
+      lineHeight: 16,
+      marginTop: 3,
+      textAlign: "right",
+    },
+    homeRecommendationRating: {
+      backgroundColor: theme.colors.goldSoft,
+      borderRadius: theme.radii.pill,
+      color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: 10,
+      lineHeight: 15,
+      overflow: "hidden",
+      paddingHorizontal: 7,
+      paddingVertical: 3,
+    },
+    homeRecommendationTitle: {
+      color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: 14,
+      lineHeight: 20,
+      textAlign: "right",
+    },
+    homeRecommendationTopRow: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 8,
+      justifyContent: "space-between",
+    },
+    homeSectionAction: {
+      color: theme.colors.gold,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: 13,
+      lineHeight: 18,
+      minWidth: 64,
+      textAlign: "left",
+    },
+    homeSectionHeader: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 14,
+      justifyContent: "space-between",
+      paddingHorizontal: 4,
+      paddingTop: 2,
+    },
+    homeSectionTitle: {
+      color: theme.colors.foreground,
+      flex: 1,
+      fontFamily: mobileTypography.kufiBold,
+      fontSize: 22,
+      letterSpacing: -0.2,
+      lineHeight: 30,
+      textAlign: "right",
+    },
+    hiddenText: {
+      opacity: 0,
+    },
+    homeLocaleOption: {
+      alignItems: "center",
+      borderRadius: 18,
+      height: 34,
+      justifyContent: "center",
+      minWidth: 36,
+      paddingHorizontal: 8,
+    },
+    homeLocaleOptionActive: {
+      backgroundColor: "rgba(255, 193, 58, 0.16)",
+      borderColor: "rgba(255, 193, 58, 0.46)",
+      borderWidth: 1,
+    },
+    homeLocaleSegment: {
+      alignItems: "center",
+      backgroundColor: "rgba(5, 13, 12, 0.86)",
+      borderColor: "rgba(255, 193, 58, 0.18)",
+      borderRadius: 21,
+      borderWidth: 1,
+      flexDirection: "row",
+      gap: 2,
+      padding: 3,
+    },
+    homeLocaleText: {
+      color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiMedium,
+      fontSize: 10,
+      lineHeight: 14,
+    },
+    homeLocaleTextActive: {
+      color: theme.colors.gold,
+    },
+    homeThemeOption: {
+      alignItems: "center",
+      borderRadius: 18,
+      height: 34,
+      justifyContent: "center",
+      minWidth: 48,
+      paddingHorizontal: 9,
+    },
+    homeThemeOptionActive: {
+      backgroundColor: theme.isDark
+        ? "rgba(255, 193, 58, 0.16)"
+        : "rgba(246, 195, 67, 0.28)",
+      borderColor: theme.isDark
+        ? "rgba(255, 193, 58, 0.46)"
+        : "rgba(184, 117, 11, 0.34)",
+      borderWidth: 1,
+    },
+    homeThemeSegment: {
+      alignItems: "center",
+      backgroundColor: theme.isDark
+        ? "rgba(5, 13, 12, 0.86)"
+        : "rgba(255, 250, 239, 0.82)",
+      borderColor: theme.isDark
+        ? "rgba(255, 193, 58, 0.18)"
+        : "rgba(199, 138, 18, 0.2)",
+      borderRadius: 21,
+      borderWidth: 1,
+      flexDirection: "row",
+      gap: 2,
+      padding: 3,
+    },
+    homeThemeText: {
+      color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiMedium,
+      fontSize: 11,
+      lineHeight: 15,
+    },
+    homeThemeTextActive: {
+      color: theme.colors.gold,
+    },
+    homeLocationBlock: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 9,
+      minWidth: 112,
+    },
+    homeLocationChevron: {
+      color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiMedium,
+      fontSize: 18,
+      lineHeight: 18,
+      marginTop: -4,
+    },
+    homeLocationCopy: {
+      alignItems: "flex-start",
+      gap: 2,
+    },
+    homeLocationMeta: {
+      color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiRegular,
+      fontSize: 11,
+      lineHeight: 15,
+    },
+    homeLocationTitleRow: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 7,
+    },
+    homeNotificationButton: {
+      alignItems: "center",
+      backgroundColor: theme.isDark
+        ? "rgba(8, 22, 18, 0.78)"
+        : "rgba(255, 250, 239, 0.78)",
+      borderColor: theme.isDark
+        ? "rgba(255, 193, 58, 0.12)"
+        : "rgba(199, 138, 18, 0.18)",
+      borderRadius: 18,
+      borderWidth: 1,
+      height: 36,
+      justifyContent: "center",
+      position: "relative",
+      width: 36,
+    },
+    homeNotificationDot: {
+      backgroundColor: theme.colors.gold,
+      borderRadius: 4,
+      height: 8,
+      position: "absolute",
+      right: 8,
+      top: 8,
+      width: 8,
+    },
+    homeNotificationIcon: {
+      height: 20,
+      tintColor: theme.colors.foreground,
+      width: 20,
+    },
+    homeReferenceGlow: {
+      backgroundColor: theme.isDark
+        ? "rgba(8, 91, 58, 0.34)"
+        : "rgba(255, 213, 104, 0.22)",
+      borderRadius: 180,
+      height: 260,
+      position: "absolute",
+      right: -110,
+      top: -85,
+      width: 260,
+    },
+    homeReferenceScreen: {
+      gap: 15,
+      overflow: "hidden",
+      paddingTop: 14,
+      position: "relative",
+    },
+    homeTopControls: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 8,
+    },
+    newReznoCard: {
+      alignItems: "center",
+      backgroundColor: theme.isDark
+        ? "rgba(8, 27, 21, 0.9)"
+        : "rgba(255, 250, 239, 0.88)",
+      borderColor: theme.isDark
+        ? "rgba(255, 193, 58, 0.22)"
+        : "rgba(199, 138, 18, 0.2)",
+      borderRadius: 20,
+      borderWidth: 1,
+      flex: 1,
+      flexDirection: "row-reverse",
       gap: 12,
+      minWidth: 160,
+      padding: 14,
+      shadowColor: theme.colors.shadow,
+      shadowOffset: { height: 10, width: 0 },
+      shadowOpacity: theme.isDark ? 0.18 : 0.06,
+      shadowRadius: 18,
+    },
+    newReznoCopy: {
+      alignItems: "flex-end",
+      flex: 1,
+      minWidth: 0,
+    },
+    newReznoGrid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 10,
+    },
+    newReznoIcon: {
+      alignItems: "center",
+      backgroundColor: theme.colors.goldSoft,
+      borderColor: theme.colors.gold,
+      borderRadius: 18,
+      borderWidth: 1,
+      height: 42,
+      justifyContent: "center",
+      width: 42,
+    },
+    newReznoIconText: {
+      color: theme.colors.gold,
+      fontFamily: mobileTypography.uiBold,
+      fontSize: 16,
+      lineHeight: 20,
+    },
+    newReznoLabel: {
+      color: theme.colors.gold,
+      fontFamily: mobileTypography.uiMedium,
+      fontSize: 11,
+      lineHeight: 16,
+    },
+    newReznoMeta: {
+      color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiRegular,
+      fontSize: 11,
+      lineHeight: 17,
+      marginTop: 3,
+      textAlign: "right",
+    },
+    newReznoTitle: {
+      color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: 14,
+      lineHeight: 20,
+      marginTop: 2,
+      textAlign: "right",
     },
     integrationBody: {
       color: theme.colors.warning,
@@ -5876,9 +6662,9 @@ const createStyles = (theme: MobileTheme) =>
       fontSize: 10,
     },
     locationIconImage: {
-      height: 14,
+      height: 30,
       tintColor: theme.colors.gold,
-      width: 14,
+      width: 30,
     },
     locationPill: {
       alignItems: "center",
@@ -5893,9 +6679,10 @@ const createStyles = (theme: MobileTheme) =>
       paddingVertical: 10,
     },
     locationText: {
-      color: theme.colors.gold,
-      fontFamily: mobileTypography.uiMedium,
-      fontSize: 12,
+      color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: 16,
+      lineHeight: 22,
     },
     logoMark: {
       alignItems: "center",
@@ -6913,19 +7700,27 @@ const createStyles = (theme: MobileTheme) =>
     },
     promoBadge: {
       alignItems: "center",
-      backgroundColor: "rgba(255, 193, 58, 0.16)",
-      borderColor: "rgba(255, 193, 58, 0.5)",
-      borderRadius: 34,
+      backgroundColor: theme.isDark
+        ? "rgba(255, 193, 58, 0.13)"
+        : "rgba(255, 246, 219, 0.96)",
+      borderColor: theme.isDark
+        ? "rgba(255, 221, 135, 0.68)"
+        : "rgba(184, 117, 11, 0.34)",
+      borderRadius: 44,
       borderWidth: 1,
-      height: 68,
+      height: 88,
       justifyContent: "center",
-      width: 68,
+      shadowColor: theme.colors.deepGold,
+      shadowOffset: { height: 12, width: 0 },
+      shadowOpacity: theme.isDark ? 0.28 : 0.1,
+      shadowRadius: 18,
+      width: 88,
     },
     promoBadgeText: {
       color: theme.colors.foregroundInverse,
     },
     promoBody: {
-      color: theme.colors.foreground,
+      color: theme.isDark ? theme.colors.foreground : "#3d3323",
       fontFamily: mobileTypography.uiRegular,
       fontSize: 15,
       lineHeight: 23,
@@ -6934,35 +7729,123 @@ const createStyles = (theme: MobileTheme) =>
     },
     promoCard: {
       alignItems: "center",
-      backgroundColor: "#0b2019",
-      borderColor: "#183c31",
-      borderRadius: 34,
+      backgroundColor: theme.isDark ? "#06281f" : "#fff6de",
+      borderColor: theme.isDark
+        ? "rgba(55, 122, 90, 0.72)"
+        : "rgba(184, 117, 11, 0.28)",
+      borderRadius: 21,
       borderWidth: 1,
-      flexDirection: "row",
+      flexDirection: "row-reverse",
       justifyContent: "space-between",
-      minHeight: 132,
-      padding: 22,
+      minHeight: 130,
+      overflow: "hidden",
+      paddingHorizontal: 24,
+      paddingVertical: 18,
+      position: "relative",
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: 20, width: 0 },
-      shadowOpacity: theme.isDark ? 0.34 : 0.1,
+      shadowOpacity: theme.isDark ? 0.34 : 0.14,
       shadowRadius: 30,
     },
     promoTitle: {
-      color: theme.colors.gold,
+      color: theme.isDark ? theme.colors.gold : theme.colors.deepGold,
       fontFamily: mobileTypography.kufiBold,
-      fontSize: 31,
-      lineHeight: 38,
+      fontSize: 30,
+      lineHeight: 36,
+    },
+    promoCopy: {
+      alignItems: "flex-end",
+      flex: 1,
+      minWidth: 0,
+    },
+    promoGlow: {
+      backgroundColor: theme.isDark
+        ? "rgba(18, 142, 88, 0.38)"
+        : "rgba(18, 142, 88, 0.12)",
+      borderRadius: 140,
+      height: 210,
+      position: "absolute",
+      left: -76,
+      top: -72,
+      width: 210,
+    },
+    promoGoldGlow: {
+      backgroundColor: theme.isDark
+        ? "rgba(255, 193, 58, 0.18)"
+        : "rgba(246, 195, 67, 0.26)",
+      borderRadius: 120,
+      height: 154,
+      position: "absolute",
+      right: -22,
+      top: -16,
+      width: 154,
+    },
+    promoPatternLine: {
+      backgroundColor: theme.isDark
+        ? "rgba(255, 255, 255, 0.05)"
+        : "rgba(184, 117, 11, 0.08)",
+      height: 1,
+      position: "absolute",
+      right: 42,
+      top: 26,
+      transform: [{ rotate: "-36deg" }],
+      width: 190,
+    },
+    promoPatternLineAlt: {
+      backgroundColor: theme.isDark
+        ? "rgba(255, 193, 58, 0.09)"
+        : "rgba(18, 142, 88, 0.08)",
+      height: 1,
+      position: "absolute",
+      right: 22,
+      top: 76,
+      transform: [{ rotate: "-36deg" }],
+      width: 170,
+    },
+    promoTicket: {
+      alignItems: "center",
+      backgroundColor: "#f6c35a",
+      borderRadius: 13,
+      height: 42,
+      justifyContent: "center",
+      position: "relative",
+      transform: [{ rotate: "-12deg" }],
+      width: 58,
+    },
+    promoTicketCutLeft: {
+      backgroundColor: theme.isDark ? "#08281f" : "#fff6de",
+      borderRadius: 8,
+      height: 14,
+      left: -7,
+      position: "absolute",
+      width: 14,
+    },
+    promoTicketCutRight: {
+      backgroundColor: theme.isDark ? "#08281f" : "#fff6de",
+      borderRadius: 8,
+      height: 14,
+      position: "absolute",
+      right: -7,
+      width: 14,
+    },
+    promoTicketText: {
+      color: theme.colors.foregroundInverse,
+      fontFamily: mobileTypography.uiBold,
+      fontSize: 22,
+      lineHeight: 28,
     },
     promoCoupon: {
-      alignSelf: "flex-start",
-      backgroundColor: theme.colors.cream,
+      alignSelf: "flex-end",
+      backgroundColor: theme.isDark ? theme.colors.cream : "#ffffff",
+      borderColor: theme.isDark ? "transparent" : "rgba(184, 117, 11, 0.16)",
+      borderWidth: 1,
       borderRadius: theme.radii.pill,
       marginTop: 16,
       paddingHorizontal: 16,
       paddingVertical: 8,
     },
     promoCouponText: {
-      color: theme.colors.foregroundInverse,
+      color: theme.isDark ? theme.colors.foregroundInverse : theme.colors.foreground,
       fontFamily: mobileTypography.uiBold,
       fontSize: 13,
     },
@@ -8083,18 +8966,22 @@ const createStyles = (theme: MobileTheme) =>
     },
     searchBar: {
       alignItems: "center",
-      backgroundColor: theme.colors.cardElevated,
-      borderColor: theme.colors.border,
-      borderRadius: 32,
+      backgroundColor: theme.isDark
+        ? "rgba(9, 24, 21, 0.96)"
+        : "rgba(255, 253, 248, 0.98)",
+      borderColor: theme.isDark
+        ? "rgba(255, 193, 58, 0.13)"
+        : "rgba(184, 117, 11, 0.24)",
+      borderRadius: 34,
       borderWidth: 1,
       flexDirection: "row",
-      gap: 12,
-      minHeight: 62,
-      paddingHorizontal: 18,
-      paddingVertical: 15,
+      gap: 13,
+      minHeight: 66,
+      paddingHorizontal: 16,
+      paddingVertical: 7,
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: 16, width: 0 },
-      shadowOpacity: theme.isDark ? 0.28 : 0.08,
+      shadowOpacity: theme.isDark ? 0.34 : 0.12,
       shadowRadius: 24,
     },
     searchBarPressed: {
@@ -8108,17 +8995,18 @@ const createStyles = (theme: MobileTheme) =>
       fontSize: 28,
     },
     searchIconImage: {
-      height: 28,
-      tintColor: theme.colors.mutedForeground,
-      width: 28,
+      height: 27,
+      tintColor: theme.colors.gold,
+      width: 27,
     },
     searchPlaceholder: {
       color: theme.colors.mutedForeground,
       fontFamily: mobileTypography.uiRegular,
       flex: 1,
-      fontSize: 16,
+      fontSize: 15,
       lineHeight: 22,
       minWidth: 0,
+      textAlign: "right",
     },
     searchChip: {
       backgroundColor: theme.colors.gold,
@@ -8456,23 +9344,25 @@ const createStyles = (theme: MobileTheme) =>
     },
     tabBar: {
       alignItems: "center",
-      backgroundColor: theme.colors.nav,
-      borderColor: theme.colors.border,
-      borderRadius: 0,
+      backgroundColor: theme.isDark ? "#06130f" : "#fffaf0",
+      borderColor: theme.isDark
+        ? "rgba(255, 193, 58, 0.26)"
+        : "rgba(184, 117, 11, 0.22)",
+      borderRadius: 23,
       borderWidth: 1,
-      bottom: 0,
+      bottom: 18,
       elevation: 24,
       flexDirection: "row",
-      height: 92,
-      left: 0,
-      paddingBottom: 14,
-      paddingHorizontal: 18,
-      paddingTop: 8,
+      height: 90,
+      left: 28,
+      paddingBottom: 9,
+      paddingHorizontal: 12,
+      paddingTop: 9,
       position: "absolute",
-      right: 0,
+      right: 28,
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: -10, width: 0 },
-      shadowOpacity: theme.isDark ? 0.54 : 0.16,
+      shadowOpacity: theme.isDark ? 0.54 : 0.14,
       shadowRadius: 28,
       zIndex: 20,
     },
@@ -8484,17 +9374,17 @@ const createStyles = (theme: MobileTheme) =>
       width: 18,
     },
     tabActiveIndicatorVisible: {
-      backgroundColor: theme.colors.gold,
-      width: 24,
+      backgroundColor: "transparent",
+      width: 18,
     },
     tabButton: {
       alignItems: "center",
       borderRadius: 22,
       flex: 1,
-      gap: 4,
+      gap: 3,
       justifyContent: "center",
-      minHeight: 54,
-      paddingHorizontal: 2,
+      minHeight: 58,
+      paddingHorizontal: 0,
     },
     tabButtonActive: {
       backgroundColor: "transparent",
@@ -8512,18 +9402,18 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.gold,
     },
     tabIconImage: {
-      height: 22,
+      height: 28,
       tintColor: theme.colors.foreground,
-      width: 22,
+      width: 28,
     },
     tabIconImageActive: {
       tintColor: theme.colors.gold,
     },
     tabLabel: {
       color: theme.colors.foreground,
-      fontFamily: mobileTypography.uiRegular,
-      fontSize: 10,
-      lineHeight: 13,
+      fontFamily: mobileTypography.uiMedium,
+      fontSize: 12,
+      lineHeight: 16,
       maxWidth: 64,
       minWidth: 48,
       textAlign: "center",
