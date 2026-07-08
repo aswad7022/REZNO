@@ -11,7 +11,6 @@ import {
 } from "react-native";
 
 import {
-  SUPPORTED_LOCALES,
   labels,
   type MobileLocale,
 } from "../i18n/labels";
@@ -115,14 +114,12 @@ type MobileText = (typeof labels)[MobileLocale];
 
 export function ScreenHeader({
   isRtl,
-  locale,
-  onLocaleChange,
   styles,
   text,
 }: {
   isRtl: boolean;
-  locale: MobileLocale;
-  onLocaleChange: (locale: MobileLocale) => void;
+  locale?: MobileLocale;
+  onLocaleChange?: (locale: MobileLocale) => void;
   styles: MobileChromeStyles;
   text: MobileText;
 }) {
@@ -146,35 +143,6 @@ export function ScreenHeader({
             {text.appTagline}
           </Text>
         </View>
-      </View>
-
-      <View style={styles.localeRow}>
-        {SUPPORTED_LOCALES.map((item) => (
-          <Pressable
-            accessibilityHint="يغير لغة الواجهة داخل هذه المعاينة فقط."
-            accessibilityLabel={`تغيير اللغة إلى ${item.toUpperCase()}`}
-            accessibilityRole="button"
-            accessibilityState={{ selected: item === locale }}
-            hitSlop={TOUCH_HIT_SLOP}
-            key={item}
-            onPress={() => onLocaleChange(item)}
-            style={({ pressed }) => [
-              styles.localeButton,
-              item === locale && styles.localeButtonActive,
-              pressed && styles.localeButtonPressed,
-            ]}
-          >
-            <Text
-              numberOfLines={1}
-              style={[
-                styles.localeButtonText,
-                item === locale && styles.localeButtonTextActive,
-              ]}
-            >
-              {item.toUpperCase()}
-            </Text>
-          </Pressable>
-        ))}
       </View>
     </View>
   );

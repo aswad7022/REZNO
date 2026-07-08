@@ -10,6 +10,8 @@ Focused fix pass: after CTO visual review, PR #90 was tightened further for the 
 
 Focused fix pass 2: PR #90 was tightened again for the bottom navigation icon system, native compass Explore mark, layered premium center plus button, shorter floating glass nav pill, promo gradient/ticket treatment, reduced Home bottom whitespace, lighter category icon containers, and stronger native venue-like business media.
 
+Focused fix pass 4: Home language selection was removed from the header and kept in Account/settings. Home now uses a local `ليلي / نهاري` theme selector, with night remaining the default and day mode wired to the existing light theme. Home content order is now `توصياتنا`, then `قريب منك`, then `جديد على REZNO`, with RTL section headers and the promo card copy aligned right opposite the ticket visual.
+
 ## Reference
 
 - Visual source of truth: attached owner Home screenshot from July 8, 2026.

@@ -30,7 +30,6 @@ import {
 import { API_BASE_URL } from "./src/config/api";
 import {
   DEFAULT_LOCALE,
-  SUPPORTED_LOCALES,
   getTextDirection,
   labels,
   type MobileLocale,
@@ -257,6 +256,24 @@ const featuredBusinesses: PremiumBusiness[] = [
     reviewCount: "74 تقييم",
     status: "الأقرب",
     tag: "مختصون",
+  },
+];
+
+const newOnReznoItems = [
+  {
+    label: "منضم حديثاً",
+    meta: "صالونات مختارة تنضم إلى التجربة المرئية",
+    title: "REZNO Beauty Club",
+  },
+  {
+    label: "خدمة جديدة",
+    meta: "حجوزات عائلية بواجهة آمنة لاحقاً",
+    title: "حجوزات العوائل",
+  },
+  {
+    label: "متاح الآن",
+    meta: "تجربة استكشاف محسّنة بدون بيانات حقيقية",
+    title: "اكتشاف قريب منك",
   },
 ];
 
@@ -570,10 +587,10 @@ const profileOverviewStats = [
 ];
 
 const languagePreferenceRows = [
-  { label: "العربية", meta: "الواجهة الأساسية", selected: true },
-  { label: "English", meta: "Available visually", selected: false },
-  { label: "کوردی", meta: "پشتیوانی کراوە", selected: false },
-];
+  { label: "العربية", locale: "ar", meta: "الواجهة الأساسية" },
+  { label: "English", locale: "en", meta: "Available visually" },
+  { label: "کوردی", locale: "ckb", meta: "پشتیوانی کراوە" },
+] as const;
 
 const themePreferenceRows = [
   { label: "حسب النظام", meta: "يتبع إعدادات الجهاز", mode: "system" },
@@ -916,11 +933,11 @@ export default function App() {
         {!selectedBusiness && activeTab === "customerHome" ? (
           <CustomerHomeScreen
             isRtl={isRtl}
-            locale={locale}
-            onLocaleChange={setLocale}
             onOpenBusiness={setSelectedBusiness}
             onOpenMarketplace={() => handleTabPress("marketplace")}
+            onThemeModeChange={setThemeMode}
             styles={styles}
+            themeMode={themeMode}
           />
         ) : null}
 
@@ -988,6 +1005,8 @@ export default function App() {
         {!selectedBusiness && activeTab === "account" ? (
           <AccountScreen
             isRtl={isRtl}
+            locale={locale}
+            onLocaleChange={setLocale}
             onThemeModeChange={setThemeMode}
             styles={styles}
             text={text}
@@ -1008,27 +1027,27 @@ export default function App() {
 
 function CustomerHomeScreen({
   isRtl,
-  locale,
-  onLocaleChange,
   onOpenBusiness,
   onOpenMarketplace,
+  onThemeModeChange,
   styles,
+  themeMode,
 }: {
   isRtl: boolean;
-  locale: MobileLocale;
-  onLocaleChange: (locale: MobileLocale) => void;
   onOpenBusiness: (business: PremiumBusiness) => void;
   onOpenMarketplace: () => void;
+  onThemeModeChange: (mode: MobileThemeMode) => void;
   styles: MobileStyles;
+  themeMode: MobileThemeMode;
 }) {
   return (
     <View style={styles.homeReferenceScreen}>
       <View style={styles.homeReferenceGlow} />
       <HeroCard
         isRtl={isRtl}
-        locale={locale}
-        onLocaleChange={onLocaleChange}
+        onThemeModeChange={onThemeModeChange}
         styles={styles}
+        themeMode={themeMode}
       />
       <SearchBar
         isRtl={isRtl}
@@ -1036,7 +1055,14 @@ function CustomerHomeScreen({
         styles={styles}
       />
       <CategoryGrid styles={styles} />
-      <SectionHeader
+      <HomeSectionHeader
+        action="عرض الكل"
+        isRtl={isRtl}
+        styles={styles}
+        title="توصياتنا"
+      />
+      <PromoCard isRtl={isRtl} styles={styles} />
+      <HomeSectionHeader
         action="عرض الكل ›"
         isRtl={isRtl}
         styles={styles}
@@ -1054,7 +1080,13 @@ function CustomerHomeScreen({
           </View>
         ))}
       </View>
-      <PromoCard isRtl={isRtl} styles={styles} />
+      <HomeSectionHeader
+        action="عرض الكل"
+        isRtl={isRtl}
+        styles={styles}
+        title="جديد على REZNO"
+      />
+      <NewOnReznoSection isRtl={isRtl} styles={styles} />
     </View>
   );
 }
@@ -1233,16 +1265,39 @@ function WelcomeOnboardingCard({
   );
 }
 
-function HeroCard({
+function HomeSectionHeader({
   isRtl,
-  locale,
-  onLocaleChange,
   styles,
+  title,
+  action,
 }: {
   isRtl: boolean;
-  locale: MobileLocale;
-  onLocaleChange: (locale: MobileLocale) => void;
   styles: MobileStyles;
+  title: string;
+  action?: string;
+}) {
+  return (
+    <View style={styles.homeSectionHeader}>
+      <Text style={[styles.homeSectionAction, !action && styles.hiddenText]}>
+        {action ?? " "}
+      </Text>
+      <Text style={[styles.homeSectionTitle, isRtl && styles.rtlText]}>
+        {title}
+      </Text>
+    </View>
+  );
+}
+
+function HeroCard({
+  isRtl,
+  onThemeModeChange,
+  styles,
+  themeMode,
+}: {
+  isRtl: boolean;
+  onThemeModeChange: (mode: MobileThemeMode) => void;
+  styles: MobileStyles;
+  themeMode: MobileThemeMode;
 }) {
   return (
     <View style={styles.heroCard}>
@@ -1273,33 +1328,38 @@ function HeroCard({
             />
             <View style={styles.homeNotificationDot} />
           </View>
-          <View style={styles.homeLocaleSegment}>
-            {SUPPORTED_LOCALES.map((item) => {
-              const active = item === locale;
-              const label = item === "ckb" ? "CKD" : item.toUpperCase();
+          <View style={styles.homeThemeSegment}>
+            {[
+              { label: "ليلي", mode: "dark" as const },
+              { label: "نهاري", mode: "light" as const },
+            ].map((item) => {
+              const active =
+                item.mode === "dark"
+                  ? themeMode !== "light"
+                  : themeMode === "light";
 
               return (
                 <Pressable
-                  accessibilityHint="يغير لغة واجهة المعاينة فقط."
-                  accessibilityLabel={`تغيير اللغة إلى ${label}`}
+                  accessibilityHint="يغير نمط ألوان المعاينة محلياً فقط."
+                  accessibilityLabel={`اختيار نمط ${item.label}`}
                   accessibilityRole="button"
                   accessibilityState={{ selected: active }}
                   hitSlop={TOUCH_HIT_SLOP}
-                  key={item}
-                  onPress={() => onLocaleChange(item)}
+                  key={item.mode}
+                  onPress={() => onThemeModeChange(item.mode)}
                   style={({ pressed }) => [
-                    styles.homeLocaleOption,
-                    active && styles.homeLocaleOptionActive,
+                    styles.homeThemeOption,
+                    active && styles.homeThemeOptionActive,
                     pressed && styles.tabButtonPressed,
                   ]}
                 >
                   <Text
                     style={[
-                      styles.homeLocaleText,
-                      active && styles.homeLocaleTextActive,
+                      styles.homeThemeText,
+                      active && styles.homeThemeTextActive,
                     ]}
                   >
-                    {label}
+                    {item.label}
                   </Text>
                 </Pressable>
               );
@@ -1318,6 +1378,37 @@ function HeroCard({
           ما الخدمة التي تحتاجها اليوم؟
         </Text>
       </View>
+    </View>
+  );
+}
+
+function NewOnReznoSection({
+  isRtl,
+  styles,
+}: {
+  isRtl: boolean;
+  styles: MobileStyles;
+}) {
+  return (
+    <View style={styles.newReznoGrid}>
+      {newOnReznoItems.map((item) => (
+        <View key={item.title} style={styles.newReznoCard}>
+          <View style={styles.newReznoIcon}>
+            <Text style={styles.newReznoIconText}>R</Text>
+          </View>
+          <View style={styles.newReznoCopy}>
+            <Text style={[styles.newReznoLabel, isRtl && styles.rtlText]}>
+              {item.label}
+            </Text>
+            <Text style={[styles.newReznoTitle, isRtl && styles.rtlText]}>
+              {item.title}
+            </Text>
+            <Text style={[styles.newReznoMeta, isRtl && styles.rtlText]}>
+              {item.meta}
+            </Text>
+          </View>
+        </View>
+      ))}
     </View>
   );
 }
@@ -1472,7 +1563,7 @@ function PromoCard({ isRtl, styles }: { isRtl: boolean; styles: MobileStyles }) 
       <View style={styles.promoGoldGlow} />
       <View style={styles.promoPatternLine} />
       <View style={styles.promoPatternLineAlt} />
-      <View>
+      <View style={styles.promoCopy}>
         <Text style={[styles.promoTitle, isRtl && styles.rtlText]}>
           خصم 15%
         </Text>
@@ -3809,12 +3900,16 @@ function BusinessInsightsPreview({
 
 function AccountScreen({
   isRtl,
+  locale,
+  onLocaleChange,
   onThemeModeChange,
   styles,
   text,
   themeMode,
 }: {
   isRtl: boolean;
+  locale: MobileLocale;
+  onLocaleChange: (locale: MobileLocale) => void;
   onThemeModeChange: (mode: MobileThemeMode) => void;
   styles: MobileStyles;
   text: (typeof labels)[MobileLocale];
@@ -3897,27 +3992,43 @@ function AccountScreen({
           <Text style={[styles.preferenceGroupTitle, isRtl && styles.rtlText]}>
             اللغة
           </Text>
-          {languagePreferenceRows.map((row) => (
-            <View key={row.label} style={styles.accountPreferenceRow}>
-              <View
-                style={[
-                  styles.accountPreferenceDot,
-                  row.selected && styles.accountPreferenceDotActive,
+          {languagePreferenceRows.map((row) => {
+            const selected = row.locale === locale;
+
+            return (
+              <Pressable
+                accessibilityHint="يغير لغة واجهة المعاينة فقط."
+                accessibilityLabel={`اختيار اللغة ${row.label}`}
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
+                hitSlop={TOUCH_HIT_SLOP}
+                key={row.locale}
+                onPress={() => onLocaleChange(row.locale)}
+                style={({ pressed }) => [
+                  styles.accountPreferenceRow,
+                  pressed && styles.softButtonPressed,
                 ]}
-              />
-              <View style={styles.preferenceCopy}>
-                <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>
-                  {row.label}
+              >
+                <View
+                  style={[
+                    styles.accountPreferenceDot,
+                    selected && styles.accountPreferenceDotActive,
+                  ]}
+                />
+                <View style={styles.preferenceCopy}>
+                  <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>
+                    {row.label}
+                  </Text>
+                  <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>
+                    {row.meta}
+                  </Text>
+                </View>
+                <Text style={styles.preferenceChevron}>
+                  {selected ? "✓" : "›"}
                 </Text>
-                <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>
-                  {row.meta}
-                </Text>
-              </View>
-              <Text style={styles.preferenceChevron}>
-                {row.selected ? "✓" : "›"}
-              </Text>
-            </View>
-          ))}
+              </Pressable>
+            );
+          })}
         </View>
         <View style={styles.preferencesGroup}>
           <Text style={[styles.preferenceGroupTitle, isRtl && styles.rtlText]}>
@@ -4742,8 +4853,12 @@ const createStyles = (theme: MobileTheme) =>
       paddingTop: 11,
     },
     businessCard: {
-      backgroundColor: "rgba(7, 24, 19, 0.96)",
-      borderColor: "rgba(235, 178, 80, 0.36)",
+      backgroundColor: theme.isDark
+        ? "rgba(7, 24, 19, 0.96)"
+        : "rgba(255, 250, 239, 0.98)",
+      borderColor: theme.isDark
+        ? "rgba(235, 178, 80, 0.36)"
+        : "rgba(199, 138, 18, 0.28)",
       borderRadius: 17,
       borderWidth: 1,
       flex: 1,
@@ -4782,7 +4897,7 @@ const createStyles = (theme: MobileTheme) =>
       textAlign: "center",
     },
     businessDetailsDot: {
-      color: "rgba(255, 248, 236, 0.44)",
+      color: theme.isDark ? "rgba(255, 248, 236, 0.44)" : "#9a7a39",
       fontFamily: mobileTypography.uiMedium,
       fontSize: 12,
       lineHeight: 18,
@@ -5198,8 +5313,12 @@ const createStyles = (theme: MobileTheme) =>
     },
     categoryItem: {
       alignItems: "center",
-      backgroundColor: "rgba(9, 25, 20, 0.9)",
-      borderColor: "rgba(235, 178, 80, 0.25)",
+      backgroundColor: theme.isDark
+        ? "rgba(9, 25, 20, 0.9)"
+        : "rgba(255, 250, 239, 0.82)",
+      borderColor: theme.isDark
+        ? "rgba(235, 178, 80, 0.25)"
+        : "rgba(199, 138, 18, 0.2)",
       borderRadius: 14,
       borderWidth: 1,
       flexBasis: "23.4%",
@@ -5995,7 +6114,9 @@ const createStyles = (theme: MobileTheme) =>
     },
     heroProfileBadge: {
       alignItems: "center",
-      backgroundColor: "rgba(8, 22, 18, 0.94)",
+      backgroundColor: theme.isDark
+        ? "rgba(8, 22, 18, 0.94)"
+        : "rgba(255, 250, 239, 0.94)",
       borderColor: theme.colors.gold,
       borderRadius: 27,
       borderWidth: 2,
@@ -6020,7 +6141,7 @@ const createStyles = (theme: MobileTheme) =>
       width: 16,
     },
     heroProfileText: {
-      color: theme.colors.cream,
+      color: theme.isDark ? theme.colors.cream : theme.colors.deepGold,
       fontFamily: mobileTypography.kufiBold,
       fontSize: 25,
       lineHeight: 32,
@@ -6050,6 +6171,34 @@ const createStyles = (theme: MobileTheme) =>
     homeBusinessGrid: {
       flexDirection: "row",
       gap: 10,
+    },
+    homeSectionAction: {
+      color: theme.colors.gold,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: 13,
+      lineHeight: 18,
+      minWidth: 64,
+      textAlign: "left",
+    },
+    homeSectionHeader: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 14,
+      justifyContent: "space-between",
+      paddingHorizontal: 4,
+      paddingTop: 2,
+    },
+    homeSectionTitle: {
+      color: theme.colors.foreground,
+      flex: 1,
+      fontFamily: mobileTypography.kufiBold,
+      fontSize: 22,
+      letterSpacing: -0.2,
+      lineHeight: 30,
+      textAlign: "right",
+    },
+    hiddenText: {
+      opacity: 0,
     },
     homeLocaleOption: {
       alignItems: "center",
@@ -6083,6 +6232,42 @@ const createStyles = (theme: MobileTheme) =>
     homeLocaleTextActive: {
       color: theme.colors.gold,
     },
+    homeThemeOption: {
+      alignItems: "center",
+      borderRadius: 18,
+      height: 34,
+      justifyContent: "center",
+      minWidth: 48,
+      paddingHorizontal: 9,
+    },
+    homeThemeOptionActive: {
+      backgroundColor: "rgba(255, 193, 58, 0.16)",
+      borderColor: "rgba(255, 193, 58, 0.46)",
+      borderWidth: 1,
+    },
+    homeThemeSegment: {
+      alignItems: "center",
+      backgroundColor: theme.isDark
+        ? "rgba(5, 13, 12, 0.86)"
+        : "rgba(255, 250, 239, 0.82)",
+      borderColor: theme.isDark
+        ? "rgba(255, 193, 58, 0.18)"
+        : "rgba(199, 138, 18, 0.2)",
+      borderRadius: 21,
+      borderWidth: 1,
+      flexDirection: "row",
+      gap: 2,
+      padding: 3,
+    },
+    homeThemeText: {
+      color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiMedium,
+      fontSize: 11,
+      lineHeight: 15,
+    },
+    homeThemeTextActive: {
+      color: theme.colors.gold,
+    },
     homeLocationBlock: {
       alignItems: "center",
       flexDirection: "row",
@@ -6113,8 +6298,12 @@ const createStyles = (theme: MobileTheme) =>
     },
     homeNotificationButton: {
       alignItems: "center",
-      backgroundColor: "rgba(8, 22, 18, 0.78)",
-      borderColor: "rgba(255, 193, 58, 0.12)",
+      backgroundColor: theme.isDark
+        ? "rgba(8, 22, 18, 0.78)"
+        : "rgba(255, 250, 239, 0.78)",
+      borderColor: theme.isDark
+        ? "rgba(255, 193, 58, 0.12)"
+        : "rgba(199, 138, 18, 0.18)",
       borderRadius: 18,
       borderWidth: 1,
       height: 36,
@@ -6137,7 +6326,9 @@ const createStyles = (theme: MobileTheme) =>
       width: 20,
     },
     homeReferenceGlow: {
-      backgroundColor: "rgba(8, 91, 58, 0.34)",
+      backgroundColor: theme.isDark
+        ? "rgba(8, 91, 58, 0.34)"
+        : "rgba(255, 213, 104, 0.22)",
       borderRadius: 180,
       height: 260,
       position: "absolute",
@@ -6155,6 +6346,74 @@ const createStyles = (theme: MobileTheme) =>
       alignItems: "center",
       flexDirection: "row",
       gap: 8,
+    },
+    newReznoCard: {
+      alignItems: "center",
+      backgroundColor: theme.isDark
+        ? "rgba(8, 27, 21, 0.9)"
+        : "rgba(255, 250, 239, 0.88)",
+      borderColor: theme.isDark
+        ? "rgba(255, 193, 58, 0.22)"
+        : "rgba(199, 138, 18, 0.2)",
+      borderRadius: 20,
+      borderWidth: 1,
+      flex: 1,
+      flexDirection: "row-reverse",
+      gap: 12,
+      minWidth: 160,
+      padding: 14,
+      shadowColor: theme.colors.shadow,
+      shadowOffset: { height: 10, width: 0 },
+      shadowOpacity: theme.isDark ? 0.18 : 0.06,
+      shadowRadius: 18,
+    },
+    newReznoCopy: {
+      alignItems: "flex-end",
+      flex: 1,
+      minWidth: 0,
+    },
+    newReznoGrid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 10,
+    },
+    newReznoIcon: {
+      alignItems: "center",
+      backgroundColor: theme.colors.goldSoft,
+      borderColor: theme.colors.gold,
+      borderRadius: 18,
+      borderWidth: 1,
+      height: 42,
+      justifyContent: "center",
+      width: 42,
+    },
+    newReznoIconText: {
+      color: theme.colors.gold,
+      fontFamily: mobileTypography.uiBold,
+      fontSize: 16,
+      lineHeight: 20,
+    },
+    newReznoLabel: {
+      color: theme.colors.gold,
+      fontFamily: mobileTypography.uiMedium,
+      fontSize: 11,
+      lineHeight: 16,
+    },
+    newReznoMeta: {
+      color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiRegular,
+      fontSize: 11,
+      lineHeight: 17,
+      marginTop: 3,
+      textAlign: "right",
+    },
+    newReznoTitle: {
+      color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: 14,
+      lineHeight: 20,
+      marginTop: 2,
+      textAlign: "right",
     },
     integrationBody: {
       color: theme.colors.warning,
@@ -7288,11 +7547,13 @@ const createStyles = (theme: MobileTheme) =>
     },
     promoCard: {
       alignItems: "center",
-      backgroundColor: "#06281f",
-      borderColor: "rgba(55, 122, 90, 0.72)",
+      backgroundColor: theme.isDark ? "#06281f" : "#f7ebc9",
+      borderColor: theme.isDark
+        ? "rgba(55, 122, 90, 0.72)"
+        : "rgba(199, 138, 18, 0.26)",
       borderRadius: 21,
       borderWidth: 1,
-      flexDirection: "row",
+      flexDirection: "row-reverse",
       justifyContent: "space-between",
       minHeight: 130,
       overflow: "hidden",
@@ -7309,6 +7570,11 @@ const createStyles = (theme: MobileTheme) =>
       fontFamily: mobileTypography.kufiBold,
       fontSize: 30,
       lineHeight: 36,
+    },
+    promoCopy: {
+      alignItems: "flex-end",
+      flex: 1,
+      minWidth: 0,
     },
     promoGlow: {
       backgroundColor: "rgba(18, 142, 88, 0.38)",
@@ -7357,7 +7623,7 @@ const createStyles = (theme: MobileTheme) =>
       width: 58,
     },
     promoTicketCutLeft: {
-      backgroundColor: "#08281f",
+      backgroundColor: theme.isDark ? "#08281f" : "#f7ebc9",
       borderRadius: 8,
       height: 14,
       left: -7,
@@ -7365,7 +7631,7 @@ const createStyles = (theme: MobileTheme) =>
       width: 14,
     },
     promoTicketCutRight: {
-      backgroundColor: "#08281f",
+      backgroundColor: theme.isDark ? "#08281f" : "#f7ebc9",
       borderRadius: 8,
       height: 14,
       position: "absolute",
@@ -7379,7 +7645,7 @@ const createStyles = (theme: MobileTheme) =>
       lineHeight: 28,
     },
     promoCoupon: {
-      alignSelf: "flex-start",
+      alignSelf: "flex-end",
       backgroundColor: theme.colors.cream,
       borderRadius: theme.radii.pill,
       marginTop: 16,
@@ -8508,8 +8774,12 @@ const createStyles = (theme: MobileTheme) =>
     },
     searchBar: {
       alignItems: "center",
-      backgroundColor: "rgba(9, 24, 21, 0.96)",
-      borderColor: "rgba(255, 193, 58, 0.13)",
+      backgroundColor: theme.isDark
+        ? "rgba(9, 24, 21, 0.96)"
+        : "rgba(255, 250, 239, 0.9)",
+      borderColor: theme.isDark
+        ? "rgba(255, 193, 58, 0.13)"
+        : "rgba(199, 138, 18, 0.18)",
       borderRadius: 34,
       borderWidth: 1,
       flexDirection: "row",
