@@ -23,7 +23,7 @@ export type MobileAppTabId = MobileTabId | "favorites" | "quickBooking";
 
 type BottomNavTabId =
   | "customerHome"
-  | "favorites"
+  | "marketplace"
   | "quickBooking"
   | "bookings"
   | "account";
@@ -42,9 +42,9 @@ const BOTTOM_NAV_TABS: BottomNavTab[] = [
     label: { ar: "الرئيسية", ckb: "سەرەکی", en: "Home" },
   },
   {
-    id: "favorites",
-    icon: require("../../assets/icons/nav/favorite.png"),
-    label: { ar: "المفضلة", ckb: "دڵخوازەکان", en: "Favorites" },
+    id: "marketplace",
+    icon: require("../../assets/icons/common/search.png"),
+    label: { ar: "استكشف", ckb: "بگەڕێ", en: "Explore" },
   },
   {
     id: "quickBooking",
