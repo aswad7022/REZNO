@@ -6,6 +6,10 @@
 
 This phase creates the staging marketplace data plan needed to verify the mobile read-only business discovery success path.
 
+Follow-up implementation is recorded in:
+
+- `docs/mobile/mobile-phase-31c-staging-marketplace-seed.md`
+
 No data was created. No seed was run. No database was mutated. No migration, schema change, backend endpoint change, mobile code change, package change, deployment, EAS action, or production data operation was performed.
 
 PR #85 remains on hold until staging returns visible marketplace businesses and the mobile success-with-data path passes smoke testing.
