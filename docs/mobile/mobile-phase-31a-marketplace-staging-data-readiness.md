@@ -373,4 +373,6 @@ If owner/UI setup is blocked or too slow:
 
 **Backend/API Phase 31B - Create Minimal Staging Marketplace Seed Plan**
 
+Phase 31B seed planning is recorded in [mobile-phase-31b-minimal-staging-marketplace-seed-plan.md](./mobile-phase-31b-minimal-staging-marketplace-seed-plan.md).
+
 Phase 31B should be a separate CTO-approved planning/implementation gate. It should not run data mutations until the owner explicitly approves the exact staging-only execution plan.
