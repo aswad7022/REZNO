@@ -2194,6 +2194,7 @@ function SalonDetailScreen({
           <Text style={styles.salonCtaArrowText}>‹</Text>
         </View>
       </View>
+      <View style={styles.salonBottomSpacer} />
     </>
   );
 }
@@ -8475,7 +8476,7 @@ const createStyles = (theme: MobileTheme) =>
       flexDirection: "row",
       gap: 12,
       marginHorizontal: 28,
-      marginBottom: 148,
+      marginBottom: 20,
       marginTop: 6,
       padding: 10,
       paddingLeft: 18,
@@ -8483,6 +8484,9 @@ const createStyles = (theme: MobileTheme) =>
       shadowOffset: { height: 16, width: 0 },
       shadowOpacity: theme.isDark ? 0.28 : 0.12,
       shadowRadius: 24,
+    },
+    salonBottomSpacer: {
+      height: 188,
     },
     salonCtaArrow: {
       alignItems: "center",
