@@ -1109,6 +1109,7 @@ function CustomerHomeScreen({
         title="جديد على REZNO"
       />
       <NewOnReznoSection isRtl={isRtl} styles={styles} />
+      <View style={styles.homeBottomSpacer} />
     </View>
   );
 }
@@ -5743,7 +5744,7 @@ const createStyles = (theme: MobileTheme) =>
       paddingHorizontal: 20,
     },
     homeContent: {
-      paddingBottom: 250,
+      paddingBottom: 128,
     },
     immersiveContent: {
       paddingHorizontal: 0,
@@ -6252,6 +6253,9 @@ const createStyles = (theme: MobileTheme) =>
     homeBusinessGrid: {
       flexDirection: "row",
       gap: 10,
+    },
+    homeBottomSpacer: {
+      height: 220,
     },
     homeRecommendationBadge: {
       color: theme.colors.deepGold,
@@ -9340,9 +9344,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     tabBar: {
       alignItems: "center",
-      backgroundColor: theme.isDark
-        ? "rgba(5, 18, 15, 0.97)"
-        : "rgba(255, 253, 248, 0.97)",
+      backgroundColor: theme.isDark ? "#06130f" : "#fffaf0",
       borderColor: theme.isDark
         ? "rgba(255, 193, 58, 0.26)"
         : "rgba(184, 117, 11, 0.22)",

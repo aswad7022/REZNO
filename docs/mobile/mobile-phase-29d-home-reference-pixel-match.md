@@ -18,6 +18,8 @@ Focused fix pass 6: Home bottom scroll clearance was increased so `قريب من
 
 Focused fix pass 7: The floating bottom navigation surface was made near-opaque in both night and day themes so Home card text no longer reads through the nav. Home-only bottom scroll clearance was increased again so the final `جديد على REZNO` section can scroll fully above the floating pill. No app-rendered Home settings gear was identified beyond previously suppressed Home nav chrome; any remaining gray gear-like control in emulator screenshots is treated as likely external development/emulator overlay.
 
+Focused fix pass 8: The floating bottom navigation now uses solid dark and ivory surfaces instead of translucent glass, while preserving the rounded floating pill, border, shadow, and center plus. Home now includes an explicit final spacer after `جديد على REZNO` so the last section can clear the nav independently of generic scroll padding. Any remaining gray gear-like control in BlueStacks screenshots remains classified as likely external emulator/development overlay unless a real app-rendered component is identified.
+
 ## Reference
 
 - Visual source of truth: attached owner Home screenshot from July 8, 2026.
