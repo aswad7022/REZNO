@@ -7720,7 +7720,7 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.foregroundInverse,
     },
     promoBody: {
-      color: theme.isDark ? theme.colors.foreground : "#3d3323",
+      color: theme.isDark ? theme.colors.foreground : "#30281d",
       fontFamily: mobileTypography.uiRegular,
       fontSize: 15,
       lineHeight: 23,
