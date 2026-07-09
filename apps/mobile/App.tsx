@@ -2194,6 +2194,7 @@ function SalonDetailScreen({
           <Text style={styles.salonCtaArrowText}>‹</Text>
         </View>
       </View>
+      <View style={styles.salonBottomSpacer} />
     </>
   );
 }
@@ -4423,8 +4424,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     bookingBackButton: {
       alignItems: "center",
-      backgroundColor: theme.colors.cardElevated,
-      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.goldSoft,
+      borderColor: theme.colors.gold,
       borderRadius: 24,
       borderWidth: 1,
       height: 48,
@@ -4433,16 +4434,18 @@ const createStyles = (theme: MobileTheme) =>
     },
     bookingBackIconImage: {
       height: 22,
-      tintColor: theme.colors.foreground,
+      tintColor: theme.colors.deepGold,
       width: 22,
     },
     bookingBottomAction: {
       marginTop: 10,
-      paddingBottom: 112,
+      paddingBottom: 144,
     },
     bookingDateRail: {
       flexDirection: "row",
+      flexWrap: "wrap",
       gap: 9,
+      rowGap: 10,
     },
     bookingLegendRow: {
       alignItems: "center",
@@ -4453,7 +4456,9 @@ const createStyles = (theme: MobileTheme) =>
       marginTop: -4,
     },
     bookingMiniSummary: {
-      backgroundColor: theme.colors.card,
+      backgroundColor: theme.isDark
+        ? "rgba(8, 27, 21, 0.94)"
+        : theme.colors.cardElevated,
       borderColor: theme.colors.goldSoft,
       borderRadius: 28,
       borderWidth: 1,
@@ -4487,12 +4492,14 @@ const createStyles = (theme: MobileTheme) =>
     },
     bookingReceiptActions: {
       gap: 12,
-      paddingBottom: 112,
+      paddingBottom: 148,
     },
     bookingSearchField: {
       alignItems: "center",
-      backgroundColor: theme.colors.cardElevated,
-      borderColor: theme.colors.border,
+      backgroundColor: theme.isDark
+        ? "rgba(9, 24, 21, 0.96)"
+        : "rgba(255, 253, 248, 0.98)",
+      borderColor: theme.colors.goldSoft,
       borderRadius: 30,
       borderWidth: 1,
       flexDirection: "row",
@@ -4514,14 +4521,25 @@ const createStyles = (theme: MobileTheme) =>
     },
     bookingStepHeader: {
       alignItems: "flex-start",
+      backgroundColor: theme.isDark
+        ? "rgba(7, 24, 19, 0.92)"
+        : "rgba(255, 253, 248, 0.98)",
+      borderColor: theme.colors.goldSoft,
+      borderRadius: 28,
+      borderWidth: 1,
       flexDirection: "row",
       gap: 14,
+      padding: 14,
+      shadowColor: theme.colors.shadow,
+      shadowOffset: { height: 14, width: 0 },
+      shadowOpacity: theme.isDark ? 0.24 : 0.08,
+      shadowRadius: 22,
     },
     bookingStepScreen: {
       gap: 16,
-      paddingBottom: 124,
+      paddingBottom: 152,
       paddingHorizontal: 20,
-      paddingTop: 38,
+      paddingTop: 30,
     },
     bookingTimeGrid: {
       flexDirection: "row",
@@ -4530,14 +4548,20 @@ const createStyles = (theme: MobileTheme) =>
     },
     bookingTimeSlot: {
       alignItems: "center",
-      backgroundColor: theme.colors.cardElevated,
-      borderColor: theme.colors.border,
+      backgroundColor: theme.isDark
+        ? "rgba(11, 31, 25, 0.9)"
+        : theme.colors.cardElevated,
+      borderColor: theme.colors.goldSoft,
       borderRadius: theme.radii.pill,
       borderWidth: 1,
       flexGrow: 1,
-      minWidth: 74,
+      minWidth: 78,
       paddingHorizontal: 14,
       paddingVertical: 12,
+      shadowColor: theme.colors.shadow,
+      shadowOffset: { height: 6, width: 0 },
+      shadowOpacity: theme.isDark ? 0.14 : 0.04,
+      shadowRadius: 12,
     },
     bookingTimeSlotActive: {
       backgroundColor: theme.colors.gold,
@@ -4593,11 +4617,13 @@ const createStyles = (theme: MobileTheme) =>
     },
     bookingDetailActions: {
       gap: 12,
-      paddingBottom: 120,
+      paddingBottom: 148,
     },
     bookingDetailHero: {
       alignItems: "center",
-      backgroundColor: theme.colors.hero,
+      backgroundColor: theme.isDark
+        ? "rgba(7, 24, 19, 0.96)"
+        : theme.colors.cardElevated,
       borderColor: theme.colors.goldSoft,
       borderRadius: 30,
       borderWidth: 1,
@@ -4625,17 +4651,23 @@ const createStyles = (theme: MobileTheme) =>
     },
     bookingDetailScreen: {
       gap: 16,
-      paddingBottom: 124,
+      paddingBottom: 152,
       paddingHorizontal: 20,
-      paddingTop: 38,
+      paddingTop: 30,
     },
     bookingDetailSummary: {
-      backgroundColor: theme.colors.card,
+      backgroundColor: theme.isDark
+        ? "rgba(8, 27, 21, 0.94)"
+        : theme.colors.cardElevated,
       borderColor: theme.colors.goldSoft,
       borderRadius: 28,
       borderWidth: 1,
       gap: 9,
       padding: 16,
+      shadowColor: theme.colors.shadow,
+      shadowOffset: { height: 14, width: 0 },
+      shadowOpacity: theme.isDark ? 0.2 : 0.06,
+      shadowRadius: 20,
     },
     bookingInfoPill: {
       alignItems: "center",
@@ -4682,14 +4714,14 @@ const createStyles = (theme: MobileTheme) =>
       width: 22,
     },
     bookingsList: {
-      gap: 10,
-      paddingBottom: 118,
+      gap: 12,
+      paddingBottom: 166,
     },
     bookingsScreen: {
       gap: 16,
-      paddingBottom: 132,
+      paddingBottom: 152,
       paddingHorizontal: 20,
-      paddingTop: 34,
+      paddingTop: 30,
     },
     bookingsSegment: {
       alignItems: "center",
@@ -4755,14 +4787,16 @@ const createStyles = (theme: MobileTheme) =>
       flexDirection: "row-reverse",
     },
     managedBookingCard: {
-      backgroundColor: theme.colors.card,
-      borderColor: theme.colors.border,
-      borderRadius: 24,
+      backgroundColor: theme.isDark
+        ? "rgba(7, 24, 19, 0.96)"
+        : theme.colors.cardElevated,
+      borderColor: theme.colors.goldSoft,
+      borderRadius: 28,
       borderWidth: 1,
-      padding: 12,
+      padding: 14,
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: 16, width: 0 },
-      shadowOpacity: theme.isDark ? 0.22 : 0.08,
+      shadowOpacity: theme.isDark ? 0.28 : 0.1,
       shadowRadius: 24,
     },
     managedBookingHeader: {
@@ -4786,11 +4820,11 @@ const createStyles = (theme: MobileTheme) =>
       flexDirection: "row-reverse",
     },
     managedBookingMedia: {
-      borderRadius: 18,
+      borderRadius: 20,
       flexShrink: 0,
-      height: 84,
+      height: 92,
       overflow: "hidden",
-      width: 96,
+      width: 104,
     },
     managedBookingMeta: {
       color: theme.colors.mutedForeground,
@@ -5793,12 +5827,15 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.foregroundInverse,
     },
     datePill: {
-      backgroundColor: theme.colors.cardElevated,
-      borderColor: theme.colors.border,
+      alignItems: "center",
+      backgroundColor: theme.isDark
+        ? "rgba(11, 31, 25, 0.9)"
+        : theme.colors.cardElevated,
+      borderColor: theme.colors.goldSoft,
       borderRadius: 24,
       borderWidth: 1,
       flexGrow: 1,
-      minWidth: 78,
+      minWidth: 76,
       padding: 11,
       paddingVertical: 13,
       shadowColor: theme.colors.shadow,
@@ -8011,7 +8048,9 @@ const createStyles = (theme: MobileTheme) =>
       width: 150,
     },
     quickBookingHero: {
-      backgroundColor: theme.colors.hero,
+      backgroundColor: theme.isDark
+        ? "rgba(7, 24, 19, 0.96)"
+        : theme.colors.cardElevated,
       borderColor: theme.colors.goldSoft,
       borderRadius: theme.radii.xl,
       borderWidth: 1,
@@ -8374,26 +8413,28 @@ const createStyles = (theme: MobileTheme) =>
       marginTop: 24,
     },
     salonActionIcon: {
-      color: theme.colors.foreground,
+      color: theme.colors.gold,
       fontFamily: mobileTypography.uiSemiBold,
       fontSize: 26,
       lineHeight: 30,
     },
     salonActionIconImage: {
       height: 24,
-      tintColor: theme.colors.foreground,
+      tintColor: theme.colors.gold,
       width: 24,
     },
     salonActionLabel: {
-      color: theme.colors.mutedForeground,
+      color: theme.colors.foreground,
       fontFamily: mobileTypography.uiMedium,
       fontSize: 12,
       marginTop: 7,
     },
     salonActionTile: {
       alignItems: "center",
-      backgroundColor: theme.colors.cardElevated,
-      borderColor: theme.colors.border,
+      backgroundColor: theme.isDark
+        ? "rgba(11, 31, 25, 0.92)"
+        : theme.colors.cardElevated,
+      borderColor: theme.colors.goldSoft,
       borderRadius: 26,
       borderWidth: 1,
       flexBasis: "22%",
@@ -8404,8 +8445,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     salonBackButton: {
       alignItems: "center",
-      backgroundColor: theme.colors.cardElevated,
-      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.goldSoft,
+      borderColor: theme.colors.gold,
       borderRadius: 28,
       borderWidth: 1,
       height: 58,
@@ -8425,7 +8466,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     salonBackIconImage: {
       height: 28,
-      tintColor: theme.colors.foreground,
+      tintColor: theme.colors.deepGold,
       width: 28,
     },
     salonBottomCta: {
@@ -8435,7 +8476,7 @@ const createStyles = (theme: MobileTheme) =>
       flexDirection: "row",
       gap: 12,
       marginHorizontal: 28,
-      marginBottom: 112,
+      marginBottom: 20,
       marginTop: 6,
       padding: 10,
       paddingLeft: 18,
@@ -8443,6 +8484,9 @@ const createStyles = (theme: MobileTheme) =>
       shadowOffset: { height: 16, width: 0 },
       shadowOpacity: theme.isDark ? 0.28 : 0.12,
       shadowRadius: 24,
+    },
+    salonBottomSpacer: {
+      height: 188,
     },
     salonCtaArrow: {
       alignItems: "center",
@@ -8460,8 +8504,10 @@ const createStyles = (theme: MobileTheme) =>
       marginTop: -5,
     },
     salonHero: {
-      backgroundColor: "#05080c",
-      height: 320,
+      backgroundColor: theme.isDark ? "#04100d" : "#fff2d2",
+      borderBottomColor: theme.colors.goldSoft,
+      borderBottomWidth: 1,
+      height: 338,
       marginHorizontal: -20,
       overflow: "hidden",
       position: "relative",
@@ -8486,8 +8532,10 @@ const createStyles = (theme: MobileTheme) =>
     salonHeroCenterpiece: {
       alignItems: "center",
       alignSelf: "center",
-      backgroundColor: "rgba(5, 8, 12, 0.54)",
-      borderColor: "rgba(255, 193, 58, 0.18)",
+      backgroundColor: theme.isDark
+        ? "rgba(5, 14, 11, 0.72)"
+        : "rgba(255, 253, 248, 0.72)",
+      borderColor: theme.colors.goldSoft,
       borderRadius: 30,
       borderWidth: 1,
       gap: 3,
@@ -8499,8 +8547,8 @@ const createStyles = (theme: MobileTheme) =>
     salonHeroKicker: {
       color: theme.colors.foreground,
       fontFamily: mobileTypography.kufiBold,
-      fontSize: 20,
-      lineHeight: 28,
+      fontSize: 19,
+      lineHeight: 27,
       marginTop: 8,
       textAlign: "center",
     },
@@ -8518,7 +8566,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     salonHeroOrb: {
       alignItems: "center",
-      backgroundColor: "rgba(255, 193, 58, 0.18)",
+      backgroundColor: theme.colors.goldSoft,
       borderColor: theme.colors.gold,
       borderRadius: 28,
       borderWidth: 1,
@@ -8548,16 +8596,18 @@ const createStyles = (theme: MobileTheme) =>
       top: 0,
     },
     salonHeroStage: {
-      backgroundColor: "rgba(91, 48, 29, 0.36)",
+      backgroundColor: theme.isDark
+        ? "rgba(91, 48, 29, 0.36)"
+        : "rgba(231, 193, 124, 0.34)",
       bottom: 0,
-      height: 118,
+      height: 126,
       left: 0,
       overflow: "hidden",
       position: "absolute",
       right: 0,
     },
     salonInfoCard: {
-      backgroundColor: theme.colors.background,
+      backgroundColor: theme.isDark ? "#020a08" : theme.colors.background,
       gap: 0,
       paddingHorizontal: 28,
       paddingTop: 20,
@@ -8584,9 +8634,9 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.foreground,
       fontFamily: mobileTypography.kufiBold,
       flexShrink: 1,
-      fontSize: 36,
+      fontSize: 31,
       letterSpacing: -0.7,
-      lineHeight: 46,
+      lineHeight: 40,
     },
     salonRatingRow: {
       alignItems: "center",
@@ -8611,8 +8661,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     salonRoundButton: {
       alignItems: "center",
-      backgroundColor: theme.colors.cardElevated,
-      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.goldSoft,
+      borderColor: theme.colors.gold,
       borderRadius: 31,
       borderWidth: 1,
       height: 58,
@@ -8627,7 +8677,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     salonRoundButtonIcon: {
       height: 28,
-      tintColor: theme.colors.foreground,
+      tintColor: theme.colors.deepGold,
       width: 28,
     },
     salonServiceAdd: {
@@ -8648,7 +8698,9 @@ const createStyles = (theme: MobileTheme) =>
     },
     salonServiceActionBlock: {
       alignItems: "center",
-      backgroundColor: theme.colors.goldSoft,
+      backgroundColor: theme.isDark
+        ? "rgba(255, 193, 58, 0.12)"
+        : theme.colors.goldSoft,
       borderColor: theme.colors.gold,
       borderRadius: 24,
       borderWidth: 1,
@@ -8701,13 +8753,15 @@ const createStyles = (theme: MobileTheme) =>
     salonServiceRow: {
       alignItems: "center",
       flexDirection: "row-reverse",
-      backgroundColor: theme.colors.card,
-      borderColor: theme.colors.border,
+      backgroundColor: theme.isDark
+        ? "rgba(8, 27, 21, 0.94)"
+        : theme.colors.cardElevated,
+      borderColor: theme.colors.goldSoft,
       borderRadius: 28,
       borderWidth: 1,
       gap: 12,
       justifyContent: "space-between",
-      padding: 12,
+      padding: 14,
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: 12, width: 0 },
       shadowOpacity: theme.isDark ? 0.16 : 0.05,
@@ -8717,6 +8771,7 @@ const createStyles = (theme: MobileTheme) =>
       gap: 12,
       paddingHorizontal: 28,
       paddingTop: 24,
+      paddingBottom: 14,
     },
     salonTabs: {
       flexDirection: "row",
@@ -9589,7 +9644,9 @@ const createStyles = (theme: MobileTheme) =>
     },
     confirmationHeroCard: {
       alignItems: "center",
-      backgroundColor: theme.colors.hero,
+      backgroundColor: theme.isDark
+        ? "rgba(7, 24, 19, 0.96)"
+        : theme.colors.cardElevated,
       borderColor: theme.colors.goldSoft,
       borderRadius: theme.radii.xl,
       borderWidth: 1,
@@ -9616,7 +9673,7 @@ const createStyles = (theme: MobileTheme) =>
     confirmationSuccessIcon: {
       alignItems: "center",
       backgroundColor: theme.colors.success,
-      borderColor: theme.colors.cardElevated,
+      borderColor: theme.isDark ? "rgba(255, 248, 236, 0.78)" : "#ffffff",
       borderRadius: 42,
       borderWidth: 4,
       height: 84,
@@ -9630,7 +9687,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     confirmationSuccessIconImage: {
       height: 38,
-      tintColor: theme.colors.foregroundInverse,
+      tintColor: "#ffffff",
       width: 38,
     },
     legendDot: {
@@ -9663,13 +9720,15 @@ const createStyles = (theme: MobileTheme) =>
     },
     paymentMethodCard: {
       alignItems: "center",
-      backgroundColor: theme.colors.card,
-      borderColor: theme.colors.border,
+      backgroundColor: theme.isDark
+        ? "rgba(8, 27, 21, 0.94)"
+        : theme.colors.cardElevated,
+      borderColor: theme.colors.goldSoft,
       borderRadius: 26,
       borderWidth: 1,
-      flexDirection: "row",
+      flexDirection: "row-reverse",
       gap: 14,
-      padding: 17,
+      padding: 18,
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: 10, width: 0 },
       shadowOpacity: theme.isDark ? 0.14 : 0.05,
@@ -9683,7 +9742,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     paymentMethodIcon: {
       alignItems: "center",
-      backgroundColor: theme.colors.goldSoft,
+      backgroundColor: theme.colors.gold,
       borderColor: theme.colors.gold,
       borderRadius: 18,
       borderWidth: 1,
@@ -9693,7 +9752,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     paymentMethodIconImage: {
       height: 22,
-      tintColor: theme.colors.deepGold,
+      tintColor: theme.colors.foregroundInverse,
       width: 22,
     },
     paymentOptionList: {
@@ -9705,13 +9764,13 @@ const createStyles = (theme: MobileTheme) =>
       borderColor: theme.colors.success,
       borderRadius: 24,
       borderWidth: 1,
-      flexDirection: "row",
+      flexDirection: "row-reverse",
       gap: 12,
       padding: 16,
     },
     securePaymentIconImage: {
       height: 22,
-      tintColor: theme.colors.success,
+      tintColor: theme.isDark ? theme.colors.success : "#047857",
       width: 22,
     },
     securePaymentNote: {
@@ -9730,7 +9789,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     staffAvatar: {
       alignItems: "center",
-      backgroundColor: theme.colors.goldSoft,
+      backgroundColor: theme.colors.gold,
       borderColor: theme.colors.gold,
       borderRadius: 23,
       borderWidth: 1,
@@ -9739,7 +9798,7 @@ const createStyles = (theme: MobileTheme) =>
       width: 46,
     },
     staffAvatarText: {
-      color: theme.colors.deepGold,
+      color: theme.colors.foregroundInverse,
       fontFamily: mobileTypography.uiBold,
       fontSize: 18,
     },
@@ -9756,7 +9815,7 @@ const createStyles = (theme: MobileTheme) =>
       minWidth: 0,
     },
     staffDetailsBlockRtl: {
-      alignItems: "flex-end",
+      alignItems: "flex-start",
     },
     staffIdentityBlock: {
       alignItems: "center",
@@ -9799,8 +9858,10 @@ const createStyles = (theme: MobileTheme) =>
     },
     staffSelectionCard: {
       alignItems: "center",
-      backgroundColor: theme.colors.card,
-      borderColor: theme.colors.border,
+      backgroundColor: theme.isDark
+        ? "rgba(8, 27, 21, 0.94)"
+        : theme.colors.cardElevated,
+      borderColor: theme.colors.goldSoft,
       borderRadius: 26,
       borderWidth: 1,
       flexDirection: "row",
@@ -9813,7 +9874,9 @@ const createStyles = (theme: MobileTheme) =>
       shadowRadius: 18,
     },
     staffSelectionCardActive: {
-      backgroundColor: theme.colors.cardElevated,
+      backgroundColor: theme.isDark
+        ? "rgba(14, 46, 35, 0.96)"
+        : theme.colors.cardElevated,
       borderColor: theme.colors.gold,
       shadowColor: theme.colors.deepGold,
       shadowOpacity: theme.isDark ? 0.24 : 0.1,
