@@ -700,7 +700,6 @@ export default function App() {
   const styles = useMemo(() => createStyles(theme), [theme]);
   const text = labels[locale];
   const isRtl = getTextDirection(locale) === "rtl";
-  const showBottomTabs = !(selectedBusiness && !bookingFlowStep);
   const confirmedVisualBooking = useMemo<VisualBooking>(
     () => ({
       businessName: selectedBusiness?.name ?? "Noura Beauty Lounge",
@@ -1037,14 +1036,12 @@ export default function App() {
         ) : null}
       </ScrollView>
 
-      {showBottomTabs ? (
-        <BottomTabBar
-          activeTab={activeTab}
-          locale={locale}
-          onTabPress={handleTabPress}
-          styles={styles}
-        />
-      ) : null}
+      <BottomTabBar
+        activeTab={activeTab}
+        locale={locale}
+        onTabPress={handleTabPress}
+        styles={styles}
+      />
     </SafeAreaView>
   );
 }
@@ -2230,14 +2227,24 @@ function SalonHeroMedia({ styles }: { styles: MobileStyles }) {
     <>
       <View style={styles.salonHeroPhotoBackdrop} />
       <View style={styles.salonHeroPhotoGlow} />
+      <View style={styles.salonHeroWallPanel} />
+      <View style={[styles.salonHeroGoldStrip, styles.salonHeroGoldStripOne]} />
+      <View style={[styles.salonHeroGoldStrip, styles.salonHeroGoldStripTwo]} />
       <View style={styles.salonHeroMirrorRail}>
         <View style={styles.salonHeroMirrorLarge} />
         <View style={styles.salonHeroMirrorLarge} />
         <View style={styles.salonHeroMirrorSmall} />
       </View>
+      <View style={styles.salonHeroBottleShelf}>
+        <View style={styles.salonHeroBottleTall} />
+        <View style={styles.salonHeroBottleSmall} />
+        <View style={styles.salonHeroBottleTall} />
+        <View style={styles.salonHeroBottleSmall} />
+      </View>
       <View style={styles.salonHeroCounter} />
       <View style={styles.salonHeroChairOne} />
       <View style={styles.salonHeroChairTwo} />
+      <View style={styles.salonHeroChairThree} />
       <View style={styles.salonHeroLampOne} />
       <View style={styles.salonHeroLampTwo} />
     </>
@@ -8498,8 +8505,8 @@ const createStyles = (theme: MobileTheme) =>
       borderWidth: 1,
       height: 68,
       justifyContent: "center",
-      left: 30,
       position: "absolute",
+      right: 30,
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: 12, width: 0 },
       shadowOpacity: theme.isDark ? 0.28 : 0.12,
@@ -8530,7 +8537,7 @@ const createStyles = (theme: MobileTheme) =>
       paddingBottom: 4,
     },
     salonBottomSpacer: {
-      height: 58,
+      height: 150,
     },
     salonCtaArrow: {
       alignItems: "center",
@@ -8557,8 +8564,8 @@ const createStyles = (theme: MobileTheme) =>
     salonHeroActions: {
       flexDirection: "row",
       gap: 14,
+      left: 30,
       position: "absolute",
-      right: 30,
       top: 42,
       zIndex: 2,
     },
@@ -8666,6 +8673,40 @@ const createStyles = (theme: MobileTheme) =>
       transform: [{ rotate: "4deg" }],
       width: 74,
     },
+    salonHeroChairThree: {
+      backgroundColor: theme.isDark
+        ? "rgba(8, 12, 10, 0.66)"
+        : "rgba(50, 43, 36, 0.24)",
+      borderColor: "rgba(255, 193, 58, 0.24)",
+      borderRadius: 22,
+      borderWidth: 1,
+      bottom: 50,
+      height: 54,
+      left: 54,
+      position: "absolute",
+      transform: [{ rotate: "5deg" }],
+      width: 66,
+    },
+    salonHeroBottleShelf: {
+      alignItems: "flex-end",
+      bottom: 104,
+      flexDirection: "row",
+      gap: 9,
+      left: 26,
+      position: "absolute",
+    },
+    salonHeroBottleSmall: {
+      backgroundColor: "rgba(255, 193, 58, 0.54)",
+      borderRadius: 5,
+      height: 30,
+      width: 9,
+    },
+    salonHeroBottleTall: {
+      backgroundColor: "rgba(255, 193, 58, 0.66)",
+      borderRadius: 6,
+      height: 46,
+      width: 11,
+    },
     salonHeroCounter: {
       backgroundColor: theme.isDark
         ? "rgba(15, 8, 4, 0.72)"
@@ -8677,6 +8718,21 @@ const createStyles = (theme: MobileTheme) =>
       left: 0,
       position: "absolute",
       right: 0,
+    },
+    salonHeroGoldStrip: {
+      backgroundColor: "rgba(255, 193, 58, 0.5)",
+      borderRadius: 999,
+      height: 146,
+      opacity: theme.isDark ? 0.62 : 0.42,
+      position: "absolute",
+      top: 74,
+      width: 3,
+    },
+    salonHeroGoldStripOne: {
+      left: 156,
+    },
+    salonHeroGoldStripTwo: {
+      right: 90,
     },
     salonHeroLampOne: {
       backgroundColor: theme.colors.gold,
@@ -8745,6 +8801,19 @@ const createStyles = (theme: MobileTheme) =>
       top: -64,
       width: 280,
     },
+    salonHeroWallPanel: {
+      backgroundColor: theme.isDark
+        ? "rgba(255, 193, 58, 0.045)"
+        : "rgba(255, 255, 255, 0.36)",
+      borderColor: "rgba(255, 193, 58, 0.18)",
+      borderRadius: 38,
+      borderWidth: 1,
+      height: 206,
+      left: 22,
+      position: "absolute",
+      right: 22,
+      top: 86,
+    },
     salonHeroStage: {
       ...StyleSheet.absoluteFill,
       backgroundColor: theme.isDark ? "#050b08" : "#fff8ea",
@@ -8807,17 +8876,21 @@ const createStyles = (theme: MobileTheme) =>
     },
     salonLikes: {
       alignSelf: "flex-start",
+      backgroundColor: theme.isDark
+        ? "rgba(255, 193, 58, 0.1)"
+        : "rgba(255, 247, 229, 0.92)",
       borderColor: theme.colors.gold,
       borderRadius: theme.radii.pill,
       borderWidth: 1,
       color: theme.colors.gold,
       fontFamily: mobileTypography.uiSemiBold,
       flexShrink: 0,
-      fontSize: 17,
-      lineHeight: 23,
+      fontSize: 18,
+      lineHeight: 25,
       overflow: "hidden",
-      paddingHorizontal: 16,
-      paddingVertical: 9,
+      paddingHorizontal: 18,
+      paddingVertical: 10,
+      textAlign: "center",
     },
     salonMeta: {
       color: theme.colors.mutedForeground,
@@ -8845,8 +8918,8 @@ const createStyles = (theme: MobileTheme) =>
       alignItems: "center",
       flexDirection: "row",
       flexShrink: 0,
-      gap: 10,
-      paddingTop: 9,
+      gap: 11,
+      paddingTop: 8,
     },
     salonRatingRow: {
       alignItems: "center",
@@ -8860,15 +8933,15 @@ const createStyles = (theme: MobileTheme) =>
       fontSize: 23,
     },
     salonRatingStarImage: {
-      height: 22,
+      height: 25,
       tintColor: theme.colors.gold,
-      width: 22,
+      width: 25,
     },
     salonRatingText: {
       color: theme.colors.foreground,
       fontFamily: mobileTypography.uiSemiBold,
-      fontSize: 18,
-      lineHeight: 25,
+      fontSize: 21,
+      lineHeight: 29,
     },
     salonRoundButton: {
       alignItems: "center",
