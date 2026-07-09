@@ -11531,8 +11531,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     paymentReferenceHeader: {
       alignItems: "center",
-      flexDirection: "row",
-      justifyContent: "space-between",
+      height: 70,
+      position: "relative",
       zIndex: 1,
     },
     paymentReferenceBackButton: {
@@ -11545,10 +11545,13 @@ const createStyles = (theme: MobileTheme) =>
       borderWidth: 1.5,
       height: 62,
       justifyContent: "center",
+      position: "absolute",
+      right: 0,
       shadowColor: theme.colors.deepGold,
       shadowOffset: { height: 12, width: 0 },
       shadowOpacity: theme.isDark ? 0.22 : 0.1,
       shadowRadius: 22,
+      top: 0,
       width: 62,
     },
     paymentReferenceBackIcon: {
@@ -11557,15 +11560,18 @@ const createStyles = (theme: MobileTheme) =>
       width: 24,
     },
     paymentReferenceProgressBlock: {
-      alignItems: "flex-end",
+      alignItems: "flex-start",
       gap: 8,
+      left: 0,
+      position: "absolute",
+      top: 7,
     },
     paymentReferenceStepText: {
       color: theme.colors.gold,
       fontFamily: mobileTypography.uiBold,
       fontSize: 17,
       lineHeight: 23,
-      textAlign: "right",
+      textAlign: "left",
     },
     paymentReferenceHeroCopy: {
       alignItems: "flex-end",
