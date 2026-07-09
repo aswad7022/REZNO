@@ -2745,11 +2745,7 @@ function StaffSelectionStep({
       <Text style={[styles.staffReferenceSectionTitle, isRtl && styles.rtlText]}>
         المختصون المتاحون
       </Text>
-      <ScrollView
-        contentContainerStyle={styles.staffReferenceSpecialistRail}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-      >
+      <View style={styles.staffReferenceSpecialistRail}>
         {availableSpecialists.map((staffOption) => {
           const selected = staffOption.id === selectedSpecialist.id;
 
@@ -2793,7 +2789,7 @@ function StaffSelectionStep({
             </Pressable>
           );
         })}
-      </ScrollView>
+      </View>
 
       <View style={styles.staffReferenceDetailCard}>
         <View style={styles.staffReferenceDetailRating}>
@@ -10358,10 +10354,10 @@ const createStyles = (theme: MobileTheme) =>
     },
     staffReferenceScreen: {
       backgroundColor: theme.isDark ? "#020805" : "#fff8ea",
-      gap: 18,
+      gap: 16,
       minHeight: "100%",
       overflow: "hidden",
-      paddingBottom: 156,
+      paddingBottom: 232,
       paddingHorizontal: 22,
       paddingTop: 34,
       position: "relative",
@@ -10666,8 +10662,9 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.deepGold,
     },
     staffReferenceSpecialistRail: {
-      flexDirection: "row",
-      gap: 8,
+      flexDirection: "row-reverse",
+      gap: 7,
+      justifyContent: "space-between",
       paddingHorizontal: 0,
       paddingVertical: 2,
     },
@@ -10679,14 +10676,16 @@ const createStyles = (theme: MobileTheme) =>
       borderColor: theme.colors.goldSoft,
       borderRadius: 24,
       borderWidth: 1,
-      minHeight: 168,
-      padding: 12,
+      flex: 1,
+      minHeight: 150,
+      minWidth: 0,
+      paddingHorizontal: 7,
+      paddingVertical: 10,
       position: "relative",
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: 10, width: 0 },
       shadowOpacity: theme.isDark ? 0.16 : 0.05,
       shadowRadius: 18,
-      width: 120,
     },
     staffReferenceSpecialistCardActive: {
       borderColor: theme.colors.gold,
@@ -10716,44 +10715,44 @@ const createStyles = (theme: MobileTheme) =>
       borderColor: theme.colors.goldSoft,
       borderRadius: 33,
       borderWidth: 1,
-      height: 66,
+      height: 56,
       justifyContent: "center",
-      marginBottom: 9,
-      width: 66,
+      marginBottom: 7,
+      width: 56,
     },
     staffReferenceAvatarText: {
       color: theme.colors.gold,
       fontFamily: mobileTypography.kufiBold,
-      fontSize: 24,
-      lineHeight: 32,
+      fontSize: 21,
+      lineHeight: 29,
     },
     staffReferenceSpecialistName: {
       color: theme.colors.foreground,
       fontFamily: mobileTypography.uiSemiBold,
-      fontSize: 14,
-      lineHeight: 20,
+      fontSize: 13,
+      lineHeight: 19,
       textAlign: "center",
     },
     staffReferenceSpecialistRole: {
       color: theme.colors.mutedForeground,
       fontFamily: mobileTypography.uiRegular,
       fontSize: 11,
-      lineHeight: 17,
+      lineHeight: 16,
       textAlign: "center",
     },
     staffReferenceSpecialistRating: {
       color: theme.colors.gold,
       fontFamily: mobileTypography.uiSemiBold,
-      fontSize: 13,
-      lineHeight: 18,
-      marginTop: 4,
+      fontSize: 12,
+      lineHeight: 17,
+      marginTop: 3,
     },
     staffReferenceAvailability: {
       color: theme.colors.success,
       fontFamily: mobileTypography.uiMedium,
-      fontSize: 11,
-      lineHeight: 17,
-      marginTop: 4,
+      fontSize: 10,
+      lineHeight: 16,
+      marginTop: 3,
     },
     staffReferenceDetailCard: {
       backgroundColor: theme.isDark
@@ -10764,8 +10763,8 @@ const createStyles = (theme: MobileTheme) =>
         : "rgba(196, 137, 32, 0.28)",
       borderRadius: 26,
       borderWidth: 1,
-      gap: 12,
-      padding: 14,
+      gap: 9,
+      padding: 12,
       shadowColor: theme.colors.deepGold,
       shadowOffset: { height: 14, width: 0 },
       shadowOpacity: theme.isDark ? 0.18 : 0.08,
@@ -10775,8 +10774,8 @@ const createStyles = (theme: MobileTheme) =>
       alignSelf: "flex-start",
       backgroundColor: theme.colors.goldSoft,
       borderRadius: theme.radii.pill,
-      paddingHorizontal: 12,
-      paddingVertical: 5,
+      paddingHorizontal: 11,
+      paddingVertical: 4,
     },
     staffReferenceDetailRatingText: {
       color: theme.colors.deepGold,
@@ -10787,23 +10786,23 @@ const createStyles = (theme: MobileTheme) =>
     staffReferenceDetailTop: {
       alignItems: "center",
       flexDirection: "row-reverse",
-      gap: 12,
+      gap: 10,
     },
     staffReferenceDetailAvatar: {
       alignItems: "center",
       backgroundColor: theme.isDark ? "#152a25" : "#f4eadb",
       borderColor: theme.colors.gold,
-      borderRadius: 38,
+      borderRadius: 34,
       borderWidth: 1,
-      height: 76,
+      height: 68,
       justifyContent: "center",
-      width: 76,
+      width: 68,
     },
     staffReferenceDetailAvatarText: {
       color: theme.colors.gold,
       fontFamily: mobileTypography.kufiBold,
-      fontSize: 27,
-      lineHeight: 36,
+      fontSize: 24,
+      lineHeight: 32,
     },
     staffReferenceDetailCopy: {
       alignItems: "flex-end",
@@ -10837,7 +10836,7 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.mutedForeground,
       fontFamily: mobileTypography.uiRegular,
       fontSize: 12,
-      lineHeight: 20,
+      lineHeight: 18,
       textAlign: "right",
     },
     staffReferenceAvailabilityRow: {
@@ -10859,7 +10858,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     staffReferenceTimeRow: {
       flexDirection: "row-reverse",
-      gap: 9,
+      gap: 7,
       justifyContent: "space-between",
     },
     staffReferenceTimeChip: {
@@ -10871,7 +10870,7 @@ const createStyles = (theme: MobileTheme) =>
       borderRadius: theme.radii.pill,
       borderWidth: 1,
       flex: 1,
-      paddingVertical: 9,
+      paddingVertical: 8,
     },
     staffReferenceTimeChipActive: {
       backgroundColor: theme.colors.gold,
@@ -10889,7 +10888,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     staffReferenceBottomAction: {
       gap: 10,
-      paddingBottom: 8,
+      paddingBottom: 42,
     },
     staffReferenceCta: {
       alignItems: "center",
