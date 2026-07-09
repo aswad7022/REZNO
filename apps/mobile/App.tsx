@@ -2129,9 +2129,11 @@ function SalonDetailScreen({
             <Text style={[styles.salonMeta, isRtl && styles.rtlText]}>
               اسطنبول · صالون · رجال
             </Text>
+            <View style={styles.salonLikes}>
+              <Text style={styles.salonLikesHeart}>❤</Text>
+              <Text style={styles.salonLikesText}>128</Text>
+            </View>
           </View>
-
-          <Text style={styles.salonLikes}>❤ 128</Text>
         </View>
 
         <View style={styles.salonActionGrid}>
@@ -2212,7 +2214,9 @@ function SalonDetailScreen({
             ]}
           >
             <Text style={styles.salonReferenceCtaText}>احجز الآن</Text>
-            <Text style={styles.salonReferenceCtaArrow}>→</Text>
+            <View style={styles.salonReferenceCtaArrowWrap}>
+              <Text style={styles.salonReferenceCtaArrow}>→</Text>
+            </View>
           </Pressable>
         </View>
       </View>
@@ -8875,22 +8879,32 @@ const createStyles = (theme: MobileTheme) =>
       shadowRadius: 28,
     },
     salonLikes: {
-      alignSelf: "flex-start",
+      alignItems: "center",
+      alignSelf: "flex-end",
       backgroundColor: theme.isDark
         ? "rgba(255, 193, 58, 0.1)"
         : "rgba(255, 247, 229, 0.92)",
       borderColor: theme.colors.gold,
       borderRadius: theme.radii.pill,
       borderWidth: 1,
+      flexDirection: "row",
+      gap: 8,
+      marginTop: 12,
+      overflow: "hidden",
+      paddingHorizontal: 17,
+      paddingVertical: 9,
+    },
+    salonLikesHeart: {
       color: theme.colors.gold,
       fontFamily: mobileTypography.uiSemiBold,
-      flexShrink: 0,
-      fontSize: 18,
-      lineHeight: 25,
-      overflow: "hidden",
-      paddingHorizontal: 18,
-      paddingVertical: 10,
-      textAlign: "center",
+      fontSize: 20,
+      lineHeight: 26,
+    },
+    salonLikesText: {
+      color: theme.isDark ? theme.colors.gold : theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: 20,
+      lineHeight: 26,
     },
     salonMeta: {
       color: theme.colors.mutedForeground,
@@ -8918,7 +8932,7 @@ const createStyles = (theme: MobileTheme) =>
       alignItems: "center",
       flexDirection: "row",
       flexShrink: 0,
-      gap: 11,
+      gap: 12,
       paddingTop: 8,
     },
     salonRatingRow: {
@@ -8933,15 +8947,15 @@ const createStyles = (theme: MobileTheme) =>
       fontSize: 23,
     },
     salonRatingStarImage: {
-      height: 25,
+      height: 26,
       tintColor: theme.colors.gold,
-      width: 25,
+      width: 26,
     },
     salonRatingText: {
       color: theme.colors.foreground,
       fontFamily: mobileTypography.uiSemiBold,
-      fontSize: 21,
-      lineHeight: 29,
+      fontSize: 22,
+      lineHeight: 30,
     },
     salonRoundButton: {
       alignItems: "center",
@@ -9095,7 +9109,7 @@ const createStyles = (theme: MobileTheme) =>
     salonTitleRow: {
       alignItems: "flex-start",
       flexDirection: "row",
-      gap: 12,
+      gap: 18,
       justifyContent: "space-between",
     },
     salonVerifiedRow: {
@@ -9123,9 +9137,17 @@ const createStyles = (theme: MobileTheme) =>
       fontFamily: mobileTypography.uiSemiBold,
       fontSize: 34,
       lineHeight: 38,
+      marginTop: -3,
+      textAlign: "center",
+    },
+    salonReferenceCtaArrowWrap: {
+      alignItems: "center",
+      bottom: 0,
+      justifyContent: "center",
       position: "absolute",
-      right: 26,
-      top: 15,
+      right: 22,
+      top: 0,
+      width: 54,
     },
     salonReferenceCtaText: {
       color: theme.colors.foregroundInverse,
