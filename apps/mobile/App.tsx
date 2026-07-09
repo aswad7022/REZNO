@@ -8467,7 +8467,7 @@ const createStyles = (theme: MobileTheme) =>
       flexDirection: "row-reverse",
       gap: 14,
       justifyContent: "space-between",
-      marginTop: 30,
+      marginTop: 14,
     },
     salonActionIcon: {
       color: theme.colors.gold,
@@ -9117,7 +9117,7 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.gold,
     },
     salonTitleRow: {
-      minHeight: 154,
+      minHeight: 112,
       position: "relative",
       width: "100%",
     },
