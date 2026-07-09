@@ -2086,11 +2086,6 @@ function SalonDetailScreen({
             label="مفضلة"
             styles={styles}
           />
-          <VisualIconButton
-            iconSource={mobileIconAssets.common.share}
-            label="مشاركة"
-            styles={styles}
-          />
         </View>
       </View>
 
@@ -8517,7 +8512,7 @@ const createStyles = (theme: MobileTheme) =>
       shadowOffset: { height: 12, width: 0 },
       shadowOpacity: theme.isDark ? 0.28 : 0.12,
       shadowRadius: 18,
-      top: 78,
+      top: 66,
       width: 68,
       zIndex: 2,
     },
@@ -8572,7 +8567,7 @@ const createStyles = (theme: MobileTheme) =>
       gap: 14,
       left: 30,
       position: "absolute",
-      top: 78,
+      top: 66,
       zIndex: 2,
     },
     salonHeroCaption: {
