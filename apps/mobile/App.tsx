@@ -2494,139 +2494,338 @@ function StaffSelectionStep({
   service: (typeof services)[number];
   styles: MobileStyles;
 }) {
-  return (
-    <View style={styles.bookingStepScreen}>
-      <BookingFlowHeader
-        isRtl={isRtl}
-        onBack={onBack}
-        stepLabel="الخطوة 01"
-        styles={styles}
-        subtitle="اختر مختصاً أو اترك REZNO يختار أقرب وقت مناسب."
-        title="اختر المختص"
-      />
+  const [bookingMethod, setBookingMethod] = useState<"rezno" | "manual">(
+    "rezno",
+  );
+  const [selectedFilter, setSelectedFilter] = useState("الأعلى تقييماً");
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState("4:30 م");
+  const summaryBusinessName = business.name || "Noura Beauty Lounge";
+  const availableSpecialists = bookingStaffOptions.filter(
+    (staff) => staff.id !== "any",
+  );
+  const selectedSpecialist =
+    availableSpecialists.find((staff) => staff.id === selectedStaff.id) ??
+    availableSpecialists[0];
+  const bookingMethods = [
+    {
+      description: "أفضل مختص حسب التقييم والخبرة وأقرب وقت متاح",
+      icon: "✧",
+      id: "rezno" as const,
+      metric: "★ 4.9",
+      title: "يختار لي REZNO",
+    },
+    {
+      description: "استعرض المختصين المتاحين واختر الأنسب",
+      icon: "♙",
+      id: "manual" as const,
+      title: "أختار بنفسي",
+    },
+  ];
+  const quickFilters = ["الأعلى تقييماً", "رجال", "الأقرب توفر", "نساء"];
+  const timeSlots = ["6:00 م", "4:30 م", "5:00 م", "5:00 م", "4:00 م"];
 
-      <View style={styles.bookingSearchField}>
-        <Image
-          alt=""
-          resizeMode="contain"
-          source={mobileIconAssets.common.search}
-          style={styles.bookingSearchIconImage}
-        />
-        <Text style={[styles.bookingSearchPlaceholder, isRtl && styles.rtlText]}>
-          ابحث عن مختص أو اختر بدون تفضيل
+  return (
+    <View style={styles.staffReferenceScreen}>
+      <View style={styles.staffReferenceGlow} />
+      <View style={styles.staffReferenceFrameTop} />
+      <View style={styles.staffReferenceHeader}>
+        <Pressable
+          accessibilityHint="يعود إلى صفحة الصالون السابقة."
+          accessibilityLabel="رجوع"
+          accessibilityRole="button"
+          hitSlop={TOUCH_HIT_SLOP}
+          onPress={onBack}
+          style={({ pressed }) => [
+            styles.staffReferenceBackButton,
+            pressed && styles.iconButtonPressed,
+          ]}
+        >
+          <Image
+            alt="رجوع"
+            resizeMode="contain"
+            source={
+              isRtl
+                ? mobileIconAssets.common.backArrowRtl
+                : mobileIconAssets.common.backArrowLtr
+            }
+            style={styles.staffReferenceBackIcon}
+          />
+        </Pressable>
+        <View style={styles.staffReferenceProgressBlock}>
+          <Text style={styles.staffReferenceStepText}>01 من 04</Text>
+          <View style={styles.staffReferenceProgressTrack}>
+            {[0, 1, 2, 3].map((item) => (
+              <View
+                key={item}
+                style={[
+                  styles.staffReferenceProgressSegment,
+                  item === 0 && styles.staffReferenceProgressSegmentActive,
+                ]}
+              />
+            ))}
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.staffReferenceHeroCopy}>
+        <Text style={[styles.staffReferenceTitle, isRtl && styles.rtlText]}>
+          اختر طريقة الحجز
+        </Text>
+        <Text style={[styles.staffReferenceSubtitle, isRtl && styles.rtlText]}>
+          اختر مختصاً أو دع REZNO يختار الأنسب لك
         </Text>
       </View>
 
-      <View style={styles.bookingOptionList}>
-        {bookingStaffOptions.map((staff) => {
-          const selected = staff.id === selectedStaff.id;
-          const staffIdentity = (
-            <View
-              style={[
-                styles.staffIdentityBlock,
-                isRtl && styles.staffIdentityBlockRtl,
-              ]}
-            >
-              <View style={styles.staffAvatar}>
-                <Text style={styles.staffAvatarText}>
-                  {staff.id === "any" ? "R" : staff.name.charAt(0)}
-                </Text>
-              </View>
-              <Text style={[styles.staffNameText, isRtl && styles.rtlText]}>
-                {staff.name}
-              </Text>
-            </View>
-          );
-          const staffDetails = (
-            <View
-              style={[
-                styles.staffDetailsBlock,
-                isRtl && styles.staffDetailsBlockRtl,
-              ]}
-            >
-              <View
-                style={[
-                  styles.staffRatingPill,
-                  isRtl && styles.staffRatingPillRtl,
-                ]}
-              >
-                <Image
-                  alt=""
-                  resizeMode="contain"
-                  source={mobileIconAssets.common.starRating}
-                  style={styles.staffRatingIconImage}
-                />
-                <Text style={styles.staffRatingText}>{staff.rating}</Text>
-              </View>
-              <Text style={[styles.staffRoleText, isRtl && styles.rtlText]}>
-                {staff.role}
-              </Text>
-              <Text style={[styles.staffExperience, isRtl && styles.rtlText]}>
-                {staff.experience}
-              </Text>
-            </View>
-          );
-          const selectionIndicator = (
-            <View
-              style={[
-                styles.staffSelectionIndicator,
-                selected && styles.staffSelectionIndicatorActive,
-              ]}
-            >
-              <View
-                style={[
-                  styles.bookingRadio,
-                  selected && styles.bookingRadioActive,
-                ]}
-              >
-                {selected ? <View style={styles.bookingRadioDot} /> : null}
-              </View>
-            </View>
-          );
+      <View style={styles.staffReferenceSummaryCard}>
+        <View style={styles.staffReferenceSummaryMedia}>
+          <BusinessMedia badge="مؤكد" styles={styles} />
+        </View>
+        <View style={styles.staffReferenceSummaryCopy}>
+          <Text style={[styles.staffReferenceBusinessName, isRtl && styles.rtlText]}>
+            {summaryBusinessName}
+          </Text>
+          <Text style={[styles.staffReferenceSummaryMeta, isRtl && styles.rtlText]}>
+            {service.name} ✂
+          </Text>
+          <Text style={[styles.staffReferenceSummaryMeta, isRtl && styles.rtlText]}>
+            {service.price} ◇
+          </Text>
+          <Text style={[styles.staffReferenceSummaryMuted, isRtl && styles.rtlText]}>
+            اليوم 06 • الوقت يحدد لاحقاً
+          </Text>
+        </View>
+        <Pressable
+          accessibilityHint="زر تعديل بصري فقط في هذه المرحلة."
+          accessibilityLabel="تعديل ملخص الحجز"
+          accessibilityRole="button"
+          accessibilityState={{ disabled: true }}
+          disabled
+          style={styles.staffReferenceEditButton}
+        >
+          <Text style={styles.staffReferenceEditText}>تعديل ✎</Text>
+        </Pressable>
+      </View>
+
+      <Text style={[styles.staffReferenceSectionTitle, isRtl && styles.rtlText]}>
+        اختر طريقة الحجز
+      </Text>
+      <View style={styles.staffReferenceMethodGrid}>
+        {bookingMethods.map((method) => {
+          const selected = bookingMethod === method.id;
 
           return (
             <Pressable
-              accessibilityHint="يحدد المختص محلياً فقط ولا يرسل أي طلب."
-              accessibilityLabel={`اختيار ${staff.name}`}
+              accessibilityHint="اختيار بصري محلي لطريقة الحجز."
+              accessibilityLabel={`طريقة الحجز ${method.title}`}
               accessibilityRole="button"
               accessibilityState={{ selected }}
-              key={staff.id}
-              onPress={() => onStaffSelect(staff)}
+              key={method.id}
+              onPress={() => setBookingMethod(method.id)}
               style={({ pressed }) => [
-                styles.staffSelectionCard,
-                selected && styles.staffSelectionCardActive,
+                styles.staffReferenceMethodCard,
+                selected && styles.staffReferenceMethodCardActive,
                 pressed && styles.softButtonPressed,
               ]}
             >
-              {isRtl ? (
-                <>
-                  {selectionIndicator}
-                  {staffDetails}
-                  {staffIdentity}
-                </>
-              ) : (
-                <>
-                  {staffIdentity}
-                  {staffDetails}
-                  {selectionIndicator}
-                </>
-              )}
+              {selected ? (
+                <View style={styles.staffReferenceCheckBadge}>
+                  <Text style={styles.staffReferenceCheckText}>✓</Text>
+                </View>
+              ) : null}
+              <View style={styles.staffReferenceMethodIcon}>
+                <Text style={styles.staffReferenceMethodIconText}>
+                  {method.icon}
+                </Text>
+              </View>
+              <Text style={[styles.staffReferenceMethodTitle, isRtl && styles.rtlText]}>
+                {method.title}
+              </Text>
+              <Text style={[styles.staffReferenceMethodDescription, isRtl && styles.rtlText]}>
+                {method.description}
+              </Text>
+              {method.metric ? (
+                <View style={styles.staffReferenceMethodMetric}>
+                  <Text style={styles.staffReferenceMethodMetricText}>
+                    {method.metric}
+                  </Text>
+                </View>
+              ) : null}
             </Pressable>
           );
         })}
       </View>
 
-      <BookingMiniSummary
-        business={business}
-        date={bookingDateOptions[0]}
-        isRtl={isRtl}
-        service={service}
-        staff={selectedStaff}
-        styles={styles}
-      />
+      <Text style={[styles.staffReferenceSectionTitle, isRtl && styles.rtlText]}>
+        تصفية سريعة
+      </Text>
+      <View style={styles.staffReferenceFilterRow}>
+        {quickFilters.map((filter) => {
+          const selected = selectedFilter === filter;
 
-      <View style={styles.bookingBottomAction}>
-        <PrimaryButton label="التالي" onPress={onNext} styles={styles} />
+          return (
+            <Pressable
+              accessibilityHint="يغير فلتر العرض محلياً فقط."
+              accessibilityLabel={`فلتر ${filter}`}
+              accessibilityRole="button"
+              accessibilityState={{ selected }}
+              key={filter}
+              onPress={() => setSelectedFilter(filter)}
+              style={({ pressed }) => [
+                styles.staffReferenceFilterChip,
+                selected && styles.staffReferenceFilterChipActive,
+                pressed && styles.softButtonPressed,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.staffReferenceFilterText,
+                  selected && styles.staffReferenceFilterTextActive,
+                ]}
+              >
+                {filter} {filter === "الأعلى تقييماً" ? "☆" : ""}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <Text style={[styles.staffReferenceSectionTitle, isRtl && styles.rtlText]}>
+        المختصون المتاحون
+      </Text>
+      <ScrollView
+        contentContainerStyle={styles.staffReferenceSpecialistRail}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+      >
+        {availableSpecialists.map((staffOption) => {
+          const selected = staffOption.id === selectedSpecialist.id;
+
+          return (
+            <Pressable
+              accessibilityHint="يحدد المختص محلياً فقط ولا يرسل أي طلب."
+              accessibilityLabel={`اختيار ${staffOption.name}`}
+              accessibilityRole="button"
+              accessibilityState={{ selected }}
+              key={staffOption.id}
+              onPress={() => {
+                setBookingMethod("manual");
+                onStaffSelect(staffOption);
+              }}
+              style={({ pressed }) => [
+                styles.staffReferenceSpecialistCard,
+                selected && styles.staffReferenceSpecialistCardActive,
+                pressed && styles.softButtonPressed,
+              ]}
+            >
+              {selected ? (
+                <View style={styles.staffReferenceSelectedDot}>
+                  <Text style={styles.staffReferenceSelectedDotText}>✓</Text>
+                </View>
+              ) : null}
+              <View style={styles.staffReferenceAvatar}>
+                <Text style={styles.staffReferenceAvatarText}>
+                  {staffOption.name.charAt(0)}
+                </Text>
+              </View>
+              <Text style={[styles.staffReferenceSpecialistName, isRtl && styles.rtlText]}>
+                {staffOption.name}
+              </Text>
+              <Text style={[styles.staffReferenceSpecialistRole, isRtl && styles.rtlText]}>
+                {staffOption.role}
+              </Text>
+              <Text style={styles.staffReferenceSpecialistRating}>
+                ★ {staffOption.rating}
+              </Text>
+              <Text style={styles.staffReferenceAvailability}>● متاح اليوم</Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+
+      <View style={styles.staffReferenceDetailCard}>
+        <View style={styles.staffReferenceDetailRating}>
+          <Text style={styles.staffReferenceDetailRatingText}>
+            ★ {selectedSpecialist.rating}
+          </Text>
+        </View>
+        <View style={styles.staffReferenceDetailTop}>
+          <View style={styles.staffReferenceDetailAvatar}>
+            <Text style={styles.staffReferenceDetailAvatarText}>
+              {selectedSpecialist.name.charAt(0)}
+            </Text>
+          </View>
+          <View style={styles.staffReferenceDetailCopy}>
+            <View style={styles.staffReferenceDetailNameRow}>
+              <Text style={[styles.staffReferenceDetailName, isRtl && styles.rtlText]}>
+                {selectedSpecialist.name}
+              </Text>
+              <Image
+                alt=""
+                resizeMode="contain"
+                source={mobileIconAssets.common.checkSuccess}
+                style={styles.staffReferenceVerifiedIcon}
+              />
+            </View>
+            <Text style={[styles.staffReferenceDetailRole, isRtl && styles.rtlText]}>
+              {selectedSpecialist.role}
+            </Text>
+          </View>
+        </View>
+        <Text style={[styles.staffReferenceDetailMeta, isRtl && styles.rtlText]}>
+          خبرة 6 سنوات • قص وتصفيف • عناية وتلوين
+        </Text>
+        <View style={styles.staffReferenceAvailabilityRow}>
+          <Text style={styles.staffReferenceCalendarMark}>▣</Text>
+          <Text style={styles.staffReferenceAvailabilityStrong}>متاح اليوم</Text>
+        </View>
+        <View style={styles.staffReferenceTimeRow}>
+          {timeSlots.map((slot, index) => {
+            const selected = selectedTimeSlot === slot && index === 1;
+
+            return (
+              <Pressable
+                accessibilityHint="يحدد وقتاً محلياً للعرض فقط."
+                accessibilityLabel={`اختيار ${slot}`}
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
+                key={`${slot}-${index}`}
+                onPress={() => setSelectedTimeSlot(slot)}
+                style={({ pressed }) => [
+                  styles.staffReferenceTimeChip,
+                  selected && styles.staffReferenceTimeChipActive,
+                  pressed && styles.softButtonPressed,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.staffReferenceTimeText,
+                    selected && styles.staffReferenceTimeTextActive,
+                  ]}
+                >
+                  {slot}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+
+      <View style={styles.staffReferenceBottomAction}>
+        <Pressable
+          accessibilityHint="ينتقل إلى الخطوة التالية في تدفق الحجز المرئي الحالي."
+          accessibilityLabel="التالي"
+          accessibilityRole="button"
+          hitSlop={TOUCH_HIT_SLOP}
+          onPress={onNext}
+          style={({ pressed }) => [
+            styles.staffReferenceCta,
+            pressed && styles.primaryButtonPressed,
+          ]}
+        >
+          <Text style={styles.staffReferenceCtaText}>التالي</Text>
+          <Text style={styles.staffReferenceCtaArrow}>←</Text>
+        </Pressable>
+        <Text style={styles.staffReferenceTrustNote}>▧ بياناتك محمية وآمنة</Text>
       </View>
     </View>
   );
@@ -9786,6 +9985,571 @@ const createStyles = (theme: MobileTheme) =>
       fontFamily: mobileTypography.uiMedium,
       fontSize: 12,
       lineHeight: 18,
+    },
+    staffReferenceScreen: {
+      backgroundColor: theme.isDark ? "#020805" : "#fff8ea",
+      gap: 18,
+      minHeight: "100%",
+      overflow: "hidden",
+      paddingBottom: 156,
+      paddingHorizontal: 22,
+      paddingTop: 34,
+      position: "relative",
+    },
+    staffReferenceGlow: {
+      backgroundColor: theme.isDark
+        ? "rgba(12, 96, 65, 0.2)"
+        : "rgba(255, 193, 58, 0.16)",
+      borderRadius: 999,
+      height: 220,
+      left: -90,
+      position: "absolute",
+      top: 32,
+      width: 220,
+    },
+    staffReferenceFrameTop: {
+      borderColor: theme.colors.gold,
+      borderRadius: 34,
+      borderWidth: 1,
+      height: 94,
+      opacity: theme.isDark ? 0.16 : 0.1,
+      position: "absolute",
+      right: -42,
+      top: 64,
+      width: 94,
+    },
+    staffReferenceHeader: {
+      alignItems: "center",
+      flexDirection: "row",
+      justifyContent: "space-between",
+      zIndex: 1,
+    },
+    staffReferenceBackButton: {
+      alignItems: "center",
+      backgroundColor: theme.isDark
+        ? "rgba(5, 12, 10, 0.68)"
+        : "rgba(255, 253, 247, 0.9)",
+      borderColor: theme.colors.goldSoft,
+      borderRadius: 27,
+      borderWidth: 1,
+      height: 54,
+      justifyContent: "center",
+      shadowColor: theme.colors.deepGold,
+      shadowOffset: { height: 10, width: 0 },
+      shadowOpacity: theme.isDark ? 0.16 : 0.08,
+      shadowRadius: 16,
+      width: 54,
+    },
+    staffReferenceBackIcon: {
+      height: 23,
+      tintColor: theme.colors.gold,
+      width: 23,
+    },
+    staffReferenceProgressBlock: {
+      alignItems: "flex-end",
+      gap: 8,
+    },
+    staffReferenceStepText: {
+      color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: 16,
+      lineHeight: 22,
+    },
+    staffReferenceProgressTrack: {
+      flexDirection: "row-reverse",
+      gap: 6,
+    },
+    staffReferenceProgressSegment: {
+      backgroundColor: theme.colors.border,
+      borderRadius: 999,
+      height: 5,
+      opacity: 0.72,
+      width: 26,
+    },
+    staffReferenceProgressSegmentActive: {
+      backgroundColor: theme.colors.gold,
+      opacity: 1,
+      width: 34,
+    },
+    staffReferenceHeroCopy: {
+      alignItems: "flex-end",
+      gap: 4,
+      marginTop: 4,
+    },
+    staffReferenceTitle: {
+      color: theme.colors.foreground,
+      fontFamily: mobileTypography.kufiBold,
+      fontSize: 28,
+      letterSpacing: -0.3,
+      lineHeight: 38,
+      textAlign: "right",
+    },
+    staffReferenceSubtitle: {
+      color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiMedium,
+      fontSize: 14,
+      lineHeight: 22,
+      textAlign: "right",
+    },
+    staffReferenceSummaryCard: {
+      alignItems: "center",
+      backgroundColor: theme.isDark
+        ? "rgba(8, 27, 21, 0.78)"
+        : "rgba(255, 255, 251, 0.92)",
+      borderColor: theme.isDark
+        ? "rgba(255, 193, 58, 0.42)"
+        : "rgba(196, 137, 32, 0.28)",
+      borderRadius: 28,
+      borderWidth: 1,
+      flexDirection: "row",
+      gap: 14,
+      padding: 14,
+      shadowColor: theme.colors.deepGold,
+      shadowOffset: { height: 14, width: 0 },
+      shadowOpacity: theme.isDark ? 0.18 : 0.08,
+      shadowRadius: 22,
+    },
+    staffReferenceSummaryMedia: {
+      borderColor: theme.colors.goldSoft,
+      borderRadius: 18,
+      borderWidth: 1,
+      height: 94,
+      overflow: "hidden",
+      width: 138,
+    },
+    staffReferenceSummaryCopy: {
+      alignItems: "flex-end",
+      flex: 1,
+      gap: 5,
+      minWidth: 0,
+    },
+    staffReferenceBusinessName: {
+      color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: 17,
+      lineHeight: 24,
+      textAlign: "right",
+    },
+    staffReferenceSummaryMeta: {
+      color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiMedium,
+      fontSize: 13,
+      lineHeight: 20,
+      textAlign: "right",
+    },
+    staffReferenceSummaryMuted: {
+      color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiRegular,
+      fontSize: 12,
+      lineHeight: 18,
+      textAlign: "right",
+    },
+    staffReferenceEditButton: {
+      alignItems: "center",
+      borderColor: theme.colors.gold,
+      borderRadius: theme.radii.pill,
+      borderWidth: 1,
+      bottom: 14,
+      left: 14,
+      minWidth: 118,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      position: "absolute",
+    },
+    staffReferenceEditText: {
+      color: theme.colors.gold,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: 13,
+      lineHeight: 19,
+    },
+    staffReferenceSectionTitle: {
+      color: theme.colors.foreground,
+      fontFamily: mobileTypography.kufiBold,
+      fontSize: 18,
+      lineHeight: 26,
+      marginTop: 2,
+      textAlign: "right",
+    },
+    staffReferenceMethodGrid: {
+      flexDirection: "row",
+      gap: 14,
+    },
+    staffReferenceMethodCard: {
+      alignItems: "center",
+      backgroundColor: theme.isDark
+        ? "rgba(9, 25, 20, 0.76)"
+        : "rgba(255, 253, 248, 0.84)",
+      borderColor: theme.colors.goldSoft,
+      borderRadius: 26,
+      borderWidth: 1,
+      flex: 1,
+      minHeight: 158,
+      padding: 16,
+      position: "relative",
+      shadowColor: theme.colors.shadow,
+      shadowOffset: { height: 10, width: 0 },
+      shadowOpacity: theme.isDark ? 0.14 : 0.04,
+      shadowRadius: 16,
+    },
+    staffReferenceMethodCardActive: {
+      backgroundColor: theme.isDark
+        ? "rgba(16, 45, 34, 0.86)"
+        : "rgba(255, 229, 158, 0.5)",
+      borderColor: theme.colors.gold,
+      shadowColor: theme.colors.deepGold,
+      shadowOpacity: theme.isDark ? 0.24 : 0.12,
+      shadowRadius: 22,
+    },
+    staffReferenceCheckBadge: {
+      alignItems: "center",
+      backgroundColor: theme.colors.gold,
+      borderRadius: 14,
+      height: 28,
+      justifyContent: "center",
+      position: "absolute",
+      right: 12,
+      top: 12,
+      width: 28,
+    },
+    staffReferenceCheckText: {
+      color: theme.colors.foregroundInverse,
+      fontFamily: mobileTypography.uiBold,
+      fontSize: 15,
+    },
+    staffReferenceMethodIcon: {
+      alignItems: "center",
+      backgroundColor: theme.colors.goldSoft,
+      borderColor: theme.colors.goldSoft,
+      borderRadius: 26,
+      borderWidth: 1,
+      height: 52,
+      justifyContent: "center",
+      marginBottom: 12,
+      width: 52,
+    },
+    staffReferenceMethodIconText: {
+      color: theme.colors.gold,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: 26,
+      lineHeight: 30,
+    },
+    staffReferenceMethodTitle: {
+      color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: 15,
+      lineHeight: 22,
+      textAlign: "center",
+    },
+    staffReferenceMethodDescription: {
+      color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiRegular,
+      fontSize: 12,
+      lineHeight: 19,
+      marginTop: 6,
+      textAlign: "center",
+    },
+    staffReferenceMethodMetric: {
+      backgroundColor: theme.colors.goldSoft,
+      borderRadius: theme.radii.pill,
+      marginTop: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 5,
+    },
+    staffReferenceMethodMetricText: {
+      color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: 13,
+      lineHeight: 18,
+    },
+    staffReferenceFilterRow: {
+      flexDirection: "row-reverse",
+      flexWrap: "wrap",
+      gap: 10,
+    },
+    staffReferenceFilterChip: {
+      alignItems: "center",
+      backgroundColor: theme.isDark
+        ? "rgba(9, 25, 20, 0.68)"
+        : "rgba(255, 253, 248, 0.92)",
+      borderColor: theme.colors.border,
+      borderRadius: theme.radii.pill,
+      borderWidth: 1,
+      paddingHorizontal: 14,
+      paddingVertical: 9,
+    },
+    staffReferenceFilterChipActive: {
+      backgroundColor: theme.colors.goldSoft,
+      borderColor: theme.colors.gold,
+    },
+    staffReferenceFilterText: {
+      color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiMedium,
+      fontSize: 12,
+      lineHeight: 18,
+    },
+    staffReferenceFilterTextActive: {
+      color: theme.colors.deepGold,
+    },
+    staffReferenceSpecialistRail: {
+      flexDirection: "row",
+      gap: 12,
+      paddingHorizontal: 2,
+      paddingVertical: 2,
+    },
+    staffReferenceSpecialistCard: {
+      alignItems: "center",
+      backgroundColor: theme.isDark
+        ? "rgba(8, 27, 21, 0.76)"
+        : "rgba(255, 255, 251, 0.92)",
+      borderColor: theme.colors.goldSoft,
+      borderRadius: 24,
+      borderWidth: 1,
+      minHeight: 168,
+      padding: 12,
+      position: "relative",
+      shadowColor: theme.colors.shadow,
+      shadowOffset: { height: 10, width: 0 },
+      shadowOpacity: theme.isDark ? 0.16 : 0.05,
+      shadowRadius: 18,
+      width: 112,
+    },
+    staffReferenceSpecialistCardActive: {
+      borderColor: theme.colors.gold,
+      shadowColor: theme.colors.deepGold,
+      shadowOpacity: theme.isDark ? 0.26 : 0.12,
+    },
+    staffReferenceSelectedDot: {
+      alignItems: "center",
+      backgroundColor: theme.colors.gold,
+      borderRadius: 13,
+      height: 26,
+      justifyContent: "center",
+      left: 8,
+      position: "absolute",
+      top: 8,
+      width: 26,
+      zIndex: 1,
+    },
+    staffReferenceSelectedDotText: {
+      color: theme.colors.foregroundInverse,
+      fontFamily: mobileTypography.uiBold,
+      fontSize: 13,
+    },
+    staffReferenceAvatar: {
+      alignItems: "center",
+      backgroundColor: theme.isDark ? "#152a25" : "#f4eadb",
+      borderColor: theme.colors.goldSoft,
+      borderRadius: 33,
+      borderWidth: 1,
+      height: 66,
+      justifyContent: "center",
+      marginBottom: 9,
+      width: 66,
+    },
+    staffReferenceAvatarText: {
+      color: theme.colors.gold,
+      fontFamily: mobileTypography.kufiBold,
+      fontSize: 24,
+      lineHeight: 32,
+    },
+    staffReferenceSpecialistName: {
+      color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: 14,
+      lineHeight: 20,
+      textAlign: "center",
+    },
+    staffReferenceSpecialistRole: {
+      color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiRegular,
+      fontSize: 11,
+      lineHeight: 17,
+      textAlign: "center",
+    },
+    staffReferenceSpecialistRating: {
+      color: theme.colors.gold,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: 13,
+      lineHeight: 18,
+      marginTop: 4,
+    },
+    staffReferenceAvailability: {
+      color: theme.colors.success,
+      fontFamily: mobileTypography.uiMedium,
+      fontSize: 11,
+      lineHeight: 17,
+      marginTop: 4,
+    },
+    staffReferenceDetailCard: {
+      backgroundColor: theme.isDark
+        ? "rgba(8, 27, 21, 0.78)"
+        : "rgba(255, 255, 251, 0.92)",
+      borderColor: theme.isDark
+        ? "rgba(255, 193, 58, 0.42)"
+        : "rgba(196, 137, 32, 0.28)",
+      borderRadius: 26,
+      borderWidth: 1,
+      gap: 12,
+      padding: 14,
+      shadowColor: theme.colors.deepGold,
+      shadowOffset: { height: 14, width: 0 },
+      shadowOpacity: theme.isDark ? 0.18 : 0.08,
+      shadowRadius: 22,
+    },
+    staffReferenceDetailRating: {
+      alignSelf: "flex-start",
+      backgroundColor: theme.colors.goldSoft,
+      borderRadius: theme.radii.pill,
+      paddingHorizontal: 12,
+      paddingVertical: 5,
+    },
+    staffReferenceDetailRatingText: {
+      color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: 13,
+      lineHeight: 18,
+    },
+    staffReferenceDetailTop: {
+      alignItems: "center",
+      flexDirection: "row-reverse",
+      gap: 12,
+    },
+    staffReferenceDetailAvatar: {
+      alignItems: "center",
+      backgroundColor: theme.isDark ? "#152a25" : "#f4eadb",
+      borderColor: theme.colors.gold,
+      borderRadius: 38,
+      borderWidth: 1,
+      height: 76,
+      justifyContent: "center",
+      width: 76,
+    },
+    staffReferenceDetailAvatarText: {
+      color: theme.colors.gold,
+      fontFamily: mobileTypography.kufiBold,
+      fontSize: 27,
+      lineHeight: 36,
+    },
+    staffReferenceDetailCopy: {
+      alignItems: "flex-end",
+      flex: 1,
+    },
+    staffReferenceDetailNameRow: {
+      alignItems: "center",
+      flexDirection: "row-reverse",
+      gap: 7,
+    },
+    staffReferenceDetailName: {
+      color: theme.colors.foreground,
+      fontFamily: mobileTypography.kufiBold,
+      fontSize: 21,
+      lineHeight: 29,
+      textAlign: "right",
+    },
+    staffReferenceVerifiedIcon: {
+      height: 18,
+      width: 18,
+    },
+    staffReferenceDetailRole: {
+      color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiRegular,
+      fontSize: 13,
+      lineHeight: 20,
+      marginTop: 3,
+      textAlign: "right",
+    },
+    staffReferenceDetailMeta: {
+      color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiRegular,
+      fontSize: 12,
+      lineHeight: 20,
+      textAlign: "right",
+    },
+    staffReferenceAvailabilityRow: {
+      alignItems: "center",
+      alignSelf: "flex-end",
+      flexDirection: "row-reverse",
+      gap: 8,
+    },
+    staffReferenceCalendarMark: {
+      color: theme.colors.gold,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: 16,
+    },
+    staffReferenceAvailabilityStrong: {
+      color: theme.colors.success,
+      fontFamily: mobileTypography.uiMedium,
+      fontSize: 12,
+      lineHeight: 18,
+    },
+    staffReferenceTimeRow: {
+      flexDirection: "row-reverse",
+      gap: 9,
+      justifyContent: "space-between",
+    },
+    staffReferenceTimeChip: {
+      alignItems: "center",
+      backgroundColor: theme.isDark
+        ? "rgba(9, 25, 20, 0.74)"
+        : "rgba(255, 253, 248, 0.92)",
+      borderColor: theme.colors.goldSoft,
+      borderRadius: theme.radii.pill,
+      borderWidth: 1,
+      flex: 1,
+      paddingVertical: 9,
+    },
+    staffReferenceTimeChipActive: {
+      backgroundColor: theme.colors.gold,
+      borderColor: theme.colors.gold,
+    },
+    staffReferenceTimeText: {
+      color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiMedium,
+      fontSize: 12,
+      lineHeight: 18,
+    },
+    staffReferenceTimeTextActive: {
+      color: theme.colors.foregroundInverse,
+      fontFamily: mobileTypography.uiSemiBold,
+    },
+    staffReferenceBottomAction: {
+      gap: 10,
+      paddingBottom: 8,
+    },
+    staffReferenceCta: {
+      alignItems: "center",
+      backgroundColor: theme.colors.gold,
+      borderRadius: theme.radii.pill,
+      justifyContent: "center",
+      minHeight: 62,
+      position: "relative",
+      shadowColor: theme.colors.deepGold,
+      shadowOffset: { height: 14, width: 0 },
+      shadowOpacity: theme.isDark ? 0.3 : 0.14,
+      shadowRadius: 24,
+    },
+    staffReferenceCtaText: {
+      color: theme.colors.foregroundInverse,
+      fontFamily: mobileTypography.kufiBold,
+      fontSize: 19,
+      lineHeight: 28,
+      textAlign: "center",
+    },
+    staffReferenceCtaArrow: {
+      color: theme.colors.foregroundInverse,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: 25,
+      left: 28,
+      lineHeight: 30,
+      position: "absolute",
+      top: 16,
+    },
+    staffReferenceTrustNote: {
+      color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiRegular,
+      fontSize: 12,
+      lineHeight: 18,
+      textAlign: "center",
     },
     staffAvatar: {
       alignItems: "center",
