@@ -2102,16 +2102,22 @@ function SalonDetailScreen({
           style={[styles.salonFrameCorner, styles.salonFrameCornerCardRight]}
         />
         <View style={styles.salonTitleRow}>
-          <View style={styles.salonRatingBlock}>
-            <Image
-              alt=""
-              resizeMode="contain"
-              source={mobileIconAssets.common.starRating}
-              style={styles.salonRatingStarImage}
-            />
-            <Text style={styles.salonRatingText}>
-              {business.rating} ({business.reviewCount.replace(" تقييم", "")})
-            </Text>
+          <View style={styles.salonMetricsBlock}>
+            <View style={styles.salonRatingBlock}>
+              <Image
+                alt=""
+                resizeMode="contain"
+                source={mobileIconAssets.common.starRating}
+                style={styles.salonRatingStarImage}
+              />
+              <Text style={styles.salonRatingText}>
+                {business.rating} ({business.reviewCount.replace(" تقييم", "")})
+              </Text>
+            </View>
+            <View style={styles.salonLikes}>
+              <Text style={styles.salonLikesHeart}>❤</Text>
+              <Text style={styles.salonLikesText}>128</Text>
+            </View>
           </View>
 
           <View style={styles.salonIdentityBlock}>
@@ -2129,10 +2135,6 @@ function SalonDetailScreen({
             <Text style={[styles.salonMeta, isRtl && styles.rtlText]}>
               اسطنبول · صالون · رجال
             </Text>
-            <View style={styles.salonLikes}>
-              <Text style={styles.salonLikesHeart}>❤</Text>
-              <Text style={styles.salonLikesText}>128</Text>
-            </View>
           </View>
         </View>
 
@@ -8515,7 +8517,7 @@ const createStyles = (theme: MobileTheme) =>
       shadowOffset: { height: 12, width: 0 },
       shadowOpacity: theme.isDark ? 0.28 : 0.12,
       shadowRadius: 18,
-      top: 62,
+      top: 78,
       width: 68,
       zIndex: 2,
     },
@@ -8570,7 +8572,7 @@ const createStyles = (theme: MobileTheme) =>
       gap: 14,
       left: 30,
       position: "absolute",
-      top: 62,
+      top: 78,
       zIndex: 2,
     },
     salonHeroCaption: {
@@ -8880,7 +8882,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     salonLikes: {
       alignItems: "center",
-      alignSelf: "flex-end",
+      alignSelf: "flex-start",
       backgroundColor: theme.isDark
         ? "rgba(255, 193, 58, 0.1)"
         : "rgba(255, 247, 229, 0.92)",
@@ -8890,7 +8892,7 @@ const createStyles = (theme: MobileTheme) =>
       flexDirection: "row",
       gap: 9,
       height: 50,
-      marginTop: 14,
+      marginTop: 12,
       overflow: "hidden",
       paddingHorizontal: 18,
     },
@@ -8931,13 +8933,17 @@ const createStyles = (theme: MobileTheme) =>
       right: 0,
       top: 0,
     },
+    salonMetricsBlock: {
+      alignItems: "flex-start",
+      left: 0,
+      minWidth: 124,
+      position: "absolute",
+      top: 48,
+    },
     salonRatingBlock: {
       alignItems: "center",
       flexDirection: "row",
       gap: 12,
-      left: 0,
-      position: "absolute",
-      top: 52,
     },
     salonRatingRow: {
       alignItems: "center",
@@ -9146,8 +9152,8 @@ const createStyles = (theme: MobileTheme) =>
       alignItems: "center",
       bottom: 0,
       justifyContent: "center",
+      left: 26,
       position: "absolute",
-      right: 26,
       top: 0,
       width: 42,
       zIndex: 1,
