@@ -8938,7 +8938,7 @@ const createStyles = (theme: MobileTheme) =>
       left: 0,
       minWidth: 124,
       position: "absolute",
-      top: 48,
+      top: 4,
     },
     salonRatingBlock: {
       alignItems: "center",
