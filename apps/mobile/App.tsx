@@ -3266,7 +3266,7 @@ function PaymentMethodStep({
           <Image
             alt="رجوع"
             resizeMode="contain"
-            source={mobileIconAssets.common.backArrowLtr}
+            source={mobileIconAssets.common.backArrowRtl}
             style={styles.paymentReferenceBackIcon}
           />
         </Pressable>
@@ -11555,9 +11555,9 @@ const createStyles = (theme: MobileTheme) =>
       width: 62,
     },
     paymentReferenceBackIcon: {
-      height: 24,
+      height: 32,
       tintColor: theme.colors.gold,
-      width: 24,
+      width: 32,
     },
     paymentReferenceProgressBlock: {
       alignItems: "flex-start",
