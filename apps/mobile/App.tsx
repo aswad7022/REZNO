@@ -2521,7 +2521,7 @@ function StaffSelectionStep({
       title: "أختار بنفسي",
     },
   ];
-  const quickFilters = ["الأعلى تقييماً", "رجال", "الأقرب توفر", "نساء"];
+  const quickFilters = ["الأعلى تقييماً", "رجال", "نساء", "الأقرب توفر"];
   const timeSlots = ["6:00 م", "4:30 م", "5:00 م", "5:00 م", "4:00 م"];
 
   return (
@@ -2552,14 +2552,14 @@ function StaffSelectionStep({
           />
         </Pressable>
         <View style={styles.staffReferenceProgressBlock}>
-          <Text style={styles.staffReferenceStepText}>01 من 04</Text>
+          <Text style={styles.staffReferenceStepText}>02 من 04</Text>
           <View style={styles.staffReferenceProgressTrack}>
             {[0, 1, 2, 3].map((item) => (
               <View
                 key={item}
                 style={[
                   styles.staffReferenceProgressSegment,
-                  item === 0 && styles.staffReferenceProgressSegmentActive,
+                  item < 2 && styles.staffReferenceProgressSegmentActive,
                 ]}
               />
             ))}
@@ -10020,7 +10020,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     staffReferenceHeader: {
       alignItems: "center",
-      flexDirection: "row",
+      flexDirection: "row-reverse",
       justifyContent: "space-between",
       zIndex: 1,
     },
@@ -10046,7 +10046,7 @@ const createStyles = (theme: MobileTheme) =>
       width: 23,
     },
     staffReferenceProgressBlock: {
-      alignItems: "flex-end",
+      alignItems: "flex-start",
       gap: 8,
     },
     staffReferenceStepText: {
@@ -10126,22 +10126,22 @@ const createStyles = (theme: MobileTheme) =>
     staffReferenceBusinessName: {
       color: theme.colors.foreground,
       fontFamily: mobileTypography.uiSemiBold,
-      fontSize: 17,
-      lineHeight: 24,
+      fontSize: 20,
+      lineHeight: 28,
       textAlign: "right",
     },
     staffReferenceSummaryMeta: {
       color: theme.colors.foreground,
       fontFamily: mobileTypography.uiMedium,
-      fontSize: 13,
-      lineHeight: 20,
+      fontSize: 15,
+      lineHeight: 23,
       textAlign: "right",
     },
     staffReferenceSummaryMuted: {
       color: theme.colors.mutedForeground,
       fontFamily: mobileTypography.uiRegular,
-      fontSize: 12,
-      lineHeight: 18,
+      fontSize: 13,
+      lineHeight: 20,
       textAlign: "right",
     },
     staffReferenceEditButton: {
@@ -10263,8 +10263,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     staffReferenceFilterRow: {
       flexDirection: "row-reverse",
-      flexWrap: "wrap",
-      gap: 10,
+      gap: 8,
+      justifyContent: "space-between",
     },
     staffReferenceFilterChip: {
       alignItems: "center",
@@ -10274,8 +10274,12 @@ const createStyles = (theme: MobileTheme) =>
       borderColor: theme.colors.border,
       borderRadius: theme.radii.pill,
       borderWidth: 1,
-      paddingHorizontal: 14,
-      paddingVertical: 9,
+      flex: 1,
+      justifyContent: "center",
+      minHeight: 46,
+      minWidth: 0,
+      paddingHorizontal: 8,
+      paddingVertical: 10,
     },
     staffReferenceFilterChipActive: {
       backgroundColor: theme.colors.goldSoft,
@@ -10284,16 +10288,17 @@ const createStyles = (theme: MobileTheme) =>
     staffReferenceFilterText: {
       color: theme.colors.foreground,
       fontFamily: mobileTypography.uiMedium,
-      fontSize: 12,
-      lineHeight: 18,
+      fontSize: 13,
+      lineHeight: 19,
+      textAlign: "center",
     },
     staffReferenceFilterTextActive: {
       color: theme.colors.deepGold,
     },
     staffReferenceSpecialistRail: {
       flexDirection: "row",
-      gap: 12,
-      paddingHorizontal: 2,
+      gap: 8,
+      paddingHorizontal: 0,
       paddingVertical: 2,
     },
     staffReferenceSpecialistCard: {
@@ -10311,7 +10316,7 @@ const createStyles = (theme: MobileTheme) =>
       shadowOffset: { height: 10, width: 0 },
       shadowOpacity: theme.isDark ? 0.16 : 0.05,
       shadowRadius: 18,
-      width: 112,
+      width: 120,
     },
     staffReferenceSpecialistCardActive: {
       borderColor: theme.colors.gold,
@@ -10538,11 +10543,12 @@ const createStyles = (theme: MobileTheme) =>
     staffReferenceCtaArrow: {
       color: theme.colors.foregroundInverse,
       fontFamily: mobileTypography.uiSemiBold,
-      fontSize: 25,
+      fontSize: 34,
       left: 28,
-      lineHeight: 30,
+      lineHeight: 62,
       position: "absolute",
-      top: 16,
+      textAlign: "center",
+      top: 0,
     },
     staffReferenceTrustNote: {
       color: theme.colors.mutedForeground,
