@@ -8485,16 +8485,23 @@ const createStyles = (theme: MobileTheme) =>
     salonActionTile: {
       alignItems: "center",
       backgroundColor: theme.isDark
-        ? "rgba(11, 31, 25, 0.76)"
-        : "rgba(255, 253, 246, 0.88)",
-      borderColor: theme.colors.goldSoft,
+        ? "rgba(11, 31, 25, 0.82)"
+        : "rgba(255, 254, 248, 0.92)",
+      borderColor: theme.isDark
+        ? "rgba(255, 193, 58, 0.54)"
+        : "rgba(196, 137, 32, 0.44)",
       borderRadius: 24,
       borderWidth: 1,
+      elevation: theme.isDark ? 3 : 2,
       flex: 1,
       justifyContent: "center",
       minHeight: 104,
       paddingHorizontal: 10,
       paddingVertical: 16,
+      shadowColor: theme.colors.deepGold,
+      shadowOffset: { height: 10, width: 0 },
+      shadowOpacity: theme.isDark ? 0.18 : 0.08,
+      shadowRadius: 18,
     },
     salonBackButton: {
       alignItems: "center",
@@ -9037,7 +9044,9 @@ const createStyles = (theme: MobileTheme) =>
       minWidth: 0,
     },
     salonServiceMedia: {
-      borderColor: theme.colors.goldSoft,
+      borderColor: theme.isDark
+        ? "rgba(255, 193, 58, 0.38)"
+        : "rgba(196, 137, 32, 0.28)",
       borderRadius: 18,
       borderWidth: 1,
       flexShrink: 0,
@@ -9072,18 +9081,21 @@ const createStyles = (theme: MobileTheme) =>
       alignItems: "center",
       flexDirection: "row",
       backgroundColor: theme.isDark
-        ? "rgba(8, 27, 21, 0.72)"
-        : "rgba(255, 255, 251, 0.86)",
-      borderColor: theme.colors.goldSoft,
+        ? "rgba(8, 27, 21, 0.78)"
+        : "rgba(255, 255, 251, 0.92)",
+      borderColor: theme.isDark
+        ? "rgba(255, 193, 58, 0.48)"
+        : "rgba(196, 137, 32, 0.36)",
       borderRadius: 24,
       borderWidth: 1,
+      elevation: theme.isDark ? 3 : 2,
       gap: 16,
       justifyContent: "space-between",
       padding: 12,
-      shadowColor: theme.colors.shadow,
+      shadowColor: theme.colors.deepGold,
       shadowOffset: { height: 12, width: 0 },
-      shadowOpacity: theme.isDark ? 0.16 : 0.05,
-      shadowRadius: 18,
+      shadowOpacity: theme.isDark ? 0.2 : 0.08,
+      shadowRadius: 22,
     },
     salonServicesList: {
       gap: 14,
