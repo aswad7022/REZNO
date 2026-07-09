@@ -343,29 +343,24 @@ const bookingStaffOptions: BookingStaffOption[] = [
 ];
 
 const bookingDateOptions: BookingDateOption[] = [
-  { day: "اليوم", id: "today", label: "06", meta: "متاح" },
-  { day: "غداً", id: "tomorrow", label: "07", meta: "6 أوقات" },
-  { day: "الأربعاء", id: "wed", label: "08", meta: "محدود" },
-  { day: "الخميس", id: "thu", label: "09", meta: "أفضل" },
+  { day: "اليوم", id: "today", label: "09", meta: "متاح" },
+  { day: "غداً", id: "tomorrow", label: "10", meta: "متاح" },
+  { day: "الجمعة", id: "fri", label: "11", meta: "مزدحم" },
+  { day: "السبت", id: "sat", label: "12", meta: "متاح" },
+  { day: "الأحد", id: "sun", label: "13", meta: "غير متاح" },
 ];
 
 const bookingTimeOptions: BookingTimeOption[] = [
-  { id: "0900", label: "09:00", state: "available" },
-  { id: "0930", label: "09:30", state: "available" },
-  { id: "1000", label: "10:00", state: "limited" },
-  { id: "1030", label: "10:30", state: "available" },
-  { id: "1100", label: "11:00", state: "booked" },
-  { id: "1130", label: "11:30", state: "available" },
-  { id: "1200", label: "12:00", state: "limited" },
-  { id: "1230", label: "12:30", state: "available" },
-  { id: "1500", label: "15:00", state: "available" },
-  { id: "1530", label: "15:30", state: "limited" },
-  { id: "1600", label: "16:00", state: "available" },
-  { id: "1630", label: "16:30", state: "available" },
-  { id: "1700", label: "17:00", state: "booked" },
-  { id: "1730", label: "17:30", state: "available" },
-  { id: "1800", label: "18:00", state: "limited" },
-  { id: "1830", label: "18:30", state: "available" },
+  { id: "1000", label: "10:00 ص", state: "available" },
+  { id: "1030", label: "10:30 ص", state: "available" },
+  { id: "1100", label: "11:00 ص", state: "limited" },
+  { id: "1200", label: "12:00 م", state: "available" },
+  { id: "1330", label: "1:30 م", state: "booked" },
+  { id: "1400", label: "2:00 م", state: "available" },
+  { id: "1600", label: "4:00 م", state: "available" },
+  { id: "1630", label: "4:30 م", state: "available" },
+  { id: "1700", label: "5:00 م", state: "limited" },
+  { id: "1800", label: "6:00 م", state: "available" },
 ];
 
 const paymentMethodOptions: BookingPaymentOption[] = [
@@ -673,7 +668,7 @@ export default function App() {
     bookingDateOptions[0],
   );
   const [selectedTime, setSelectedTime] = useState<BookingTimeOption>(
-    bookingTimeOptions[11],
+    bookingTimeOptions[7],
   );
   const [selectedPayment, setSelectedPayment] = useState<BookingPaymentOption>(
     paymentMethodOptions[3],
@@ -802,7 +797,7 @@ export default function App() {
   const handleStartBookingFlow = () => {
     setSelectedStaff(bookingStaffOptions[0]);
     setSelectedDate(bookingDateOptions[0]);
-    setSelectedTime(bookingTimeOptions[11]);
+    setSelectedTime(bookingTimeOptions[7]);
     setSelectedPayment(paymentMethodOptions[3]);
     setBookingFlowStep("staff");
   };
@@ -2380,12 +2375,15 @@ function BookingStepScreen({
   if (step === "datetime") {
     return (
       <DateTimeSelectionStep
+        business={business}
         date={date}
         isRtl={isRtl}
         onBack={onBack}
         onDateSelect={onDateSelect}
         onNext={() => onStepChange("payment")}
         onTimeSelect={onTimeSelect}
+        service={service}
+        staff={staff}
         styles={styles}
         time={time}
       />
@@ -2825,7 +2823,7 @@ function StaffSelectionStep({
         </Text>
         <View style={styles.staffReferenceAvailabilityRow}>
           <Text style={styles.staffReferenceCalendarMark}>▣</Text>
-          <Text style={styles.staffReferenceAvailabilityStrong}>متاح اليوم</Text>
+          <Text style={styles.staffReferenceAvailabilityStrong}>اقتراحات سريعة</Text>
         </View>
         <View style={styles.staffReferenceTimeRow}>
           {timeSlots.map((slot, index) => {
@@ -2881,62 +2879,168 @@ function StaffSelectionStep({
 }
 
 function DateTimeSelectionStep({
+  business,
   date,
   isRtl,
   onBack,
   onDateSelect,
   onNext,
   onTimeSelect,
+  service,
+  staff,
   styles,
   time,
 }: {
+  business: PremiumBusiness;
   date: BookingDateOption;
   isRtl: boolean;
   onBack: () => void;
   onDateSelect: (date: BookingDateOption) => void;
   onNext: () => void;
   onTimeSelect: (time: BookingTimeOption) => void;
+  service: (typeof services)[number];
+  staff: BookingStaffOption;
   styles: MobileStyles;
   time: BookingTimeOption;
 }) {
-  return (
-    <View style={styles.bookingStepScreen}>
-      <BookingFlowHeader
-        isRtl={isRtl}
-        onBack={onBack}
-        stepLabel="الخطوة 02"
-        styles={styles}
-        subtitle="الأوقات هنا عرض محلي فقط، ولا يتم فحص التوفر الحقيقي."
-        title="اختر التاريخ والوقت"
-      />
+  const [selectedPeriod, setSelectedPeriod] = useState("الأقرب");
+  const periodFilters = ["الأقرب", "الصباح", "الظهيرة", "المساء"];
+  const compactCalendarDays = ["09", "10", "11", "12", "13", "14", "15"];
+  const displayBusinessName = business.name || "Noura Beauty Lounge";
+  const displayStaffName = staff.id === "any" ? "أحمد" : staff.name;
+  const selectedDateSummary = `${date.day}، ${date.label} يوليو`;
+  const suggestedTimeLabel = "4:30 م";
 
-      <View style={styles.bookingDateRail}>
+  return (
+    <View style={styles.dateTimeReferenceScreen}>
+      <View style={styles.staffReferenceGlow} />
+      <View style={styles.staffReferenceFrameTop} />
+      <View style={styles.staffReferenceHeader}>
+        <Pressable
+          accessibilityHint="يعود إلى اختيار طريقة الحجز."
+          accessibilityLabel="رجوع"
+          accessibilityRole="button"
+          hitSlop={TOUCH_HIT_SLOP}
+          onPress={onBack}
+          style={({ pressed }) => [
+            styles.staffReferenceBackButton,
+            pressed && styles.iconButtonPressed,
+          ]}
+        >
+          <Image
+            alt="رجوع"
+            resizeMode="contain"
+            source={
+              isRtl
+                ? mobileIconAssets.common.backArrowRtl
+                : mobileIconAssets.common.backArrowLtr
+            }
+            style={styles.staffReferenceBackIcon}
+          />
+        </Pressable>
+        <View style={styles.staffReferenceProgressBlock}>
+          <Text style={styles.staffReferenceStepText}>03 من 04</Text>
+          <View style={styles.staffReferenceProgressTrack}>
+            {[0, 1, 2, 3].map((item) => (
+              <View
+                key={item}
+                style={[
+                  styles.staffReferenceProgressSegment,
+                  item < 3 && styles.staffReferenceProgressSegmentActive,
+                ]}
+              />
+            ))}
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.staffReferenceHeroCopy}>
+        <Text style={[styles.staffReferenceTitle, isRtl && styles.rtlText]}>
+          اختر التاريخ والوقت
+        </Text>
+        <Text style={[styles.staffReferenceSubtitle, isRtl && styles.rtlText]}>
+          حدد اليوم والوقت المناسبين لإكمال الحجز
+        </Text>
+      </View>
+
+      <View style={styles.dateTimeSummaryCard}>
+        <View style={styles.dateTimeSummaryMedia}>
+          <BusinessMedia badge="مختار" styles={styles} />
+        </View>
+        <View style={styles.dateTimeSummaryCopy}>
+          <Text style={[styles.staffReferenceBusinessName, isRtl && styles.rtlText]}>
+            {displayBusinessName}
+          </Text>
+          <Text style={[styles.staffReferenceSummaryMeta, isRtl && styles.rtlText]}>
+            {service.name} • {displayStaffName}
+          </Text>
+          <Text style={[styles.staffReferenceSummaryMeta, isRtl && styles.rtlText]}>
+            {service.price}
+          </Text>
+          <Text style={[styles.staffReferenceSummaryMuted, isRtl && styles.rtlText]}>
+            اقتراح سريع: {suggestedTimeLabel}
+          </Text>
+        </View>
+        <Pressable
+          accessibilityHint="زر تعديل بصري فقط في هذه المرحلة."
+          accessibilityLabel="تعديل ملخص الموعد"
+          accessibilityRole="button"
+          accessibilityState={{ disabled: true }}
+          disabled
+          style={styles.dateTimeEditButton}
+        >
+          <Text style={styles.staffReferenceEditText}>تعديل</Text>
+        </Pressable>
+      </View>
+
+      <Text style={[styles.staffReferenceSectionTitle, isRtl && styles.rtlText]}>
+        اختر اليوم
+      </Text>
+      <View style={styles.dateTimeDateRail}>
         {bookingDateOptions.map((item) => {
           const selected = item.id === date.id;
+          const disabled = item.meta === "غير متاح";
 
           return (
             <Pressable
-              accessibilityHint="يحدد التاريخ محلياً فقط."
+              accessibilityHint={
+                disabled
+                  ? "هذا اليوم غير متاح بصرياً في هذه المرحلة."
+                  : "يحدد التاريخ محلياً فقط."
+              }
               accessibilityLabel={`اختيار ${item.day} ${item.label}`}
               accessibilityRole="button"
-              accessibilityState={{ selected }}
+              accessibilityState={{ disabled, selected }}
+              disabled={disabled}
               key={item.id}
               onPress={() => onDateSelect(item)}
               style={({ pressed }) => [
-                styles.datePill,
-                selected && styles.datePillActive,
-                pressed && styles.softButtonPressed,
+                styles.dateTimeDateCard,
+                item.meta === "مزدحم" && styles.dateTimeDateCardBusy,
+                disabled && styles.dateTimeDateCardDisabled,
+                selected && styles.dateTimeDateCardActive,
+                pressed && !disabled && styles.softButtonPressed,
               ]}
             >
-              <Text style={[styles.dateDay, selected && styles.dateDayActive]}>
+              <Text style={[styles.dateTimeDateDay, selected && styles.dateTimeDateTextActive]}>
                 {item.day}
               </Text>
               <Text
-                style={[styles.dateLabel, selected && styles.dateLabelActive]}
+                style={[
+                  styles.dateTimeDateNumber,
+                  selected && styles.dateTimeDateNumberActive,
+                  disabled && styles.dateTimeDateDisabledText,
+                ]}
               >
                 {item.label}
               </Text>
-              <Text style={[styles.dateMeta, selected && styles.dateMetaActive]}>
+              <Text
+                style={[
+                  styles.dateTimeDateMeta,
+                  selected && styles.dateTimeDateTextActive,
+                  disabled && styles.dateTimeDateDisabledText,
+                ]}
+              >
                 {item.meta}
               </Text>
             </Pressable>
@@ -2944,16 +3048,76 @@ function DateTimeSelectionStep({
         })}
       </View>
 
-      <View style={styles.bookingLegendRow}>
-        <LegendItem label="متاح" styles={styles} tone="available" />
-        <LegendItem label="محدود" styles={styles} tone="limited" />
-        <LegendItem label="محجوز" styles={styles} tone="booked" />
+      <View style={styles.dateTimeCalendarCard}>
+        <View style={styles.dateTimeCalendarHeader}>
+          <Text style={styles.dateTimeCalendarTitle}>يوليو 2026</Text>
+          <Text style={styles.dateTimeCalendarMeta}>اختيار محلي للعرض فقط</Text>
+        </View>
+        <View style={styles.dateTimeCalendarGrid}>
+          {compactCalendarDays.map((day) => {
+            const active = day === date.label;
+
+            return (
+              <View
+                key={day}
+                style={[
+                  styles.dateTimeCalendarDay,
+                  active && styles.dateTimeCalendarDayActive,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.dateTimeCalendarDayText,
+                    active && styles.dateTimeCalendarDayTextActive,
+                  ]}
+                >
+                  {day}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
       </View>
 
-      <View style={styles.bookingTimeGrid}>
+      <Text style={[styles.staffReferenceSectionTitle, isRtl && styles.rtlText]}>
+        الأوقات المتاحة
+      </Text>
+      <View style={styles.dateTimePeriodRow}>
+        {periodFilters.map((filter) => {
+          const selected = selectedPeriod === filter;
+
+          return (
+            <Pressable
+              accessibilityHint="يغير فلتر الأوقات محلياً فقط."
+              accessibilityLabel={`فلتر ${filter}`}
+              accessibilityRole="button"
+              accessibilityState={{ selected }}
+              key={filter}
+              onPress={() => setSelectedPeriod(filter)}
+              style={({ pressed }) => [
+                styles.dateTimePeriodChip,
+                selected && styles.dateTimePeriodChipActive,
+                pressed && styles.softButtonPressed,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.dateTimePeriodText,
+                  selected && styles.dateTimePeriodTextActive,
+                ]}
+              >
+                {filter}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <View style={styles.dateTimeSlotGrid}>
         {bookingTimeOptions.map((item) => {
           const selected = item.id === time.id;
           const booked = item.state === "booked";
+          const suggested = item.label === suggestedTimeLabel;
 
           return (
             <Pressable
@@ -2969,18 +3133,20 @@ function DateTimeSelectionStep({
               key={item.id}
               onPress={() => onTimeSelect(item)}
               style={({ pressed }) => [
-                styles.bookingTimeSlot,
-                item.state === "limited" && styles.bookingTimeSlotLimited,
-                booked && styles.bookingTimeSlotBooked,
-                selected && styles.bookingTimeSlotActive,
+                styles.dateTimeSlot,
+                suggested && styles.dateTimeSlotSuggested,
+                item.state === "limited" && styles.dateTimeSlotLimited,
+                booked && styles.dateTimeSlotDisabled,
+                selected && styles.dateTimeSlotActive,
                 pressed && !booked && styles.softButtonPressed,
               ]}
             >
               <Text
                 style={[
-                  styles.timeSlotText,
-                  selected && styles.timeSlotTextActive,
-                  booked && styles.bookingTimeSlotTextMuted,
+                  styles.dateTimeSlotText,
+                  suggested && styles.dateTimeSlotSuggestedText,
+                  selected && styles.dateTimeSlotTextActive,
+                  booked && styles.dateTimeSlotTextDisabled,
                 ]}
               >
                 {item.label}
@@ -2990,32 +3156,38 @@ function DateTimeSelectionStep({
         })}
       </View>
 
-      <View style={styles.bookingBottomAction}>
-        <PrimaryButton label="التالي" onPress={onNext} styles={styles} />
+      <View style={styles.dateTimeSelectedCard}>
+        <View style={styles.dateTimeSelectedAccent} />
+        <View style={styles.dateTimeSelectedCopy}>
+          <Text style={[styles.dateTimeSelectedLabel, isRtl && styles.rtlText]}>
+            موعدك المختار
+          </Text>
+          <Text style={[styles.dateTimeSelectedValue, isRtl && styles.rtlText]}>
+            {selectedDateSummary} • {time.label}
+          </Text>
+          <Text style={[styles.dateTimeSelectedMeta, isRtl && styles.rtlText]}>
+            مع {displayStaffName}
+          </Text>
+        </View>
       </View>
-    </View>
-  );
-}
 
-function LegendItem({
-  label,
-  styles,
-  tone,
-}: {
-  label: string;
-  styles: MobileStyles;
-  tone: "available" | "booked" | "limited";
-}) {
-  return (
-    <View style={styles.legendItem}>
-      <View
-        style={[
-          styles.legendDot,
-          tone === "limited" && styles.legendDotLimited,
-          tone === "booked" && styles.legendDotBooked,
-        ]}
-      />
-      <Text style={styles.legendText}>{label}</Text>
+      <View style={styles.dateTimeBottomAction}>
+        <Pressable
+          accessibilityHint="ينتقل إلى مراجعة الدفع في تدفق الحجز المرئي."
+          accessibilityLabel="التالي"
+          accessibilityRole="button"
+          hitSlop={TOUCH_HIT_SLOP}
+          onPress={onNext}
+          style={({ pressed }) => [
+            styles.staffReferenceCta,
+            pressed && styles.primaryButtonPressed,
+          ]}
+        >
+          <Text style={styles.staffReferenceCtaText}>التالي</Text>
+          <Text style={styles.staffReferenceCtaArrow}>←</Text>
+        </Pressable>
+        <Text style={styles.staffReferenceTrustNote}>▧ بياناتك محمية وآمنة</Text>
+      </View>
     </View>
   );
 }
@@ -3050,7 +3222,7 @@ function PaymentMethodStep({
       <BookingFlowHeader
         isRtl={isRtl}
         onBack={onBack}
-        stepLabel="الخطوة 03"
+        stepLabel="04 من 04"
         styles={styles}
         subtitle="اختيار طريقة الدفع مرئي فقط ولا يضيف أي تكامل دفع."
         title="طريقة الدفع"
@@ -10925,6 +11097,331 @@ const createStyles = (theme: MobileTheme) =>
       fontSize: 12,
       lineHeight: 18,
       textAlign: "center",
+    },
+    dateTimeReferenceScreen: {
+      backgroundColor: theme.isDark ? "#020805" : "#fff8ea",
+      gap: 16,
+      minHeight: "100%",
+      overflow: "hidden",
+      paddingBottom: 232,
+      paddingHorizontal: 22,
+      paddingTop: 34,
+      position: "relative",
+    },
+    dateTimeSummaryCard: {
+      alignItems: "center",
+      backgroundColor: theme.isDark
+        ? "rgba(8, 27, 21, 0.8)"
+        : "rgba(255, 255, 251, 0.94)",
+      borderColor: theme.isDark
+        ? "rgba(255, 193, 58, 0.46)"
+        : "rgba(196, 137, 32, 0.3)",
+      borderRadius: 28,
+      borderWidth: 1,
+      flexDirection: "row",
+      gap: 13,
+      padding: 13,
+      shadowColor: theme.colors.deepGold,
+      shadowOffset: { height: 14, width: 0 },
+      shadowOpacity: theme.isDark ? 0.2 : 0.08,
+      shadowRadius: 24,
+    },
+    dateTimeSummaryMedia: {
+      borderColor: theme.colors.goldSoft,
+      borderRadius: 18,
+      borderWidth: 1,
+      height: 88,
+      overflow: "hidden",
+      width: 126,
+    },
+    dateTimeSummaryCopy: {
+      alignItems: "flex-end",
+      flex: 1,
+      gap: 4,
+      minWidth: 0,
+    },
+    dateTimeEditButton: {
+      alignItems: "center",
+      borderColor: theme.colors.gold,
+      borderRadius: theme.radii.pill,
+      borderWidth: 1,
+      bottom: 12,
+      left: 12,
+      minWidth: 92,
+      paddingHorizontal: 13,
+      paddingVertical: 7,
+      position: "absolute",
+    },
+    dateTimeDateRail: {
+      flexDirection: "row-reverse",
+      gap: 7,
+      justifyContent: "space-between",
+    },
+    dateTimeDateCard: {
+      alignItems: "center",
+      backgroundColor: theme.isDark
+        ? "rgba(9, 25, 20, 0.78)"
+        : "rgba(255, 253, 248, 0.92)",
+      borderColor: theme.colors.goldSoft,
+      borderRadius: 22,
+      borderWidth: 1,
+      flex: 1,
+      gap: 2,
+      minHeight: 98,
+      minWidth: 0,
+      paddingHorizontal: 6,
+      paddingVertical: 11,
+      shadowColor: theme.colors.shadow,
+      shadowOffset: { height: 9, width: 0 },
+      shadowOpacity: theme.isDark ? 0.14 : 0.05,
+      shadowRadius: 16,
+    },
+    dateTimeDateCardActive: {
+      backgroundColor: theme.colors.gold,
+      borderColor: theme.colors.gold,
+      shadowColor: theme.colors.deepGold,
+      shadowOpacity: theme.isDark ? 0.28 : 0.16,
+      shadowRadius: 22,
+    },
+    dateTimeDateCardBusy: {
+      borderColor: theme.colors.warning,
+    },
+    dateTimeDateCardDisabled: {
+      opacity: 0.46,
+    },
+    dateTimeDateDay: {
+      color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiMedium,
+      fontSize: 11,
+      lineHeight: 17,
+      textAlign: "center",
+    },
+    dateTimeDateNumber: {
+      color: theme.colors.foreground,
+      fontFamily: mobileTypography.kufiBold,
+      fontSize: 25,
+      lineHeight: 34,
+      textAlign: "center",
+    },
+    dateTimeDateNumberActive: {
+      color: theme.colors.foregroundInverse,
+    },
+    dateTimeDateMeta: {
+      color: theme.colors.success,
+      fontFamily: mobileTypography.uiMedium,
+      fontSize: 10,
+      lineHeight: 16,
+      textAlign: "center",
+    },
+    dateTimeDateTextActive: {
+      color: theme.colors.foregroundInverse,
+    },
+    dateTimeDateDisabledText: {
+      color: theme.colors.mutedForeground,
+    },
+    dateTimeCalendarCard: {
+      backgroundColor: theme.isDark
+        ? "rgba(7, 22, 18, 0.72)"
+        : "rgba(255, 251, 242, 0.9)",
+      borderColor: theme.colors.goldSoft,
+      borderRadius: 24,
+      borderWidth: 1,
+      gap: 12,
+      padding: 14,
+      shadowColor: theme.colors.shadow,
+      shadowOffset: { height: 10, width: 0 },
+      shadowOpacity: theme.isDark ? 0.14 : 0.05,
+      shadowRadius: 18,
+    },
+    dateTimeCalendarHeader: {
+      alignItems: "flex-end",
+      gap: 2,
+    },
+    dateTimeCalendarTitle: {
+      color: theme.colors.foreground,
+      fontFamily: mobileTypography.kufiBold,
+      fontSize: 17,
+      lineHeight: 24,
+      textAlign: "right",
+    },
+    dateTimeCalendarMeta: {
+      color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiRegular,
+      fontSize: 12,
+      lineHeight: 18,
+      textAlign: "right",
+    },
+    dateTimeCalendarGrid: {
+      flexDirection: "row-reverse",
+      gap: 7,
+      justifyContent: "space-between",
+    },
+    dateTimeCalendarDay: {
+      alignItems: "center",
+      backgroundColor: theme.isDark
+        ? "rgba(12, 32, 26, 0.72)"
+        : "rgba(255, 255, 251, 0.86)",
+      borderColor: theme.colors.border,
+      borderRadius: 15,
+      borderWidth: 1,
+      flex: 1,
+      minHeight: 38,
+      justifyContent: "center",
+    },
+    dateTimeCalendarDayActive: {
+      backgroundColor: theme.colors.goldSoft,
+      borderColor: theme.colors.gold,
+    },
+    dateTimeCalendarDayText: {
+      color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: 12,
+      lineHeight: 18,
+    },
+    dateTimeCalendarDayTextActive: {
+      color: theme.colors.deepGold,
+    },
+    dateTimePeriodRow: {
+      flexDirection: "row-reverse",
+      gap: 8,
+      justifyContent: "space-between",
+    },
+    dateTimePeriodChip: {
+      alignItems: "center",
+      backgroundColor: theme.isDark
+        ? "rgba(9, 25, 20, 0.7)"
+        : "rgba(255, 253, 248, 0.92)",
+      borderColor: theme.colors.border,
+      borderRadius: theme.radii.pill,
+      borderWidth: 1,
+      flex: 1,
+      minHeight: 44,
+      minWidth: 0,
+      justifyContent: "center",
+      paddingHorizontal: 8,
+      paddingVertical: 9,
+    },
+    dateTimePeriodChipActive: {
+      backgroundColor: theme.colors.goldSoft,
+      borderColor: theme.colors.gold,
+    },
+    dateTimePeriodText: {
+      color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiMedium,
+      fontSize: 13,
+      lineHeight: 19,
+      textAlign: "center",
+    },
+    dateTimePeriodTextActive: {
+      color: theme.colors.deepGold,
+      fontFamily: mobileTypography.uiSemiBold,
+    },
+    dateTimeSlotGrid: {
+      flexDirection: "row-reverse",
+      flexWrap: "wrap",
+      gap: 9,
+    },
+    dateTimeSlot: {
+      alignItems: "center",
+      backgroundColor: theme.isDark
+        ? "rgba(9, 25, 20, 0.74)"
+        : "rgba(255, 253, 248, 0.92)",
+      borderColor: theme.colors.goldSoft,
+      borderRadius: theme.radii.pill,
+      borderWidth: 1,
+      flexBasis: "31%",
+      flexGrow: 1,
+      minHeight: 48,
+      justifyContent: "center",
+      paddingHorizontal: 10,
+      paddingVertical: 10,
+    },
+    dateTimeSlotActive: {
+      backgroundColor: theme.colors.gold,
+      borderColor: theme.colors.gold,
+      shadowColor: theme.colors.deepGold,
+      shadowOpacity: theme.isDark ? 0.22 : 0.12,
+      shadowRadius: 16,
+    },
+    dateTimeSlotLimited: {
+      borderColor: theme.colors.warning,
+    },
+    dateTimeSlotDisabled: {
+      opacity: 0.45,
+    },
+    dateTimeSlotSuggested: {
+      borderColor: theme.colors.success,
+    },
+    dateTimeSlotText: {
+      color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiMedium,
+      fontSize: 13,
+      lineHeight: 19,
+      textAlign: "center",
+    },
+    dateTimeSlotTextActive: {
+      color: theme.colors.foregroundInverse,
+      fontFamily: mobileTypography.uiSemiBold,
+    },
+    dateTimeSlotSuggestedText: {
+      color: theme.colors.success,
+    },
+    dateTimeSlotTextDisabled: {
+      color: theme.colors.mutedForeground,
+    },
+    dateTimeSelectedCard: {
+      alignItems: "center",
+      backgroundColor: theme.isDark
+        ? "rgba(8, 27, 21, 0.78)"
+        : "rgba(255, 255, 251, 0.92)",
+      borderColor: theme.isDark
+        ? "rgba(255, 193, 58, 0.42)"
+        : "rgba(196, 137, 32, 0.28)",
+      borderRadius: 24,
+      borderWidth: 1,
+      flexDirection: "row-reverse",
+      gap: 12,
+      padding: 14,
+      shadowColor: theme.colors.deepGold,
+      shadowOffset: { height: 12, width: 0 },
+      shadowOpacity: theme.isDark ? 0.16 : 0.06,
+      shadowRadius: 20,
+    },
+    dateTimeSelectedAccent: {
+      backgroundColor: theme.colors.gold,
+      borderRadius: 999,
+      height: 44,
+      width: 5,
+    },
+    dateTimeSelectedCopy: {
+      alignItems: "flex-end",
+      flex: 1,
+      gap: 2,
+    },
+    dateTimeSelectedLabel: {
+      color: theme.colors.gold,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: 13,
+      lineHeight: 19,
+      textAlign: "right",
+    },
+    dateTimeSelectedValue: {
+      color: theme.colors.foreground,
+      fontFamily: mobileTypography.kufiBold,
+      fontSize: 17,
+      lineHeight: 25,
+      textAlign: "right",
+    },
+    dateTimeSelectedMeta: {
+      color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiRegular,
+      fontSize: 12,
+      lineHeight: 18,
+      textAlign: "right",
+    },
+    dateTimeBottomAction: {
+      gap: 10,
+      paddingBottom: 42,
     },
     staffAvatar: {
       alignItems: "center",
