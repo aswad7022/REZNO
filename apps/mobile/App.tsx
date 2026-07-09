@@ -2022,15 +2022,42 @@ function SalonDetailScreen({
   onStartBooking: () => void;
   styles: MobileStyles;
 }) {
+  const salonReferenceServices = [
+    {
+      duration: "30 دقيقة",
+      name: "قص شعر",
+      price: "250 TL",
+      tag: "رائج",
+    },
+    {
+      duration: "45 دقيقة",
+      name: "حلاقة + دقن",
+      price: "350 TL",
+      tag: "مميز",
+    },
+    {
+      duration: "20 دقيقة",
+      name: "تشذيب بارز",
+      price: "150 TL",
+      tag: "سريع",
+    },
+  ];
+
   return (
-    <>
+    <View style={styles.salonDetailScreen}>
       <View style={styles.salonHero}>
+        <View style={styles.salonHeroStage}>
+          <SalonHeroMedia styles={styles} />
+        </View>
+        <View style={styles.salonHeroOverlay} />
         <View style={styles.salonHeroPattern}>
           <View style={styles.salonHeroLineTall} />
           <View style={styles.salonHeroLine} />
           <View style={styles.salonHeroLineTall} />
           <View style={styles.salonHeroLine} />
         </View>
+        <View style={[styles.salonFrameCorner, styles.salonFrameCornerTopLeft]} />
+        <View style={[styles.salonFrameCorner, styles.salonFrameCornerTopRight]} />
         <Pressable
           accessibilityHint="يعود إلى الشاشة السابقة."
           accessibilityLabel="رجوع"
@@ -2059,34 +2086,39 @@ function SalonDetailScreen({
             label="مفضلة"
             styles={styles}
           />
-          <VisualIconButton
-            iconSource={mobileIconAssets.common.share}
-            label="مشاركة"
-            styles={styles}
-          />
-        </View>
-        <View style={styles.salonHeroCenterpiece}>
-          <View style={styles.salonHeroOrb}>
-            <Text style={styles.salonHeroOrbText}>R</Text>
-          </View>
-          <Text style={[styles.salonHeroKicker, isRtl && styles.rtlText]}>
-            تجربة صالون فاخرة
-          </Text>
-          <Text style={[styles.salonHeroCaption, isRtl && styles.rtlText]}>
-            خدمات مختارة وحجز واضح بخطوات آمنة
-          </Text>
-        </View>
-        <View style={styles.salonHeroStage}>
-          <BusinessMedia badge={business.status} styles={styles} />
         </View>
       </View>
 
       <View style={styles.salonInfoCard}>
+        <View
+          style={[styles.salonFrameCorner, styles.salonFrameCornerCardLeft]}
+        />
+        <View
+          style={[styles.salonFrameCorner, styles.salonFrameCornerCardRight]}
+        />
         <View style={styles.salonTitleRow}>
-          <View style={styles.rowCopy}>
+          <View style={styles.salonMetricsBlock}>
+            <View style={styles.salonRatingBlock}>
+              <Image
+                alt=""
+                resizeMode="contain"
+                source={mobileIconAssets.common.starRating}
+                style={styles.salonRatingStarImage}
+              />
+              <Text style={styles.salonRatingText}>
+                {business.rating} ({business.reviewCount.replace(" تقييم", "")})
+              </Text>
+            </View>
+            <View style={styles.salonLikes}>
+              <Text style={styles.salonLikesHeart}>❤</Text>
+              <Text style={styles.salonLikesText}>128</Text>
+            </View>
+          </View>
+
+          <View style={styles.salonIdentityBlock}>
             <View style={styles.salonVerifiedRow}>
               <Text style={[styles.salonName, isRtl && styles.rtlText]}>
-                {business.name}
+                صالون فيجن
               </Text>
               <Image
                 alt=""
@@ -2096,21 +2128,9 @@ function SalonDetailScreen({
               />
             </View>
             <Text style={[styles.salonMeta, isRtl && styles.rtlText]}>
-              اسطنبول · {business.category} · {business.distance}
+              اسطنبول · صالون · رجال
             </Text>
           </View>
-          <Text style={styles.salonLikes}>❤ 128</Text>
-        </View>
-        <View style={styles.salonRatingRow}>
-          <Image
-            alt=""
-            resizeMode="contain"
-            source={mobileIconAssets.common.starRating}
-            style={styles.salonRatingStarImage}
-          />
-          <Text style={styles.salonRatingText}>
-            {business.rating} ({business.reviewCount.replace(" تقييم", "")})
-          </Text>
         </View>
 
         <View style={styles.salonActionGrid}>
@@ -2131,19 +2151,19 @@ function SalonDetailScreen({
           />
           <VisualActionTile
             iconSource={mobileIconAssets.common.whatsappGeneric}
-            label="واتساب"
+            label="مراسلة"
             styles={styles}
           />
         </View>
 
         <View style={styles.salonTabs}>
-          {["نبذة", "التقييمات", "العروض", "الصور", "الخدمات"].map(
+          {["الخدمات", "الصور", "الموظفون", "التقييمات", "نبذة"].map(
             (tab, index) => (
               <Text
                 key={tab}
                 style={[
                   styles.salonTabText,
-                  index === 4 && styles.salonTabTextActive,
+                  index === 0 && styles.salonTabTextActive,
                 ]}
               >
                 {tab}
@@ -2151,50 +2171,83 @@ function SalonDetailScreen({
             ),
           )}
         </View>
-      </View>
 
-      <View style={styles.salonServicesList}>
-        {services.map((service, index) => (
-          <View key={service.name} style={styles.salonServiceRow}>
-            <View style={styles.salonServiceMain}>
-              <View style={styles.salonServiceMedia}>
-                <BusinessMedia
-                  badge={index === 0 ? "رائج" : service.tag}
-                  styles={styles}
-                />
-              </View>
-              <View style={styles.salonServiceCopy}>
-                <Text style={[styles.salonServiceName, isRtl && styles.rtlText]}>
-                  {index === 0 ? "قص شعر" : service.name}
-                </Text>
-                <Text style={[styles.salonServiceMeta, isRtl && styles.rtlText]}>
-                  {service.duration} · عرض مرئي
-                </Text>
-              </View>
-            </View>
-            <View style={styles.salonServiceActionBlock}>
-              <Text style={styles.salonServicePrice}>
-                {index === 0 ? "250 TL" : service.price}
-              </Text>
+        <View style={styles.salonServicesList}>
+          {salonReferenceServices.map((service) => (
+            <View key={service.name} style={styles.salonServiceRow}>
               <View style={styles.salonServiceAdd}>
                 <Text style={styles.salonServiceAddText}>+</Text>
               </View>
-            </View>
-          </View>
-        ))}
-      </View>
 
-      <View style={styles.salonBottomCta}>
-        <PrimaryButton
-          label="احجز الآن"
-          onPress={onStartBooking}
-          styles={styles}
-        />
-        <View style={styles.salonCtaArrow}>
-          <Text style={styles.salonCtaArrowText}>‹</Text>
+              <View style={styles.salonServiceCopy}>
+                <Text style={[styles.salonServiceName, isRtl && styles.rtlText]}>
+                  {service.name}
+                </Text>
+                <Text style={[styles.salonServiceMeta, isRtl && styles.rtlText]}>
+                  {service.duration}
+                </Text>
+                <Text style={[styles.salonServicePrice, isRtl && styles.rtlText]}>
+                  {service.price}
+                </Text>
+              </View>
+
+              <View style={styles.salonServiceMedia}>
+                <BusinessMedia badge={service.tag} styles={styles} />
+              </View>
+            </View>
+          ))}
+        </View>
+
+        <View style={styles.salonBottomCta}>
+          <Pressable
+            accessibilityHint="ينتقل إلى تدفق الحجز المرئي الحالي."
+            accessibilityLabel="احجز الآن"
+            accessibilityRole="button"
+            hitSlop={TOUCH_HIT_SLOP}
+            onPress={onStartBooking}
+            style={({ pressed }) => [
+              styles.salonReferenceCta,
+              pressed && styles.primaryButtonPressed,
+            ]}
+          >
+            <Text style={styles.salonReferenceCtaText}>احجز الآن</Text>
+            <View style={styles.salonReferenceCtaArrowWrap}>
+              <Text style={styles.salonReferenceCtaArrow}>→</Text>
+            </View>
+          </Pressable>
         </View>
       </View>
+
       <View style={styles.salonBottomSpacer} />
+    </View>
+  );
+}
+
+function SalonHeroMedia({ styles }: { styles: MobileStyles }) {
+  return (
+    <>
+      <View style={styles.salonHeroPhotoBackdrop} />
+      <View style={styles.salonHeroPhotoGlow} />
+      <View style={styles.salonHeroWallPanel} />
+      <View style={[styles.salonHeroGoldStrip, styles.salonHeroGoldStripOne]} />
+      <View style={[styles.salonHeroGoldStrip, styles.salonHeroGoldStripTwo]} />
+      <View style={styles.salonHeroMirrorRail}>
+        <View style={styles.salonHeroMirrorLarge} />
+        <View style={styles.salonHeroMirrorLarge} />
+        <View style={styles.salonHeroMirrorSmall} />
+      </View>
+      <View style={styles.salonHeroBottleShelf}>
+        <View style={styles.salonHeroBottleTall} />
+        <View style={styles.salonHeroBottleSmall} />
+        <View style={styles.salonHeroBottleTall} />
+        <View style={styles.salonHeroBottleSmall} />
+      </View>
+      <View style={styles.salonHeroCounter} />
+      <View style={styles.salonHeroChairOne} />
+      <View style={styles.salonHeroChairTwo} />
+      <View style={styles.salonHeroChairThree} />
+      <View style={styles.salonHeroLampOne} />
+      <View style={styles.salonHeroLampTwo} />
     </>
   );
 }
@@ -8605,11 +8658,10 @@ const createStyles = (theme: MobileTheme) =>
       transform: [{ rotate: "25deg" }],
     },
     salonActionGrid: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: 12,
+      flexDirection: "row-reverse",
+      gap: 14,
       justifyContent: "space-between",
-      marginTop: 24,
+      marginTop: 14,
     },
     salonActionIcon: {
       color: theme.colors.gold,
@@ -8618,42 +8670,56 @@ const createStyles = (theme: MobileTheme) =>
       lineHeight: 30,
     },
     salonActionIconImage: {
-      height: 24,
+      height: 29,
       tintColor: theme.colors.gold,
-      width: 24,
+      width: 29,
     },
     salonActionLabel: {
       color: theme.colors.foreground,
       fontFamily: mobileTypography.uiMedium,
-      fontSize: 12,
-      marginTop: 7,
+      fontSize: 14,
+      lineHeight: 20,
+      marginTop: 10,
     },
     salonActionTile: {
       alignItems: "center",
       backgroundColor: theme.isDark
-        ? "rgba(11, 31, 25, 0.92)"
-        : theme.colors.cardElevated,
-      borderColor: theme.colors.goldSoft,
-      borderRadius: 26,
+        ? "rgba(11, 31, 25, 0.82)"
+        : "rgba(255, 254, 248, 0.92)",
+      borderColor: theme.isDark
+        ? "rgba(255, 193, 58, 0.54)"
+        : "rgba(196, 137, 32, 0.44)",
+      borderRadius: 24,
       borderWidth: 1,
-      flexBasis: "22%",
-      flexGrow: 1,
+      elevation: theme.isDark ? 3 : 2,
+      flex: 1,
       justifyContent: "center",
-      minHeight: 86,
-      padding: 12,
+      minHeight: 104,
+      paddingHorizontal: 10,
+      paddingVertical: 16,
+      shadowColor: theme.colors.deepGold,
+      shadowOffset: { height: 10, width: 0 },
+      shadowOpacity: theme.isDark ? 0.18 : 0.08,
+      shadowRadius: 18,
     },
     salonBackButton: {
       alignItems: "center",
-      backgroundColor: theme.colors.goldSoft,
+      backgroundColor: theme.isDark
+        ? "rgba(5, 12, 10, 0.68)"
+        : "rgba(255, 253, 247, 0.9)",
       borderColor: theme.colors.gold,
-      borderRadius: 28,
+      borderRadius: 34,
       borderWidth: 1,
-      height: 58,
+      height: 68,
       justifyContent: "center",
-      left: 30,
       position: "absolute",
-      top: 34,
-      width: 58,
+      right: 30,
+      shadowColor: theme.colors.shadow,
+      shadowOffset: { height: 12, width: 0 },
+      shadowOpacity: theme.isDark ? 0.28 : 0.12,
+      shadowRadius: 18,
+      top: 66,
+      width: 68,
       zIndex: 2,
     },
     salonBackIcon: {
@@ -8665,27 +8731,20 @@ const createStyles = (theme: MobileTheme) =>
     },
     salonBackIconImage: {
       height: 28,
-      tintColor: theme.colors.deepGold,
+      tintColor: theme.isDark ? theme.colors.gold : theme.colors.foreground,
       width: 28,
     },
+    salonDetailScreen: {
+      backgroundColor: theme.isDark ? "#020805" : "#fff8ea",
+      paddingBottom: 0,
+      position: "relative",
+    },
     salonBottomCta: {
-      alignItems: "center",
-      backgroundColor: theme.colors.gold,
-      borderRadius: 999,
-      flexDirection: "row",
-      gap: 12,
-      marginHorizontal: 28,
-      marginBottom: 20,
-      marginTop: 6,
-      padding: 10,
-      paddingLeft: 18,
-      shadowColor: theme.colors.deepGold,
-      shadowOffset: { height: 16, width: 0 },
-      shadowOpacity: theme.isDark ? 0.28 : 0.12,
-      shadowRadius: 24,
+      marginTop: 20,
+      paddingBottom: 4,
     },
     salonBottomSpacer: {
-      height: 188,
+      height: 150,
     },
     salonCtaArrow: {
       alignItems: "center",
@@ -8703,20 +8762,18 @@ const createStyles = (theme: MobileTheme) =>
       marginTop: -5,
     },
     salonHero: {
-      backgroundColor: theme.isDark ? "#04100d" : "#fff2d2",
-      borderBottomColor: theme.colors.goldSoft,
-      borderBottomWidth: 1,
-      height: 338,
-      marginHorizontal: -20,
+      backgroundColor: theme.isDark ? "#020806" : "#fff7e8",
+      height: 392,
+      marginHorizontal: 0,
       overflow: "hidden",
       position: "relative",
     },
     salonHeroActions: {
       flexDirection: "row",
       gap: 14,
+      left: 30,
       position: "absolute",
-      right: 30,
-      top: 34,
+      top: 66,
       zIndex: 2,
     },
     salonHeroCaption: {
@@ -8786,56 +8843,308 @@ const createStyles = (theme: MobileTheme) =>
     salonHeroPattern: {
       alignItems: "flex-start",
       flexDirection: "row",
-      gap: 70,
+      gap: 86,
       justifyContent: "center",
       left: 0,
-      opacity: 0.9,
+      opacity: theme.isDark ? 0.7 : 0.42,
       position: "absolute",
       right: 0,
       top: 0,
+      zIndex: 2,
     },
-    salonHeroStage: {
+    salonHeroChairOne: {
       backgroundColor: theme.isDark
-        ? "rgba(91, 48, 29, 0.36)"
-        : "rgba(231, 193, 124, 0.34)",
+        ? "rgba(6, 9, 8, 0.82)"
+        : "rgba(44, 39, 34, 0.38)",
+      borderColor: "rgba(255, 193, 58, 0.36)",
+      borderRadius: 28,
+      borderWidth: 1,
+      bottom: 44,
+      height: 72,
+      position: "absolute",
+      right: 110,
+      transform: [{ rotate: "-3deg" }],
+      width: 82,
+    },
+    salonHeroChairTwo: {
+      backgroundColor: theme.isDark
+        ? "rgba(6, 9, 8, 0.72)"
+        : "rgba(44, 39, 34, 0.3)",
+      borderColor: "rgba(255, 193, 58, 0.28)",
+      borderRadius: 26,
+      borderWidth: 1,
+      bottom: 38,
+      height: 62,
+      position: "absolute",
+      right: 212,
+      transform: [{ rotate: "4deg" }],
+      width: 74,
+    },
+    salonHeroChairThree: {
+      backgroundColor: theme.isDark
+        ? "rgba(8, 12, 10, 0.66)"
+        : "rgba(50, 43, 36, 0.24)",
+      borderColor: "rgba(255, 193, 58, 0.24)",
+      borderRadius: 22,
+      borderWidth: 1,
+      bottom: 50,
+      height: 54,
+      left: 54,
+      position: "absolute",
+      transform: [{ rotate: "5deg" }],
+      width: 66,
+    },
+    salonHeroBottleShelf: {
+      alignItems: "flex-end",
+      bottom: 104,
+      flexDirection: "row",
+      gap: 9,
+      left: 26,
+      position: "absolute",
+    },
+    salonHeroBottleSmall: {
+      backgroundColor: "rgba(255, 193, 58, 0.54)",
+      borderRadius: 5,
+      height: 30,
+      width: 9,
+    },
+    salonHeroBottleTall: {
+      backgroundColor: "rgba(255, 193, 58, 0.66)",
+      borderRadius: 6,
+      height: 46,
+      width: 11,
+    },
+    salonHeroCounter: {
+      backgroundColor: theme.isDark
+        ? "rgba(15, 8, 4, 0.72)"
+        : "rgba(255, 245, 224, 0.72)",
+      borderTopColor: "rgba(255, 193, 58, 0.36)",
+      borderTopWidth: 1,
       bottom: 0,
-      height: 126,
+      height: 86,
       left: 0,
-      overflow: "hidden",
       position: "absolute",
       right: 0,
     },
+    salonHeroGoldStrip: {
+      backgroundColor: "rgba(255, 193, 58, 0.5)",
+      borderRadius: 999,
+      height: 146,
+      opacity: theme.isDark ? 0.62 : 0.42,
+      position: "absolute",
+      top: 74,
+      width: 3,
+    },
+    salonHeroGoldStripOne: {
+      left: 156,
+    },
+    salonHeroGoldStripTwo: {
+      right: 90,
+    },
+    salonHeroLampOne: {
+      backgroundColor: theme.colors.gold,
+      borderRadius: 999,
+      height: 12,
+      left: 92,
+      position: "absolute",
+      top: 118,
+      width: 12,
+    },
+    salonHeroLampTwo: {
+      backgroundColor: theme.colors.gold,
+      borderRadius: 999,
+      height: 10,
+      position: "absolute",
+      right: 168,
+      top: 96,
+      width: 10,
+    },
+    salonHeroMirrorLarge: {
+      backgroundColor: theme.isDark
+        ? "rgba(255, 193, 58, 0.06)"
+        : "rgba(255, 255, 255, 0.5)",
+      borderColor: "rgba(255, 193, 58, 0.5)",
+      borderRadius: 26,
+      borderWidth: 1,
+      height: 156,
+      width: 88,
+    },
+    salonHeroMirrorRail: {
+      bottom: 86,
+      flexDirection: "row-reverse",
+      gap: 28,
+      position: "absolute",
+      right: 32,
+    },
+    salonHeroMirrorSmall: {
+      backgroundColor: theme.isDark
+        ? "rgba(255, 193, 58, 0.05)"
+        : "rgba(255, 255, 255, 0.42)",
+      borderColor: "rgba(255, 193, 58, 0.34)",
+      borderRadius: 22,
+      borderWidth: 1,
+      height: 128,
+      width: 74,
+    },
+    salonHeroOverlay: {
+      ...StyleSheet.absoluteFill,
+      backgroundColor: theme.isDark
+        ? "rgba(0, 8, 6, 0.18)"
+        : "rgba(255, 250, 239, 0.16)",
+      zIndex: 1,
+    },
+    salonHeroPhotoBackdrop: {
+      ...StyleSheet.absoluteFill,
+      backgroundColor: theme.isDark ? "#060806" : "#fff3dc",
+    },
+    salonHeroPhotoGlow: {
+      backgroundColor: theme.isDark
+        ? "rgba(255, 193, 58, 0.18)"
+        : "rgba(255, 193, 58, 0.22)",
+      borderRadius: 999,
+      height: 280,
+      position: "absolute",
+      right: -54,
+      top: -64,
+      width: 280,
+    },
+    salonHeroWallPanel: {
+      backgroundColor: theme.isDark
+        ? "rgba(255, 193, 58, 0.045)"
+        : "rgba(255, 255, 255, 0.36)",
+      borderColor: "rgba(255, 193, 58, 0.18)",
+      borderRadius: 38,
+      borderWidth: 1,
+      height: 206,
+      left: 22,
+      position: "absolute",
+      right: 22,
+      top: 86,
+    },
+    salonHeroStage: {
+      ...StyleSheet.absoluteFill,
+      backgroundColor: theme.isDark ? "#050b08" : "#fff8ea",
+      overflow: "hidden",
+    },
+    salonFrameCorner: {
+      borderColor: theme.colors.gold,
+      borderRadius: 24,
+      borderWidth: 1,
+      height: 86,
+      opacity: theme.isDark ? 0.36 : 0.28,
+      position: "absolute",
+      width: 86,
+      zIndex: 2,
+    },
+    salonFrameCornerCardLeft: {
+      borderRightWidth: 0,
+      bottom: 26,
+      left: -40,
+      opacity: theme.isDark ? 0.28 : 0.22,
+    },
+    salonFrameCornerCardRight: {
+      borderLeftWidth: 0,
+      bottom: 26,
+      opacity: theme.isDark ? 0.28 : 0.22,
+      right: -40,
+    },
+    salonFrameCornerTopLeft: {
+      borderBottomWidth: 0,
+      borderRightWidth: 0,
+      left: -22,
+      top: 18,
+    },
+    salonFrameCornerTopRight: {
+      borderBottomWidth: 0,
+      borderLeftWidth: 0,
+      right: -22,
+      top: 18,
+    },
     salonInfoCard: {
-      backgroundColor: theme.isDark ? "#020a08" : theme.colors.background,
+      backgroundColor: theme.isDark
+        ? "rgba(3, 14, 10, 0.96)"
+        : "rgba(255, 253, 247, 0.96)",
+      borderColor: theme.colors.goldSoft,
+      borderTopLeftRadius: 48,
+      borderTopRightRadius: 48,
+      borderWidth: 1,
       gap: 0,
-      paddingHorizontal: 28,
-      paddingTop: 20,
+      marginHorizontal: 20,
+      marginTop: -76,
+      overflow: "hidden",
+      paddingBottom: 26,
+      paddingHorizontal: 22,
+      paddingTop: 30,
+      position: "relative",
+      shadowColor: theme.colors.deepGold,
+      shadowOffset: { height: 18, width: 0 },
+      shadowOpacity: theme.isDark ? 0.26 : 0.13,
+      shadowRadius: 28,
     },
     salonLikes: {
+      alignItems: "center",
+      alignSelf: "flex-start",
+      backgroundColor: theme.isDark
+        ? "rgba(255, 193, 58, 0.1)"
+        : "rgba(255, 247, 229, 0.92)",
       borderColor: theme.colors.gold,
       borderRadius: theme.radii.pill,
       borderWidth: 1,
-      color: theme.colors.gold,
-      fontFamily: mobileTypography.uiSemiBold,
-      fontSize: 16,
+      flexDirection: "row",
+      gap: 9,
+      height: 50,
+      marginTop: 12,
       overflow: "hidden",
       paddingHorizontal: 18,
-      paddingVertical: 10,
+    },
+    salonLikesHeart: {
+      color: theme.colors.gold,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: 22,
+      lineHeight: 28,
+    },
+    salonLikesText: {
+      color: theme.isDark ? theme.colors.gold : theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: 22,
+      lineHeight: 28,
     },
     salonMeta: {
       color: theme.colors.mutedForeground,
       fontFamily: mobileTypography.uiRegular,
-      fontSize: 16,
-      lineHeight: 24,
+      fontSize: 17,
+      lineHeight: 25,
       marginTop: 6,
+      textAlign: "right",
     },
     salonName: {
       color: theme.colors.foreground,
       fontFamily: mobileTypography.kufiBold,
       flexShrink: 1,
-      fontSize: 31,
+      fontSize: 32,
       letterSpacing: -0.7,
-      lineHeight: 40,
+      lineHeight: 42,
+      textAlign: "right",
+    },
+    salonIdentityBlock: {
+      alignItems: "flex-end",
+      maxWidth: "62%",
+      minWidth: 0,
+      position: "absolute",
+      right: 0,
+      top: 0,
+    },
+    salonMetricsBlock: {
+      alignItems: "flex-start",
+      left: 0,
+      minWidth: 124,
+      position: "absolute",
+      top: 4,
+    },
+    salonRatingBlock: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 12,
     },
     salonRatingRow: {
       alignItems: "center",
@@ -8849,24 +9158,31 @@ const createStyles = (theme: MobileTheme) =>
       fontSize: 23,
     },
     salonRatingStarImage: {
-      height: 22,
+      height: 28,
       tintColor: theme.colors.gold,
-      width: 22,
+      width: 28,
     },
     salonRatingText: {
       color: theme.colors.foreground,
       fontFamily: mobileTypography.uiSemiBold,
-      fontSize: 18,
+      fontSize: 23,
+      lineHeight: 31,
     },
     salonRoundButton: {
       alignItems: "center",
-      backgroundColor: theme.colors.goldSoft,
+      backgroundColor: theme.isDark
+        ? "rgba(5, 12, 10, 0.7)"
+        : "rgba(255, 253, 247, 0.92)",
       borderColor: theme.colors.gold,
-      borderRadius: 31,
+      borderRadius: 34,
       borderWidth: 1,
-      height: 58,
+      height: 68,
       justifyContent: "center",
-      width: 58,
+      shadowColor: theme.colors.shadow,
+      shadowOffset: { height: 12, width: 0 },
+      shadowOpacity: theme.isDark ? 0.24 : 0.12,
+      shadowRadius: 18,
+      width: 68,
     },
     salonRoundButtonText: {
       color: theme.colors.foreground,
@@ -8875,25 +9191,27 @@ const createStyles = (theme: MobileTheme) =>
       lineHeight: 34,
     },
     salonRoundButtonIcon: {
-      height: 28,
-      tintColor: theme.colors.deepGold,
-      width: 28,
+      height: 30,
+      tintColor: theme.isDark ? theme.colors.gold : theme.colors.foreground,
+      width: 30,
     },
     salonServiceAdd: {
       alignItems: "center",
-      backgroundColor: theme.colors.gold,
-      borderColor: theme.colors.accent,
-      borderRadius: 22,
+      backgroundColor: "transparent",
+      borderColor: theme.colors.gold,
+      borderRadius: 28,
       borderWidth: 1,
-      height: 44,
+      flexShrink: 0,
+      height: 56,
       justifyContent: "center",
-      width: 44,
+      width: 56,
     },
     salonServiceAddText: {
-      color: theme.colors.foregroundInverse,
+      color: theme.colors.gold,
       fontFamily: mobileTypography.uiSemiBold,
-      fontSize: 28,
-      lineHeight: 30,
+      fontSize: 36,
+      lineHeight: 39,
+      marginTop: -3,
     },
     salonServiceActionBlock: {
       alignItems: "center",
@@ -8915,6 +9233,7 @@ const createStyles = (theme: MobileTheme) =>
       flex: 1,
       flexShrink: 1,
       minWidth: 0,
+      paddingHorizontal: 4,
     },
     salonServiceMain: {
       alignItems: "center",
@@ -8924,82 +9243,133 @@ const createStyles = (theme: MobileTheme) =>
       minWidth: 0,
     },
     salonServiceMedia: {
+      borderColor: theme.isDark
+        ? "rgba(255, 193, 58, 0.38)"
+        : "rgba(196, 137, 32, 0.28)",
       borderRadius: 18,
-      height: 64,
+      borderWidth: 1,
+      flexShrink: 0,
+      height: 88,
       overflow: "hidden",
-      width: 86,
+      width: 116,
     },
     salonServiceMeta: {
       color: theme.colors.mutedForeground,
       fontFamily: mobileTypography.uiRegular,
-      fontSize: 13,
-      lineHeight: 19,
-      marginTop: 5,
+      fontSize: 17,
+      lineHeight: 24,
+      marginTop: 8,
+      textAlign: "right",
     },
     salonServiceName: {
       color: theme.colors.foreground,
-      fontFamily: mobileTypography.uiSemiBold,
-      fontSize: 21,
-      lineHeight: 29,
+      fontFamily: mobileTypography.kufiBold,
+      fontSize: 22,
+      lineHeight: 30,
+      textAlign: "right",
     },
     salonServicePrice: {
-      color: theme.colors.gold,
+      color: theme.colors.foreground,
       fontFamily: mobileTypography.uiSemiBold,
-      fontSize: 15,
-      lineHeight: 21,
-      textAlign: "center",
+      fontSize: 21,
+      lineHeight: 28,
+      marginTop: 4,
+      textAlign: "right",
     },
     salonServiceRow: {
       alignItems: "center",
-      flexDirection: "row-reverse",
+      flexDirection: "row",
       backgroundColor: theme.isDark
-        ? "rgba(8, 27, 21, 0.94)"
-        : theme.colors.cardElevated,
-      borderColor: theme.colors.goldSoft,
-      borderRadius: 28,
+        ? "rgba(8, 27, 21, 0.78)"
+        : "rgba(255, 255, 251, 0.92)",
+      borderColor: theme.isDark
+        ? "rgba(255, 193, 58, 0.48)"
+        : "rgba(196, 137, 32, 0.36)",
+      borderRadius: 24,
       borderWidth: 1,
-      gap: 12,
+      elevation: theme.isDark ? 3 : 2,
+      gap: 16,
       justifyContent: "space-between",
-      padding: 14,
-      shadowColor: theme.colors.shadow,
+      padding: 12,
+      shadowColor: theme.colors.deepGold,
       shadowOffset: { height: 12, width: 0 },
-      shadowOpacity: theme.isDark ? 0.16 : 0.05,
-      shadowRadius: 18,
+      shadowOpacity: theme.isDark ? 0.2 : 0.08,
+      shadowRadius: 22,
     },
     salonServicesList: {
-      gap: 12,
-      paddingHorizontal: 28,
-      paddingTop: 24,
-      paddingBottom: 14,
+      gap: 14,
+      paddingBottom: 4,
+      paddingHorizontal: 0,
+      paddingTop: 20,
     },
     salonTabs: {
-      flexDirection: "row",
+      borderBottomColor: theme.colors.border,
+      borderBottomWidth: 1,
+      flexDirection: "row-reverse",
       justifyContent: "space-between",
-      marginTop: 34,
+      marginTop: 32,
     },
     salonTabText: {
       color: theme.colors.mutedForeground,
       fontFamily: mobileTypography.uiMedium,
-      fontSize: 15,
-      paddingBottom: 14,
+      fontSize: 16,
+      lineHeight: 23,
+      paddingBottom: 16,
+      textAlign: "center",
     },
     salonTabTextActive: {
       borderBottomColor: theme.colors.gold,
-      borderBottomWidth: 5,
+      borderBottomWidth: 4,
       color: theme.colors.gold,
     },
     salonTitleRow: {
-      alignItems: "flex-start",
-      flexDirection: "row",
-      gap: 16,
-      justifyContent: "space-between",
+      minHeight: 112,
+      position: "relative",
+      width: "100%",
     },
     salonVerifiedRow: {
       alignItems: "center",
-      flexDirection: "row",
+      flexDirection: "row-reverse",
       flexWrap: "wrap",
       gap: 10,
       justifyContent: "flex-end",
+    },
+    salonReferenceCta: {
+      alignItems: "center",
+      backgroundColor: theme.colors.gold,
+      borderRadius: theme.radii.pill,
+      minHeight: 70,
+      justifyContent: "center",
+      overflow: "hidden",
+      position: "relative",
+      shadowColor: theme.colors.deepGold,
+      shadowOffset: { height: 16, width: 0 },
+      shadowOpacity: theme.isDark ? 0.32 : 0.16,
+      shadowRadius: 26,
+    },
+    salonReferenceCtaArrow: {
+      color: theme.colors.foregroundInverse,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: 36,
+      lineHeight: 40,
+      textAlign: "center",
+    },
+    salonReferenceCtaArrowWrap: {
+      alignItems: "center",
+      bottom: 0,
+      justifyContent: "center",
+      left: 26,
+      position: "absolute",
+      top: 0,
+      width: 42,
+      zIndex: 1,
+    },
+    salonReferenceCtaText: {
+      color: theme.colors.foregroundInverse,
+      fontFamily: mobileTypography.kufiBold,
+      fontSize: 24,
+      lineHeight: 32,
+      textAlign: "center",
     },
     searchMapBoundaryCard: {
       backgroundColor: theme.colors.cardElevated,
