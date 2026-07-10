@@ -367,12 +367,12 @@ const paymentMethodOptions: BookingPaymentOption[] = [
   {
     id: "apple-pay",
     label: "Apple Pay",
-    meta: "زر بصري فقط بدون تكامل دفع",
+    meta: "( قريباً )",
   },
   {
     id: "card",
-    label: "بطاقة الائتمان / مدى",
-    meta: "لا يتم إدخال أو حفظ بيانات بطاقة",
+    label: "بطاقة الائتمان",
+    meta: "( قريباً )",
   },
   {
     id: "bank",
@@ -3217,18 +3217,85 @@ function PaymentMethodStep({
   styles: MobileStyles;
   time: BookingTimeOption;
 }) {
-  return (
-    <View style={styles.bookingStepScreen}>
-      <BookingFlowHeader
-        isRtl={isRtl}
-        onBack={onBack}
-        stepLabel="04 من 04"
-        styles={styles}
-        subtitle="اختيار طريقة الدفع مرئي فقط ولا يضيف أي تكامل دفع."
-        title="طريقة الدفع"
-      />
+  const displayBusinessName = business.name || "Noura Beauty Lounge";
+  const displayStaffName = staff.id === "any" ? "بدون تفضيل" : staff.name;
+  const paymentIconContent: Record<string, string> = {
+    "apple-pay": "Pay",
+    bank: "▥",
+    card: "▰",
+    venue: "▣",
+  };
+  const paymentSummaryRows = [
+    {
+      icon: mobileIconAssets.categories.spa,
+      label: "النشاط",
+      value: displayBusinessName,
+    },
+    {
+      icon: mobileIconAssets.categories.salon,
+      label: "الخدمة",
+      value: `${service.name} • ${service.price}`,
+    },
+    {
+      iconText: "♙",
+      label: "المختص",
+      value: displayStaffName,
+    },
+    {
+      icon: mobileIconAssets.common.calendar,
+      label: "الموعد",
+      value: `${date.day} ${date.label} • ${time.label}`,
+    },
+  ];
 
-      <View style={styles.paymentOptionList}>
+  return (
+    <View style={styles.paymentReferenceScreen}>
+      <View style={styles.staffReferenceGlow} />
+      <View style={styles.paymentReferenceHeader}>
+        <Pressable
+          accessibilityHint="يعود إلى اختيار التاريخ والوقت."
+          accessibilityLabel="رجوع"
+          accessibilityRole="button"
+          hitSlop={TOUCH_HIT_SLOP}
+          onPress={onBack}
+          style={({ pressed }) => [
+            styles.paymentReferenceBackButton,
+            pressed && styles.iconButtonPressed,
+          ]}
+        >
+          <Image
+            alt="رجوع"
+            resizeMode="contain"
+            source={mobileIconAssets.common.backArrowRtl}
+            style={styles.paymentReferenceBackIcon}
+          />
+        </Pressable>
+        <View style={styles.paymentReferenceProgressBlock}>
+          <Text style={styles.paymentReferenceStepText}>04 من 04</Text>
+          <View style={styles.staffReferenceProgressTrack}>
+            {[0, 1, 2, 3].map((item) => (
+              <View
+                key={item}
+                style={[
+                  styles.staffReferenceProgressSegment,
+                  item < 4 && styles.staffReferenceProgressSegmentActive,
+                ]}
+              />
+            ))}
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.paymentReferenceHeroCopy}>
+        <Text style={[styles.paymentReferenceTitle, isRtl && styles.rtlText]}>
+          طريقة الدفع
+        </Text>
+        <Text style={[styles.paymentReferenceSubtitle, isRtl && styles.rtlText]}>
+          اختر طريقة الدفع المناسبة. لا يتم تحصيل أي مبلغ إلا وفق الطريقة المحددة.
+        </Text>
+      </View>
+
+      <View style={styles.paymentReferenceList}>
         {paymentMethodOptions.map((item) => {
           const selected = item.id === payment.id;
 
@@ -3241,69 +3308,98 @@ function PaymentMethodStep({
               key={item.id}
               onPress={() => onPaymentSelect(item)}
               style={({ pressed }) => [
-                styles.paymentMethodCard,
-                selected && styles.paymentMethodCardActive,
+                styles.paymentReferenceMethodCard,
+                selected && styles.paymentReferenceMethodCardActive,
                 pressed && styles.softButtonPressed,
               ]}
             >
-              <View style={styles.paymentMethodIcon}>
-                <Image
-                  alt=""
-                  resizeMode="contain"
-                  source={mobileIconAssets.common.paymentCard}
-                  style={styles.paymentMethodIconImage}
-                />
+              <View style={styles.paymentReferenceRadio}>
+                {selected ? <View style={styles.paymentReferenceRadioDot} /> : null}
               </View>
-              <View style={styles.rowCopy}>
-                <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>
+
+              <View style={styles.paymentReferenceMethodCopy}>
+                <Text style={[styles.paymentReferenceMethodTitle, isRtl && styles.rtlText]}>
                   {item.label}
                 </Text>
-                <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>
+                <Text style={[styles.paymentReferenceMethodMeta, isRtl && styles.rtlText]}>
                   {item.meta}
                 </Text>
               </View>
-              <View
-                style={[
-                  styles.bookingRadio,
-                  selected && styles.bookingRadioActive,
-                ]}
-              >
-                {selected ? <View style={styles.bookingRadioDot} /> : null}
+
+              <View style={styles.paymentReferenceIconBox}>
+                {item.id === "card" ? (
+                  <Image
+                    alt=""
+                    resizeMode="contain"
+                    source={mobileIconAssets.common.paymentCard}
+                    style={styles.paymentReferenceIconImage}
+                  />
+                ) : (
+                  <Text style={styles.paymentReferenceIconText}>
+                    {paymentIconContent[item.id] ?? "▣"}
+                  </Text>
+                )}
               </View>
             </Pressable>
           );
         })}
       </View>
 
-      <BookingMiniSummary
-        business={business}
-        date={date}
-        isRtl={isRtl}
-        payment={payment}
-        service={service}
-        staff={staff}
-        styles={styles}
-        time={time}
-      />
+      <View style={styles.paymentSummaryCard}>
+        <View style={styles.paymentSummaryTitleRow}>
+          <Text style={styles.paymentSummaryTitle}>ملخص الحجز</Text>
+          <Text style={styles.paymentSummaryTitleIcon}>☷</Text>
+        </View>
+        <View style={styles.paymentSummaryRows}>
+          {paymentSummaryRows.map((row) => (
+            <View key={row.label} style={styles.paymentSummaryRow}>
+              <Text style={styles.paymentSummaryLabel}>{row.label}</Text>
+              <Text style={[styles.paymentSummaryValue, isRtl && styles.rtlText]}>
+                {row.value}
+              </Text>
+              <View style={styles.paymentSummaryIconBox}>
+                {row.icon ? (
+                  <Image
+                    alt=""
+                    resizeMode="contain"
+                    source={row.icon}
+                    style={styles.paymentSummaryIconImage}
+                  />
+                ) : (
+                  <Text style={styles.paymentSummaryIconText}>{row.iconText}</Text>
+                )}
+              </View>
+            </View>
+          ))}
+        </View>
+      </View>
 
-      <View style={styles.securePaymentCard}>
+      <View style={styles.paymentReferenceTrustBar}>
         <Image
           alt=""
           resizeMode="contain"
           source={mobileIconAssets.common.checkSuccess}
-          style={styles.securePaymentIconImage}
+          style={styles.paymentReferenceTrustIcon}
         />
-        <Text style={[styles.securePaymentText, isRtl && styles.rtlText]}>
-          عملية دفع آمنة ومشفرة — عرض بصري فقط بدون أي معالجة حقيقية.
+        <Text style={[styles.paymentReferenceTrustText, isRtl && styles.rtlText]}>
+          الدفع في الموقع • عملية دفع آمنة ومشفرة بصرياً فقط
         </Text>
       </View>
 
-      <View style={styles.bookingBottomAction}>
-        <PrimaryButton
-          label={payment.id === "venue" ? "تأكيد الحجز" : "ادفع الآن"}
+      <View style={styles.paymentReferenceBottomAction}>
+        <Pressable
+          accessibilityHint="ينتقل إلى شاشة التأكيد المحلية بدون أي معالجة دفع حقيقية."
+          accessibilityLabel="تأكيد الحجز"
+          accessibilityRole="button"
+          hitSlop={TOUCH_HIT_SLOP}
           onPress={onConfirm}
-          styles={styles}
-        />
+          style={({ pressed }) => [
+            styles.paymentReferenceCta,
+            pressed && styles.primaryButtonPressed,
+          ]}
+        >
+          <Text style={styles.paymentReferenceCtaText}>تأكيد الحجز</Text>
+        </Pressable>
       </View>
     </View>
   );
@@ -11422,6 +11518,313 @@ const createStyles = (theme: MobileTheme) =>
     dateTimeBottomAction: {
       gap: 10,
       paddingBottom: 42,
+    },
+    paymentReferenceScreen: {
+      backgroundColor: theme.isDark ? "#020805" : "#fff8ea",
+      gap: 16,
+      minHeight: "100%",
+      overflow: "hidden",
+      paddingBottom: 228,
+      paddingHorizontal: 20,
+      paddingTop: 34,
+      position: "relative",
+    },
+    paymentReferenceHeader: {
+      alignItems: "center",
+      height: 70,
+      position: "relative",
+      zIndex: 1,
+    },
+    paymentReferenceBackButton: {
+      alignItems: "center",
+      backgroundColor: theme.isDark
+        ? "rgba(5, 12, 10, 0.72)"
+        : "rgba(255, 253, 247, 0.92)",
+      borderColor: theme.colors.gold,
+      borderRadius: 31,
+      borderWidth: 1.5,
+      height: 62,
+      justifyContent: "center",
+      position: "absolute",
+      right: 0,
+      shadowColor: theme.colors.deepGold,
+      shadowOffset: { height: 12, width: 0 },
+      shadowOpacity: theme.isDark ? 0.22 : 0.1,
+      shadowRadius: 22,
+      top: 0,
+      width: 62,
+    },
+    paymentReferenceBackIcon: {
+      height: 32,
+      tintColor: theme.colors.gold,
+      width: 32,
+    },
+    paymentReferenceProgressBlock: {
+      alignItems: "flex-start",
+      gap: 8,
+      left: 0,
+      position: "absolute",
+      top: 7,
+    },
+    paymentReferenceStepText: {
+      color: theme.colors.gold,
+      fontFamily: mobileTypography.uiBold,
+      fontSize: 17,
+      lineHeight: 23,
+      textAlign: "left",
+    },
+    paymentReferenceHeroCopy: {
+      alignItems: "flex-end",
+      gap: 7,
+      marginTop: 4,
+    },
+    paymentReferenceTitle: {
+      color: theme.colors.foreground,
+      fontFamily: mobileTypography.kufiBold,
+      fontSize: 36,
+      letterSpacing: -0.6,
+      lineHeight: 48,
+      textAlign: "right",
+    },
+    paymentReferenceSubtitle: {
+      color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: 16,
+      lineHeight: 25,
+      textAlign: "right",
+    },
+    paymentReferenceList: {
+      gap: 11,
+      marginTop: 8,
+    },
+    paymentReferenceMethodCard: {
+      alignItems: "center",
+      backgroundColor: theme.isDark
+        ? "rgba(8, 27, 21, 0.78)"
+        : "rgba(255, 255, 251, 0.92)",
+      borderColor: theme.isDark
+        ? "rgba(255, 193, 58, 0.28)"
+        : "rgba(196, 137, 32, 0.22)",
+      borderRadius: 26,
+      borderWidth: 1,
+      flexDirection: "row",
+      gap: 16,
+      minHeight: 88,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      shadowColor: theme.colors.shadow,
+      shadowOffset: { height: 12, width: 0 },
+      shadowOpacity: theme.isDark ? 0.18 : 0.06,
+      shadowRadius: 22,
+    },
+    paymentReferenceMethodCardActive: {
+      borderColor: theme.colors.gold,
+      borderWidth: 1.5,
+      shadowColor: theme.colors.deepGold,
+      shadowOpacity: theme.isDark ? 0.3 : 0.16,
+      shadowRadius: 26,
+    },
+    paymentReferenceRadio: {
+      alignItems: "center",
+      borderColor: theme.colors.mutedForeground,
+      borderRadius: 16,
+      borderWidth: 2,
+      height: 32,
+      justifyContent: "center",
+      width: 32,
+    },
+    paymentReferenceRadioDot: {
+      backgroundColor: theme.colors.gold,
+      borderRadius: 11,
+      height: 22,
+      width: 22,
+    },
+    paymentReferenceMethodCopy: {
+      alignItems: "flex-end",
+      flex: 1,
+      gap: 4,
+      minWidth: 0,
+    },
+    paymentReferenceMethodTitle: {
+      color: theme.colors.foreground,
+      fontFamily: mobileTypography.kufiBold,
+      fontSize: 21,
+      lineHeight: 29,
+      textAlign: "right",
+    },
+    paymentReferenceMethodMeta: {
+      color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: 14,
+      lineHeight: 22,
+      textAlign: "right",
+    },
+    paymentReferenceIconBox: {
+      alignItems: "center",
+      backgroundColor: theme.isDark
+        ? "rgba(255, 193, 58, 0.08)"
+        : "rgba(255, 219, 137, 0.26)",
+      borderColor: theme.colors.gold,
+      borderRadius: 17,
+      borderWidth: 1.3,
+      height: 56,
+      justifyContent: "center",
+      shadowColor: theme.colors.deepGold,
+      shadowOffset: { height: 8, width: 0 },
+      shadowOpacity: theme.isDark ? 0.22 : 0.1,
+      shadowRadius: 14,
+      width: 56,
+    },
+    paymentReferenceIconImage: {
+      height: 28,
+      tintColor: theme.colors.gold,
+      width: 28,
+    },
+    paymentReferenceIconText: {
+      color: theme.colors.gold,
+      fontFamily: mobileTypography.uiBold,
+      fontSize: 22,
+      lineHeight: 28,
+      textAlign: "center",
+    },
+    paymentSummaryCard: {
+      backgroundColor: theme.isDark
+        ? "rgba(8, 27, 21, 0.8)"
+        : "rgba(255, 255, 251, 0.94)",
+      borderColor: theme.isDark
+        ? "rgba(255, 193, 58, 0.34)"
+        : "rgba(196, 137, 32, 0.28)",
+      borderRadius: 28,
+      borderWidth: 1,
+      gap: 16,
+      paddingHorizontal: 18,
+      paddingVertical: 18,
+      shadowColor: theme.colors.deepGold,
+      shadowOffset: { height: 14, width: 0 },
+      shadowOpacity: theme.isDark ? 0.2 : 0.08,
+      shadowRadius: 24,
+    },
+    paymentSummaryTitleRow: {
+      alignItems: "center",
+      flexDirection: "row-reverse",
+      gap: 11,
+      justifyContent: "flex-start",
+    },
+    paymentSummaryTitle: {
+      color: theme.colors.gold,
+      fontFamily: mobileTypography.kufiBold,
+      fontSize: 21,
+      lineHeight: 30,
+      textAlign: "right",
+    },
+    paymentSummaryTitleIcon: {
+      color: theme.colors.gold,
+      fontFamily: mobileTypography.uiBold,
+      fontSize: 22,
+      lineHeight: 27,
+    },
+    paymentSummaryRows: {
+      gap: 10,
+    },
+    paymentSummaryRow: {
+      alignItems: "center",
+      backgroundColor: theme.isDark
+        ? "rgba(5, 18, 15, 0.72)"
+        : "rgba(255, 251, 242, 0.9)",
+      borderColor: theme.isDark
+        ? "rgba(255, 193, 58, 0.24)"
+        : "rgba(196, 137, 32, 0.18)",
+      borderRadius: 15,
+      borderWidth: 1,
+      flexDirection: "row-reverse",
+      gap: 13,
+      minHeight: 60,
+      paddingHorizontal: 14,
+      paddingVertical: 11,
+    },
+    paymentSummaryLabel: {
+      color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: 14,
+      lineHeight: 21,
+      minWidth: 78,
+      textAlign: "right",
+    },
+    paymentSummaryValue: {
+      color: theme.colors.foreground,
+      flex: 1,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: 16,
+      lineHeight: 24,
+      textAlign: "right",
+    },
+    paymentSummaryIconBox: {
+      alignItems: "center",
+      borderColor: theme.colors.goldSoft,
+      borderRadius: 12,
+      borderWidth: 1,
+      height: 40,
+      justifyContent: "center",
+      width: 40,
+    },
+    paymentSummaryIconImage: {
+      height: 23,
+      tintColor: theme.colors.gold,
+      width: 23,
+    },
+    paymentSummaryIconText: {
+      color: theme.colors.gold,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: 20,
+      lineHeight: 24,
+    },
+    paymentReferenceTrustBar: {
+      alignItems: "center",
+      backgroundColor: theme.isDark
+        ? "rgba(11, 62, 39, 0.44)"
+        : "rgba(218, 255, 232, 0.7)",
+      borderColor: theme.colors.success,
+      borderRadius: 20,
+      borderWidth: 1,
+      flexDirection: "row-reverse",
+      gap: 10,
+      minHeight: 58,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+    },
+    paymentReferenceTrustIcon: {
+      height: 24,
+      tintColor: theme.colors.success,
+      width: 24,
+    },
+    paymentReferenceTrustText: {
+      color: theme.colors.success,
+      flex: 1,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: 15,
+      lineHeight: 23,
+      textAlign: "right",
+    },
+    paymentReferenceBottomAction: {
+      paddingBottom: 42,
+    },
+    paymentReferenceCta: {
+      alignItems: "center",
+      backgroundColor: theme.colors.gold,
+      borderRadius: theme.radii.pill,
+      justifyContent: "center",
+      minHeight: 64,
+      shadowColor: theme.colors.deepGold,
+      shadowOffset: { height: 14, width: 0 },
+      shadowOpacity: theme.isDark ? 0.3 : 0.14,
+      shadowRadius: 24,
+    },
+    paymentReferenceCtaText: {
+      color: theme.colors.foregroundInverse,
+      fontFamily: mobileTypography.kufiBold,
+      fontSize: 22,
+      lineHeight: 31,
+      textAlign: "center",
     },
     staffAvatar: {
       alignItems: "center",
