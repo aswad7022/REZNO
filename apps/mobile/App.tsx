@@ -68,6 +68,34 @@ type PremiumBusiness = {
 
 type BookingFlowStepId = "staff" | "datetime" | "payment" | "confirmation";
 
+type BookingMethodId = "rezno-pick" | "manual";
+
+type BookingPaymentMethodId =
+  | "apple-pay"
+  | "bank-transfer"
+  | "card"
+  | "pay-on-site";
+
+type BookingServiceOption = {
+  duration: string;
+  name: string;
+  price: string;
+  tag: string;
+};
+
+type BookingDraft = {
+  bookingMethod: BookingMethodId;
+  businessName: string;
+  dateLabel: string;
+  paymentMethod: BookingPaymentMethodId;
+  selectedDateId: string;
+  selectedTimeId: string;
+  serviceName: string;
+  servicePrice: string;
+  specialistName: string;
+  timeLabel: string;
+};
+
 type BookingStaffOption = {
   experience: string;
   id: string;
@@ -90,7 +118,7 @@ type BookingTimeOption = {
 };
 
 type BookingPaymentOption = {
-  id: string;
+  id: BookingPaymentMethodId;
   label: string;
   meta: string;
 };
@@ -298,10 +326,31 @@ const newOnReznoItems = [
   },
 ];
 
-const services = [
+const services: BookingServiceOption[] = [
   { duration: "45 دقيقة", name: "قص وتصفيف", price: "25,000 د.ع", tag: "الأكثر طلباً" },
   { duration: "60 دقيقة", name: "عناية بشرة", price: "35,000 د.ع", tag: "عناية فاخرة" },
   { duration: "90 دقيقة", name: "باقة فاخرة", price: "55,000 د.ع", tag: "VIP" },
+];
+
+const salonReferenceServices: BookingServiceOption[] = [
+  {
+    duration: "30 دقيقة",
+    name: "قص شعر",
+    price: "250 TL",
+    tag: "رائج",
+  },
+  {
+    duration: "45 دقيقة",
+    name: "حلاقة + دقن",
+    price: "350 TL",
+    tag: "مميز",
+  },
+  {
+    duration: "20 دقيقة",
+    name: "تشذيب بارز",
+    price: "150 TL",
+    tag: "سريع",
+  },
 ];
 
 const bookingStaffOptions: BookingStaffOption[] = [
@@ -375,16 +424,69 @@ const paymentMethodOptions: BookingPaymentOption[] = [
     meta: "( قريباً )",
   },
   {
-    id: "bank",
+    id: "bank-transfer",
     label: "تحويل بنكي",
     meta: "تعليمات دفع تجريبية فقط",
   },
   {
-    id: "venue",
+    id: "pay-on-site",
     label: "الدفع في الموقع",
     meta: "تأكيد بصري بدون تحصيل",
   },
 ];
+
+const formatBookingDateLabel = (date: BookingDateOption) =>
+  `${date.day} ${date.label}`;
+
+const createInitialBookingDraft = (): BookingDraft => ({
+  bookingMethod: "rezno-pick",
+  businessName: "Noura Beauty Lounge",
+  dateLabel: formatBookingDateLabel(bookingDateOptions[0]),
+  paymentMethod: "pay-on-site",
+  selectedDateId: bookingDateOptions[0].id,
+  selectedTimeId: bookingTimeOptions[7].id,
+  serviceName: salonReferenceServices[0].name,
+  servicePrice: salonReferenceServices[0].price,
+  specialistName: bookingStaffOptions[0].name,
+  timeLabel: bookingTimeOptions[7].label,
+});
+
+const resolveDraftService = (draft: BookingDraft): BookingServiceOption => {
+  const matchingService =
+    salonReferenceServices.find(
+      (service) =>
+        service.name === draft.serviceName &&
+        service.price === draft.servicePrice,
+    ) ?? services.find((service) => service.name === draft.serviceName);
+
+  return {
+    ...(matchingService ?? salonReferenceServices[0]),
+    name: draft.serviceName,
+    price: draft.servicePrice,
+  };
+};
+
+const resolveDraftStaff = (draft: BookingDraft) =>
+  bookingStaffOptions.find((staff) => staff.name === draft.specialistName) ??
+  bookingStaffOptions[0];
+
+const resolveDraftDate = (draft: BookingDraft) =>
+  bookingDateOptions.find((date) => date.id === draft.selectedDateId) ??
+  bookingDateOptions.find(
+    (date) => formatBookingDateLabel(date) === draft.dateLabel,
+  ) ??
+  bookingDateOptions[0];
+
+const resolveDraftTime = (draft: BookingDraft) =>
+  bookingTimeOptions.find((time) => time.id === draft.selectedTimeId) ??
+  bookingTimeOptions.find(
+    (time) => time.label === draft.timeLabel && time.state !== "booked",
+  ) ??
+  bookingTimeOptions[7];
+
+const resolveDraftPayment = (draft: BookingDraft) =>
+  paymentMethodOptions.find((payment) => payment.id === draft.paymentMethod) ??
+  paymentMethodOptions[3];
 
 const onboardingHighlights = [
   "حجوزات",
@@ -660,18 +762,8 @@ export default function App() {
     useState<PremiumBusiness | null>(null);
   const [bookingFlowStep, setBookingFlowStep] =
     useState<BookingFlowStepId | null>(null);
-  const [selectedBookingService] = useState(services[0]);
-  const [selectedStaff, setSelectedStaff] = useState<BookingStaffOption>(
-    bookingStaffOptions[0],
-  );
-  const [selectedDate, setSelectedDate] = useState<BookingDateOption>(
-    bookingDateOptions[0],
-  );
-  const [selectedTime, setSelectedTime] = useState<BookingTimeOption>(
-    bookingTimeOptions[7],
-  );
-  const [selectedPayment, setSelectedPayment] = useState<BookingPaymentOption>(
-    paymentMethodOptions[3],
+  const [bookingDraft, setBookingDraft] = useState<BookingDraft>(
+    createInitialBookingDraft,
   );
   const [bookingFilter, setBookingFilter] =
     useState<BookingListFilter>("upcoming");
@@ -695,31 +787,50 @@ export default function App() {
   const styles = useMemo(() => createStyles(theme), [theme]);
   const text = labels[locale];
   const isRtl = getTextDirection(locale) === "rtl";
+  const selectedBookingService = useMemo(
+    () => resolveDraftService(bookingDraft),
+    [bookingDraft],
+  );
+  const selectedStaff = useMemo(
+    () => resolveDraftStaff(bookingDraft),
+    [bookingDraft],
+  );
+  const selectedDate = useMemo(
+    () => resolveDraftDate(bookingDraft),
+    [bookingDraft],
+  );
+  const selectedTime = useMemo(
+    () => resolveDraftTime(bookingDraft),
+    [bookingDraft],
+  );
+  const selectedPayment = useMemo(
+    () => resolveDraftPayment(bookingDraft),
+    [bookingDraft],
+  );
   const confirmedVisualBooking = useMemo<VisualBooking>(
     () => ({
-      businessName: selectedBusiness?.name ?? "Noura Beauty Lounge",
+      businessName: bookingDraft.businessName,
       category: selectedBusiness?.category ?? "صالون وتجميل",
-      date: `${selectedDate.day} ${selectedDate.label}`,
+      date: bookingDraft.dateLabel,
       id: "visual-confirmed-booking",
       paymentMethod: selectedPayment.label,
-      price: selectedBookingService.price,
+      price: bookingDraft.servicePrice,
       reference: "REZNO-2406",
-      serviceName: selectedBookingService.name,
-      staff: selectedStaff.name,
+      serviceName: bookingDraft.serviceName,
+      staff: bookingDraft.specialistName,
       status: "confirmed",
       statusLabel: "مؤكد",
-      time: selectedTime.label,
+      time: bookingDraft.timeLabel,
     }),
     [
-      selectedBookingService.name,
-      selectedBookingService.price,
+      bookingDraft.businessName,
+      bookingDraft.dateLabel,
+      bookingDraft.serviceName,
+      bookingDraft.servicePrice,
+      bookingDraft.specialistName,
+      bookingDraft.timeLabel,
       selectedBusiness?.category,
-      selectedBusiness?.name,
-      selectedDate.day,
-      selectedDate.label,
       selectedPayment.label,
-      selectedStaff.name,
-      selectedTime.label,
     ],
   );
   const managedBookings = useMemo<VisualBooking[]>(
@@ -794,12 +905,75 @@ export default function App() {
     setShowOnboarding(false);
   };
 
-  const handleStartBookingFlow = () => {
-    setSelectedStaff(bookingStaffOptions[0]);
-    setSelectedDate(bookingDateOptions[0]);
-    setSelectedTime(bookingTimeOptions[7]);
-    setSelectedPayment(paymentMethodOptions[3]);
+  const updateBookingDraft = (updates: Partial<BookingDraft>) => {
+    setBookingDraft((currentDraft) => ({
+      ...currentDraft,
+      ...updates,
+    }));
+  };
+
+  const handleStartBookingFlow = (service?: BookingServiceOption) => {
+    const selectedService = service ?? selectedBookingService;
+    const initialDraft = createInitialBookingDraft();
+
+    setBookingDraft({
+      ...initialDraft,
+      businessName:
+        selectedBusiness?.name || initialDraft.businessName,
+      serviceName: selectedService.name,
+      servicePrice: selectedService.price,
+    });
     setBookingFlowStep("staff");
+  };
+
+  const handleBookingMethodSelect = (bookingMethod: BookingMethodId) => {
+    updateBookingDraft({
+      bookingMethod,
+      specialistName:
+        bookingMethod === "rezno-pick"
+          ? bookingStaffOptions[0].name
+          : selectedStaff.id === "any"
+            ? bookingStaffOptions[1].name
+            : selectedStaff.name,
+    });
+  };
+
+  const handleStaffSelect = (staff: BookingStaffOption) => {
+    updateBookingDraft({
+      bookingMethod: "manual",
+      specialistName: staff.name,
+    });
+  };
+
+  const handleSuggestedTimeSelect = (timeLabel: string) => {
+    const matchingTime = bookingTimeOptions.find(
+      (time) => time.label === timeLabel && time.state !== "booked",
+    );
+
+    updateBookingDraft({
+      selectedTimeId: matchingTime?.id ?? bookingDraft.selectedTimeId,
+      timeLabel,
+    });
+  };
+
+  const handleDateSelect = (date: BookingDateOption) => {
+    updateBookingDraft({
+      dateLabel: formatBookingDateLabel(date),
+      selectedDateId: date.id,
+    });
+  };
+
+  const handleTimeSelect = (time: BookingTimeOption) => {
+    updateBookingDraft({
+      selectedTimeId: time.id,
+      timeLabel: time.label,
+    });
+  };
+
+  const handlePaymentSelect = (payment: BookingPaymentOption) => {
+    updateBookingDraft({
+      paymentMethod: payment.id,
+    });
   };
 
   const handleBookingBack = () => {
@@ -925,17 +1099,19 @@ export default function App() {
 
         {selectedBusiness && bookingFlowStep ? (
           <BookingStepScreen
-            business={selectedBusiness}
             date={selectedDate}
+            draft={bookingDraft}
             isRtl={isRtl}
             onBack={handleBookingBack}
+            onBookingMethodSelect={handleBookingMethodSelect}
             onConfirm={() => setBookingFlowStep("confirmation")}
-            onDateSelect={setSelectedDate}
-            onPaymentSelect={setSelectedPayment}
+            onDateSelect={handleDateSelect}
+            onPaymentSelect={handlePaymentSelect}
             onReturnHome={handleReturnHome}
-            onStaffSelect={setSelectedStaff}
+            onStaffSelect={handleStaffSelect}
             onStepChange={setBookingFlowStep}
-            onTimeSelect={setSelectedTime}
+            onSuggestedTimeSelect={handleSuggestedTimeSelect}
+            onTimeSelect={handleTimeSelect}
             onViewBookings={handleViewBookings}
             payment={selectedPayment}
             service={selectedBookingService}
@@ -2014,29 +2190,16 @@ function SalonDetailScreen({
   business: PremiumBusiness;
   isRtl: boolean;
   onBack: () => void;
-  onStartBooking: () => void;
+  onStartBooking: (service?: BookingServiceOption) => void;
   styles: MobileStyles;
 }) {
-  const salonReferenceServices = [
-    {
-      duration: "30 دقيقة",
-      name: "قص شعر",
-      price: "250 TL",
-      tag: "رائج",
-    },
-    {
-      duration: "45 دقيقة",
-      name: "حلاقة + دقن",
-      price: "350 TL",
-      tag: "مميز",
-    },
-    {
-      duration: "20 دقيقة",
-      name: "تشذيب بارز",
-      price: "150 TL",
-      tag: "سريع",
-    },
-  ];
+  const [selectedServiceName, setSelectedServiceName] = useState(
+    salonReferenceServices[0].name,
+  );
+  const selectedService =
+    salonReferenceServices.find(
+      (service) => service.name === selectedServiceName,
+    ) ?? salonReferenceServices[0];
 
   return (
     <View style={styles.salonDetailScreen}>
@@ -2168,10 +2331,27 @@ function SalonDetailScreen({
         </View>
 
         <View style={styles.salonServicesList}>
-          {salonReferenceServices.map((service) => (
-            <View key={service.name} style={styles.salonServiceRow}>
+          {salonReferenceServices.map((service) => {
+            const selected = service.name === selectedService.name;
+
+            return (
+            <Pressable
+              accessibilityHint="يحدد الخدمة محلياً لتظهر في خطوات الحجز التالية."
+              accessibilityLabel={`اختيار خدمة ${service.name}`}
+              accessibilityRole="button"
+              accessibilityState={{ selected }}
+              key={service.name}
+              onPress={() => setSelectedServiceName(service.name)}
+              style={({ pressed }) => [
+                styles.salonServiceRow,
+                selected && styles.salonServiceRowSelected,
+                pressed && styles.softButtonPressed,
+              ]}
+            >
               <View style={styles.salonServiceAdd}>
-                <Text style={styles.salonServiceAddText}>+</Text>
+                <Text style={styles.salonServiceAddText}>
+                  {selected ? "✓" : "+"}
+                </Text>
               </View>
 
               <View style={styles.salonServiceCopy}>
@@ -2189,8 +2369,9 @@ function SalonDetailScreen({
               <View style={styles.salonServiceMedia}>
                 <BusinessMedia badge={service.tag} styles={styles} />
               </View>
-            </View>
-          ))}
+            </Pressable>
+            );
+          })}
         </View>
 
         <View style={styles.salonBottomCta}>
@@ -2199,7 +2380,7 @@ function SalonDetailScreen({
             accessibilityLabel="احجز الآن"
             accessibilityRole="button"
             hitSlop={TOUCH_HIT_SLOP}
-            onPress={onStartBooking}
+            onPress={() => onStartBooking(selectedService)}
             style={({ pressed }) => [
               styles.salonReferenceCta,
               pressed && styles.primaryButtonPressed,
@@ -2319,16 +2500,18 @@ function VisualActionTile({
 }
 
 function BookingStepScreen({
-  business,
   date,
+  draft,
   isRtl,
   onBack,
+  onBookingMethodSelect,
   onConfirm,
   onDateSelect,
   onPaymentSelect,
   onReturnHome,
   onStaffSelect,
   onStepChange,
+  onSuggestedTimeSelect,
   onTimeSelect,
   onViewBookings,
   payment,
@@ -2338,20 +2521,22 @@ function BookingStepScreen({
   styles,
   time,
 }: {
-  business: PremiumBusiness;
   date: BookingDateOption;
+  draft: BookingDraft;
   isRtl: boolean;
   onBack: () => void;
+  onBookingMethodSelect: (method: BookingMethodId) => void;
   onConfirm: () => void;
   onDateSelect: (date: BookingDateOption) => void;
   onPaymentSelect: (payment: BookingPaymentOption) => void;
   onReturnHome: () => void;
   onStaffSelect: (staff: BookingStaffOption) => void;
   onStepChange: (step: BookingFlowStepId) => void;
+  onSuggestedTimeSelect: (timeLabel: string) => void;
   onTimeSelect: (time: BookingTimeOption) => void;
   onViewBookings: () => void;
   payment: BookingPaymentOption;
-  service: (typeof services)[number];
+  service: BookingServiceOption;
   staff: BookingStaffOption;
   step: BookingFlowStepId;
   styles: MobileStyles;
@@ -2360,11 +2545,13 @@ function BookingStepScreen({
   if (step === "staff") {
     return (
       <StaffSelectionStep
-        business={business}
+        draft={draft}
         isRtl={isRtl}
         onBack={onBack}
+        onBookingMethodSelect={onBookingMethodSelect}
         onNext={() => onStepChange("datetime")}
         onStaffSelect={onStaffSelect}
+        onSuggestedTimeSelect={onSuggestedTimeSelect}
         selectedStaff={staff}
         service={service}
         styles={styles}
@@ -2375,15 +2562,13 @@ function BookingStepScreen({
   if (step === "datetime") {
     return (
       <DateTimeSelectionStep
-        business={business}
         date={date}
+        draft={draft}
         isRtl={isRtl}
         onBack={onBack}
         onDateSelect={onDateSelect}
         onNext={() => onStepChange("payment")}
         onTimeSelect={onTimeSelect}
-        service={service}
-        staff={staff}
         styles={styles}
         time={time}
       />
@@ -2393,33 +2578,25 @@ function BookingStepScreen({
   if (step === "payment") {
     return (
       <PaymentMethodStep
-        business={business}
-        date={date}
+        draft={draft}
         isRtl={isRtl}
         onBack={onBack}
         onConfirm={onConfirm}
         onPaymentSelect={onPaymentSelect}
         payment={payment}
-        service={service}
-        staff={staff}
         styles={styles}
-        time={time}
       />
     );
   }
 
   return (
     <BookingConfirmationStep
-      business={business}
-      date={date}
+      draft={draft}
       isRtl={isRtl}
       onReturnHome={onReturnHome}
       onViewBookings={onViewBookings}
       payment={payment}
-      service={service}
-      staff={staff}
       styles={styles}
-      time={time}
     />
   );
 }
@@ -2481,41 +2658,33 @@ function BookingFlowHeader({
 }
 
 function BookingMiniSummary({
-  business,
-  date,
+  draft,
   isRtl,
   payment,
-  service,
-  staff,
   styles,
-  time,
 }: {
-  business: PremiumBusiness;
-  date: BookingDateOption;
+  draft: BookingDraft;
   isRtl: boolean;
   payment?: BookingPaymentOption;
-  service: (typeof services)[number];
-  staff: BookingStaffOption;
   styles: MobileStyles;
-  time?: BookingTimeOption;
 }) {
   return (
     <View style={styles.bookingMiniSummary}>
       <SummaryItem
         label="النشاط"
         styles={styles}
-        value={business.name}
+        value={draft.businessName}
       />
       <SummaryItem
         label="الخدمة"
         styles={styles}
-        value={`${service.name} · ${service.price}`}
+        value={`${draft.serviceName} · ${draft.servicePrice}`}
       />
-      <SummaryItem label="المختص" styles={styles} value={staff.name} />
+      <SummaryItem label="المختص" styles={styles} value={draft.specialistName} />
       <SummaryItem
         label="الموعد"
         styles={styles}
-        value={`${date.day} ${date.label}${time ? ` · ${time.label}` : ""}`}
+        value={`${draft.dateLabel} · ${draft.timeLabel}`}
       />
       {payment ? (
         <Text style={[styles.securePaymentNote, isRtl && styles.rtlText]}>
@@ -2527,41 +2696,44 @@ function BookingMiniSummary({
 }
 
 function StaffSelectionStep({
-  business,
+  draft,
   isRtl,
   onBack,
+  onBookingMethodSelect,
   onNext,
   onStaffSelect,
+  onSuggestedTimeSelect,
   selectedStaff,
   service,
   styles,
 }: {
-  business: PremiumBusiness;
+  draft: BookingDraft;
   isRtl: boolean;
   onBack: () => void;
+  onBookingMethodSelect: (method: BookingMethodId) => void;
   onNext: () => void;
   onStaffSelect: (staff: BookingStaffOption) => void;
+  onSuggestedTimeSelect: (timeLabel: string) => void;
   selectedStaff: BookingStaffOption;
-  service: (typeof services)[number];
+  service: BookingServiceOption;
   styles: MobileStyles;
 }) {
-  const [bookingMethod, setBookingMethod] = useState<"rezno" | "manual">(
-    "rezno",
-  );
   const [selectedFilter, setSelectedFilter] = useState("الأعلى تقييماً");
-  const [selectedTimeSlot, setSelectedTimeSlot] = useState("4:30 م");
-  const summaryBusinessName = business.name || "Noura Beauty Lounge";
+  const summaryBusinessName = draft.businessName || "Noura Beauty Lounge";
   const availableSpecialists = bookingStaffOptions.filter(
     (staff) => staff.id !== "any",
   );
   const selectedSpecialist =
+    availableSpecialists.find(
+      (staff) => staff.name === draft.specialistName,
+    ) ??
     availableSpecialists.find((staff) => staff.id === selectedStaff.id) ??
     availableSpecialists[0];
   const bookingMethods = [
     {
       description: "أفضل مختص حسب التقييم والخبرة وأقرب وقت متاح",
       icon: "✧",
-      id: "rezno" as const,
+      id: "rezno-pick" as const,
       metric: "★ 4.9",
       title: "يختار لي REZNO",
     },
@@ -2636,13 +2808,13 @@ function StaffSelectionStep({
             {summaryBusinessName}
           </Text>
           <Text style={[styles.staffReferenceSummaryMeta, isRtl && styles.rtlText]}>
-            {service.name} ✂
+            {draft.serviceName || service.name} ✂
           </Text>
           <Text style={[styles.staffReferenceSummaryMeta, isRtl && styles.rtlText]}>
-            {service.price} ◇
+            {draft.servicePrice || service.price} ◇
           </Text>
           <Text style={[styles.staffReferenceSummaryMuted, isRtl && styles.rtlText]}>
-            اليوم 06 • الوقت يحدد لاحقاً
+            {draft.dateLabel} • {draft.timeLabel || "الوقت يحدد لاحقاً"}
           </Text>
         </View>
         <Pressable
@@ -2662,7 +2834,7 @@ function StaffSelectionStep({
       </Text>
       <View style={styles.staffReferenceMethodGrid}>
         {bookingMethods.map((method) => {
-          const selected = bookingMethod === method.id;
+          const selected = draft.bookingMethod === method.id;
 
           return (
             <Pressable
@@ -2671,7 +2843,7 @@ function StaffSelectionStep({
               accessibilityRole="button"
               accessibilityState={{ selected }}
               key={method.id}
-              onPress={() => setBookingMethod(method.id)}
+              onPress={() => onBookingMethodSelect(method.id)}
               style={({ pressed }) => [
                 styles.staffReferenceMethodCard,
                 selected && styles.staffReferenceMethodCardActive,
@@ -2755,7 +2927,6 @@ function StaffSelectionStep({
               accessibilityState={{ selected }}
               key={staffOption.id}
               onPress={() => {
-                setBookingMethod("manual");
                 onStaffSelect(staffOption);
               }}
               style={({ pressed }) => [
@@ -2827,7 +2998,7 @@ function StaffSelectionStep({
         </View>
         <View style={styles.staffReferenceTimeRow}>
           {timeSlots.map((slot, index) => {
-            const selected = selectedTimeSlot === slot && index === 1;
+            const selected = draft.timeLabel === slot;
 
             return (
               <Pressable
@@ -2836,7 +3007,7 @@ function StaffSelectionStep({
                 accessibilityRole="button"
                 accessibilityState={{ selected }}
                 key={`${slot}-${index}`}
-                onPress={() => setSelectedTimeSlot(slot)}
+                onPress={() => onSuggestedTimeSelect(slot)}
                 style={({ pressed }) => [
                   styles.staffReferenceTimeChip,
                   selected && styles.staffReferenceTimeChipActive,
@@ -2879,37 +3050,36 @@ function StaffSelectionStep({
 }
 
 function DateTimeSelectionStep({
-  business,
   date,
+  draft,
   isRtl,
   onBack,
   onDateSelect,
   onNext,
   onTimeSelect,
-  service,
-  staff,
   styles,
   time,
 }: {
-  business: PremiumBusiness;
   date: BookingDateOption;
+  draft: BookingDraft;
   isRtl: boolean;
   onBack: () => void;
   onDateSelect: (date: BookingDateOption) => void;
   onNext: () => void;
   onTimeSelect: (time: BookingTimeOption) => void;
-  service: (typeof services)[number];
-  staff: BookingStaffOption;
   styles: MobileStyles;
   time: BookingTimeOption;
 }) {
   const [selectedPeriod, setSelectedPeriod] = useState("الأقرب");
   const periodFilters = ["الأقرب", "الصباح", "الظهيرة", "المساء"];
   const compactCalendarDays = ["09", "10", "11", "12", "13", "14", "15"];
-  const displayBusinessName = business.name || "Noura Beauty Lounge";
-  const displayStaffName = staff.id === "any" ? "أحمد" : staff.name;
+  const displayBusinessName = draft.businessName || "Noura Beauty Lounge";
+  const displayStaffName = draft.specialistName || bookingStaffOptions[0].name;
   const selectedDateSummary = `${date.day}، ${date.label} يوليو`;
-  const suggestedTimeLabel = "4:30 م";
+  const suggestedTimeLabel =
+    bookingTimeOptions.some((option) => option.label === draft.timeLabel)
+      ? draft.timeLabel
+      : bookingTimeOptions[7].label;
 
   return (
     <View style={styles.dateTimeReferenceScreen}>
@@ -2972,10 +3142,10 @@ function DateTimeSelectionStep({
             {displayBusinessName}
           </Text>
           <Text style={[styles.staffReferenceSummaryMeta, isRtl && styles.rtlText]}>
-            {service.name} • {displayStaffName}
+            {draft.serviceName} • {displayStaffName}
           </Text>
           <Text style={[styles.staffReferenceSummaryMeta, isRtl && styles.rtlText]}>
-            {service.price}
+            {draft.servicePrice}
           </Text>
           <Text style={[styles.staffReferenceSummaryMuted, isRtl && styles.rtlText]}>
             اقتراح سريع: {suggestedTimeLabel}
@@ -3193,37 +3363,32 @@ function DateTimeSelectionStep({
 }
 
 function PaymentMethodStep({
-  business,
-  date,
+  draft,
   isRtl,
   onBack,
   onConfirm,
   onPaymentSelect,
   payment,
-  service,
-  staff,
   styles,
-  time,
 }: {
-  business: PremiumBusiness;
-  date: BookingDateOption;
+  draft: BookingDraft;
   isRtl: boolean;
   onBack: () => void;
   onConfirm: () => void;
   onPaymentSelect: (payment: BookingPaymentOption) => void;
   payment: BookingPaymentOption;
-  service: (typeof services)[number];
-  staff: BookingStaffOption;
   styles: MobileStyles;
-  time: BookingTimeOption;
 }) {
-  const displayBusinessName = business.name || "Noura Beauty Lounge";
-  const displayStaffName = staff.id === "any" ? "بدون تفضيل" : staff.name;
+  const displayBusinessName = draft.businessName || "Noura Beauty Lounge";
+  const displayStaffName =
+    draft.bookingMethod === "rezno-pick"
+      ? draft.specialistName || "REZNO يختار"
+      : draft.specialistName;
   const paymentIconContent: Record<string, string> = {
     "apple-pay": "Pay",
-    bank: "▥",
+    "bank-transfer": "▥",
     card: "▰",
-    venue: "▣",
+    "pay-on-site": "▣",
   };
   const paymentSummaryRows = [
     {
@@ -3234,7 +3399,7 @@ function PaymentMethodStep({
     {
       icon: mobileIconAssets.categories.salon,
       label: "الخدمة",
-      value: `${service.name} • ${service.price}`,
+      value: `${draft.serviceName} • ${draft.servicePrice}`,
     },
     {
       iconText: "♙",
@@ -3244,7 +3409,7 @@ function PaymentMethodStep({
     {
       icon: mobileIconAssets.common.calendar,
       label: "الموعد",
-      value: `${date.day} ${date.label} • ${time.label}`,
+      value: `${draft.dateLabel} • ${draft.timeLabel}`,
     },
   ];
 
@@ -3398,7 +3563,9 @@ function PaymentMethodStep({
             pressed && styles.primaryButtonPressed,
           ]}
         >
-          <Text style={styles.paymentReferenceCtaText}>تأكيد الحجز</Text>
+          <Text style={styles.paymentReferenceCtaText}>
+            {payment.id === "pay-on-site" ? "تأكيد الحجز" : "ادفع الآن"}
+          </Text>
         </Pressable>
       </View>
     </View>
@@ -3406,27 +3573,19 @@ function PaymentMethodStep({
 }
 
 function BookingConfirmationStep({
-  business,
-  date,
+  draft,
   isRtl,
   onReturnHome,
   onViewBookings,
   payment,
-  service,
-  staff,
   styles,
-  time,
 }: {
-  business: PremiumBusiness;
-  date: BookingDateOption;
+  draft: BookingDraft;
   isRtl: boolean;
   onReturnHome: () => void;
   onViewBookings: () => void;
   payment: BookingPaymentOption;
-  service: (typeof services)[number];
-  staff: BookingStaffOption;
   styles: MobileStyles;
-  time: BookingTimeOption;
 }) {
   return (
     <View style={styles.bookingStepScreen}>
@@ -3454,14 +3613,10 @@ function BookingConfirmationStep({
       </View>
 
       <BookingMiniSummary
-        business={business}
-        date={date}
+        draft={draft}
         isRtl={isRtl}
         payment={payment}
-        service={service}
-        staff={staff}
         styles={styles}
-        time={time}
       />
 
       <View style={styles.bookingReceiptActions}>
@@ -9559,6 +9714,10 @@ const createStyles = (theme: MobileTheme) =>
       shadowOffset: { height: 12, width: 0 },
       shadowOpacity: theme.isDark ? 0.2 : 0.08,
       shadowRadius: 22,
+    },
+    salonServiceRowSelected: {
+      borderColor: theme.colors.gold,
+      shadowOpacity: theme.isDark ? 0.28 : 0.12,
     },
     salonServicesList: {
       gap: 14,
