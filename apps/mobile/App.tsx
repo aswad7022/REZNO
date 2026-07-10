@@ -1,15 +1,18 @@
-import { StatusBar } from "expo-status-bar";
+import { StatusBar as ExpoStatusBar } from "expo-status-bar";
 import { useFonts } from "expo-font";
 import { useCallback, useMemo, useState } from "react";
 import {
   I18nManager,
   Image,
+  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
+  StatusBar as NativeStatusBar,
   useColorScheme,
+  useWindowDimensions,
   View,
   type ImageSourcePropType,
 } from "react-native";
@@ -47,6 +50,60 @@ import {
 import type { MobileMarketplaceBusiness } from "./src/types/marketplace";
 
 I18nManager.allowRTL(true);
+
+type TextWithResponsiveDefaults = typeof Text & {
+  defaultProps?: {
+    maxFontSizeMultiplier?: number;
+  };
+};
+
+const responsiveText = Text as TextWithResponsiveDefaults;
+responsiveText.defaultProps = {
+  ...responsiveText.defaultProps,
+  maxFontSizeMultiplier: 1.1,
+};
+
+const clamp = (value: number, min: number, max: number) =>
+  Math.min(Math.max(value, min), max);
+
+type ResponsiveMetrics = ReturnType<typeof createResponsiveMetrics>;
+
+const createResponsiveMetrics = (width: number, height: number) => {
+  const isCompactPhone = width <= 380 || height <= 720;
+  const isNarrowPhone = width <= 360;
+  const androidBottomGuard = Platform.OS === "android" ? 34 : 20;
+  const topSafePadding =
+    Platform.OS === "android"
+      ? Math.max(NativeStatusBar.currentHeight ?? 0, 24) + 8
+      : 20;
+  const screenPadding = isNarrowPhone ? 14 : isCompactPhone ? 16 : 20;
+  const bottomNavHeight = isCompactPhone ? 76 : 88;
+  const contentBottomPadding = bottomNavHeight + androidBottomGuard + 28;
+  const checkoutFooterHeight = isCompactPhone ? 86 : 102;
+  const checkoutBottomPadding = checkoutFooterHeight + androidBottomGuard + 28;
+
+  return {
+    androidBottomGuard,
+    body: isCompactPhone ? 13 : 15,
+    bottomNavHeight,
+    buttonText: isCompactPhone ? 15 : 18,
+    caption: isCompactPhone ? 10 : 12,
+    cardRadius: isCompactPhone ? 22 : 28,
+    categoryBasis: (isNarrowPhone ? "48%" : "23.4%") as "48%" | "23.4%",
+    categoryMinHeight: isNarrowPhone ? 86 : isCompactPhone ? 96 : 112,
+    checkoutBottomPadding,
+    checkoutFooterHeight,
+    contentBottomPadding,
+    h1: clamp(width * 0.078, isCompactPhone ? 24 : 28, isCompactPhone ? 30 : 34),
+    h2: isCompactPhone ? 20 : 24,
+    isCompactPhone,
+    isNarrowPhone,
+    mapHeight: clamp(height * 0.33, 220, isCompactPhone ? 280 : 360),
+    screenHeight: height,
+    screenPadding,
+    topSafePadding,
+  };
+};
 
 type MarketplaceState =
   | { status: "idle" }
@@ -642,7 +699,7 @@ const accountManagementActions = [
   { label: "مركز المساعدة", tone: "primary" },
 ];
 
-export default function App() {
+function ReznoMobileApp() {
   /* eslint-disable @typescript-eslint/no-require-imports -- Expo Font loads local TTF assets through static require(). */
   const [fontsLoaded] = useFonts({
     [mobileTypography.kufiBold]: require("./assets/fonts/NotoKufiArabic-Bold.ttf"),
@@ -653,6 +710,7 @@ export default function App() {
     [mobileTypography.uiSemiBold]: require("./assets/fonts/NotoSansArabicUI-SemiBold.ttf"),
   });
   /* eslint-enable @typescript-eslint/no-require-imports */
+  const { height: windowHeight, width: windowWidth } = useWindowDimensions();
   const colorScheme = useColorScheme();
   const [locale, setLocale] = useState<MobileLocale>(DEFAULT_LOCALE);
   const [activeTab, setActiveTab] = useState<MobileAppTabId>("customerHome");
@@ -692,9 +750,24 @@ export default function App() {
     themeMode === "system" ? colorScheme ?? "dark" : themeMode;
   const theme =
     effectiveThemeMode === "light" ? lightMobileTheme : darkMobileTheme;
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const responsiveMetrics = useMemo(
+    () => createResponsiveMetrics(windowWidth, windowHeight),
+    [windowHeight, windowWidth],
+  );
+  const styles = useMemo(
+    () => createStyles(theme, responsiveMetrics),
+    [responsiveMetrics, theme],
+  );
   const text = labels[locale];
   const isRtl = getTextDirection(locale) === "rtl";
+  const isCompactOnboarding = windowHeight < 700;
+  const isVeryCompactOnboarding = windowHeight < 660;
+  const onboardingTopPadding = responsiveMetrics.topSafePadding;
+  const onboardingFooterBottomPadding =
+    responsiveMetrics.androidBottomGuard + 16;
+  const onboardingContentBottomPadding =
+    onboardingFooterBottomPadding + (isCompactOnboarding ? 150 : 170);
+  const showBottomTabBar = !bookingFlowStep;
   const confirmedVisualBooking = useMemo<VisualBooking>(
     () => ({
       businessName: selectedBusiness?.name ?? "Noura Beauty Lounge",
@@ -863,7 +936,7 @@ export default function App() {
   if (!fontsLoaded) {
     return (
       <SafeAreaView style={styles.shell}>
-        <StatusBar style={theme.isDark ? "light" : "dark"} />
+        <ExpoStatusBar style={theme.isDark ? "light" : "dark"} />
         <View style={styles.fontLoadingScreen} />
       </SafeAreaView>
     );
@@ -872,13 +945,46 @@ export default function App() {
   if (showOnboarding) {
     return (
       <SafeAreaView style={styles.shell}>
-        <StatusBar style="light" />
+        <ExpoStatusBar style="light" />
         <View style={styles.onboardingScreen}>
-          <WelcomeOnboardingCard
-            isRtl={isRtl}
-            onStart={handleEnterApp}
-            styles={styles}
-          />
+          <ScrollView
+            contentContainerStyle={[
+              styles.onboardingScrollContent,
+              {
+                paddingBottom: onboardingContentBottomPadding,
+                paddingTop: onboardingTopPadding,
+              },
+            ]}
+            showsVerticalScrollIndicator={false}
+          >
+            <WelcomeOnboardingCard
+              isCompact={isCompactOnboarding}
+              isRtl={isRtl}
+              isVeryCompact={isVeryCompactOnboarding}
+              styles={styles}
+            />
+          </ScrollView>
+          <View
+            style={[
+              styles.onboardingFixedActions,
+              {
+                paddingBottom: onboardingFooterBottomPadding,
+                paddingHorizontal: windowWidth <= 370 ? 20 : 28,
+              },
+            ]}
+          >
+            <PrimaryButton label="ابدأ الآن" onPress={handleEnterApp} styles={styles} />
+            <Pressable
+              accessibilityRole="button"
+              onPress={handleEnterApp}
+              style={({ pressed }) => [
+                styles.onboardingSecondary,
+                pressed && styles.softButtonPressed,
+              ]}
+            >
+              <Text style={styles.onboardingSecondaryText}>تسجيل الدخول</Text>
+            </Pressable>
+          </View>
         </View>
       </SafeAreaView>
     );
@@ -886,7 +992,7 @@ export default function App() {
 
   return (
     <SafeAreaView style={styles.shell}>
-      <StatusBar style={theme.isDark ? "light" : "dark"} />
+      <ExpoStatusBar style={theme.isDark ? "light" : "dark"} />
       {!selectedBusiness &&
       activeTab !== "marketplace" &&
       activeTab !== "customerHome" ? (
@@ -907,6 +1013,7 @@ export default function App() {
             styles.homeContent,
           (selectedBusiness || activeTab === "marketplace") &&
             styles.immersiveContent,
+          bookingFlowStep && styles.checkoutContent,
         ]}
         showsVerticalScrollIndicator={false}
       >
@@ -1031,14 +1138,20 @@ export default function App() {
         ) : null}
       </ScrollView>
 
-      <BottomTabBar
-        activeTab={activeTab}
-        locale={locale}
-        onTabPress={handleTabPress}
-        styles={styles}
-      />
+      {showBottomTabBar ? (
+        <BottomTabBar
+          activeTab={activeTab}
+          locale={locale}
+          onTabPress={handleTabPress}
+          styles={styles}
+        />
+      ) : null}
     </SafeAreaView>
   );
+}
+
+export default function App() {
+  return <ReznoMobileApp />;
 }
 
 function CustomerHomeScreen({
@@ -1219,16 +1332,23 @@ function QuickBookingEntryScreen({
 }
 
 function WelcomeOnboardingCard({
+  isCompact,
   isRtl,
-  onStart,
+  isVeryCompact,
   styles,
 }: {
+  isCompact: boolean;
   isRtl: boolean;
-  onStart: () => void;
+  isVeryCompact: boolean;
   styles: MobileStyles;
 }) {
   return (
-    <View style={styles.onboardingCard}>
+    <View
+      style={[
+        styles.onboardingCard,
+        isCompact && styles.onboardingCardCompact,
+      ]}
+    >
       <View style={styles.onboardingGlow} />
       <View style={styles.onboardingPattern}>
         <View
@@ -1247,37 +1367,61 @@ function WelcomeOnboardingCard({
         <View style={styles.onboardingPatternArc} />
       </View>
 
-      <View style={styles.onboardingLogo}>
-        <Text style={styles.onboardingLogoText}>R</Text>
+      <View
+        style={[
+          styles.onboardingLogo,
+          isCompact && styles.onboardingLogoCompact,
+          isVeryCompact && styles.onboardingLogoVeryCompact,
+        ]}
+      >
+        <Text
+          style={[
+            styles.onboardingLogoText,
+            isCompact && styles.onboardingLogoTextCompact,
+            isVeryCompact && styles.onboardingLogoTextVeryCompact,
+          ]}
+        >
+          R
+        </Text>
       </View>
-      <Text style={[styles.onboardingBrand, isRtl && styles.rtlText]}>
+      <Text
+        style={[
+          styles.onboardingBrand,
+          isCompact && styles.onboardingBrandCompact,
+          isRtl && styles.rtlText,
+        ]}
+      >
         REZNO
       </Text>
-      <Text style={[styles.onboardingSlogan, isRtl && styles.rtlText]}>
+      <Text
+        style={[
+          styles.onboardingSlogan,
+          isCompact && styles.onboardingSloganCompact,
+          isRtl && styles.rtlText,
+        ]}
+      >
         Book Everything
       </Text>
-      <Text style={[styles.onboardingBody, isRtl && styles.rtlText]}>
+      <Text
+        style={[
+          styles.onboardingBody,
+          isCompact && styles.onboardingBodyCompact,
+          isRtl && styles.rtlText,
+        ]}
+      >
         احجز أي خدمة في أي وقت وبسهولة وثقة
       </Text>
-      <View style={styles.onboardingHighlights}>
+      <View
+        style={[
+          styles.onboardingHighlights,
+          isCompact && styles.onboardingHighlightsCompact,
+        ]}
+      >
         {onboardingHighlights.map((item) => (
           <Text key={item} style={styles.onboardingHighlight}>
             {item}
           </Text>
         ))}
-      </View>
-      <View style={styles.onboardingActions}>
-        <PrimaryButton label="ابدأ الآن" onPress={onStart} styles={styles} />
-        <Pressable
-          accessibilityRole="button"
-          onPress={onStart}
-          style={({ pressed }) => [
-            styles.onboardingSecondary,
-            pressed && styles.softButtonPressed,
-          ]}
-        >
-          <Text style={styles.onboardingSecondaryText}>تسجيل الدخول</Text>
-        </Pressable>
       </View>
     </View>
   );
@@ -1527,7 +1671,11 @@ function SearchBar({
         source={mobileIconAssets.common.search}
         style={styles.searchIconImage}
       />
-      <Text style={[styles.searchPlaceholder, isRtl && styles.rtlText]}>
+      <Text
+        ellipsizeMode="tail"
+        numberOfLines={1}
+        style={[styles.searchPlaceholder, isRtl && styles.rtlText]}
+      >
         ابحث عن مطعم، عيادة، صالون...
       </Text>
       <View style={styles.filterButton}>
@@ -1569,7 +1717,9 @@ function CategoryGrid({ styles }: { styles: MobileStyles }) {
               <CategoryFallbackMark mark={category.mark} styles={styles} />
             )}
           </View>
-          <Text style={styles.categoryLabel}>{category.label}</Text>
+          <Text ellipsizeMode="tail" numberOfLines={1} style={styles.categoryLabel}>
+            {category.label}
+          </Text>
         </View>
       ))}
     </View>
@@ -1722,10 +1872,18 @@ function PremiumBusinessCard({
       <View style={styles.businessBody}>
         <View style={styles.businessTitleRow}>
           <View style={styles.businessCopy}>
-            <Text style={[styles.businessName, isRtl && styles.rtlText]}>
+            <Text
+              ellipsizeMode="tail"
+              numberOfLines={2}
+              style={[styles.businessName, isRtl && styles.rtlText]}
+            >
               {business.name}
             </Text>
-            <Text style={[styles.businessMeta, isRtl && styles.rtlText]}>
+            <Text
+              ellipsizeMode="tail"
+              numberOfLines={1}
+              style={[styles.businessMeta, isRtl && styles.rtlText]}
+            >
               {business.category}
             </Text>
           </View>
@@ -1747,10 +1905,14 @@ function PremiumBusinessCard({
               source={mobileIconAssets.common.locationPin}
               style={styles.businessDistanceIcon}
             />
-            <Text style={styles.priceText}>{business.distance}</Text>
+          <Text ellipsizeMode="tail" numberOfLines={1} style={styles.priceText}>
+            {business.distance}
+          </Text>
           </View>
           <Text style={styles.businessDetailsDot}>•</Text>
-          <Text style={styles.priceText}>{business.price}</Text>
+          <Text ellipsizeMode="tail" numberOfLines={1} style={styles.priceText}>
+            {business.price}
+          </Text>
         </View>
         <View style={styles.businessCta}>
           <Text style={styles.businessCtaText}>احجز الآن</Text>
@@ -1915,10 +2077,18 @@ function SearchMapResultCard({
         <BusinessMedia badge={business.tag} styles={styles} />
       </View>
       <View style={styles.searchResultCopy}>
-        <Text style={[styles.searchResultName, isRtl && styles.rtlText]}>
+        <Text
+          ellipsizeMode="tail"
+          numberOfLines={2}
+          style={[styles.searchResultName, isRtl && styles.rtlText]}
+        >
           {business.name}
         </Text>
-        <Text style={[styles.searchResultMeta, isRtl && styles.rtlText]}>
+        <Text
+          ellipsizeMode="tail"
+          numberOfLines={1}
+          style={[styles.searchResultMeta, isRtl && styles.rtlText]}
+        >
           {business.category} · {business.status}
         </Text>
         <View style={styles.searchResultStats}>
@@ -4688,7 +4858,7 @@ function AccountScreen({
 
 type MobileStyles = ReturnType<typeof createStyles>;
 
-const createStyles = (theme: MobileTheme) =>
+const createStyles = (theme: MobileTheme, metrics: ResponsiveMetrics) =>
   StyleSheet.create({
     actionStack: {
       gap: theme.spacing.sm,
@@ -4858,8 +5028,11 @@ const createStyles = (theme: MobileTheme) =>
       width: 22,
     },
     bookingBottomAction: {
+      bottom: metrics.androidBottomGuard + 16,
+      left: metrics.screenPadding,
       marginTop: 10,
-      paddingBottom: 144,
+      position: "absolute",
+      right: metrics.screenPadding,
     },
     bookingDateRail: {
       flexDirection: "row",
@@ -4911,8 +5084,11 @@ const createStyles = (theme: MobileTheme) =>
       width: 14,
     },
     bookingReceiptActions: {
+      bottom: metrics.androidBottomGuard + 16,
       gap: 12,
-      paddingBottom: 148,
+      left: metrics.screenPadding,
+      position: "absolute",
+      right: metrics.screenPadding,
     },
     bookingSearchField: {
       alignItems: "center",
@@ -4956,10 +5132,14 @@ const createStyles = (theme: MobileTheme) =>
       shadowRadius: 22,
     },
     bookingStepScreen: {
-      gap: 16,
-      paddingBottom: 152,
-      paddingHorizontal: 20,
-      paddingTop: 30,
+      backgroundColor: theme.colors.background,
+      flexGrow: 1,
+      gap: metrics.isCompactPhone ? 12 : 16,
+      minHeight: metrics.screenHeight - metrics.topSafePadding,
+      paddingBottom: metrics.checkoutBottomPadding,
+      paddingHorizontal: metrics.screenPadding,
+      paddingTop: metrics.topSafePadding,
+      position: "relative",
     },
     bookingTimeGrid: {
       flexDirection: "row",
@@ -5037,7 +5217,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     bookingDetailActions: {
       gap: 12,
-      paddingBottom: 148,
+      paddingBottom: metrics.contentBottomPadding,
     },
     bookingDetailHero: {
       alignItems: "center",
@@ -5071,9 +5251,9 @@ const createStyles = (theme: MobileTheme) =>
     },
     bookingDetailScreen: {
       gap: 16,
-      paddingBottom: 152,
-      paddingHorizontal: 20,
-      paddingTop: 30,
+      paddingBottom: metrics.contentBottomPadding,
+      paddingHorizontal: metrics.screenPadding,
+      paddingTop: metrics.topSafePadding,
     },
     bookingDetailSummary: {
       backgroundColor: theme.isDark
@@ -5135,13 +5315,13 @@ const createStyles = (theme: MobileTheme) =>
     },
     bookingsList: {
       gap: 12,
-      paddingBottom: 166,
+      paddingBottom: metrics.contentBottomPadding,
     },
     bookingsScreen: {
       gap: 16,
-      paddingBottom: 152,
-      paddingHorizontal: 20,
-      paddingTop: 30,
+      paddingBottom: metrics.contentBottomPadding,
+      paddingHorizontal: metrics.screenPadding,
+      paddingTop: metrics.topSafePadding,
     },
     bookingsSegment: {
       alignItems: "center",
@@ -5372,9 +5552,9 @@ const createStyles = (theme: MobileTheme) =>
       marginTop: 1,
     },
     businessBody: {
-      gap: 8,
-      padding: 12,
-      paddingTop: 11,
+      gap: metrics.isCompactPhone ? 6 : 8,
+      padding: metrics.isCompactPhone ? 10 : 12,
+      paddingTop: metrics.isCompactPhone ? 9 : 11,
     },
     businessCard: {
       backgroundColor: theme.isDark
@@ -5383,7 +5563,7 @@ const createStyles = (theme: MobileTheme) =>
       borderColor: theme.isDark
         ? "rgba(235, 178, 80, 0.36)"
         : "rgba(199, 138, 18, 0.28)",
-      borderRadius: 17,
+      borderRadius: metrics.isCompactPhone ? 16 : 17,
       borderWidth: 1,
       flex: 1,
       overflow: "hidden",
@@ -5410,14 +5590,14 @@ const createStyles = (theme: MobileTheme) =>
       borderWidth: 1,
       justifyContent: "center",
       marginTop: 3,
-      minHeight: 35,
+      minHeight: metrics.isCompactPhone ? 32 : 35,
       paddingHorizontal: 10,
     },
     businessCtaText: {
       color: theme.colors.gold,
       fontFamily: mobileTypography.uiSemiBold,
-      fontSize: 12,
-      lineHeight: 18,
+      fontSize: metrics.isCompactPhone ? 11 : 12,
+      lineHeight: metrics.isCompactPhone ? 16 : 18,
       textAlign: "center",
     },
     businessDetailsDot: {
@@ -5469,7 +5649,7 @@ const createStyles = (theme: MobileTheme) =>
       backgroundColor: "#050907",
       borderBottomColor: "rgba(235, 178, 80, 0.2)",
       borderBottomWidth: 1,
-      height: 120,
+      height: metrics.isCompactPhone ? 148 : 120,
       justifyContent: "space-between",
       overflow: "hidden",
       padding: 12,
@@ -5509,7 +5689,7 @@ const createStyles = (theme: MobileTheme) =>
     businessMediaChairSeat: {
       backgroundColor: "rgba(255, 193, 58, 0.28)",
       borderRadius: 999,
-      bottom: 18,
+      bottom: metrics.androidBottomGuard,
       height: 14,
       left: 27,
       position: "absolute",
@@ -5629,9 +5809,9 @@ const createStyles = (theme: MobileTheme) =>
     businessMeta: {
       color: theme.colors.mutedForeground,
       fontFamily: mobileTypography.uiRegular,
-      fontSize: 11,
+      fontSize: metrics.isCompactPhone ? 10 : 11,
       flexShrink: 1,
-      lineHeight: 16,
+      lineHeight: metrics.isCompactPhone ? 14 : 16,
       marginTop: 3,
     },
     businessMetric: {
@@ -5654,10 +5834,10 @@ const createStyles = (theme: MobileTheme) =>
     businessName: {
       color: theme.colors.foreground,
       fontFamily: mobileTypography.uiSemiBold,
-      fontSize: 13,
+      fontSize: metrics.isCompactPhone ? 15 : 13,
       flexShrink: 1,
       letterSpacing: -0.3,
-      lineHeight: 19,
+      lineHeight: metrics.isCompactPhone ? 20 : 19,
     },
     businessStatusBadge: {
       backgroundColor: "rgba(10, 110, 76, 0.78)",
@@ -5794,7 +5974,7 @@ const createStyles = (theme: MobileTheme) =>
       flexWrap: "wrap",
       justifyContent: "space-between",
       marginTop: 2,
-      rowGap: 12,
+      rowGap: metrics.isCompactPhone ? 10 : 12,
     },
     categoryIcon: {
       color: theme.colors.gold,
@@ -5803,9 +5983,9 @@ const createStyles = (theme: MobileTheme) =>
       lineHeight: 28,
     },
     categoryIconImage: {
-      height: 39,
+      height: metrics.isCompactPhone ? 30 : 39,
       tintColor: theme.colors.gold,
-      width: 39,
+      width: metrics.isCompactPhone ? 30 : 39,
     },
     categoryIconTile: {
       alignItems: "center",
@@ -5813,11 +5993,11 @@ const createStyles = (theme: MobileTheme) =>
         ? "transparent"
         : "rgba(255, 193, 58, 0.08)",
       borderColor: "transparent",
-      borderRadius: 16,
+      borderRadius: metrics.isCompactPhone ? 14 : 16,
       borderWidth: 0,
-      height: 50,
+      height: metrics.isCompactPhone ? 42 : 50,
       justifyContent: "center",
-      width: 50,
+      width: metrics.isCompactPhone ? 42 : 50,
     },
     categoryIconTileBlue: {
       backgroundColor: "rgba(255, 193, 58, 0.06)",
@@ -5845,15 +6025,15 @@ const createStyles = (theme: MobileTheme) =>
       borderColor: theme.isDark
         ? "rgba(235, 178, 80, 0.25)"
         : "rgba(184, 117, 11, 0.24)",
-      borderRadius: 14,
+      borderRadius: metrics.isCompactPhone ? 12 : 14,
       borderWidth: 1,
-      flexBasis: "23.4%",
+      flexBasis: metrics.categoryBasis,
       gap: 6,
       justifyContent: "center",
-      minHeight: 112,
+      minHeight: metrics.categoryMinHeight,
       minWidth: 0,
-      paddingHorizontal: 5,
-      paddingVertical: 13,
+      paddingHorizontal: metrics.isCompactPhone ? 4 : 5,
+      paddingVertical: metrics.isCompactPhone ? 9 : 13,
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: 10, width: 0 },
       shadowOpacity: theme.isDark ? 0.16 : 0.08,
@@ -5862,8 +6042,8 @@ const createStyles = (theme: MobileTheme) =>
     categoryLabel: {
       color: theme.isDark ? theme.colors.cream : theme.colors.foreground,
       fontFamily: mobileTypography.uiMedium,
-      fontSize: 12,
-      lineHeight: 18,
+      fontSize: metrics.isCompactPhone ? 11 : 12,
+      lineHeight: metrics.isCompactPhone ? 15 : 18,
       textAlign: "center",
     },
     categoryBookLine: {
@@ -6041,17 +6221,20 @@ const createStyles = (theme: MobileTheme) =>
       borderWidth: 0,
       borderRadius: 36,
       flex: 1,
-      height: 72,
+      height: metrics.isCompactPhone ? 58 : 72,
       marginHorizontal: 0,
       shadowColor: theme.colors.deepGold,
       shadowOffset: { height: 8, width: 0 },
       shadowOpacity: theme.isDark ? 0.4 : 0.12,
       shadowRadius: 18,
-      transform: [{ translateY: -8 }],
+      transform: [{ translateY: metrics.isCompactPhone ? -5 : -8 }],
     },
     centerTabButtonActive: {
       backgroundColor: "transparent",
-      transform: [{ translateY: -9 }, { scale: 1.02 }],
+      transform: [
+        { translateY: metrics.isCompactPhone ? -6 : -9 },
+        { scale: 1.02 },
+      ],
     },
     centerTabActiveIndicator: {
       backgroundColor: "transparent",
@@ -6063,9 +6246,9 @@ const createStyles = (theme: MobileTheme) =>
       lineHeight: 30,
     },
     centerTabIconImage: {
-      height: 34,
+      height: metrics.isCompactPhone ? 27 : 34,
       tintColor: theme.colors.foregroundInverse,
-      width: 34,
+      width: metrics.isCompactPhone ? 27 : 34,
     },
     centerTabHalo: {
       alignItems: "center",
@@ -6075,15 +6258,15 @@ const createStyles = (theme: MobileTheme) =>
       borderColor: theme.isDark
         ? "rgba(255, 246, 205, 0.7)"
         : "rgba(184, 117, 11, 0.28)",
-      borderRadius: 35,
+      borderRadius: metrics.isCompactPhone ? 29 : 35,
       borderWidth: 2,
-      height: 70,
+      height: metrics.isCompactPhone ? 58 : 70,
       justifyContent: "center",
       shadowColor: theme.colors.deepGold,
       shadowOffset: { height: 10, width: 0 },
       shadowOpacity: theme.isDark ? 0.44 : 0.14,
       shadowRadius: 18,
-      width: 70,
+      width: metrics.isCompactPhone ? 58 : 70,
     },
     centerTabInner: {
       alignItems: "center",
@@ -6091,17 +6274,17 @@ const createStyles = (theme: MobileTheme) =>
       borderColor: theme.isDark
         ? "rgba(255, 248, 220, 0.28)"
         : "rgba(255, 253, 248, 0.56)",
-      borderRadius: 28,
+      borderRadius: metrics.isCompactPhone ? 23 : 28,
       borderWidth: 1,
-      height: 56,
+      height: metrics.isCompactPhone ? 46 : 56,
       justifyContent: "center",
-      width: 56,
+      width: metrics.isCompactPhone ? 46 : 56,
     },
     centerTabPlusText: {
       color: theme.isDark ? theme.colors.cream : theme.colors.foregroundInverse,
       fontFamily: mobileTypography.uiRegular,
-      fontSize: 41,
-      lineHeight: 44,
+      fontSize: metrics.isCompactPhone ? 32 : 41,
+      lineHeight: metrics.isCompactPhone ? 35 : 44,
       marginTop: -2,
     },
     exploreCompassIcon: {
@@ -6193,12 +6376,17 @@ const createStyles = (theme: MobileTheme) =>
       textAlign: "center",
     },
     content: {
-      gap: 18,
-      paddingBottom: 170,
-      paddingHorizontal: 20,
+      flexGrow: 1,
+      gap: metrics.isCompactPhone ? 14 : 18,
+      paddingBottom: metrics.contentBottomPadding,
+      paddingHorizontal: metrics.screenPadding,
+      paddingTop: 8,
     },
     homeContent: {
-      paddingBottom: 128,
+      paddingBottom: metrics.contentBottomPadding,
+    },
+    checkoutContent: {
+      paddingBottom: 0,
     },
     immersiveContent: {
       paddingHorizontal: 0,
@@ -6643,9 +6831,9 @@ const createStyles = (theme: MobileTheme) =>
     heroEyebrow: {
       color: theme.colors.mutedForeground,
       fontFamily: mobileTypography.uiMedium,
-      fontSize: 15,
+      fontSize: metrics.isCompactPhone ? 13 : 15,
       letterSpacing: 0,
-      lineHeight: 22,
+      lineHeight: metrics.isCompactPhone ? 19 : 22,
       marginTop: 2,
     },
     heroGlow: {
@@ -6659,14 +6847,14 @@ const createStyles = (theme: MobileTheme) =>
       borderColor: theme.colors.gold,
       borderRadius: 27,
       borderWidth: 2,
-      height: 54,
+      height: metrics.isCompactPhone ? 46 : 54,
       justifyContent: "center",
       position: "relative",
       shadowColor: theme.colors.deepGold,
       shadowOffset: { height: 8, width: 0 },
       shadowOpacity: theme.isDark ? 0.22 : 0.08,
       shadowRadius: 14,
-      width: 54,
+      width: metrics.isCompactPhone ? 46 : 54,
     },
     heroProfileStatusDot: {
       backgroundColor: theme.colors.success,
@@ -6682,15 +6870,15 @@ const createStyles = (theme: MobileTheme) =>
     heroProfileText: {
       color: theme.isDark ? theme.colors.cream : theme.colors.deepGold,
       fontFamily: mobileTypography.kufiBold,
-      fontSize: 25,
-      lineHeight: 32,
+      fontSize: metrics.isCompactPhone ? 21 : 25,
+      lineHeight: metrics.isCompactPhone ? 27 : 32,
     },
     heroTitle: {
       color: theme.colors.foreground,
       fontFamily: mobileTypography.kufiBold,
-      fontSize: 34,
+      fontSize: metrics.h1,
       letterSpacing: -0.6,
-      lineHeight: 40,
+      lineHeight: metrics.h1 + 7,
     },
     heroTopRow: {
       alignItems: "center",
@@ -6703,16 +6891,17 @@ const createStyles = (theme: MobileTheme) =>
       marginTop: 20,
     },
     homeBusinessCardSlot: {
-      flexBasis: "31%",
+      flexBasis: metrics.isCompactPhone ? "100%" : "31%",
       flexGrow: 1,
       minWidth: 0,
     },
     homeBusinessGrid: {
       flexDirection: "row",
+      flexWrap: "wrap",
       gap: 10,
     },
     homeBottomSpacer: {
-      height: 220,
+      height: metrics.contentBottomPadding,
     },
     homeRecommendationBadge: {
       color: theme.colors.deepGold,
@@ -6730,7 +6919,8 @@ const createStyles = (theme: MobileTheme) =>
         : "rgba(184, 117, 11, 0.22)",
       borderRadius: 22,
       borderWidth: 1,
-      flex: 1,
+      flex: metrics.isCompactPhone ? 0 : 1,
+      flexBasis: metrics.isCompactPhone ? "100%" : "31%",
       minWidth: 0,
       overflow: "hidden",
       shadowColor: theme.colors.shadow,
@@ -6744,6 +6934,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     homeRecommendationGrid: {
       flexDirection: "row",
+      flexWrap: "wrap",
       gap: 10,
     },
     homeRecommendationMedia: {
@@ -6823,9 +7014,9 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.foreground,
       flex: 1,
       fontFamily: mobileTypography.kufiBold,
-      fontSize: 22,
+      fontSize: metrics.h2,
       letterSpacing: -0.2,
-      lineHeight: 30,
+      lineHeight: metrics.h2 + 8,
       textAlign: "right",
     },
     hiddenText: {
@@ -6866,10 +7057,10 @@ const createStyles = (theme: MobileTheme) =>
     homeThemeOption: {
       alignItems: "center",
       borderRadius: 18,
-      height: 34,
+      height: metrics.isCompactPhone ? 30 : 34,
       justifyContent: "center",
-      minWidth: 48,
-      paddingHorizontal: 9,
+      minWidth: metrics.isCompactPhone ? 38 : 48,
+      paddingHorizontal: metrics.isCompactPhone ? 7 : 9,
     },
     homeThemeOptionActive: {
       backgroundColor: theme.isDark
@@ -6897,8 +7088,8 @@ const createStyles = (theme: MobileTheme) =>
     homeThemeText: {
       color: theme.colors.mutedForeground,
       fontFamily: mobileTypography.uiMedium,
-      fontSize: 11,
-      lineHeight: 15,
+      fontSize: metrics.isCompactPhone ? 9 : 11,
+      lineHeight: metrics.isCompactPhone ? 12 : 15,
     },
     homeThemeTextActive: {
       color: theme.colors.gold,
@@ -6907,7 +7098,8 @@ const createStyles = (theme: MobileTheme) =>
       alignItems: "center",
       flexDirection: "row",
       gap: 9,
-      minWidth: 112,
+      flexShrink: 1,
+      minWidth: metrics.isCompactPhone ? 96 : 112,
     },
     homeLocationChevron: {
       color: theme.colors.foreground,
@@ -6972,15 +7164,18 @@ const createStyles = (theme: MobileTheme) =>
       width: 260,
     },
     homeReferenceScreen: {
-      gap: 15,
+      gap: metrics.isCompactPhone ? 12 : 15,
       overflow: "hidden",
-      paddingTop: 14,
+      paddingTop: metrics.isCompactPhone ? 8 : 14,
       position: "relative",
     },
     homeTopControls: {
       alignItems: "center",
       flexDirection: "row",
-      gap: 8,
+      flexShrink: 1,
+      flexWrap: "wrap",
+      gap: metrics.isCompactPhone ? 5 : 8,
+      justifyContent: "flex-end",
     },
     newReznoCard: {
       alignItems: "center",
@@ -7487,9 +7682,16 @@ const createStyles = (theme: MobileTheme) =>
       gap: 8,
       justifyContent: "space-between",
     },
-    onboardingActions: {
-      gap: 14,
-      marginTop: 96,
+    onboardingFixedActions: {
+      backgroundColor: "rgba(2, 8, 5, 0.92)",
+      borderTopColor: "rgba(255, 193, 58, 0.1)",
+      borderTopWidth: 1,
+      bottom: 0,
+      gap: 12,
+      left: 0,
+      paddingTop: 14,
+      position: "absolute",
+      right: 0,
     },
     categoryRailCardBlue: {
       borderColor: "#38a9d3",
@@ -7508,16 +7710,26 @@ const createStyles = (theme: MobileTheme) =>
       fontFamily: mobileTypography.uiRegular,
       fontSize: 26,
       lineHeight: 40,
-      marginTop: 28,
+      marginTop: 22,
       textAlign: "center",
+    },
+    onboardingBodyCompact: {
+      fontSize: 21,
+      lineHeight: 31,
+      marginTop: 14,
     },
     onboardingBrand: {
       color: theme.colors.foreground,
       fontFamily: mobileTypography.kufiBold,
       fontSize: 44,
       letterSpacing: 2,
-      marginTop: 24,
+      marginTop: 18,
       textAlign: "center",
+    },
+    onboardingBrandCompact: {
+      fontSize: 34,
+      lineHeight: 43,
+      marginTop: 10,
     },
     onboardingBrandRow: {
       alignItems: "center",
@@ -7527,10 +7739,16 @@ const createStyles = (theme: MobileTheme) =>
     onboardingCard: {
       backgroundColor: theme.colors.hero,
       borderRadius: 0,
-      flex: 1,
+      flexGrow: 1,
+      justifyContent: "center",
+      minHeight: "100%",
       overflow: "hidden",
       paddingHorizontal: 28,
-      paddingVertical: 28,
+      paddingVertical: 24,
+    },
+    onboardingCardCompact: {
+      paddingHorizontal: 22,
+      paddingVertical: 16,
     },
     onboardingGlow: {
       backgroundColor: theme.colors.goldSoft,
@@ -7539,7 +7757,7 @@ const createStyles = (theme: MobileTheme) =>
       opacity: 0.34,
       position: "absolute",
       right: -94,
-      top: 130,
+      top: "16%",
       width: 260,
     },
     onboardingHighlight: {
@@ -7559,7 +7777,10 @@ const createStyles = (theme: MobileTheme) =>
       flexDirection: "row",
       flexWrap: "wrap",
       gap: 8,
-      marginTop: 22,
+      marginTop: 18,
+    },
+    onboardingHighlightsCompact: {
+      marginTop: 12,
     },
     onboardingLogo: {
       alignItems: "center",
@@ -7567,14 +7788,29 @@ const createStyles = (theme: MobileTheme) =>
       backgroundColor: "transparent",
       height: 156,
       justifyContent: "center",
-      marginTop: 78,
       width: 156,
+    },
+    onboardingLogoCompact: {
+      height: 112,
+      width: 112,
+    },
+    onboardingLogoVeryCompact: {
+      height: 92,
+      width: 92,
     },
     onboardingLogoText: {
       color: theme.colors.gold,
       fontFamily: mobileTypography.uiBold,
       fontSize: 132,
       lineHeight: 142,
+    },
+    onboardingLogoTextCompact: {
+      fontSize: 96,
+      lineHeight: 104,
+    },
+    onboardingLogoTextVeryCompact: {
+      fontSize: 78,
+      lineHeight: 86,
     },
     onboardingSecondary: {
       alignItems: "center",
@@ -7596,13 +7832,21 @@ const createStyles = (theme: MobileTheme) =>
       flex: 1,
       paddingHorizontal: 0,
     },
+    onboardingScrollContent: {
+      flexGrow: 1,
+    },
     onboardingSlogan: {
       color: theme.colors.gold,
       fontFamily: mobileTypography.uiRegular,
       fontSize: 31,
       lineHeight: 38,
-      marginTop: 16,
+      marginTop: 12,
       textAlign: "center",
+    },
+    onboardingSloganCompact: {
+      fontSize: 24,
+      lineHeight: 31,
+      marginTop: 6,
     },
     onboardingPattern: {
       bottom: 0,
@@ -7620,7 +7864,7 @@ const createStyles = (theme: MobileTheme) =>
       left: -44,
       position: "absolute",
       right: -44,
-      top: 82,
+      top: "9%",
       transform: [{ rotate: "-8deg" }],
     },
     onboardingPatternLine: {
@@ -8137,9 +8381,9 @@ const createStyles = (theme: MobileTheme) =>
       borderWidth: 1,
       borderRadius: theme.radii.pill,
       flex: 1,
-      minHeight: 58,
+      minHeight: metrics.isCompactPhone ? 52 : 58,
       justifyContent: "center",
-      paddingVertical: 16,
+      paddingVertical: metrics.isCompactPhone ? 13 : 16,
       shadowColor: theme.colors.deepGold,
       shadowOffset: { height: 14, width: 0 },
       shadowOpacity: theme.isDark ? 0.5 : 0.18,
@@ -8153,7 +8397,7 @@ const createStyles = (theme: MobileTheme) =>
     primaryButtonText: {
       color: theme.colors.foregroundInverse,
       fontFamily: mobileTypography.uiSemiBold,
-      fontSize: 18,
+      fontSize: metrics.buttonText,
     },
     promoBadge: {
       alignItems: "center",
@@ -8680,26 +8924,26 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.mutedForeground,
       fontFamily: mobileTypography.uiRegular,
       flexShrink: 1,
-      fontSize: 15,
-      lineHeight: 23,
-      marginTop: 8,
+      fontSize: metrics.body,
+      lineHeight: metrics.body + 8,
+      marginTop: metrics.isCompactPhone ? 5 : 8,
     },
     screenEyebrow: {
       color: theme.colors.gold,
       fontFamily: mobileTypography.uiMedium,
       flexShrink: 1,
-      fontSize: 12,
+      fontSize: metrics.caption,
       letterSpacing: 0.2,
-      lineHeight: 16,
+      lineHeight: metrics.caption + 4,
     },
     screenTitle: {
       color: theme.colors.foreground,
       fontFamily: mobileTypography.kufiBold,
       flexShrink: 1,
-      fontSize: 29,
+      fontSize: metrics.h1,
       letterSpacing: -0.3,
-      lineHeight: 37,
-      marginTop: 8,
+      lineHeight: metrics.h1 + 8,
+      marginTop: metrics.isCompactPhone ? 5 : 8,
     },
     iconButtonPressed: {
       opacity: 0.86,
@@ -8708,12 +8952,12 @@ const createStyles = (theme: MobileTheme) =>
     mapBusinessPin: {
       backgroundColor: "#07090d",
       borderColor: "#ffffff",
-      borderRadius: 45,
-      borderWidth: 6,
-      height: 90,
+      borderRadius: metrics.isCompactPhone ? 34 : 45,
+      borderWidth: metrics.isCompactPhone ? 4 : 6,
+      height: metrics.isCompactPhone ? 68 : 90,
       overflow: "hidden",
       position: "absolute",
-      width: 90,
+      width: metrics.isCompactPhone ? 68 : 90,
       ...createMobileShadow(theme, {
         darkOpacity: 0.25,
         height: 8,
@@ -8780,30 +9024,30 @@ const createStyles = (theme: MobileTheme) =>
     },
     mapPulseCore: {
       backgroundColor: "#1473f9",
-      borderRadius: 22,
-      height: 44,
-      width: 44,
+      borderRadius: metrics.isCompactPhone ? 18 : 22,
+      height: metrics.isCompactPhone ? 36 : 44,
+      width: metrics.isCompactPhone ? 36 : 44,
     },
     mapPulseMiddle: {
       alignItems: "center",
       backgroundColor: "rgba(20, 115, 249, 0.46)",
-      borderRadius: 76,
-      height: 104,
+      borderRadius: metrics.isCompactPhone ? 56 : 76,
+      height: metrics.isCompactPhone ? 78 : 104,
       justifyContent: "center",
-      width: 104,
+      width: metrics.isCompactPhone ? 78 : 104,
     },
     mapPulseOuter: {
       alignItems: "center",
       backgroundColor: "rgba(20, 115, 249, 0.24)",
-      borderRadius: 88,
-      height: 150,
+      borderRadius: metrics.isCompactPhone ? 66 : 88,
+      height: metrics.isCompactPhone ? 112 : 150,
       justifyContent: "center",
       left: "43%",
-      marginLeft: -75,
-      marginTop: -75,
+      marginLeft: metrics.isCompactPhone ? -56 : -75,
+      marginTop: metrics.isCompactPhone ? -56 : -75,
       position: "absolute",
       top: "57%",
-      width: 150,
+      width: metrics.isCompactPhone ? 112 : 150,
     },
     mapRoad: {
       backgroundColor: "rgba(119, 151, 166, 0.42)",
@@ -8827,9 +9071,10 @@ const createStyles = (theme: MobileTheme) =>
     },
     salonActionGrid: {
       flexDirection: "row-reverse",
-      gap: 14,
+      flexWrap: "wrap",
+      gap: metrics.isCompactPhone ? 8 : 14,
       justifyContent: "space-between",
-      marginTop: 14,
+      marginTop: metrics.isCompactPhone ? 10 : 14,
     },
     salonActionIcon: {
       color: theme.colors.gold,
@@ -8838,16 +9083,16 @@ const createStyles = (theme: MobileTheme) =>
       lineHeight: 30,
     },
     salonActionIconImage: {
-      height: 29,
+      height: metrics.isCompactPhone ? 22 : 29,
       tintColor: theme.colors.gold,
-      width: 29,
+      width: metrics.isCompactPhone ? 22 : 29,
     },
     salonActionLabel: {
       color: theme.colors.foreground,
       fontFamily: mobileTypography.uiMedium,
-      fontSize: 14,
-      lineHeight: 20,
-      marginTop: 10,
+      fontSize: metrics.isCompactPhone ? 12 : 14,
+      lineHeight: metrics.isCompactPhone ? 17 : 20,
+      marginTop: metrics.isCompactPhone ? 6 : 10,
     },
     salonActionTile: {
       alignItems: "center",
@@ -8860,11 +9105,12 @@ const createStyles = (theme: MobileTheme) =>
       borderRadius: 24,
       borderWidth: 1,
       elevation: theme.isDark ? 3 : 2,
-      flex: 1,
+      flexBasis: metrics.isCompactPhone ? "48%" : "22%",
+      flexGrow: 1,
       justifyContent: "center",
-      minHeight: 104,
-      paddingHorizontal: 10,
-      paddingVertical: 16,
+      minHeight: metrics.isCompactPhone ? 74 : 104,
+      paddingHorizontal: metrics.isCompactPhone ? 8 : 10,
+      paddingVertical: metrics.isCompactPhone ? 10 : 16,
       shadowColor: theme.colors.deepGold,
       shadowOffset: { height: 10, width: 0 },
       shadowOpacity: theme.isDark ? 0.18 : 0.08,
@@ -8876,18 +9122,18 @@ const createStyles = (theme: MobileTheme) =>
         ? "rgba(5, 12, 10, 0.68)"
         : "rgba(255, 253, 247, 0.9)",
       borderColor: theme.colors.gold,
-      borderRadius: 34,
+      borderRadius: metrics.isCompactPhone ? 26 : 34,
       borderWidth: 1,
-      height: 68,
+      height: metrics.isCompactPhone ? 52 : 68,
       justifyContent: "center",
       position: "absolute",
-      right: 30,
+      right: metrics.screenPadding,
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: 12, width: 0 },
       shadowOpacity: theme.isDark ? 0.28 : 0.12,
       shadowRadius: 18,
-      top: 66,
-      width: 68,
+      top: metrics.topSafePadding,
+      width: metrics.isCompactPhone ? 52 : 68,
       zIndex: 2,
     },
     salonBackIcon: {
@@ -8898,9 +9144,9 @@ const createStyles = (theme: MobileTheme) =>
       marginTop: -4,
     },
     salonBackIconImage: {
-      height: 28,
+      height: metrics.isCompactPhone ? 22 : 28,
       tintColor: theme.isDark ? theme.colors.gold : theme.colors.foreground,
-      width: 28,
+      width: metrics.isCompactPhone ? 22 : 28,
     },
     salonDetailScreen: {
       backgroundColor: theme.isDark ? "#020805" : "#fff8ea",
@@ -8912,7 +9158,7 @@ const createStyles = (theme: MobileTheme) =>
       paddingBottom: 4,
     },
     salonBottomSpacer: {
-      height: 150,
+      height: metrics.contentBottomPadding,
     },
     salonCtaArrow: {
       alignItems: "center",
@@ -8931,7 +9177,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     salonHero: {
       backgroundColor: theme.isDark ? "#020806" : "#fff7e8",
-      height: 392,
+      height: metrics.isCompactPhone ? 300 : 392,
       marginHorizontal: 0,
       overflow: "hidden",
       position: "relative",
@@ -8939,9 +9185,9 @@ const createStyles = (theme: MobileTheme) =>
     salonHeroActions: {
       flexDirection: "row",
       gap: 14,
-      left: 30,
+      left: metrics.screenPadding,
       position: "absolute",
-      top: 66,
+      top: metrics.topSafePadding,
       zIndex: 2,
     },
     salonHeroCaption: {
@@ -9233,16 +9479,16 @@ const createStyles = (theme: MobileTheme) =>
         ? "rgba(3, 14, 10, 0.96)"
         : "rgba(255, 253, 247, 0.96)",
       borderColor: theme.colors.goldSoft,
-      borderTopLeftRadius: 48,
-      borderTopRightRadius: 48,
+      borderTopLeftRadius: metrics.isCompactPhone ? 34 : 48,
+      borderTopRightRadius: metrics.isCompactPhone ? 34 : 48,
       borderWidth: 1,
       gap: 0,
-      marginHorizontal: 20,
-      marginTop: -76,
+      marginHorizontal: metrics.screenPadding,
+      marginTop: metrics.isCompactPhone ? -52 : -76,
       overflow: "hidden",
-      paddingBottom: 26,
-      paddingHorizontal: 22,
-      paddingTop: 30,
+      paddingBottom: metrics.isCompactPhone ? 18 : 26,
+      paddingHorizontal: metrics.isCompactPhone ? 14 : 22,
+      paddingTop: metrics.isCompactPhone ? 22 : 30,
       position: "relative",
       shadowColor: theme.colors.deepGold,
       shadowOffset: { height: 18, width: 0 },
@@ -9260,28 +9506,28 @@ const createStyles = (theme: MobileTheme) =>
       borderWidth: 1,
       flexDirection: "row",
       gap: 9,
-      height: 50,
-      marginTop: 12,
+      height: metrics.isCompactPhone ? 42 : 50,
+      marginTop: metrics.isCompactPhone ? 8 : 12,
       overflow: "hidden",
       paddingHorizontal: 18,
     },
     salonLikesHeart: {
       color: theme.colors.gold,
       fontFamily: mobileTypography.uiSemiBold,
-      fontSize: 22,
-      lineHeight: 28,
+      fontSize: metrics.isCompactPhone ? 18 : 22,
+      lineHeight: metrics.isCompactPhone ? 24 : 28,
     },
     salonLikesText: {
       color: theme.isDark ? theme.colors.gold : theme.colors.foreground,
       fontFamily: mobileTypography.uiSemiBold,
-      fontSize: 22,
-      lineHeight: 28,
+      fontSize: metrics.isCompactPhone ? 18 : 22,
+      lineHeight: metrics.isCompactPhone ? 24 : 28,
     },
     salonMeta: {
       color: theme.colors.mutedForeground,
       fontFamily: mobileTypography.uiRegular,
-      fontSize: 17,
-      lineHeight: 25,
+      fontSize: metrics.isCompactPhone ? 13 : 17,
+      lineHeight: metrics.isCompactPhone ? 19 : 25,
       marginTop: 6,
       textAlign: "right",
     },
@@ -9289,14 +9535,14 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.foreground,
       fontFamily: mobileTypography.kufiBold,
       flexShrink: 1,
-      fontSize: 32,
+      fontSize: metrics.isCompactPhone ? 24 : 32,
       letterSpacing: -0.7,
-      lineHeight: 42,
+      lineHeight: metrics.isCompactPhone ? 32 : 42,
       textAlign: "right",
     },
     salonIdentityBlock: {
       alignItems: "flex-end",
-      maxWidth: "62%",
+      maxWidth: metrics.isCompactPhone ? "58%" : "62%",
       minWidth: 0,
       position: "absolute",
       right: 0,
@@ -9305,7 +9551,7 @@ const createStyles = (theme: MobileTheme) =>
     salonMetricsBlock: {
       alignItems: "flex-start",
       left: 0,
-      minWidth: 124,
+      minWidth: metrics.isCompactPhone ? 104 : 124,
       position: "absolute",
       top: 4,
     },
@@ -9326,15 +9572,15 @@ const createStyles = (theme: MobileTheme) =>
       fontSize: 23,
     },
     salonRatingStarImage: {
-      height: 28,
+      height: metrics.isCompactPhone ? 22 : 28,
       tintColor: theme.colors.gold,
-      width: 28,
+      width: metrics.isCompactPhone ? 22 : 28,
     },
     salonRatingText: {
       color: theme.colors.foreground,
       fontFamily: mobileTypography.uiSemiBold,
-      fontSize: 23,
-      lineHeight: 31,
+      fontSize: metrics.isCompactPhone ? 18 : 23,
+      lineHeight: metrics.isCompactPhone ? 24 : 31,
     },
     salonRoundButton: {
       alignItems: "center",
@@ -9342,15 +9588,15 @@ const createStyles = (theme: MobileTheme) =>
         ? "rgba(5, 12, 10, 0.7)"
         : "rgba(255, 253, 247, 0.92)",
       borderColor: theme.colors.gold,
-      borderRadius: 34,
+      borderRadius: metrics.isCompactPhone ? 26 : 34,
       borderWidth: 1,
-      height: 68,
+      height: metrics.isCompactPhone ? 52 : 68,
       justifyContent: "center",
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: 12, width: 0 },
       shadowOpacity: theme.isDark ? 0.24 : 0.12,
       shadowRadius: 18,
-      width: 68,
+      width: metrics.isCompactPhone ? 52 : 68,
     },
     salonRoundButtonText: {
       color: theme.colors.foreground,
@@ -9359,9 +9605,9 @@ const createStyles = (theme: MobileTheme) =>
       lineHeight: 34,
     },
     salonRoundButtonIcon: {
-      height: 30,
+      height: metrics.isCompactPhone ? 22 : 30,
       tintColor: theme.isDark ? theme.colors.gold : theme.colors.foreground,
-      width: 30,
+      width: metrics.isCompactPhone ? 22 : 30,
     },
     salonServiceAdd: {
       alignItems: "center",
@@ -9370,15 +9616,15 @@ const createStyles = (theme: MobileTheme) =>
       borderRadius: 28,
       borderWidth: 1,
       flexShrink: 0,
-      height: 56,
+      height: metrics.isCompactPhone ? 44 : 56,
       justifyContent: "center",
-      width: 56,
+      width: metrics.isCompactPhone ? 44 : 56,
     },
     salonServiceAddText: {
       color: theme.colors.gold,
       fontFamily: mobileTypography.uiSemiBold,
-      fontSize: 36,
-      lineHeight: 39,
+      fontSize: metrics.isCompactPhone ? 28 : 36,
+      lineHeight: metrics.isCompactPhone ? 31 : 39,
       marginTop: -3,
     },
     salonServiceActionBlock: {
@@ -9417,30 +9663,30 @@ const createStyles = (theme: MobileTheme) =>
       borderRadius: 18,
       borderWidth: 1,
       flexShrink: 0,
-      height: 88,
+      height: metrics.isCompactPhone ? 70 : 88,
       overflow: "hidden",
-      width: 116,
+      width: metrics.isCompactPhone ? 88 : 116,
     },
     salonServiceMeta: {
       color: theme.colors.mutedForeground,
       fontFamily: mobileTypography.uiRegular,
-      fontSize: 17,
-      lineHeight: 24,
+      fontSize: metrics.isCompactPhone ? 13 : 17,
+      lineHeight: metrics.isCompactPhone ? 19 : 24,
       marginTop: 8,
       textAlign: "right",
     },
     salonServiceName: {
       color: theme.colors.foreground,
       fontFamily: mobileTypography.kufiBold,
-      fontSize: 22,
-      lineHeight: 30,
+      fontSize: metrics.isCompactPhone ? 17 : 22,
+      lineHeight: metrics.isCompactPhone ? 24 : 30,
       textAlign: "right",
     },
     salonServicePrice: {
       color: theme.colors.foreground,
       fontFamily: mobileTypography.uiSemiBold,
-      fontSize: 21,
-      lineHeight: 28,
+      fontSize: metrics.isCompactPhone ? 16 : 21,
+      lineHeight: metrics.isCompactPhone ? 23 : 28,
       marginTop: 4,
       textAlign: "right",
     },
@@ -9456,9 +9702,9 @@ const createStyles = (theme: MobileTheme) =>
       borderRadius: 24,
       borderWidth: 1,
       elevation: theme.isDark ? 3 : 2,
-      gap: 16,
+      gap: metrics.isCompactPhone ? 10 : 16,
       justifyContent: "space-between",
-      padding: 12,
+      padding: metrics.isCompactPhone ? 10 : 12,
       shadowColor: theme.colors.deepGold,
       shadowOffset: { height: 12, width: 0 },
       shadowOpacity: theme.isDark ? 0.2 : 0.08,
@@ -9474,15 +9720,16 @@ const createStyles = (theme: MobileTheme) =>
       borderBottomColor: theme.colors.border,
       borderBottomWidth: 1,
       flexDirection: "row-reverse",
+      flexWrap: "wrap",
       justifyContent: "space-between",
-      marginTop: 32,
+      marginTop: metrics.isCompactPhone ? 20 : 32,
     },
     salonTabText: {
       color: theme.colors.mutedForeground,
       fontFamily: mobileTypography.uiMedium,
-      fontSize: 16,
-      lineHeight: 23,
-      paddingBottom: 16,
+      fontSize: metrics.isCompactPhone ? 13 : 16,
+      lineHeight: metrics.isCompactPhone ? 19 : 23,
+      paddingBottom: metrics.isCompactPhone ? 10 : 16,
       textAlign: "center",
     },
     salonTabTextActive: {
@@ -9491,7 +9738,7 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.gold,
     },
     salonTitleRow: {
-      minHeight: 112,
+      minHeight: metrics.isCompactPhone ? 92 : 112,
       position: "relative",
       width: "100%",
     },
@@ -9506,7 +9753,7 @@ const createStyles = (theme: MobileTheme) =>
       alignItems: "center",
       backgroundColor: theme.colors.gold,
       borderRadius: theme.radii.pill,
-      minHeight: 70,
+      minHeight: metrics.isCompactPhone ? 58 : 70,
       justifyContent: "center",
       overflow: "hidden",
       position: "relative",
@@ -9535,8 +9782,8 @@ const createStyles = (theme: MobileTheme) =>
     salonReferenceCtaText: {
       color: theme.colors.foregroundInverse,
       fontFamily: mobileTypography.kufiBold,
-      fontSize: 24,
-      lineHeight: 32,
+      fontSize: metrics.isCompactPhone ? 19 : 24,
+      lineHeight: metrics.isCompactPhone ? 27 : 32,
       textAlign: "center",
     },
     searchMapBoundaryCard: {
@@ -9549,9 +9796,9 @@ const createStyles = (theme: MobileTheme) =>
     },
     searchMapCanvas: {
       backgroundColor: "#dceaf0",
-      borderRadius: 36,
-      height: 410,
-      marginTop: 18,
+      borderRadius: metrics.isCompactPhone ? 28 : 36,
+      height: metrics.mapHeight,
+      marginTop: metrics.isCompactPhone ? 12 : 18,
       overflow: "hidden",
       position: "relative",
     },
@@ -9563,10 +9810,10 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.foreground,
       fontFamily: mobileTypography.uiMedium,
       flexGrow: 1,
-      fontSize: 14,
+      fontSize: metrics.isCompactPhone ? 12 : 14,
       overflow: "hidden",
-      paddingHorizontal: 18,
-      paddingVertical: 12,
+      paddingHorizontal: metrics.isCompactPhone ? 10 : 18,
+      paddingVertical: metrics.isCompactPhone ? 9 : 12,
       textAlign: "center",
     },
     searchMapChipActive: {
@@ -9575,16 +9822,17 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.foregroundInverse,
       fontFamily: mobileTypography.uiMedium,
       flexGrow: 1,
-      fontSize: 15,
+      fontSize: metrics.isCompactPhone ? 12 : 15,
       overflow: "hidden",
-      paddingHorizontal: 24,
-      paddingVertical: 13,
+      paddingHorizontal: metrics.isCompactPhone ? 12 : 24,
+      paddingVertical: metrics.isCompactPhone ? 10 : 13,
       textAlign: "center",
     },
     searchMapChipRow: {
       flexDirection: "row-reverse",
-      gap: 12,
-      marginTop: 20,
+      flexWrap: "wrap",
+      gap: metrics.isCompactPhone ? 8 : 12,
+      marginTop: metrics.isCompactPhone ? 14 : 20,
     },
     searchMapFilterButton: {
       alignItems: "center",
@@ -9592,9 +9840,9 @@ const createStyles = (theme: MobileTheme) =>
       borderColor: theme.colors.border,
       borderRadius: 30,
       borderWidth: 1,
-      height: 60,
+      height: metrics.isCompactPhone ? 52 : 60,
       justifyContent: "center",
-      width: 60,
+      width: metrics.isCompactPhone ? 52 : 60,
     },
     searchMapFilterIcon: {
       color: theme.colors.foreground,
@@ -9610,8 +9858,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     searchMapScreen: {
       backgroundColor: theme.colors.background,
-      paddingHorizontal: 20,
-      paddingTop: 14,
+      paddingHorizontal: metrics.screenPadding,
+      paddingTop: metrics.topSafePadding,
     },
     searchMapTopRow: {
       alignItems: "center",
@@ -9626,11 +9874,16 @@ const createStyles = (theme: MobileTheme) =>
     },
     searchResultCard: {
       alignItems: "center",
-      backgroundColor: "#f4f6f8",
-      borderRadius: 26,
+      backgroundColor: theme.isDark
+        ? "rgba(8, 27, 21, 0.92)"
+        : "#f4f6f8",
+      borderColor: theme.isDark ? theme.colors.goldSoft : "transparent",
+      borderRadius: metrics.isCompactPhone ? 22 : 26,
+      borderWidth: theme.isDark ? 1 : 0,
       flexDirection: "row-reverse",
-      gap: 16,
-      paddingVertical: 11,
+      gap: metrics.isCompactPhone ? 10 : 16,
+      paddingHorizontal: metrics.isCompactPhone ? 10 : 0,
+      paddingVertical: metrics.isCompactPhone ? 10 : 11,
     },
     searchResultCardPressed: {
       opacity: 0.9,
@@ -9641,9 +9894,9 @@ const createStyles = (theme: MobileTheme) =>
       minWidth: 0,
     },
     searchResultDistance: {
-      color: "#6b7280",
+      color: theme.isDark ? theme.colors.mutedForeground : "#6b7280",
       fontFamily: mobileTypography.uiRegular,
-      fontSize: 15,
+      fontSize: metrics.isCompactPhone ? 12 : 15,
     },
     searchResultHeart: {
       color: "#111827",
@@ -9658,39 +9911,39 @@ const createStyles = (theme: MobileTheme) =>
     },
     searchResultMedia: {
       borderRadius: 20,
-      height: 88,
+      height: metrics.isCompactPhone ? 72 : 88,
       overflow: "hidden",
-      width: 116,
+      width: metrics.isCompactPhone ? 92 : 116,
     },
     searchResultMeta: {
-      color: "#6b7280",
+      color: theme.isDark ? theme.colors.mutedForeground : "#6b7280",
       fontFamily: mobileTypography.uiRegular,
-      fontSize: 16,
-      lineHeight: 22,
+      fontSize: metrics.isCompactPhone ? 13 : 16,
+      lineHeight: metrics.isCompactPhone ? 18 : 22,
       marginTop: 4,
     },
     searchResultName: {
-      color: "#101827",
+      color: theme.isDark ? theme.colors.foreground : "#101827",
       fontFamily: mobileTypography.uiSemiBold,
-      fontSize: 24,
+      fontSize: metrics.isCompactPhone ? 18 : 24,
       letterSpacing: -0.4,
-      lineHeight: 31,
+      lineHeight: metrics.isCompactPhone ? 24 : 31,
     },
     searchResultPrice: {
-      color: "#101827",
+      color: theme.isDark ? theme.colors.foreground : "#101827",
       fontFamily: mobileTypography.uiSemiBold,
-      fontSize: 17,
+      fontSize: metrics.isCompactPhone ? 14 : 17,
       marginTop: 8,
     },
     searchResultRating: {
-      color: "#101827",
+      color: theme.isDark ? theme.colors.foreground : "#101827",
       fontFamily: mobileTypography.uiSemiBold,
-      fontSize: 17,
+      fontSize: metrics.isCompactPhone ? 14 : 17,
     },
     searchResultReviews: {
-      color: "#101827",
+      color: theme.isDark ? theme.colors.foreground : "#101827",
       fontFamily: mobileTypography.uiRegular,
-      fontSize: 17,
+      fontSize: metrics.isCompactPhone ? 14 : 17,
     },
     searchResultShare: {
       color: "#6b7280",
@@ -9700,7 +9953,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     searchResultShareImage: {
       height: 23,
-      tintColor: "#6b7280",
+      tintColor: theme.isDark ? theme.colors.mutedForeground : "#6b7280",
       width: 23,
     },
     searchResultStarImage: {
@@ -9715,19 +9968,24 @@ const createStyles = (theme: MobileTheme) =>
       marginTop: 10,
     },
     searchResultsSheet: {
-      backgroundColor: "#f4f6f8",
-      borderTopLeftRadius: 42,
-      borderTopRightRadius: 42,
-      gap: 12,
-      marginTop: -42,
-      padding: 24,
-      paddingTop: 40,
+      backgroundColor: theme.isDark
+        ? "rgba(5, 16, 13, 0.98)"
+        : "#f4f6f8",
+      borderTopColor: theme.isDark ? theme.colors.goldSoft : "transparent",
+      borderTopLeftRadius: metrics.isCompactPhone ? 32 : 42,
+      borderTopRightRadius: metrics.isCompactPhone ? 32 : 42,
+      borderTopWidth: theme.isDark ? 1 : 0,
+      gap: metrics.isCompactPhone ? 10 : 12,
+      marginTop: metrics.isCompactPhone ? -30 : -42,
+      padding: metrics.screenPadding,
+      paddingBottom: metrics.contentBottomPadding,
+      paddingTop: metrics.isCompactPhone ? 30 : 40,
     },
     searchResultsTitle: {
-      color: "#101827",
+      color: theme.isDark ? theme.colors.foreground : "#101827",
       fontFamily: mobileTypography.kufiBold,
-      fontSize: 27,
-      lineHeight: 35,
+      fontSize: metrics.isCompactPhone ? 22 : 27,
+      lineHeight: metrics.isCompactPhone ? 29 : 35,
       marginBottom: 6,
     },
     searchActionButton: {
@@ -10145,13 +10403,13 @@ const createStyles = (theme: MobileTheme) =>
       bottom: 18,
       elevation: 24,
       flexDirection: "row",
-      height: 90,
-      left: 28,
-      paddingBottom: 9,
-      paddingHorizontal: 12,
-      paddingTop: 9,
+      height: metrics.bottomNavHeight,
+      left: metrics.screenPadding,
+      paddingBottom: metrics.isCompactPhone ? 6 : 9,
+      paddingHorizontal: metrics.isCompactPhone ? 8 : 12,
+      paddingTop: metrics.isCompactPhone ? 6 : 9,
       position: "absolute",
-      right: 28,
+      right: metrics.screenPadding,
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: -10, width: 0 },
       shadowOpacity: theme.isDark ? 0.54 : 0.14,
@@ -10173,9 +10431,9 @@ const createStyles = (theme: MobileTheme) =>
       alignItems: "center",
       borderRadius: 22,
       flex: 1,
-      gap: 3,
+      gap: metrics.isCompactPhone ? 1 : 3,
       justifyContent: "center",
-      minHeight: 58,
+      minHeight: metrics.isCompactPhone ? 48 : 58,
       paddingHorizontal: 0,
     },
     tabButtonActive: {
@@ -10194,9 +10452,9 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.gold,
     },
     tabIconImage: {
-      height: 28,
+      height: metrics.isCompactPhone ? 22 : 28,
       tintColor: theme.colors.foreground,
-      width: 28,
+      width: metrics.isCompactPhone ? 22 : 28,
     },
     tabIconImageActive: {
       tintColor: theme.colors.gold,
@@ -10204,10 +10462,10 @@ const createStyles = (theme: MobileTheme) =>
     tabLabel: {
       color: theme.colors.foreground,
       fontFamily: mobileTypography.uiMedium,
-      fontSize: 12,
-      lineHeight: 16,
-      maxWidth: 64,
-      minWidth: 48,
+      fontSize: metrics.isCompactPhone ? 10 : 12,
+      lineHeight: metrics.isCompactPhone ? 13 : 16,
+      maxWidth: metrics.isCompactPhone ? 54 : 64,
+      minWidth: 0,
       textAlign: "center",
     },
     tabLabelActive: {
@@ -10388,7 +10646,7 @@ const createStyles = (theme: MobileTheme) =>
       borderRadius: theme.radii.xl,
       borderWidth: 1,
       overflow: "hidden",
-      padding: 28,
+      padding: metrics.isCompactPhone ? 20 : 28,
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: 24, width: 0 },
       shadowOpacity: theme.isDark ? 0.36 : 0.12,
@@ -10411,21 +10669,21 @@ const createStyles = (theme: MobileTheme) =>
       alignItems: "center",
       backgroundColor: theme.colors.success,
       borderColor: theme.isDark ? "rgba(255, 248, 236, 0.78)" : "#ffffff",
-      borderRadius: 42,
+      borderRadius: metrics.isCompactPhone ? 34 : 42,
       borderWidth: 4,
-      height: 84,
+      height: metrics.isCompactPhone ? 68 : 84,
       justifyContent: "center",
-      marginBottom: 16,
+      marginBottom: metrics.isCompactPhone ? 10 : 16,
       shadowColor: theme.colors.success,
       shadowOffset: { height: 12, width: 0 },
       shadowOpacity: theme.isDark ? 0.28 : 0.12,
       shadowRadius: 18,
-      width: 84,
+      width: metrics.isCompactPhone ? 68 : 84,
     },
     confirmationSuccessIconImage: {
-      height: 38,
+      height: metrics.isCompactPhone ? 30 : 38,
       tintColor: "#ffffff",
-      width: 38,
+      width: metrics.isCompactPhone ? 30 : 38,
     },
     legendDot: {
       backgroundColor: theme.colors.success,
@@ -10461,11 +10719,11 @@ const createStyles = (theme: MobileTheme) =>
         ? "rgba(8, 27, 21, 0.94)"
         : theme.colors.cardElevated,
       borderColor: theme.colors.goldSoft,
-      borderRadius: 26,
+      borderRadius: metrics.isCompactPhone ? 22 : 26,
       borderWidth: 1,
       flexDirection: "row-reverse",
-      gap: 14,
-      padding: 18,
+      gap: metrics.isCompactPhone ? 10 : 14,
+      padding: metrics.isCompactPhone ? 14 : 18,
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: 10, width: 0 },
       shadowOpacity: theme.isDark ? 0.14 : 0.05,
@@ -10483,14 +10741,14 @@ const createStyles = (theme: MobileTheme) =>
       borderColor: theme.colors.gold,
       borderRadius: 18,
       borderWidth: 1,
-      height: 42,
+      height: metrics.isCompactPhone ? 36 : 42,
       justifyContent: "center",
-      width: 42,
+      width: metrics.isCompactPhone ? 36 : 42,
     },
     paymentMethodIconImage: {
-      height: 22,
+      height: metrics.isCompactPhone ? 18 : 22,
       tintColor: theme.colors.foregroundInverse,
-      width: 22,
+      width: metrics.isCompactPhone ? 18 : 22,
     },
     paymentOptionList: {
       gap: 12,
@@ -10503,7 +10761,7 @@ const createStyles = (theme: MobileTheme) =>
       borderWidth: 1,
       flexDirection: "row-reverse",
       gap: 12,
-      padding: 16,
+      padding: metrics.isCompactPhone ? 12 : 16,
     },
     securePaymentIconImage: {
       height: 22,
@@ -10521,17 +10779,17 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.success,
       flex: 1,
       fontFamily: mobileTypography.uiMedium,
-      fontSize: 12,
-      lineHeight: 18,
+      fontSize: metrics.isCompactPhone ? 11 : 12,
+      lineHeight: metrics.isCompactPhone ? 16 : 18,
     },
     staffReferenceScreen: {
       backgroundColor: theme.isDark ? "#020805" : "#fff8ea",
-      gap: 16,
-      minHeight: "100%",
+      gap: metrics.isCompactPhone ? 12 : 16,
+      minHeight: metrics.screenHeight - metrics.topSafePadding,
       overflow: "hidden",
-      paddingBottom: 232,
-      paddingHorizontal: 22,
-      paddingTop: 34,
+      paddingBottom: metrics.checkoutBottomPadding,
+      paddingHorizontal: metrics.screenPadding,
+      paddingTop: metrics.topSafePadding,
       position: "relative",
     },
     staffReferenceGlow: {
@@ -10617,16 +10875,16 @@ const createStyles = (theme: MobileTheme) =>
     staffReferenceTitle: {
       color: theme.colors.foreground,
       fontFamily: mobileTypography.kufiBold,
-      fontSize: 28,
+      fontSize: metrics.isCompactPhone ? 23 : 28,
       letterSpacing: -0.3,
-      lineHeight: 38,
+      lineHeight: metrics.isCompactPhone ? 31 : 38,
       textAlign: "right",
     },
     staffReferenceSubtitle: {
       color: theme.colors.mutedForeground,
       fontFamily: mobileTypography.uiMedium,
-      fontSize: 14,
-      lineHeight: 22,
+      fontSize: metrics.isCompactPhone ? 12 : 14,
+      lineHeight: metrics.isCompactPhone ? 18 : 22,
       textAlign: "right",
     },
     staffReferenceSummaryCard: {
@@ -10640,8 +10898,9 @@ const createStyles = (theme: MobileTheme) =>
       borderRadius: 28,
       borderWidth: 1,
       flexDirection: "row",
-      gap: 14,
-      padding: 14,
+      flexWrap: "wrap",
+      gap: metrics.isCompactPhone ? 10 : 14,
+      padding: metrics.isCompactPhone ? 11 : 14,
       shadowColor: theme.colors.deepGold,
       shadowOffset: { height: 14, width: 0 },
       shadowOpacity: theme.isDark ? 0.18 : 0.08,
@@ -10651,9 +10910,9 @@ const createStyles = (theme: MobileTheme) =>
       borderColor: theme.colors.goldSoft,
       borderRadius: 18,
       borderWidth: 1,
-      height: 94,
+      height: metrics.isCompactPhone ? 76 : 94,
       overflow: "hidden",
-      width: 138,
+      width: metrics.isCompactPhone ? 112 : 138,
     },
     staffReferenceSummaryCopy: {
       alignItems: "flex-end",
@@ -10664,15 +10923,15 @@ const createStyles = (theme: MobileTheme) =>
     staffReferenceBusinessName: {
       color: theme.colors.foreground,
       fontFamily: mobileTypography.uiSemiBold,
-      fontSize: 20,
-      lineHeight: 28,
+      fontSize: metrics.isCompactPhone ? 16 : 20,
+      lineHeight: metrics.isCompactPhone ? 23 : 28,
       textAlign: "right",
     },
     staffReferenceSummaryMeta: {
       color: theme.colors.foreground,
       fontFamily: mobileTypography.uiMedium,
-      fontSize: 15,
-      lineHeight: 23,
+      fontSize: metrics.isCompactPhone ? 13 : 15,
+      lineHeight: metrics.isCompactPhone ? 19 : 23,
       textAlign: "right",
     },
     staffReferenceSummaryMuted: {
@@ -10710,6 +10969,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     staffReferenceMethodGrid: {
       flexDirection: "row",
+      flexWrap: "wrap",
       gap: 14,
     },
     staffReferenceMethodCard: {
@@ -10720,9 +10980,10 @@ const createStyles = (theme: MobileTheme) =>
       borderColor: theme.colors.goldSoft,
       borderRadius: 26,
       borderWidth: 1,
-      flex: 1,
-      minHeight: 158,
-      padding: 16,
+      flexBasis: metrics.isNarrowPhone ? "100%" : "47%",
+      flexGrow: 1,
+      minHeight: metrics.isCompactPhone ? 128 : 158,
+      padding: metrics.isCompactPhone ? 12 : 16,
       position: "relative",
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: 10, width: 0 },
@@ -10801,6 +11062,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     staffReferenceFilterRow: {
       flexDirection: "row-reverse",
+      flexWrap: "wrap",
       gap: 8,
       justifyContent: "space-between",
     },
@@ -10812,7 +11074,8 @@ const createStyles = (theme: MobileTheme) =>
       borderColor: theme.colors.border,
       borderRadius: theme.radii.pill,
       borderWidth: 1,
-      flex: 1,
+      flexGrow: 1,
+      flexBasis: metrics.isCompactPhone ? "47%" : "22%",
       justifyContent: "center",
       minHeight: 46,
       minWidth: 0,
@@ -10835,7 +11098,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     staffReferenceSpecialistRail: {
       flexDirection: "row-reverse",
-      gap: 7,
+      flexWrap: "wrap",
+      gap: metrics.isCompactPhone ? 8 : 7,
       justifyContent: "space-between",
       paddingHorizontal: 0,
       paddingVertical: 2,
@@ -10848,8 +11112,9 @@ const createStyles = (theme: MobileTheme) =>
       borderColor: theme.colors.goldSoft,
       borderRadius: 24,
       borderWidth: 1,
-      flex: 1,
-      minHeight: 150,
+      flexBasis: metrics.isCompactPhone ? "47%" : "22%",
+      flexGrow: 1,
+      minHeight: metrics.isCompactPhone ? 134 : 150,
       minWidth: 0,
       paddingHorizontal: 7,
       paddingVertical: 10,
@@ -10887,10 +11152,10 @@ const createStyles = (theme: MobileTheme) =>
       borderColor: theme.colors.goldSoft,
       borderRadius: 33,
       borderWidth: 1,
-      height: 56,
+      height: metrics.isCompactPhone ? 48 : 56,
       justifyContent: "center",
       marginBottom: 7,
-      width: 56,
+      width: metrics.isCompactPhone ? 48 : 56,
     },
     staffReferenceAvatarText: {
       color: theme.colors.gold,
@@ -10901,8 +11166,8 @@ const createStyles = (theme: MobileTheme) =>
     staffReferenceSpecialistName: {
       color: theme.colors.foreground,
       fontFamily: mobileTypography.uiSemiBold,
-      fontSize: 13,
-      lineHeight: 19,
+      fontSize: metrics.isCompactPhone ? 12 : 13,
+      lineHeight: metrics.isCompactPhone ? 17 : 19,
       textAlign: "center",
     },
     staffReferenceSpecialistRole: {
@@ -11059,15 +11324,18 @@ const createStyles = (theme: MobileTheme) =>
       fontFamily: mobileTypography.uiSemiBold,
     },
     staffReferenceBottomAction: {
+      bottom: metrics.androidBottomGuard + 16,
       gap: 10,
-      paddingBottom: 42,
+      left: metrics.screenPadding,
+      position: "absolute",
+      right: metrics.screenPadding,
     },
     staffReferenceCta: {
       alignItems: "center",
       backgroundColor: theme.colors.gold,
       borderRadius: theme.radii.pill,
       justifyContent: "center",
-      minHeight: 62,
+      minHeight: metrics.isCompactPhone ? 56 : 62,
       position: "relative",
       shadowColor: theme.colors.deepGold,
       shadowOffset: { height: 14, width: 0 },
@@ -11077,8 +11345,8 @@ const createStyles = (theme: MobileTheme) =>
     staffReferenceCtaText: {
       color: theme.colors.foregroundInverse,
       fontFamily: mobileTypography.kufiBold,
-      fontSize: 19,
-      lineHeight: 28,
+      fontSize: metrics.isCompactPhone ? 17 : 19,
+      lineHeight: metrics.isCompactPhone ? 24 : 28,
       textAlign: "center",
     },
     staffReferenceCtaArrow: {
@@ -11086,7 +11354,7 @@ const createStyles = (theme: MobileTheme) =>
       fontFamily: mobileTypography.uiSemiBold,
       fontSize: 34,
       left: 28,
-      lineHeight: 62,
+      lineHeight: metrics.isCompactPhone ? 56 : 62,
       position: "absolute",
       textAlign: "center",
       top: 0,
@@ -11100,12 +11368,12 @@ const createStyles = (theme: MobileTheme) =>
     },
     dateTimeReferenceScreen: {
       backgroundColor: theme.isDark ? "#020805" : "#fff8ea",
-      gap: 16,
-      minHeight: "100%",
+      gap: metrics.isCompactPhone ? 12 : 16,
+      minHeight: metrics.screenHeight - metrics.topSafePadding,
       overflow: "hidden",
-      paddingBottom: 232,
-      paddingHorizontal: 22,
-      paddingTop: 34,
+      paddingBottom: metrics.checkoutBottomPadding,
+      paddingHorizontal: metrics.screenPadding,
+      paddingTop: metrics.topSafePadding,
       position: "relative",
     },
     dateTimeSummaryCard: {
@@ -11119,8 +11387,9 @@ const createStyles = (theme: MobileTheme) =>
       borderRadius: 28,
       borderWidth: 1,
       flexDirection: "row",
-      gap: 13,
-      padding: 13,
+      flexWrap: "wrap",
+      gap: metrics.isCompactPhone ? 10 : 13,
+      padding: metrics.isCompactPhone ? 11 : 13,
       shadowColor: theme.colors.deepGold,
       shadowOffset: { height: 14, width: 0 },
       shadowOpacity: theme.isDark ? 0.2 : 0.08,
@@ -11130,9 +11399,9 @@ const createStyles = (theme: MobileTheme) =>
       borderColor: theme.colors.goldSoft,
       borderRadius: 18,
       borderWidth: 1,
-      height: 88,
+      height: metrics.isCompactPhone ? 72 : 88,
       overflow: "hidden",
-      width: 126,
+      width: metrics.isCompactPhone ? 104 : 126,
     },
     dateTimeSummaryCopy: {
       alignItems: "flex-end",
@@ -11154,7 +11423,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     dateTimeDateRail: {
       flexDirection: "row-reverse",
-      gap: 7,
+      flexWrap: "wrap",
+      gap: metrics.isCompactPhone ? 8 : 7,
       justifyContent: "space-between",
     },
     dateTimeDateCard: {
@@ -11165,9 +11435,10 @@ const createStyles = (theme: MobileTheme) =>
       borderColor: theme.colors.goldSoft,
       borderRadius: 22,
       borderWidth: 1,
-      flex: 1,
+      flexBasis: metrics.isCompactPhone ? "30%" : "15%",
+      flexGrow: 1,
       gap: 2,
-      minHeight: 98,
+      minHeight: metrics.isCompactPhone ? 82 : 98,
       minWidth: 0,
       paddingHorizontal: 6,
       paddingVertical: 11,
@@ -11199,8 +11470,8 @@ const createStyles = (theme: MobileTheme) =>
     dateTimeDateNumber: {
       color: theme.colors.foreground,
       fontFamily: mobileTypography.kufiBold,
-      fontSize: 25,
-      lineHeight: 34,
+      fontSize: metrics.isCompactPhone ? 20 : 25,
+      lineHeight: metrics.isCompactPhone ? 27 : 34,
       textAlign: "center",
     },
     dateTimeDateNumberActive: {
@@ -11253,7 +11524,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     dateTimeCalendarGrid: {
       flexDirection: "row-reverse",
-      gap: 7,
+      flexWrap: "wrap",
+      gap: metrics.isCompactPhone ? 6 : 7,
       justifyContent: "space-between",
     },
     dateTimeCalendarDay: {
@@ -11283,7 +11555,8 @@ const createStyles = (theme: MobileTheme) =>
     },
     dateTimePeriodRow: {
       flexDirection: "row-reverse",
-      gap: 8,
+      flexWrap: "wrap",
+      gap: metrics.isCompactPhone ? 7 : 8,
       justifyContent: "space-between",
     },
     dateTimePeriodChip: {
@@ -11294,7 +11567,8 @@ const createStyles = (theme: MobileTheme) =>
       borderColor: theme.colors.border,
       borderRadius: theme.radii.pill,
       borderWidth: 1,
-      flex: 1,
+      flexBasis: metrics.isCompactPhone ? "47%" : "22%",
+      flexGrow: 1,
       minHeight: 44,
       minWidth: 0,
       justifyContent: "center",
@@ -11329,7 +11603,7 @@ const createStyles = (theme: MobileTheme) =>
       borderColor: theme.colors.goldSoft,
       borderRadius: theme.radii.pill,
       borderWidth: 1,
-      flexBasis: "31%",
+      flexBasis: metrics.isCompactPhone ? "30%" : "31%",
       flexGrow: 1,
       minHeight: 48,
       justifyContent: "center",
@@ -11420,8 +11694,11 @@ const createStyles = (theme: MobileTheme) =>
       textAlign: "right",
     },
     dateTimeBottomAction: {
+      bottom: metrics.androidBottomGuard + 16,
       gap: 10,
-      paddingBottom: 42,
+      left: metrics.screenPadding,
+      position: "absolute",
+      right: metrics.screenPadding,
     },
     staffAvatar: {
       alignItems: "center",
