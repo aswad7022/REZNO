@@ -24,6 +24,7 @@ import {
   ScreenHeader,
   TOUCH_HIT_SLOP,
 } from "./src/components/mobile-chrome";
+import { ActivityLauncher } from "./src/components/activity-launcher";
 import {
   PremiumStateCard,
   SectionHeader,
@@ -51,7 +52,10 @@ import {
   type MobileTheme,
 } from "./src/theme/tokens";
 import { ReznoHomeScreen } from "./src/screens/rezno-home-screen";
+import { ReznoAiComingSoonScreen } from "./src/screens/rezno-ai-coming-soon-screen";
+import { ReznoMarketShellScreen } from "./src/screens/rezno-market-shell-screen";
 import { ReznoNearbySearchScreen } from "./src/screens/rezno-nearby-search-screen";
+import { ReznoOrdersScreen } from "./src/screens/rezno-orders-screen";
 import type { MobileMarketplaceBusiness } from "./src/types/marketplace";
 
 I18nManager.allowRTL(true);
@@ -672,6 +676,7 @@ export default function App() {
   const colorScheme = useColorScheme();
   const [locale, setLocale] = useState<MobileLocale>(DEFAULT_LOCALE);
   const [activeTab, setActiveTab] = useState<MobileAppTabId>("customerHome");
+  const [activityMenuOpen, setActivityMenuOpen] = useState(false);
   const [selectedBusiness, setSelectedBusiness] =
     useState<PremiumBusiness | null>(null);
   const [bookingFlowStep, setBookingFlowStep] =
@@ -857,12 +862,18 @@ export default function App() {
   }, []);
 
   const handleTabPress = (tabId: MobileAppTabId) => {
+    if (tabId === "activity") {
+      setActivityMenuOpen((current) => !current);
+      return;
+    }
+
+    setActivityMenuOpen(false);
     setSelectedBusiness(null);
     setBookingFlowStep(null);
     setSelectedBookingId(null);
     setBookingManagementPanel(null);
 
-    if (tabId === "marketplace" && marketplaceState.status === "idle") {
+    if (tabId === "serviceDiscovery" && marketplaceState.status === "idle") {
       loadMarketplace();
     }
 
@@ -1030,8 +1041,11 @@ export default function App() {
       <StatusBar style={theme.isDark ? "light" : "dark"} />
       {!selectedBusiness &&
       activeTab !== "marketplace" &&
+      activeTab !== "serviceDiscovery" &&
       activeTab !== "customerHome" &&
-      activeTab !== "bookings" ? (
+      activeTab !== "bookings" &&
+      activeTab !== "orders" &&
+      activeTab !== "reznoAi" ? (
         <ScreenHeader
           isRtl={isRtl}
           locale={locale}
@@ -1041,7 +1055,7 @@ export default function App() {
         />
       ) : null}
 
-      {!selectedBusiness && activeTab === "marketplace" ? (
+      {!selectedBusiness && activeTab === "serviceDiscovery" ? (
         <ReznoNearbySearchScreen
           isRtl={isRtl}
           locale={locale}
@@ -1106,8 +1120,25 @@ export default function App() {
             locale={locale}
             marketplaceState={marketplaceState}
             onOpenBusiness={setSelectedBusiness}
-            onOpenMarketplace={() => handleTabPress("marketplace")}
+            onOpenServiceDiscovery={() => handleTabPress("serviceDiscovery")}
             onRetry={loadMarketplace}
+            theme={theme}
+          />
+        ) : null}
+
+        {!selectedBusiness && activeTab === "marketplace" ? (
+          <ReznoMarketShellScreen
+            isRtl={isRtl}
+            locale={locale}
+            onOpenServiceDiscovery={() => handleTabPress("serviceDiscovery")}
+            theme={theme}
+          />
+        ) : null}
+
+        {!selectedBusiness && activeTab === "reznoAi" ? (
+          <ReznoAiComingSoonScreen
+            isRtl={isRtl}
+            locale={locale}
             theme={theme}
           />
         ) : null}
@@ -1116,7 +1147,7 @@ export default function App() {
           <FavoritesScreen
             isRtl={isRtl}
             onOpenBusiness={setSelectedBusiness}
-            onOpenMarketplace={() => handleTabPress("marketplace")}
+            onOpenMarketplace={() => handleTabPress("serviceDiscovery")}
             styles={styles}
           />
         ) : null}
@@ -1124,7 +1155,7 @@ export default function App() {
         {!selectedBusiness && activeTab === "quickBooking" ? (
           <QuickBookingEntryScreen
             isRtl={isRtl}
-            onOpenMarketplace={() => handleTabPress("marketplace")}
+            onOpenMarketplace={() => handleTabPress("serviceDiscovery")}
             styles={styles}
           />
         ) : null}
@@ -1153,6 +1184,14 @@ export default function App() {
           />
         ) : null}
 
+        {!selectedBusiness && activeTab === "orders" ? (
+          <ReznoOrdersScreen
+            isRtl={isRtl}
+            locale={locale}
+            theme={theme}
+          />
+        ) : null}
+
         {!selectedBusiness && activeTab === "messages" ? (
           <MessagesNotificationsPreviewScreen isRtl={isRtl} styles={styles} />
         ) : null}
@@ -1177,9 +1216,18 @@ export default function App() {
 
       <BottomTabBar
         activeTab={activeTab}
+        activityMenuOpen={activityMenuOpen}
         locale={locale}
         onTabPress={handleTabPress}
         styles={styles}
+      />
+      <ActivityLauncher
+        isRtl={isRtl}
+        locale={locale}
+        onClose={() => setActivityMenuOpen(false)}
+        onNavigate={handleTabPress}
+        theme={theme}
+        visible={activityMenuOpen}
       />
     </SafeAreaView>
   );
@@ -1200,7 +1248,7 @@ function FavoritesScreen({
     <>
       <PremiumStateCard
         body="مساحة مرئية آمنة للمفضلة. لا تضيف حفظاً أو مزامنة أو استدعاءات API حالياً."
-        cta="استكشف السوق"
+        cta="استكشف الخدمات"
         icon="♡"
         isRtl={isRtl}
         label="المفضلة"
@@ -6486,7 +6534,7 @@ const createStyles = (theme: MobileTheme) =>
       borderWidth: 0,
       borderRadius: 30,
       flex: 1,
-      height: 62,
+      height: 66,
       marginHorizontal: 0,
       shadowColor: theme.colors.deepGold,
       shadowOffset: { height: 8, width: 0 },
@@ -6505,9 +6553,9 @@ const createStyles = (theme: MobileTheme) =>
       width: 0,
     },
     centerTabIconImage: {
-      height: 42,
+      height: 26,
       tintColor: theme.colors.foregroundInverse,
-      width: 42,
+      width: 26,
     },
     centerTabHalo: {
       alignItems: "center",
@@ -6517,15 +6565,15 @@ const createStyles = (theme: MobileTheme) =>
       borderColor: theme.isDark
         ? "rgba(255, 246, 205, 0.7)"
         : "rgba(184, 117, 11, 0.28)",
-      borderRadius: 29,
+      borderRadius: 25,
       borderWidth: 2,
-      height: 58,
+      height: 50,
       justifyContent: "center",
       shadowColor: theme.colors.deepGold,
       shadowOffset: { height: 10, width: 0 },
       shadowOpacity: theme.isDark ? 0.44 : 0.14,
       shadowRadius: 18,
-      width: 58,
+      width: 50,
     },
     centerTabInner: {
       alignItems: "center",
@@ -6533,11 +6581,20 @@ const createStyles = (theme: MobileTheme) =>
       borderColor: theme.isDark
         ? "rgba(255, 248, 220, 0.28)"
         : "rgba(255, 253, 248, 0.56)",
-      borderRadius: 25,
+      borderRadius: 21,
       borderWidth: 1,
-      height: 50,
+      height: 42,
       justifyContent: "center",
-      width: 50,
+      width: 42,
+    },
+    centerTabLabel: {
+      color: theme.colors.gold,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: 9,
+      lineHeight: 11,
+      marginTop: 1,
+      maxWidth: 62,
+      textAlign: "center",
     },
     exploreCompassIcon: {
       alignItems: "center",

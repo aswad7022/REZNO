@@ -76,6 +76,7 @@ export async function GET(request: NextRequest) {
             hasTables: business.hasTables,
             averageRating: business.averageRating,
             reviewCount: business.reviewCount,
+            createdAt: business.createdAt.toISOString(),
             distanceKm: business.distanceKm,
             branch: {
               latitude: business.branchLatitude,

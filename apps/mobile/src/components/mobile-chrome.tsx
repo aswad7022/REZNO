@@ -21,13 +21,20 @@ import {
 
 export const TOUCH_HIT_SLOP = { bottom: 8, left: 8, right: 8, top: 8 };
 
-export type MobileAppTabId = MobileTabId | "favorites" | "quickBooking";
+export type MobileAppTabId =
+  | MobileTabId
+  | "activity"
+  | "favorites"
+  | "orders"
+  | "quickBooking"
+  | "reznoAi"
+  | "serviceDiscovery";
 
 type BottomNavTabId =
   | "customerHome"
   | "marketplace"
-  | "quickBooking"
-  | "bookings"
+  | "reznoAi"
+  | "activity"
   | "account";
 
 type BottomNavTab = {
@@ -45,18 +52,18 @@ const BOTTOM_NAV_TABS: BottomNavTab[] = [
   },
   {
     id: "marketplace",
-    icon: require("../../assets/icons/common/search.png"),
-    label: { ar: "استكشف", ckb: "بگەڕێ", en: "Explore" },
+    icon: require("../../assets/icons/categories/services.png"),
+    label: { ar: "السوق", ckb: "بازاڕ", en: "Market" },
   },
   {
-    id: "quickBooking",
-    icon: require("../../assets/icons/nav/quick-booking-plus.png"),
-    label: { ar: "إضافة حجز", ckb: "حجز زیاد بکە", en: "Quick book" },
+    id: "reznoAi",
+    icon: require("../../assets/icons/common/star-rating.png"),
+    label: { ar: "REZNO AI", ckb: "REZNO AI", en: "REZNO AI" },
   },
   {
-    id: "bookings",
+    id: "activity",
     icon: require("../../assets/icons/common/calendar.png"),
-    label: { ar: "حجوزاتي", ckb: "حجزەکانم", en: "My bookings" },
+    label: { ar: "نشاطي", ckb: "چالاکی", en: "Activity" },
   },
   {
     id: "account",
@@ -68,20 +75,32 @@ const BOTTOM_NAV_TABS: BottomNavTab[] = [
 
 const BOTTOM_NAV_A11Y: Record<
   MobileLocale,
-  { activeHint: string; openHint: (label: string) => string; tabLabel: (label: string) => string }
+  {
+    activeHint: string;
+    activityHint: string;
+    aiLabel: string;
+    openHint: (label: string) => string;
+    tabLabel: (label: string) => string;
+  }
 > = {
   ar: {
     activeHint: "هذا هو التبويب المفتوح حالياً.",
+    activityHint: "يفتح قائمة نشاطي.",
+    aiLabel: "REZNO AI، ميزة ذكاء اصطناعي قريباً",
     openHint: (label) => `يفتح تبويب ${label}.`,
     tabLabel: (label) => `تبويب ${label}`,
   },
   ckb: {
     activeHint: "ئەم تابە ئێستا کراوەتەوە.",
+    activityHint: "لیستی چالاکییەکانم دەکاتەوە.",
+    aiLabel: "REZNO AI، تایبەتمەندی زیرەکی دەستکرد بەم زووانە",
     openHint: (label) => `تابی ${label} دەکاتەوە.`,
     tabLabel: (label) => `تابی ${label}`,
   },
   en: {
     activeHint: "This tab is currently open.",
+    activityHint: "Opens the My activity menu.",
+    aiLabel: "REZNO AI, artificial intelligence feature coming soon",
     openHint: (label) => `Opens the ${label} tab.`,
     tabLabel: (label) => `${label} tab`,
   },
@@ -98,6 +117,7 @@ type MobileChromeStyles = {
   centerTabHalo: StyleProp<ViewStyle>;
   centerTabIconImage: StyleProp<ImageStyle>;
   centerTabInner: StyleProp<ViewStyle>;
+  centerTabLabel: StyleProp<TextStyle>;
   disabledButton: StyleProp<ViewStyle>;
   disabledButtonText: StyleProp<TextStyle>;
   exploreCompassIcon: StyleProp<ViewStyle>;
@@ -218,11 +238,13 @@ export function PrimaryButton({
 
 export function BottomTabBar({
   activeTab,
+  activityMenuOpen,
   locale,
   onTabPress,
   styles,
 }: {
   activeTab: MobileAppTabId;
+  activityMenuOpen: boolean;
   locale: MobileLocale;
   onTabPress: (tabId: MobileAppTabId) => void;
   styles: MobileChromeStyles;
@@ -233,8 +255,15 @@ export function BottomTabBar({
   return (
     <View style={styles.tabBar}>
       {visibleTabs.map((tab) => {
-        const active = tab.id === activeTab;
-        const isCenterAction = tab.id === "quickBooking";
+        const activityDestinationActive =
+          activeTab === "bookings" ||
+          activeTab === "favorites" ||
+          activeTab === "orders";
+        const active =
+          tab.id === "activity"
+            ? activityMenuOpen || activityDestinationActive
+            : tab.id === activeTab;
+        const isCenterAction = tab.id === "reznoAi";
         const label = tab.label[locale];
         const accessibilityCopy = BOTTOM_NAV_A11Y[locale];
 
@@ -243,12 +272,16 @@ export function BottomTabBar({
             accessibilityHint={
               active
                 ? accessibilityCopy.activeHint
+                : tab.id === "activity"
+                  ? accessibilityCopy.activityHint
                 : accessibilityCopy.openHint(label)
             }
             accessibilityLabel={
-              isCenterAction ? label : accessibilityCopy.tabLabel(label)
+              isCenterAction
+                ? accessibilityCopy.aiLabel
+                : accessibilityCopy.tabLabel(label)
             }
-            accessibilityRole="tab"
+            accessibilityRole={tab.id === "activity" ? "button" : "tab"}
             accessibilityState={{ selected: active }}
             hitSlop={TOUCH_HIT_SLOP}
             key={tab.id}
@@ -267,31 +300,22 @@ export function BottomTabBar({
               style={{ alignItems: "center" }}
             >
               {isCenterAction ? (
-                <View style={styles.centerTabHalo}>
-                  <View style={styles.centerTabInner}>
-                    <Image
-                      accessible={false}
-                      alt=""
-                      resizeMode="contain"
-                      source={tab.icon}
-                      style={styles.centerTabIconImage}
-                    />
+                <>
+                  <View style={styles.centerTabHalo}>
+                    <View style={styles.centerTabInner}>
+                      <Image
+                        accessible={false}
+                        alt=""
+                        resizeMode="contain"
+                        source={tab.icon}
+                        style={styles.centerTabIconImage}
+                      />
+                    </View>
                   </View>
-                </View>
-              ) : tab.id === "marketplace" ? (
-                <View
-                  style={[
-                    styles.exploreCompassIcon,
-                    active && styles.exploreCompassIconActive,
-                  ]}
-                >
-                  <View
-                    style={[
-                      styles.exploreCompassNeedle,
-                      active && styles.exploreCompassNeedleActive,
-                    ]}
-                  />
-                </View>
+                  <Text numberOfLines={1} style={styles.centerTabLabel}>
+                    {label}
+                  </Text>
+                </>
               ) : (
                 <Image
                   accessible={false}
@@ -304,14 +328,14 @@ export function BottomTabBar({
                   ]}
                 />
               )}
-              {isCenterAction ? null : (
+              {!isCenterAction ? (
                 <Text
                   numberOfLines={1}
                   style={[styles.tabLabel, active && styles.tabLabelActive]}
                 >
                   {label}
                 </Text>
-              )}
+              ) : null}
             </PremiumEntrance>
             <View
               style={[

@@ -93,7 +93,7 @@ const HOME_COPY: Record<MobileLocale, HomeCopy> = {
     recommendations: "توصياتنا لك ✧",
     retryAccessibility: "إعادة تحميل الأنشطة القريبة",
     searchAccessibility: "فتح البحث في خدمات REZNO",
-    searchPlaceholder: "ابحث عن مطعم، عيادة، صالون...",
+    searchPlaceholder: "ابحث عن خدمة أو نشاط",
     viewAll: "عرض الكل",
   },
   en: {
@@ -125,7 +125,7 @@ const HOME_COPY: Record<MobileLocale, HomeCopy> = {
     recommendations: "Recommendations for you",
     retryAccessibility: "Reload nearby businesses",
     searchAccessibility: "Open REZNO service search",
-    searchPlaceholder: "Search restaurants, clinics, salons...",
+    searchPlaceholder: "Search for a service or business",
     viewAll: "View all",
   },
   ckb: {
@@ -157,7 +157,7 @@ const HOME_COPY: Record<MobileLocale, HomeCopy> = {
     recommendations: "پێشنیارەکانمان بۆ تۆ",
     retryAccessibility: "کارە نزیکەکان دووبارە بار بکە",
     searchAccessibility: "گەڕانی خزمەتگوزارییەکانی REZNO بکەرەوە",
-    searchPlaceholder: "بگەڕێ بۆ چێشتخانە، کلینیک، سالۆن...",
+    searchPlaceholder: "بگەڕێ بۆ خزمەتگوزاری یان کار",
     viewAll: "هەمووی ببینە",
   },
 };
@@ -247,7 +247,7 @@ type ReznoHomeScreenProps = {
   locale: MobileLocale;
   marketplaceState: HomeMarketplaceState;
   onOpenBusiness: (business: HomeBusiness) => void;
-  onOpenMarketplace: () => void;
+  onOpenServiceDiscovery: () => void;
   onRetry: () => void;
   theme: MobileTheme;
 };
@@ -257,7 +257,7 @@ export function ReznoHomeScreen({
   locale,
   marketplaceState,
   onOpenBusiness,
-  onOpenMarketplace,
+  onOpenServiceDiscovery,
   onRetry,
   theme,
 }: ReznoHomeScreenProps) {
@@ -296,14 +296,14 @@ export function ReznoHomeScreen({
       title: copy.recommendations,
     },
     {
-      businesses: businessSections.nearby,
-      key: "nearby",
-      title: copy.nearYou,
-    },
-    {
       businesses: businessSections.newOnRezno,
       key: "new-on-rezno",
       title: copy.newOnRezno,
+    },
+    {
+      businesses: businessSections.nearby,
+      key: "nearby",
+      title: copy.nearYou,
     },
   ];
   return (
@@ -325,7 +325,7 @@ export function ReznoHomeScreen({
         <SearchControl
           copy={copy}
           isRtl={isRtl}
-          onPress={onOpenMarketplace}
+          onPress={onOpenServiceDiscovery}
           styles={styles}
         />
       </PremiumEntrance>
@@ -361,7 +361,7 @@ export function ReznoHomeScreen({
                 category={category}
                 height={categoryHeight}
                 label={copy.categories[categoryIndex]}
-                onPress={onOpenMarketplace}
+                onPress={onOpenServiceDiscovery}
                 styles={styles}
                 width={categoryWidth}
               />
@@ -375,7 +375,7 @@ export function ReznoHomeScreen({
           <SectionHeader
             action={copy.viewAll}
             isRtl={isRtl}
-            onPress={onOpenMarketplace}
+            onPress={onOpenServiceDiscovery}
             pagePadding={pagePadding}
             styles={styles}
             title={section.title}
@@ -1252,14 +1252,13 @@ function deriveHomeBusinessSections(
       );
     })
     .slice(0, HOME_LAYOUT.businessSectionLimit);
-  const stableBusinesses = [...state.businesses].sort((left, right) =>
-    compareStableText(left.id, right.id),
-  );
-  const rotationOffset = stableBusinesses.length > 1 ? 1 : 0;
-  const newOnRezno = [
-    ...stableBusinesses.slice(rotationOffset),
-    ...stableBusinesses.slice(0, rotationOffset),
-  ]
+  const newOnRezno = [...state.businesses]
+    .sort((left, right) => {
+      const createdAtDifference =
+        parseCreatedAt(right.createdAt) - parseCreatedAt(left.createdAt);
+
+      return createdAtDifference || compareStableText(left.id, right.id);
+    })
     .slice(0, HOME_LAYOUT.businessSectionLimit);
   const mapBusiness = (business: MobileMarketplaceBusiness) =>
     mapMarketplaceBusiness(business, locale, copy);
@@ -1269,6 +1268,11 @@ function deriveHomeBusinessSections(
     newOnRezno: newOnRezno.map(mapBusiness),
     recommendations: recommendations.map(mapBusiness),
   };
+}
+
+function parseCreatedAt(value: string) {
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? timestamp : 0;
 }
 
 function compareStableText(left: string, right: string) {

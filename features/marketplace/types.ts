@@ -42,6 +42,7 @@ export interface MarketplaceBusiness {
   branchLongitude: number | null;
   branchLocationLabel: string | null;
   branchNearbyLandmark: string | null;
+  createdAt: Date;
 }
 
 export interface PublicBusinessProfile extends MarketplaceBusiness {

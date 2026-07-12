@@ -28,6 +28,7 @@ export type MobileMarketplaceBusiness = {
   hasTables: boolean;
   averageRating: number | null;
   reviewCount: number;
+  createdAt: string;
   distanceKm: number | null;
   branch: {
     latitude: number | null;
