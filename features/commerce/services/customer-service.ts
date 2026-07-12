@@ -50,7 +50,11 @@ export async function createCustomerAddress(customerId: string, input: CustomerA
   const coordinates = validateCoordinates(input.latitude, input.longitude);
   return runCommerceSerializable(async (transaction) => {
     const customer = await requireActiveCommerceCustomer(customerId, transaction);
-    if (input.isDefault) {
+    const activeAddressCount = await transaction.customerAddress.count({
+      where: { customerId: customer.personId, archivedAt: null },
+    });
+    const makeDefault = input.isDefault === true || activeAddressCount === 0;
+    if (makeDefault) {
       await transaction.customerAddress.updateMany({
         where: { customerId: customer.personId, archivedAt: null, isDefault: true },
         data: { isDefault: false },
@@ -62,7 +66,7 @@ export async function createCustomerAddress(customerId: string, input: CustomerA
         area: requiredText(input.area, "area", 160),
         city: requiredText(input.city, "city", 160),
         customerId: customer.personId,
-        isDefault: input.isDefault ?? false,
+        isDefault: makeDefault,
         label: optionalText(input.label, 80),
         landmark: optionalText(input.landmark, 240),
         latitude: coordinates.latitude,
@@ -73,6 +77,114 @@ export async function createCustomerAddress(customerId: string, input: CustomerA
       },
     });
   });
+}
+
+export async function listCustomerAddresses(customerId: string) {
+  await requireActiveCommerceCustomer(customerId);
+  return prisma.customerAddress.findMany({
+    where: { customerId, archivedAt: null },
+    orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }, { id: "asc" }],
+  });
+}
+
+export async function updateCustomerAddress(
+  customerId: string,
+  addressId: string,
+  input: Partial<CustomerAddressInput>,
+) {
+  const coordinates = validateCoordinates(input.latitude, input.longitude);
+  return runCommerceSerializable(async (transaction) => {
+    await requireActiveCommerceCustomer(customerId, transaction);
+    const address = await transaction.customerAddress.findFirst({
+      where: { id: addressId, customerId, archivedAt: null },
+    });
+    if (!address) commerceError("NOT_FOUND", "Address was not found.");
+    if (input.isDefault === true) {
+      await transaction.customerAddress.updateMany({
+        where: { customerId, archivedAt: null, isDefault: true, id: { not: address.id } },
+        data: { isDefault: false },
+      });
+    }
+    const data = {
+      additionalDetails:
+        input.additionalDetails === undefined
+          ? undefined
+          : requiredText(input.additionalDetails, "additionalDetails", 500),
+      area: input.area === undefined ? undefined : requiredText(input.area, "area", 160),
+      city: input.city === undefined ? undefined : requiredText(input.city, "city", 160),
+      isDefault: input.isDefault,
+      label: input.label === undefined ? undefined : optionalText(input.label, 80),
+      landmark: input.landmark === undefined ? undefined : optionalText(input.landmark, 240),
+      latitude:
+        input.latitude === undefined && input.longitude === undefined ? undefined : coordinates.latitude,
+      longitude:
+        input.latitude === undefined && input.longitude === undefined ? undefined : coordinates.longitude,
+      phone: input.phone === undefined ? undefined : requiredText(input.phone, "phone", 30),
+      recipientName:
+        input.recipientName === undefined
+          ? undefined
+          : requiredText(input.recipientName, "recipientName", 160),
+      street: input.street === undefined ? undefined : requiredText(input.street, "street", 240),
+    };
+    const updated = await transaction.customerAddress.update({ where: { id: address.id }, data });
+    if (address.isDefault && input.isDefault === false) {
+      await promoteDeterministicDefault(transaction, customerId, address.id);
+    }
+    return updated;
+  });
+}
+
+export async function archiveCustomerAddress(customerId: string, addressId: string) {
+  return runCommerceSerializable(async (transaction) => {
+    await requireActiveCommerceCustomer(customerId, transaction);
+    const address = await transaction.customerAddress.findFirst({
+      where: { id: addressId, customerId, archivedAt: null },
+    });
+    if (!address) commerceError("NOT_FOUND", "Address was not found.");
+    const archived = await transaction.customerAddress.update({
+      where: { id: address.id },
+      data: { archivedAt: new Date(), isDefault: false },
+    });
+    if (address.isDefault) await promoteDeterministicDefault(transaction, customerId, address.id);
+    return archived;
+  });
+}
+
+export async function setDefaultCustomerAddress(customerId: string, addressId: string) {
+  return runCommerceSerializable(async (transaction) => {
+    await requireActiveCommerceCustomer(customerId, transaction);
+    const address = await transaction.customerAddress.findFirst({
+      where: { id: addressId, customerId, archivedAt: null },
+      select: { id: true },
+    });
+    if (!address) commerceError("NOT_FOUND", "Address was not found.");
+    await transaction.customerAddress.updateMany({
+      where: { customerId, archivedAt: null, isDefault: true, id: { not: address.id } },
+      data: { isDefault: false },
+    });
+    return transaction.customerAddress.update({
+      where: { id: address.id },
+      data: { isDefault: true },
+    });
+  });
+}
+
+async function promoteDeterministicDefault(
+  transaction: Prisma.TransactionClient,
+  customerId: string,
+  excludedAddressId: string,
+) {
+  const replacement = await transaction.customerAddress.findFirst({
+    where: { customerId, archivedAt: null, id: { not: excludedAddressId } },
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    select: { id: true },
+  });
+  if (replacement) {
+    await transaction.customerAddress.update({
+      where: { id: replacement.id },
+      data: { isDefault: true },
+    });
+  }
 }
 
 export async function getCustomerAddress(customerId: string, addressId: string) {
@@ -118,3 +230,4 @@ export async function unfavoriteProduct(customerId: string, productId: string) {
   await requireActiveCommerceCustomer(customerId);
   await prisma.customerFavoriteProduct.deleteMany({ where: { customerId, productId } });
 }
+import type { Prisma } from "@prisma/client";

@@ -47,7 +47,7 @@ function orderNumber() {
 }
 
 function boundedInstructions(value: string | null | undefined) {
-  const result = value?.trim();
+  const result = value?.trim().replace(/\s+/g, " ");
   if (!result) return null;
   if (result.length > 1000) {
     commerceError("VALIDATION_ERROR", "Customer instructions are too long.");
@@ -138,23 +138,29 @@ export async function createPendingOrder(input: CreatePendingOrderInput) {
       let address: Awaited<ReturnType<typeof transaction.customerAddress.findFirst>> = null;
       let paymentMethod: "CASH_ON_DELIVERY" | "PAY_AT_PICKUP";
       if (input.fulfillmentMethod === "STORE_DELIVERY") {
-        if (!cart.store.deliveryEnabled || !input.addressId) {
-          commerceError("VALIDATION_ERROR", "Store delivery and a customer address are required.");
+        if (!cart.store.deliveryEnabled) {
+          commerceError("INVALID_FULFILLMENT_METHOD", "Store delivery is not available.");
+        }
+        if (!input.addressId) {
+          commerceError("ADDRESS_REQUIRED", "A customer address is required for Store delivery.");
         }
         address = await transaction.customerAddress.findFirst({
           where: { id: input.addressId, customerId: customer.personId, archivedAt: null },
         });
-        if (!address) commerceError("NOT_FOUND", "Delivery address was not found.");
+        if (!address) commerceError("ADDRESS_OWNERSHIP_REQUIRED", "Delivery address was not found.");
         if (
           normalizeCommerceText(address.city) !== normalizeCommerceText(cart.store.deliveryCity ?? "") ||
           normalizeCommerceText(address.area) !== normalizeCommerceText(cart.store.deliveryArea ?? "")
         ) {
-          commerceError("VALIDATION_ERROR", "Address is outside the Store delivery area.");
+          commerceError("ADDRESS_NOT_ALLOWED", "Address is outside the Store delivery area.");
         }
         paymentMethod = "CASH_ON_DELIVERY";
       } else {
+        if (input.addressId) {
+          commerceError("ADDRESS_NOT_ALLOWED", "Pickup Checkout must not include an address.");
+        }
         if (!cart.store.pickupEnabled) {
-          commerceError("VALIDATION_ERROR", "Customer pickup is not available.");
+          commerceError("INVALID_FULFILLMENT_METHOD", "Customer pickup is not available.");
         }
         paymentMethod = "PAY_AT_PICKUP";
       }
@@ -172,9 +178,6 @@ export async function createPendingOrder(input: CreatePendingOrderInput) {
         ) {
           commerceError("PRODUCT_UNAVAILABLE", "A Cart Product is no longer available.");
         }
-        if (!item.unitPriceSnapshot.equals(variant.price)) {
-          commerceError("CONFLICT", "A Product price changed. Refresh the Cart.");
-        }
         if (!variant.inventory) commerceError("INSUFFICIENT_STOCK", "Inventory is unavailable.");
         return {
           compareAtPrice: variant.compareAtPrice,
@@ -188,7 +191,7 @@ export async function createPendingOrder(input: CreatePendingOrderInput) {
       );
       const merchandiseTotal = new Prisma.Decimal(totals.subtotal).minus(totals.discountTotal);
       if (merchandiseTotal.lessThan(cart.store.minimumOrderValue)) {
-        commerceError("VALIDATION_ERROR", "Cart does not meet the Store minimum order value.");
+        commerceError("MINIMUM_ORDER_NOT_MET", "Cart does not meet the Store minimum order value.");
       }
 
       const inventoryIds = cart.items.map((item) => item.productVariant.inventory!.id);

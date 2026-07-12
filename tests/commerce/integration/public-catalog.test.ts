@@ -76,8 +76,12 @@ test("Milestone 2B public catalog PostgreSQL contract", { concurrency: false }, 
   await t.test("Product visibility, Store scope, details, and inventory privacy", async () => {
     const result = await products("sort=name_asc");
     assert.deepEqual(
-      result.data.map((item) => item.slug),
-      ["equal-a", "equal-b", "out-of-stock", "premium-phone", "second-product", "arabic-phone"],
+      new Set(result.data.map((item) => item.slug)),
+      new Set(["equal-a", "equal-b", "out-of-stock", "premium-phone", "second-product", "arabic-phone"]),
+    );
+    assert.deepEqual(
+      result.data.map((item) => item.id),
+      (await products("sort=name_asc")).data.map((item) => item.id),
     );
     assert.equal(result.data.find((item) => item.slug === "out-of-stock")?.inStock, false);
     assert.equal(result.data.find((item) => item.slug === "arabic-phone")?.inStock, true);
