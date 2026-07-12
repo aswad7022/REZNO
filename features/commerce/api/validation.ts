@@ -3,6 +3,8 @@ import { publicQueryFingerprint } from "@/features/commerce/public/cursor";
 import { commerceApiError } from "@/features/commerce/api/errors";
 import type { CustomerAddressInput } from "@/features/commerce/services/customer-service";
 import type { MerchantInventoryQuery } from "@/features/commerce/services/merchant-inventory-service";
+import type { CustomerOrderQuery } from "@/features/commerce/services/customer-order-query-service";
+import type { FavoriteQuery } from "@/features/commerce/services/customer-favorite-service";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -272,4 +274,96 @@ export async function parseInventoryAdjustment(request: Request) {
     operationKey: parseUuid(body.operationKey, "operationKey"),
     reason: requiredString(body.reason, "reason", 500, 2).replace(/\s+/g, " "),
   };
+}
+
+export function parseCustomerOrderQuery(params: URLSearchParams): CustomerOrderQuery {
+  assertUniqueQueryParameters(params, [
+    "cursor",
+    "limit",
+    "status",
+    "fulfillmentStatus",
+    "paymentStatus",
+    "fulfillmentMethod",
+    "storeSlug",
+    "sort",
+  ]);
+  return {
+    cursor: boundedCursor(params.get("cursor")),
+    fulfillmentMethod: optionalEnum(params.get("fulfillmentMethod"), "fulfillmentMethod", [
+      "STORE_DELIVERY", "CUSTOMER_PICKUP",
+    ] as const),
+    fulfillmentStatus: optionalEnum(params.get("fulfillmentStatus"), "fulfillmentStatus", [
+      "UNFULFILLED", "PREPARING", "READY_FOR_PICKUP", "OUT_FOR_DELIVERY",
+      "DELIVERED", "PICKED_UP", "DELIVERY_FAILED", "CANCELLED",
+    ] as const),
+    limit: parseCollectionLimit(params.get("limit")),
+    paymentStatus: optionalEnum(params.get("paymentStatus"), "paymentStatus", [
+      "UNPAID", "PAID", "VOIDED",
+    ] as const),
+    sort: optionalEnum(params.get("sort"), "sort", ["newest", "oldest"] as const) ?? "newest",
+    status: optionalEnum(params.get("status"), "status", [
+      "PENDING", "CONFIRMED", "COMPLETED", "REJECTED", "CANCELLED", "EXPIRED",
+    ] as const),
+    storeSlug: params.get("storeSlug") === null
+      ? undefined
+      : requiredString(params.get("storeSlug"), "storeSlug", 160),
+  };
+}
+
+export function parseFavoriteQuery(params: URLSearchParams): FavoriteQuery {
+  assertUniqueQueryParameters(params, ["cursor", "limit"]);
+  return {
+    cursor: boundedCursor(params.get("cursor")),
+    limit: parseCollectionLimit(params.get("limit")),
+  };
+}
+
+export async function parseFavoriteTarget(request: Request, field: "productId" | "storeId") {
+  const body = await readJsonObject(request, [field]);
+  return parseUuid(body[field], field);
+}
+
+export async function parseCancellationRequest(request: Request) {
+  const body = await readJsonObject(request, ["reason"]);
+  if (typeof body.reason !== "string" || body.reason.trim().length < 2 || body.reason.trim().length > 500) {
+    commerceApiError(
+      "CANCELLATION_REASON_REQUIRED",
+      400,
+      "A cancellation reason between 2 and 500 characters is required.",
+    );
+  }
+  return { reason: body.reason.trim().replace(/\s+/g, " ") };
+}
+
+function assertUniqueQueryParameters(params: URLSearchParams, allowed: readonly string[]) {
+  for (const key of params.keys()) {
+    if (!allowed.includes(key) || params.getAll(key).length !== 1) {
+      commerceApiError("INVALID_REQUEST", 400, `Unsupported or duplicate query parameter: ${key}.`);
+    }
+  }
+}
+
+function parseCollectionLimit(value: string | null) {
+  if (value === null) return 20;
+  if (!/^\d+$/.test(value)) commerceApiError("INVALID_REQUEST", 400, "limit is invalid.");
+  const limit = Number(value);
+  if (limit < 1 || limit > 50) commerceApiError("INVALID_REQUEST", 400, "limit must be between 1 and 50.");
+  return limit;
+}
+
+function boundedCursor(value: string | null) {
+  if (value === null) return undefined;
+  const cursor = value.trim();
+  if (!cursor || cursor.length > 2048) commerceApiError("INVALID_CURSOR", 400, "cursor is invalid.");
+  return cursor;
+}
+
+function optionalEnum<const T extends readonly string[]>(
+  value: string | null,
+  name: string,
+  values: T,
+): T[number] | undefined {
+  if (value === null) return undefined;
+  if (!values.includes(value)) commerceApiError("INVALID_REQUEST", 400, `${name} is invalid.`);
+  return value as T[number];
 }

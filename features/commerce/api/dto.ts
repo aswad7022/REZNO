@@ -2,6 +2,7 @@ import { Prisma, type CustomerAddress } from "@prisma/client";
 
 import { calculateCommerceTotals, decimalString } from "@/features/commerce/domain/money";
 import type { CartApiRecord } from "@/features/commerce/services/cart-service";
+import type { CustomerOrderRecord } from "@/features/commerce/services/customer-order-query-service";
 
 export function serializeCustomerAddress(address: CustomerAddress) {
   return {
@@ -210,4 +211,110 @@ export function serializeMerchantInventory(item: {
       sku: item.variant.sku,
     },
   };
+}
+
+export function serializeCustomerOrderSummary(order: CustomerOrderRecord) {
+  const primaryItem = order.items[0];
+  return {
+    canCustomerCancel: canCustomerCancel(order),
+    createdAt: order.createdAt.toISOString(),
+    currency: order.currency,
+    expiresAt: order.status === "PENDING" ? order.reservationExpiresAt.toISOString() : null,
+    fulfillmentMethod: order.fulfillmentMethod,
+    fulfillmentStatus: order.fulfillmentStatus,
+    grandTotal: decimalString(order.grandTotal),
+    id: order.id,
+    orderNumber: order.orderNumber,
+    paymentMethod: order.paymentMethod,
+    paymentStatus: order.paymentStatus,
+    primaryItem: primaryItem
+      ? {
+          imageUrl: primaryItem.imageUrlSnapshot,
+          productName: primaryItem.productNameSnapshot,
+          quantity: primaryItem.quantity,
+          variantTitle: primaryItem.variantTitleSnapshot,
+        }
+      : null,
+    status: order.status,
+    store: {
+      logoUrl: order.storeLogoUrlSnapshot,
+      name: order.storeNameSnapshot,
+      slug: order.storeSlugSnapshot,
+    },
+    totalItemQuantity: order.items.reduce((total, item) => total + item.quantity, 0),
+  };
+}
+
+export function serializeCustomerOrderDetail(order: CustomerOrderRecord) {
+  return {
+    ...serializeCustomerOrderSummary(order),
+    address: order.address
+      ? {
+          additionalDetails: order.address.additionalDetails,
+          area: order.address.area,
+          city: order.address.city,
+          landmark: order.address.landmark,
+          latitude: order.address.latitude?.toString() ?? null,
+          longitude: order.address.longitude?.toString() ?? null,
+          phone: order.address.phone,
+          recipientName: order.address.recipientName,
+          street: order.address.street,
+        }
+      : null,
+    customerInstructions: order.customerInstructions,
+    deliveryFee: decimalString(order.deliveryFee),
+    discountTotal: decimalString(order.discountTotal),
+    history: order.history.map((item) => ({
+      actorType: item.actorType,
+      createdAt: item.createdAt.toISOString(),
+      newFulfillmentStatus: item.newFulfillmentStatus,
+      newOrderStatus: item.newOrderStatus,
+      newPaymentStatus: item.newPaymentStatus,
+      previousFulfillmentStatus: item.previousFulfillmentStatus,
+      previousOrderStatus: item.previousOrderStatus,
+      previousPaymentStatus: item.previousPaymentStatus,
+      reason: customerVisibleHistoryReason(item.actorType, item.reason),
+    })),
+    items: order.items.map((item) => ({
+      compareAtPrice: item.compareAtPrice ? decimalString(item.compareAtPrice) : null,
+      currency: item.currency,
+      imageUrl: item.imageUrlSnapshot,
+      lineDiscount: decimalString(item.lineDiscount),
+      lineSubtotal: decimalString(item.lineSubtotal),
+      lineTotal: decimalString(item.lineTotal),
+      optionValues: item.optionValuesSnapshot,
+      productName: item.productNameSnapshot,
+      quantity: item.quantity,
+      unitPrice: decimalString(item.unitPrice),
+      variantTitle: item.variantTitleSnapshot,
+    })),
+    pickup: order.fulfillmentMethod === "CUSTOMER_PICKUP"
+      ? {
+          address: order.pickupAddressSnapshot,
+          instructions: order.pickupInstructionsSnapshot,
+        }
+      : null,
+    subtotal: decimalString(order.subtotal),
+    taxTotal: decimalString(order.taxTotal),
+  };
+}
+
+export function canCustomerCancel(order: {
+  fulfillmentStatus: string;
+  paymentStatus: string;
+  status: string;
+}) {
+  return order.paymentStatus !== "PAID" && (
+    order.status === "PENDING" ||
+    (order.status === "CONFIRMED" && order.fulfillmentStatus === "UNFULFILLED")
+  );
+}
+
+function customerVisibleHistoryReason(actorType: string, reason: string | null) {
+  if (!reason) return null;
+  if (actorType === "CUSTOMER") return reason;
+  if (actorType === "SYSTEM" && reason === "PENDING_RESERVATION_EXPIRED") {
+    return "PENDING_RESERVATION_EXPIRED";
+  }
+  return null;
 }

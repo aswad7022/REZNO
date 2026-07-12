@@ -20,6 +20,10 @@ import {
   resolveMerchantCommerceContext,
   type CommerceAdminContext,
 } from "@/features/commerce/services/authorization";
+import {
+  notifyCustomerCancellation,
+  notifyCustomerOrderEvent,
+} from "@/features/commerce/services/commerce-notification-service";
 import type { MerchantIdentityInput } from "@/features/commerce/services/store-service";
 import {
   lockInventoryItems,
@@ -28,6 +32,7 @@ import {
 } from "@/features/commerce/services/transaction";
 
 const orderResultInclude = {
+  address: true,
   history: { orderBy: { createdAt: "asc" as const } },
   items: true,
   payment: true,
@@ -276,6 +281,7 @@ export async function confirmOrder(
         previousOrderStatus: order.status,
       },
     });
+    await notifyCustomerOrderEvent(transaction, order.id, "order.confirmed");
     return transaction.order.findUniqueOrThrow({ where: { id: order.id }, include: orderResultInclude });
   });
 }
@@ -322,24 +328,26 @@ export async function rejectOrder(
         reason,
       },
     });
+    await notifyCustomerOrderEvent(transaction, order.id, "order.rejected");
     return transaction.order.findUniqueOrThrow({ where: { id: order.id }, include: orderResultInclude });
   });
 }
 
 export async function cancelCustomerOrder(
   customerId: string,
-  input: { idempotencyKey: string; orderId: string; reason: string },
+  input: { orderId: string; reason: string },
 ) {
   const reason = requiredReason(input.reason);
   return runCommerceSerializable(async (transaction) => {
     const customer = await requireActiveCommerceCustomer(customerId, transaction);
-    const replay = await replayTransition(transaction, input.orderId, input.idempotencyKey);
-    if (replay) return replay;
     await lockOrder(transaction, input.orderId);
     const order = await transaction.order.findFirst({
       where: { id: input.orderId, customerId: customer.personId },
     });
     if (!order) commerceError("NOT_FOUND", "Order was not found.");
+    if (order.paymentStatus === "PAID") {
+      commerceError("ORDER_NOT_CANCELLABLE", "Paid Orders require an approved refund policy.");
+    }
     assertCustomerCancellationAllowed({
       fulfillmentStatus: order.fulfillmentStatus,
       orderStatus: order.status,
@@ -364,7 +372,7 @@ export async function cancelCustomerOrder(
     return finishCancellation(transaction, order, {
       actorId: customer.personId,
       actorType: "CUSTOMER",
-      idempotencyKey: input.idempotencyKey,
+      idempotencyKey: `order:${order.id}:customer-cancelled`,
       reason,
     });
   });
@@ -500,6 +508,11 @@ async function finishCancellation(
       reason: input.reason,
     },
   });
+  if (input.actorType === "CUSTOMER") {
+    await notifyCustomerCancellation(transaction, order.id);
+  } else {
+    await notifyCustomerOrderEvent(transaction, order.id, "order.cancelled");
+  }
   return transaction.order.findUniqueOrThrow({ where: { id: order.id }, include: orderResultInclude });
 }
 
@@ -534,6 +547,8 @@ export async function advanceOrderFulfillment(
         reason,
       },
     });
+    const notificationEvent = fulfillmentNotificationEvent(input.next);
+    if (notificationEvent) await notifyCustomerOrderEvent(transaction, order.id, notificationEvent);
     return transaction.order.findUniqueOrThrow({ where: { id: order.id }, include: orderResultInclude });
   });
 }
@@ -624,7 +639,16 @@ export async function expirePendingOrderInTransaction(
       reason: "PENDING_RESERVATION_EXPIRED",
     },
   });
+  await notifyCustomerOrderEvent(transaction, order.id, "order.expired");
   return transaction.order.findUniqueOrThrow({ where: { id: order.id }, include: orderResultInclude });
+}
+
+function fulfillmentNotificationEvent(status: FulfillmentStatus) {
+  if (status === "PREPARING") return "order.preparing" as const;
+  if (status === "READY_FOR_PICKUP") return "order.ready_for_pickup" as const;
+  if (status === "OUT_FOR_DELIVERY") return "order.out_for_delivery" as const;
+  if (status === "DELIVERED") return "order.delivered" as const;
+  return null;
 }
 
 function requiredReason(value: string) {

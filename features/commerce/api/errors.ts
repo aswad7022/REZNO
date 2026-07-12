@@ -22,6 +22,11 @@ export type CommerceApiErrorCode =
   | "PRODUCT_UNAVAILABLE"
   | "VARIANT_UNAVAILABLE"
   | "INVENTORY_CONFLICT"
+  | "ORDER_NOT_CANCELLABLE"
+  | "CANCELLATION_REASON_REQUIRED"
+  | "ORDER_STATE_CONFLICT"
+  | "FAVORITE_ALREADY_EXISTS"
+  | "FAVORITE_NOT_FOUND"
   | "RATE_LIMITED"
   | "INTERNAL_ERROR";
 
@@ -73,6 +78,9 @@ export function mapCommerceApiError(error: unknown) {
       "PRODUCT_UNAVAILABLE",
       "VARIANT_UNAVAILABLE",
       "INVENTORY_CONFLICT",
+      "ORDER_NOT_CANCELLABLE",
+      "FAVORITE_NOT_FOUND",
+      "INVALID_CURSOR",
     ]);
     const code: CommerceApiErrorCode =
       error.code === "UNAUTHORIZED"
@@ -93,7 +101,7 @@ export function mapCommerceApiError(error: unknown) {
           ? 403
           : code === "NOT_FOUND"
             ? 404
-            : code === "ADDRESS_OWNERSHIP_REQUIRED"
+            : code === "ADDRESS_OWNERSHIP_REQUIRED" || code === "FAVORITE_NOT_FOUND"
               ? 404
               : code === "INVALID_REQUEST" ||
                     code === "INVALID_CURSOR" ||

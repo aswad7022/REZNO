@@ -17,6 +17,7 @@ import {
   stockMovementKey,
 } from "@/features/commerce/domain/inventory";
 import { requireActiveCommerceCustomer } from "@/features/commerce/services/authorization";
+import { notifyCheckoutCreated } from "@/features/commerce/services/commerce-notification-service";
 import {
   lockInventoryItems,
   runCommerceSerializable,
@@ -375,6 +376,7 @@ export async function createPendingOrder(input: CreatePendingOrderInput) {
           status: "COMPLETED",
         },
       });
+      await notifyCheckoutCreated(transaction, orderId);
       return transaction.order.findUniqueOrThrow({ where: { id: orderId }, include: orderInclude });
     });
   } catch (error) {

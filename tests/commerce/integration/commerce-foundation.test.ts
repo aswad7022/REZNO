@@ -743,17 +743,17 @@ test("Milestone 2A PostgreSQL commerce foundation", { concurrency: false }, asyn
     const pendingBefore = await prisma.inventoryItem.findUniqueOrThrow({
       where: { variantId: primary.variant.id },
     });
-    const pendingKey = `cancel-pending-${pendingOrder.id}`;
     await cancelCustomerOrder(pendingCustomer.id, {
-      idempotencyKey: pendingKey,
       orderId: pendingOrder.id,
       reason: "Customer changed plans",
     });
-    await cancelCustomerOrder(pendingCustomer.id, {
-      idempotencyKey: pendingKey,
-      orderId: pendingOrder.id,
-      reason: "Customer changed plans",
-    });
+    await assert.rejects(
+      () => cancelCustomerOrder(pendingCustomer.id, {
+        orderId: pendingOrder.id,
+        reason: "Customer changed plans",
+      }),
+      expectCommerceCode("ORDER_NOT_CANCELLABLE"),
+    );
     assert.equal(
       await prisma.stockMovement.count({ where: { orderId: pendingOrder.id, type: "RELEASE" } }),
       1,
@@ -780,17 +780,17 @@ test("Milestone 2A PostgreSQL commerce foundation", { concurrency: false }, asyn
     const confirmedBeforeCancellation = await prisma.inventoryItem.findUniqueOrThrow({
       where: { variantId: primary.variant.id },
     });
-    const cancelKey = `cancel-confirmed-${confirmedOrder.id}`;
     await cancelCustomerOrder(confirmedCustomer.id, {
-      idempotencyKey: cancelKey,
       orderId: confirmedOrder.id,
       reason: "Cancel before preparation",
     });
-    await cancelCustomerOrder(confirmedCustomer.id, {
-      idempotencyKey: cancelKey,
-      orderId: confirmedOrder.id,
-      reason: "Cancel before preparation",
-    });
+    await assert.rejects(
+      () => cancelCustomerOrder(confirmedCustomer.id, {
+        orderId: confirmedOrder.id,
+        reason: "Cancel before preparation",
+      }),
+      expectCommerceCode("ORDER_NOT_CANCELLABLE"),
+    );
     assert.equal(
       await prisma.stockMovement.count({ where: { orderId: confirmedOrder.id, type: "RESTOCK" } }),
       1,

@@ -76,7 +76,7 @@ export function assertCustomerCancellationAllowed(input: {
     input.orderStatus !== "PENDING" &&
     !(input.orderStatus === "CONFIRMED" && input.fulfillmentStatus === "UNFULFILLED")
   ) {
-    commerceError("INVALID_TRANSITION", "The customer can no longer cancel this Order.");
+    commerceError("ORDER_NOT_CANCELLABLE", "The customer can no longer cancel this Order.");
   }
 }
 

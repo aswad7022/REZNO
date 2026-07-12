@@ -18,7 +18,10 @@ export type CommerceErrorCode =
   | "ADDRESS_REQUIRED"
   | "ADDRESS_NOT_ALLOWED"
   | "ADDRESS_OWNERSHIP_REQUIRED"
-  | "INVENTORY_CONFLICT";
+  | "INVENTORY_CONFLICT"
+  | "FAVORITE_NOT_FOUND"
+  | "ORDER_NOT_CANCELLABLE"
+  | "INVALID_CURSOR";
 
 export class CommerceDomainError extends Error {
   constructor(

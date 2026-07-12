@@ -633,6 +633,8 @@ model Notification {
   body              String
   audience          NotificationAudience
   priority          NotificationPriority @default(NORMAL)
+  eventKey          String?              @unique
+  metadata          Json?
   recipientPersonId String?              @db.Uuid
   businessId        String?              @db.Uuid
   createdByUserId   String?
@@ -1196,6 +1198,7 @@ enum LanguageCode {
   AR
   EN
   TR
+  KU
 }
 
 enum EntityStatus {
