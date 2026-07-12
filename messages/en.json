@@ -1365,7 +1365,15 @@
       "NOTIFICATIONS_SEND": "Send notifications",
       "SETTINGS_VIEW": "View settings",
       "SETTINGS_MANAGE": "Manage settings",
-      "AUDIT_LOG_VIEW": "View audit log"
+      "AUDIT_LOG_VIEW": "View audit log",
+      "COMMERCE_STORES_VIEW": "View commerce Stores",
+      "COMMERCE_STORES_REVIEW": "Review commerce Stores",
+      "COMMERCE_CATALOG_VIEW": "View commerce catalog",
+      "COMMERCE_CATALOG_MODERATE": "Moderate commerce catalog",
+      "COMMERCE_INVENTORY_VIEW": "View commerce inventory",
+      "COMMERCE_INVENTORY_MANAGE": "Manage commerce inventory",
+      "COMMERCE_ORDERS_VIEW": "View commerce Orders",
+      "COMMERCE_ORDERS_MANAGE": "Manage commerce Orders"
     }
   },
   "Messages": {

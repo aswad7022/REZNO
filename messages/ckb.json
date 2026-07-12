@@ -1365,7 +1365,15 @@
       "NOTIFICATIONS_SEND": "ناردنی ئاگادارکردنەوەکان",
       "SETTINGS_VIEW": "بینینی ڕێکخستنەکان",
       "SETTINGS_MANAGE": "بەڕێوەبردنی ڕێکخستنەکان",
-      "AUDIT_LOG_VIEW": "بینینی تۆماری پشکنین"
+      "AUDIT_LOG_VIEW": "بینینی تۆماری پشکنین",
+      "COMMERCE_STORES_VIEW": "بینینی فرۆشگاکانی بازاڕ",
+      "COMMERCE_STORES_REVIEW": "پێداچوونەوەی فرۆشگاکانی بازاڕ",
+      "COMMERCE_CATALOG_VIEW": "بینینی کەتەلۆگی بازاڕ",
+      "COMMERCE_CATALOG_MODERATE": "چاودێریکردنی کەتەلۆگی بازاڕ",
+      "COMMERCE_INVENTORY_VIEW": "بینینی کۆگای بازاڕ",
+      "COMMERCE_INVENTORY_MANAGE": "بەڕێوەبردنی کۆگای بازاڕ",
+      "COMMERCE_ORDERS_VIEW": "بینینی داواکارییەکانی بازاڕ",
+      "COMMERCE_ORDERS_MANAGE": "بەڕێوەبردنی داواکارییەکانی بازاڕ"
     }
   },
   "Messages": {

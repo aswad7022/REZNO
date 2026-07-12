@@ -7,6 +7,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "npm run test:commerce",
+    "test:unit": "tsx --test tests/commerce/unit/*.test.ts",
+    "test:integration": "tsx --test tests/commerce/integration/*.test.ts",
+    "test:commerce": "npm run test:unit && npm run test:integration",
+    "commerce:expire-pending-orders": "tsx scripts/commerce/expire-pending-orders.ts",
     "seed:staging:marketplace-demo": "tsx scripts/staging/seed-marketplace-demo.ts",
     "postinstall": "prisma generate"
   },
