@@ -1,6 +1,7 @@
 import { StatusBar } from "expo-status-bar";
 import { useFonts } from "expo-font";
-import { useCallback, useMemo, useState } from "react";
+import { requireOptionalNativeModule } from "expo-modules-core";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   I18nManager,
   Image,
@@ -10,6 +11,7 @@ import {
   StyleSheet,
   Text,
   useColorScheme,
+  useWindowDimensions,
   View,
   type ImageSourcePropType,
 } from "react-native";
@@ -27,6 +29,10 @@ import {
   SectionHeader,
   SummaryItem,
 } from "./src/components/screen-composition";
+import {
+  PremiumEntrance,
+  PremiumPressable,
+} from "./src/components/premium-motion";
 import { API_BASE_URL } from "./src/config/api";
 import {
   DEFAULT_LOCALE,
@@ -44,6 +50,8 @@ import {
   lightMobileTheme,
   type MobileTheme,
 } from "./src/theme/tokens";
+import { ReznoHomeScreen } from "./src/screens/rezno-home-screen";
+import { ReznoNearbySearchScreen } from "./src/screens/rezno-nearby-search-screen";
 import type { MobileMarketplaceBusiness } from "./src/types/marketplace";
 
 I18nManager.allowRTL(true);
@@ -123,7 +131,7 @@ type BookingPaymentOption = {
   meta: string;
 };
 
-type BookingListFilter = "upcoming" | "past" | "cancelled";
+type BookingListFilter = "all" | "upcoming" | "completed" | "cancelled";
 
 type BookingManagementPanel = "cancel" | "edit" | null;
 
@@ -146,27 +154,16 @@ type VisualBooking = {
 
 type MobileThemeMode = "system" | "light" | "dark";
 
-type HomeCategoryTone =
-  | "blue"
-  | "gold"
-  | "green"
-  | "neutral"
-  | "purple"
-  | "rose";
+type DevMenuPreferencesModule = {
+  getPreferencesAsync(): Promise<{ showFloatingActionButton?: boolean }>;
+  setPreferencesAsync(settings: {
+    showFloatingActionButton: boolean;
+  }): Promise<void>;
+};
 
-type HomeCategory =
-  | {
-      icon: ImageSourcePropType;
-      label: string;
-      mark?: never;
-      tone: HomeCategoryTone;
-    }
-  | {
-      icon?: never;
-      label: string;
-      mark: "book" | "car" | "more";
-      tone: HomeCategoryTone;
-    };
+const DEV_MENU_PREFERENCES = __DEV__
+  ? requireOptionalNativeModule<DevMenuPreferencesModule>("DevMenuPreferences")
+  : null;
 
 const mobileTypography = {
   kufiBold: "NotoKufiArabic-Bold",
@@ -180,11 +177,7 @@ const mobileTypography = {
 /* eslint-disable @typescript-eslint/no-require-imports -- React Native bundles static image assets through require(). */
 const mobileIconAssets = {
   categories: {
-    clinic: require("./assets/icons/categories/clinic.png") as ImageSourcePropType,
-    gym: require("./assets/icons/categories/gym.png") as ImageSourcePropType,
-    restaurant: require("./assets/icons/categories/restaurant.png") as ImageSourcePropType,
     salon: require("./assets/icons/categories/salon.png") as ImageSourcePropType,
-    services: require("./assets/icons/categories/services.png") as ImageSourcePropType,
     spa: require("./assets/icons/categories/spa.png") as ImageSourcePropType,
   },
   common: {
@@ -207,49 +200,6 @@ const mobileIconAssets = {
   },
 };
 /* eslint-enable @typescript-eslint/no-require-imports */
-
-const categories: HomeCategory[] = [
-  {
-    icon: mobileIconAssets.categories.salon,
-    label: "صالون",
-    tone: "rose",
-  },
-  {
-    icon: mobileIconAssets.categories.restaurant,
-    label: "مطاعم",
-    tone: "gold",
-  },
-  {
-    icon: mobileIconAssets.categories.clinic,
-    label: "عيادات",
-    tone: "blue",
-  },
-  {
-    icon: mobileIconAssets.categories.gym,
-    label: "رياضة",
-    tone: "green",
-  },
-  {
-    icon: mobileIconAssets.categories.spa,
-    label: "سبا",
-    tone: "purple",
-  },
-  {
-    label: "تعليم",
-    mark: "book",
-    tone: "blue",
-  },
-  {
-    label: "سيارات",
-    mark: "car",
-    tone: "gold",
-  },
-  {
-    label: "المزيد",
-    mark: "more",
-    tone: "neutral",
-  },
-];
 
 const featuredBusinesses: PremiumBusiness[] = [
   {
@@ -284,45 +234,6 @@ const featuredBusinesses: PremiumBusiness[] = [
     reviewCount: "74 تقييم",
     status: "الأقرب",
     tag: "مختصون",
-  },
-];
-
-const homeRecommendations = [
-  {
-    badge: "اختيار REZNO",
-    category: "مطاعم ومشاوي",
-    id: "recommend-mazaj",
-    meta: "تجربة عشاء فاخرة هذا الأسبوع",
-    price: "حجز يبدأ من 15,000 د.ع",
-    rating: "4.8",
-    title: "مطعم مزاج الذهبي",
-  },
-  {
-    badge: "الأكثر حجزاً",
-    category: "صالونات وتجميل",
-    id: "recommend-noura",
-    meta: "باقة عناية وتصفيف مختارة",
-    price: "خصم خاص للحجوزات المبكرة",
-    rating: "4.9",
-    title: "Noura Beauty Lounge",
-  },
-];
-
-const newOnReznoItems = [
-  {
-    label: "منضم حديثاً",
-    meta: "صالونات مختارة تنضم إلى التجربة المرئية",
-    title: "REZNO Beauty Club",
-  },
-  {
-    label: "خدمة جديدة",
-    meta: "حجوزات عائلية بواجهة آمنة لاحقاً",
-    title: "حجوزات العوائل",
-  },
-  {
-    label: "متاح الآن",
-    meta: "تجربة استكشاف محسّنة بدون بيانات حقيقية",
-    title: "اكتشاف قريب منك",
   },
 ];
 
@@ -489,9 +400,9 @@ const resolveDraftPayment = (draft: BookingDraft) =>
   paymentMethodOptions[3];
 
 const onboardingHighlights = [
-  "حجوزات",
-  "رسائل",
-  "أعمال",
+  { icon: mobileIconAssets.common.starRating, label: "عروض" },
+  { icon: mobileIconAssets.common.message, label: "رسائل" },
+  { icon: mobileIconAssets.categories.salon, label: "أعمال" },
 ];
 
 const accountActions = [
@@ -500,8 +411,9 @@ const accountActions = [
 ];
 
 const bookingFilterTabs: { id: BookingListFilter; label: string }[] = [
+  { id: "all", label: "الكل" },
   { id: "upcoming", label: "القادمة" },
-  { id: "past", label: "السابقة" },
+  { id: "completed", label: "المكتملة" },
   { id: "cancelled", label: "ملغاة" },
 ];
 
@@ -512,48 +424,50 @@ const visualBookingStatusLabels: Record<VisualBookingStatus, string> = {
   pending: "قيد الانتظار",
 };
 
-const demoManagedBookings: VisualBooking[] = [
+const SHOW_BOOKINGS_VISUAL_QA_FIXTURES = true;
+
+const bookingVisualQaFixtures: VisualBooking[] = [
   {
     businessName: "Noura Beauty Lounge",
     category: "صالون وتجميل",
-    date: "اليوم 06",
-    id: "noura-2406",
+    date: "الأحد، 9 يونيو 2025",
+    id: "visual-confirmed-booking",
     paymentMethod: "الدفع في الموقع",
-    price: "25,000 د.ع",
+    price: "250 TL",
     reference: "REZNO-2406",
-    serviceName: "قص وتصفيف فاخر",
-    staff: "أحمد",
+    serviceName: "قص شعر",
+    staff: "سارة أحمد",
     status: "confirmed",
     statusLabel: "مؤكد",
-    time: "15:00",
+    time: "4:30 م",
   },
   {
     businessName: "Mat3am Gold",
-    category: "مطعم وحجوزات",
-    date: "غداً 07",
+    category: "مطعم",
+    date: "السبت، 7 يونيو 2025",
     id: "mat3am-2407",
     paymentMethod: "حسب العرض البصري",
-    price: "حسب العرض البصري",
+    price: "400 TL",
     reference: "REZNO-2407",
     serviceName: "طاولة لـ 4 أشخاص",
-    staff: "بدون تفضيل",
+    staff: "عائلي",
     status: "pending",
     statusLabel: "قيد الانتظار",
-    time: "20:30",
+    time: "8:30 م",
   },
   {
-    businessName: "Smile Studio Clinic",
-    category: "عيادة أسنان",
-    date: "أمس",
-    id: "smile-2405",
+    businessName: "REZNO Gym",
+    category: "رياضة",
+    date: "الخميس، 1 مايو 2025",
+    id: "rezno-gym-2405",
     paymentMethod: "بطاقة الائتمان / مدى",
-    price: "15,000 د.ع",
+    price: "150 TL",
     reference: "REZNO-2405",
-    serviceName: "استشارة أسنان",
-    staff: "يوسف",
+    serviceName: "اشتراك شهري",
+    staff: "",
     status: "completed",
     statusLabel: "مكتمل",
-    time: "11:30",
+    time: "10:00 ص",
   },
 ];
 
@@ -766,7 +680,7 @@ export default function App() {
     createInitialBookingDraft,
   );
   const [bookingFilter, setBookingFilter] =
-    useState<BookingListFilter>("upcoming");
+    useState<BookingListFilter>("all");
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(
     null,
   );
@@ -787,6 +701,37 @@ export default function App() {
   const styles = useMemo(() => createStyles(theme), [theme]);
   const text = labels[locale];
   const isRtl = getTextDirection(locale) === "rtl";
+
+  useEffect(() => {
+    if ((!showOnboarding && activeTab !== "bookings") || !DEV_MENU_PREFERENCES) {
+      return;
+    }
+
+    let cancelled = false;
+    let originalFabVisibility: boolean | undefined;
+    const hideFabTask = DEV_MENU_PREFERENCES.getPreferencesAsync()
+      .then((preferences) => {
+        if (cancelled) return;
+
+        originalFabVisibility =
+          preferences.showFloatingActionButton ?? true;
+        return DEV_MENU_PREFERENCES.setPreferencesAsync({
+          showFloatingActionButton: false,
+        });
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+      void hideFabTask.finally(() => {
+        if (originalFabVisibility === undefined) return;
+
+        void DEV_MENU_PREFERENCES.setPreferencesAsync({
+          showFloatingActionButton: originalFabVisibility,
+        });
+      });
+    };
+  }, [activeTab, showOnboarding]);
   const selectedBookingService = useMemo(
     () => resolveDraftService(bookingDraft),
     [bookingDraft],
@@ -835,9 +780,23 @@ export default function App() {
   );
   const managedBookings = useMemo<VisualBooking[]>(
     () => {
-      const visualBookingFeed = [
+      const initialDraft = createInitialBookingDraft();
+      const bookingDraftIsUnchanged =
+        bookingDraft.businessName === initialDraft.businessName &&
+        bookingDraft.dateLabel === initialDraft.dateLabel &&
+        bookingDraft.serviceName === initialDraft.serviceName &&
+        bookingDraft.servicePrice === initialDraft.servicePrice &&
+        bookingDraft.specialistName === initialDraft.specialistName &&
+        bookingDraft.timeLabel === initialDraft.timeLabel;
+      const visualFixtures =
+        __DEV__ && SHOW_BOOKINGS_VISUAL_QA_FIXTURES
+          ? bookingVisualQaFixtures
+          : [];
+      const visualBookingFeed = bookingDraftIsUnchanged && visualFixtures.length
+        ? visualFixtures
+        : [
         confirmedVisualBooking,
-        ...demoManagedBookings.filter(
+        ...visualFixtures.filter(
           (booking) =>
             booking.id !== confirmedVisualBooking.id &&
             booking.businessName !== confirmedVisualBooking.businessName &&
@@ -860,7 +819,16 @@ export default function App() {
         };
       });
     },
-    [confirmedVisualBooking, visualCancelledBookingIds],
+    [
+      bookingDraft.businessName,
+      bookingDraft.dateLabel,
+      bookingDraft.serviceName,
+      bookingDraft.servicePrice,
+      bookingDraft.specialistName,
+      bookingDraft.timeLabel,
+      confirmedVisualBooking,
+      visualCancelledBookingIds,
+    ],
   );
   const selectedManagedBooking = selectedBookingId
     ? managedBookings.find((booking) => booking.id === selectedBookingId) ??
@@ -902,6 +870,10 @@ export default function App() {
   };
 
   const handleEnterApp = () => {
+    if (marketplaceState.status === "idle") {
+      loadMarketplace();
+    }
+
     setShowOnboarding(false);
   };
 
@@ -1014,11 +986,6 @@ export default function App() {
     setActiveTab("bookings");
   };
 
-  const handleOpenBooking = (booking: VisualBooking) => {
-    setSelectedBookingId(booking.id);
-    setBookingManagementPanel(null);
-  };
-
   const handleBackToBookings = () => {
     setSelectedBookingId(null);
     setBookingManagementPanel(null);
@@ -1045,7 +1012,7 @@ export default function App() {
 
   if (showOnboarding) {
     return (
-      <SafeAreaView style={styles.shell}>
+      <SafeAreaView style={[styles.shell, styles.onboardingSafeArea]}>
         <StatusBar style="light" />
         <View style={styles.onboardingScreen}>
           <WelcomeOnboardingCard
@@ -1063,7 +1030,8 @@ export default function App() {
       <StatusBar style={theme.isDark ? "light" : "dark"} />
       {!selectedBusiness &&
       activeTab !== "marketplace" &&
-      activeTab !== "customerHome" ? (
+      activeTab !== "customerHome" &&
+      activeTab !== "bookings" ? (
         <ScreenHeader
           isRtl={isRtl}
           locale={locale}
@@ -1073,17 +1041,27 @@ export default function App() {
         />
       ) : null}
 
-      <ScrollView
-        contentContainerStyle={[
-          styles.content,
-          activeTab === "customerHome" &&
-            !selectedBusiness &&
-            styles.homeContent,
-          (selectedBusiness || activeTab === "marketplace") &&
-            styles.immersiveContent,
-        ]}
-        showsVerticalScrollIndicator={false}
-      >
+      {!selectedBusiness && activeTab === "marketplace" ? (
+        <ReznoNearbySearchScreen
+          isRtl={isRtl}
+          locale={locale}
+          onOpenBusiness={(business) => setSelectedBusiness(business)}
+          onRetry={loadMarketplace}
+          state={marketplaceState}
+          theme={theme}
+        />
+      ) : (
+        <ScrollView
+          contentContainerStyle={[
+            styles.content,
+            activeTab === "customerHome" &&
+              !selectedBusiness &&
+              styles.homeContent,
+            selectedBusiness && styles.immersiveContent,
+          ]}
+          showsVerticalScrollIndicator={false}
+          style={styles.appScroll}
+        >
         {selectedBusiness && !bookingFlowStep ? (
           <SalonDetailScreen
             business={selectedBusiness}
@@ -1123,13 +1101,14 @@ export default function App() {
         ) : null}
 
         {!selectedBusiness && activeTab === "customerHome" ? (
-          <CustomerHomeScreen
+          <ReznoHomeScreen
             isRtl={isRtl}
+            locale={locale}
+            marketplaceState={marketplaceState}
             onOpenBusiness={setSelectedBusiness}
             onOpenMarketplace={() => handleTabPress("marketplace")}
-            onThemeModeChange={setThemeMode}
-            styles={styles}
-            themeMode={themeMode}
+            onRetry={loadMarketplace}
+            theme={theme}
           />
         ) : null}
 
@@ -1139,17 +1118,6 @@ export default function App() {
             onOpenBusiness={setSelectedBusiness}
             onOpenMarketplace={() => handleTabPress("marketplace")}
             styles={styles}
-          />
-        ) : null}
-
-        {!selectedBusiness && activeTab === "marketplace" ? (
-          <SearchMapScreen
-            isRtl={isRtl}
-            onOpenBusiness={setSelectedBusiness}
-            onRetry={loadMarketplace}
-            state={marketplaceState}
-            styles={styles}
-            text={text}
           />
         ) : null}
 
@@ -1178,7 +1146,6 @@ export default function App() {
               setSelectedBookingId(booking.id);
               setBookingManagementPanel("edit");
             }}
-            onOpenBooking={handleOpenBooking}
             onReturnHome={handleReturnHome}
             onSelectFilter={setBookingFilter}
             selectedBooking={selectedManagedBooking}
@@ -1205,7 +1172,8 @@ export default function App() {
             themeMode={themeMode}
           />
         ) : null}
-      </ScrollView>
+        </ScrollView>
+      )}
 
       <BottomTabBar
         activeTab={activeTab}
@@ -1214,74 +1182,6 @@ export default function App() {
         styles={styles}
       />
     </SafeAreaView>
-  );
-}
-
-function CustomerHomeScreen({
-  isRtl,
-  onOpenBusiness,
-  onOpenMarketplace,
-  onThemeModeChange,
-  styles,
-  themeMode,
-}: {
-  isRtl: boolean;
-  onOpenBusiness: (business: PremiumBusiness) => void;
-  onOpenMarketplace: () => void;
-  onThemeModeChange: (mode: MobileThemeMode) => void;
-  styles: MobileStyles;
-  themeMode: MobileThemeMode;
-}) {
-  return (
-    <View style={styles.homeReferenceScreen}>
-      <View style={styles.homeReferenceGlow} />
-      <HeroCard
-        isRtl={isRtl}
-        onThemeModeChange={onThemeModeChange}
-        styles={styles}
-        themeMode={themeMode}
-      />
-      <SearchBar
-        isRtl={isRtl}
-        onOpenMarketplace={onOpenMarketplace}
-        styles={styles}
-      />
-      <PromoCard isRtl={isRtl} styles={styles} />
-      <CategoryGrid styles={styles} />
-      <HomeSectionHeader
-        action="عرض الكل"
-        isRtl={isRtl}
-        styles={styles}
-        title="توصياتنا"
-      />
-      <HomeRecommendationsSection isRtl={isRtl} styles={styles} />
-      <HomeSectionHeader
-        action="عرض الكل"
-        isRtl={isRtl}
-        styles={styles}
-        title="قريب منك"
-      />
-      <View style={styles.homeBusinessGrid}>
-        {featuredBusinesses.map((business) => (
-          <View key={business.id} style={styles.homeBusinessCardSlot}>
-            <PremiumBusinessCard
-              business={business}
-              isRtl={isRtl}
-              onPress={() => onOpenBusiness(business)}
-              styles={styles}
-            />
-          </View>
-        ))}
-      </View>
-      <HomeSectionHeader
-        action="عرض الكل"
-        isRtl={isRtl}
-        styles={styles}
-        title="جديد على REZNO"
-      />
-      <NewOnReznoSection isRtl={isRtl} styles={styles} />
-      <View style={styles.homeBottomSpacer} />
-    </View>
   );
 }
 
@@ -1403,254 +1303,130 @@ function WelcomeOnboardingCard({
   onStart: () => void;
   styles: MobileStyles;
 }) {
+  const { height, width } = useWindowDimensions();
+  const compact = height < 760 || width < 375;
+
   return (
-    <View style={styles.onboardingCard}>
-      <View style={styles.onboardingGlow} />
-      <View style={styles.onboardingPattern}>
-        <View
-          style={[
-            styles.onboardingPatternLine,
-            styles.onboardingPatternLineStart,
-          ]}
-        />
-        <View style={styles.onboardingPatternLineTall} />
-        <View
-          style={[
-            styles.onboardingPatternLine,
-            styles.onboardingPatternLineEnd,
-          ]}
-        />
-        <View style={styles.onboardingPatternArc} />
+    <ScrollView
+      bounces={false}
+      contentContainerStyle={[
+        styles.onboardingCard,
+        compact && styles.onboardingCardCompact,
+      ]}
+      showsVerticalScrollIndicator={false}
+      style={styles.onboardingScroll}
+    >
+      <View pointerEvents="none" style={styles.onboardingPattern}>
+        <View style={styles.onboardingAmbientGlow} />
+        <View style={[styles.onboardingArc, styles.onboardingArcPrimary]} />
+        <View style={[styles.onboardingArc, styles.onboardingArcSecondary]} />
+        <View style={[styles.onboardingArc, styles.onboardingArcTertiary]} />
       </View>
 
-      <View style={styles.onboardingLogo}>
-        <Text style={styles.onboardingLogoText}>R</Text>
-      </View>
-      <Text style={[styles.onboardingBrand, isRtl && styles.rtlText]}>
-        REZNO
-      </Text>
-      <Text style={[styles.onboardingSlogan, isRtl && styles.rtlText]}>
-        Book Everything
-      </Text>
-      <Text style={[styles.onboardingBody, isRtl && styles.rtlText]}>
-        احجز أي خدمة في أي وقت وبسهولة وثقة
-      </Text>
-      <View style={styles.onboardingHighlights}>
-        {onboardingHighlights.map((item) => (
-          <Text key={item} style={styles.onboardingHighlight}>
-            {item}
-          </Text>
-        ))}
-      </View>
-      <View style={styles.onboardingActions}>
-        <PrimaryButton label="ابدأ الآن" onPress={onStart} styles={styles} />
-        <Pressable
-          accessibilityRole="button"
-          onPress={onStart}
-          style={({ pressed }) => [
-            styles.onboardingSecondary,
-            pressed && styles.softButtonPressed,
+      <PremiumEntrance
+        delay={70}
+        distance={16}
+        style={styles.onboardingLogoSection}
+      >
+        <View style={styles.onboardingLogoGlow} />
+        <Text
+          accessibilityLabel="REZNO"
+          style={[
+            styles.onboardingLogoText,
+            compact && styles.onboardingLogoTextCompact,
           ]}
         >
-          <Text style={styles.onboardingSecondaryText}>تسجيل الدخول</Text>
-        </Pressable>
+          R
+        </Text>
+        <Text style={styles.onboardingBrand}>REZNO</Text>
+        <View style={styles.onboardingSloganRow}>
+          <View style={styles.onboardingSloganLine} />
+          <Text style={styles.onboardingSlogan}>Book Everything</Text>
+          <View style={styles.onboardingSloganLine} />
+        </View>
+      </PremiumEntrance>
+
+      <View style={styles.onboardingValueSection}>
+        <PremiumEntrance
+          delay={300}
+          distance={10}
+          style={styles.onboardingMotionCentered}
+        >
+          <Text
+            numberOfLines={2}
+            style={[styles.onboardingBody, isRtl && styles.rtlText]}
+          >
+            {"احجز أي خدمة في أي وقت\nوبسهولة وثقة"}
+          </Text>
+        </PremiumEntrance>
+        <View style={styles.onboardingHighlights}>
+          {onboardingHighlights.map((item, index) => (
+            <PremiumEntrance
+              delay={390 + index * 70}
+              distance={10}
+              key={item.label}
+              style={styles.onboardingHighlightMotionItem}
+            >
+              <View style={styles.onboardingHighlight}>
+                <Image
+                  accessible={false}
+                  alt=""
+                  resizeMode="contain"
+                  source={item.icon}
+                  style={styles.onboardingHighlightIcon}
+                />
+                <Text style={styles.onboardingHighlightLabel}>
+                  {item.label}
+                </Text>
+              </View>
+            </PremiumEntrance>
+          ))}
+        </View>
       </View>
-    </View>
-  );
-}
 
-function HomeSectionHeader({
-  isRtl,
-  styles,
-  title,
-  action,
-}: {
-  isRtl: boolean;
-  styles: MobileStyles;
-  title: string;
-  action?: string;
-}) {
-  return (
-    <View style={styles.homeSectionHeader}>
-      <Text style={[styles.homeSectionAction, !action && styles.hiddenText]}>
-        {action ?? " "}
-      </Text>
-      <Text style={[styles.homeSectionTitle, isRtl && styles.rtlText]}>
-        {title}
-      </Text>
-    </View>
-  );
-}
-
-function HeroCard({
-  isRtl,
-  onThemeModeChange,
-  styles,
-  themeMode,
-}: {
-  isRtl: boolean;
-  onThemeModeChange: (mode: MobileThemeMode) => void;
-  styles: MobileStyles;
-  themeMode: MobileThemeMode;
-}) {
-  return (
-    <View style={styles.heroCard}>
-      <View style={styles.heroGlow} />
-      <View style={styles.heroTopRow}>
-        <View style={styles.homeLocationBlock}>
+      <PremiumEntrance
+        delay={620}
+        distance={10}
+        style={styles.onboardingActions}
+      >
+        <PremiumPressable
+          accessibilityHint="يفتح تجربة REZNO الرئيسية."
+          accessibilityLabel="ابدأ الآن"
+          accessibilityRole="button"
+          onPress={onStart}
+          scaleTo={0.975}
+          style={styles.onboardingPrimary}
+        >
+          <View style={styles.onboardingPrimaryHighlight} />
+          <View style={styles.onboardingPrimaryShade} />
+          <Text style={styles.onboardingPrimaryText}>ابدأ الآن</Text>
           <Image
+            accessible={false}
             alt=""
             resizeMode="contain"
-            source={mobileIconAssets.common.locationPin}
-            style={styles.locationIconImage}
+            source={mobileIconAssets.common.backArrowRtl}
+            style={styles.onboardingPrimaryArrow}
           />
-          <View style={styles.homeLocationCopy}>
-            <View style={styles.homeLocationTitleRow}>
-              <Text style={styles.locationText}>بغداد</Text>
-              <Text style={styles.homeLocationChevron}>⌄</Text>
-            </View>
-            <Text style={styles.homeLocationMeta}>تغيير الموقع</Text>
-          </View>
+        </PremiumPressable>
+        <PremiumPressable
+          accessibilityHint="يفتح تجربة تسجيل الدخول الحالية."
+          accessibilityLabel="تسجيل الدخول"
+          accessibilityRole="button"
+          onPress={onStart}
+          scaleTo={0.98}
+          style={styles.onboardingSecondary}
+        >
+          <Text style={styles.onboardingSecondaryText}>تسجيل الدخول</Text>
+        </PremiumPressable>
+        <View style={styles.onboardingFooterBrand}>
+          <View style={styles.onboardingFooterLine} />
+          <View style={styles.onboardingFooterDot} />
+          <Text style={styles.onboardingFooterText}>REZNO</Text>
+          <View style={styles.onboardingFooterDot} />
+          <View style={styles.onboardingFooterLine} />
         </View>
-        <View style={styles.homeTopControls}>
-          <View style={styles.homeNotificationButton}>
-            <Image
-              alt=""
-              resizeMode="contain"
-              source={mobileIconAssets.common.notificationBell}
-              style={styles.homeNotificationIcon}
-            />
-            <View style={styles.homeNotificationDot} />
-          </View>
-          <View style={styles.homeThemeSegment}>
-            {[
-              { label: "ليلي", mode: "dark" as const },
-              { label: "نهاري", mode: "light" as const },
-            ].map((item) => {
-              const active =
-                item.mode === "dark"
-                  ? themeMode !== "light"
-                  : themeMode === "light";
-
-              return (
-                <Pressable
-                  accessibilityHint="يغير نمط ألوان المعاينة محلياً فقط."
-                  accessibilityLabel={`اختيار نمط ${item.label}`}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: active }}
-                  hitSlop={TOUCH_HIT_SLOP}
-                  key={item.mode}
-                  onPress={() => onThemeModeChange(item.mode)}
-                  style={({ pressed }) => [
-                    styles.homeThemeOption,
-                    active && styles.homeThemeOptionActive,
-                    pressed && styles.tabButtonPressed,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.homeThemeText,
-                      active && styles.homeThemeTextActive,
-                    ]}
-                  >
-                    {item.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-          <View style={styles.heroProfileBadge}>
-            <Text style={styles.heroProfileText}>ع</Text>
-          </View>
-        </View>
-      </View>
-      <View style={styles.homeGreetingBlock}>
-        <Text style={[styles.heroTitle, isRtl && styles.rtlText]}>
-          مرحباً، علي
-        </Text>
-        <Text style={[styles.heroEyebrow, isRtl && styles.rtlText]}>
-          ما الخدمة التي تحتاجها اليوم؟
-        </Text>
-      </View>
-    </View>
-  );
-}
-
-function HomeRecommendationsSection({
-  isRtl,
-  styles,
-}: {
-  isRtl: boolean;
-  styles: MobileStyles;
-}) {
-  return (
-    <View style={styles.homeRecommendationGrid}>
-      {homeRecommendations.map((item) => (
-        <View key={item.id} style={styles.homeRecommendationCard}>
-          <View style={styles.homeRecommendationMedia}>
-            <BusinessMedia badge={item.badge} styles={styles} />
-          </View>
-          <View style={styles.homeRecommendationCopy}>
-            <View style={styles.homeRecommendationTopRow}>
-              <Text style={styles.homeRecommendationRating}>★ {item.rating}</Text>
-              <Text
-                style={[
-                  styles.homeRecommendationBadge,
-                  isRtl && styles.rtlText,
-                ]}
-              >
-                {item.badge}
-              </Text>
-            </View>
-            <Text
-              style={[styles.homeRecommendationTitle, isRtl && styles.rtlText]}
-            >
-              {item.title}
-            </Text>
-            <Text style={[styles.homeRecommendationMeta, isRtl && styles.rtlText]}>
-              {item.category}
-            </Text>
-            <Text style={[styles.homeRecommendationNote, isRtl && styles.rtlText]}>
-              {item.meta}
-            </Text>
-            <Text style={[styles.homeRecommendationPrice, isRtl && styles.rtlText]}>
-              {item.price}
-            </Text>
-          </View>
-        </View>
-      ))}
-    </View>
-  );
-}
-
-function NewOnReznoSection({
-  isRtl,
-  styles,
-}: {
-  isRtl: boolean;
-  styles: MobileStyles;
-}) {
-  return (
-    <View style={styles.newReznoGrid}>
-      {newOnReznoItems.map((item) => (
-        <View key={item.title} style={styles.newReznoCard}>
-          <View style={styles.newReznoIcon}>
-            <Text style={styles.newReznoIconText}>R</Text>
-          </View>
-          <View style={styles.newReznoCopy}>
-            <Text style={[styles.newReznoLabel, isRtl && styles.rtlText]}>
-              {item.label}
-            </Text>
-            <Text style={[styles.newReznoTitle, isRtl && styles.rtlText]}>
-              {item.title}
-            </Text>
-            <Text style={[styles.newReznoMeta, isRtl && styles.rtlText]}>
-              {item.meta}
-            </Text>
-          </View>
-        </View>
-      ))}
-    </View>
+      </PremiumEntrance>
+    </ScrollView>
   );
 }
 
@@ -1715,114 +1491,6 @@ function SearchBar({
         />
       </View>
     </Pressable>
-  );
-}
-
-function CategoryGrid({ styles }: { styles: MobileStyles }) {
-  return (
-    <View style={styles.categoryGrid}>
-      {categories.map((category) => (
-        <View key={category.label} style={styles.categoryItem}>
-          <View
-            style={[
-              styles.categoryIconTile,
-              category.tone === "green" && styles.categoryIconTileGreen,
-              category.tone === "blue" && styles.categoryIconTileBlue,
-              category.tone === "rose" && styles.categoryIconTileRose,
-              category.tone === "purple" && styles.categoryIconTilePurple,
-              category.tone === "gold" && styles.categoryIconTileGold,
-              category.tone === "neutral" && styles.categoryIconTileNeutral,
-            ]}
-          >
-            {"icon" in category ? (
-              <Image
-                alt=""
-                resizeMode="contain"
-                source={category.icon}
-                style={styles.categoryIconImage}
-              />
-            ) : (
-              <CategoryFallbackMark mark={category.mark} styles={styles} />
-            )}
-          </View>
-          <Text style={styles.categoryLabel}>{category.label}</Text>
-        </View>
-      ))}
-    </View>
-  );
-}
-
-function CategoryFallbackMark({
-  mark,
-  styles,
-}: {
-  mark: "book" | "car" | "more";
-  styles: MobileStyles;
-}) {
-  if (mark === "book") {
-    return (
-      <View style={styles.categoryBookMark}>
-        <View style={styles.categoryBookPage}>
-          <View style={styles.categoryBookLine} />
-          <View style={styles.categoryBookLineShort} />
-          <View style={styles.categoryBookLine} />
-        </View>
-        <View style={styles.categoryBookPageRight} />
-      </View>
-    );
-  }
-
-  if (mark === "car") {
-    return (
-      <View style={styles.categoryCarMark}>
-        <View style={styles.categoryCarRoof} />
-        <View style={styles.categoryCarBody}>
-          <View style={styles.categoryCarLight} />
-          <View style={styles.categoryCarLight} />
-        </View>
-        <View style={styles.categoryCarWheelRow}>
-          <View style={styles.categoryCarWheel} />
-          <View style={styles.categoryCarWheel} />
-        </View>
-      </View>
-    );
-  }
-
-  return (
-    <View style={styles.categoryMoreMark}>
-      <View style={styles.categoryMoreDot} />
-      <View style={styles.categoryMoreDot} />
-      <View style={styles.categoryMoreDot} />
-    </View>
-  );
-}
-
-function PromoCard({ isRtl, styles }: { isRtl: boolean; styles: MobileStyles }) {
-  return (
-    <View style={styles.promoCard}>
-      <View style={styles.promoGlow} />
-      <View style={styles.promoGoldGlow} />
-      <View style={styles.promoPatternLine} />
-      <View style={styles.promoPatternLineAlt} />
-      <View style={styles.promoCopy}>
-        <Text style={[styles.promoTitle, isRtl && styles.rtlText]}>
-          خصم 15%
-        </Text>
-        <Text style={[styles.promoBody, isRtl && styles.rtlText]}>
-          على حجوزات التجميل
-        </Text>
-        <View style={styles.promoCoupon}>
-          <Text style={styles.promoCouponText}>REZNO15</Text>
-        </View>
-      </View>
-      <View style={styles.promoBadge}>
-        <View style={styles.promoTicket}>
-          <View style={styles.promoTicketCutLeft} />
-          <View style={styles.promoTicketCutRight} />
-          <Text style={styles.promoTicketText}>%</Text>
-        </View>
-      </View>
-    </View>
   );
 }
 
@@ -1958,226 +1626,6 @@ function PremiumBusinessCard({
       {content}
     </View>
   );
-}
-
-function SearchMapScreen({
-  isRtl,
-  onOpenBusiness,
-  onRetry,
-  state,
-  styles,
-  text,
-}: {
-  isRtl: boolean;
-  onOpenBusiness: (business: PremiumBusiness) => void;
-  onRetry: () => void;
-  state: MarketplaceState;
-  styles: MobileStyles;
-  text: (typeof labels)[MobileLocale];
-}) {
-  return (
-    <>
-      <View style={styles.searchMapScreen}>
-        <View style={styles.searchMapTopRow}>
-          <SearchBar isRtl={isRtl} styles={styles} />
-          <View style={styles.searchMapFilterButton}>
-            <Image
-              alt=""
-              resizeMode="contain"
-              source={mobileIconAssets.common.filter}
-              style={styles.searchMapFilterIconImage}
-            />
-          </View>
-        </View>
-
-        <View style={styles.searchMapChipRow}>
-          <Text style={styles.searchMapChipActive}>القرب</Text>
-          <Text style={styles.searchMapChip}>الأعلى تقييماً</Text>
-          <Text style={styles.searchMapChip}>جميع الفئات</Text>
-        </View>
-
-        <SearchMapCanvas styles={styles} />
-      </View>
-
-      <View style={styles.searchResultsSheet}>
-        <Text style={[styles.searchResultsTitle, isRtl && styles.rtlText]}>
-          نتائج بالقرب منك
-        </Text>
-        {featuredBusinesses.map((business, index) => (
-          <SearchMapResultCard
-            business={business}
-            index={index}
-            isRtl={isRtl}
-            key={business.id}
-            onPress={() => onOpenBusiness(business)}
-            styles={styles}
-          />
-        ))}
-      </View>
-
-      <SearchMapApiStatus
-        isRtl={isRtl}
-        onRetry={onRetry}
-        state={state}
-        styles={styles}
-        text={text}
-      />
-    </>
-  );
-}
-
-function SearchMapCanvas({ styles }: { styles: MobileStyles }) {
-  return (
-    <View style={styles.searchMapCanvas}>
-      <View style={[styles.mapRoad, styles.mapRoadOne]} />
-      <View style={[styles.mapRoad, styles.mapRoadTwo]} />
-      <View style={[styles.mapRoad, styles.mapRoadThree]} />
-      <View style={styles.mapPulseOuter}>
-        <View style={styles.mapPulseMiddle}>
-          <View style={styles.mapPulseCore} />
-        </View>
-      </View>
-      <View style={[styles.mapPin, styles.mapPinGreen, styles.mapPinOne]}>
-        <View style={styles.mapPinDot} />
-      </View>
-      <View style={[styles.mapPin, styles.mapPinGold, styles.mapPinTwo]}>
-        <View style={styles.mapPinDot} />
-      </View>
-      <View style={[styles.mapPin, styles.mapPinRose, styles.mapPinThree]}>
-        <View style={styles.mapPinDot} />
-      </View>
-      <View style={[styles.mapPin, styles.mapPinPurple, styles.mapPinFour]}>
-        <View style={styles.mapPinDot} />
-      </View>
-      <View style={[styles.mapBusinessPin, styles.mapBusinessPinOne]}>
-        <BusinessMedia badge="متاح" styles={styles} />
-      </View>
-      <View style={[styles.mapBusinessPin, styles.mapBusinessPinTwo]}>
-        <BusinessMedia badge="قريب" styles={styles} />
-      </View>
-      <View style={[styles.mapBusinessPin, styles.mapBusinessPinThree]}>
-        <BusinessMedia badge="VIP" styles={styles} />
-      </View>
-    </View>
-  );
-}
-
-function SearchMapResultCard({
-  business,
-  index,
-  isRtl,
-  onPress,
-  styles,
-}: {
-  business: PremiumBusiness;
-  index: number;
-  isRtl: boolean;
-  onPress: () => void;
-  styles: MobileStyles;
-}) {
-  return (
-    <Pressable
-      accessibilityHint="يفتح شاشة تفاصيل النشاط المرئية بدون تنفيذ إجراء حقيقي."
-      accessibilityLabel={`فتح تفاصيل ${business.name}`}
-      accessibilityRole="button"
-      hitSlop={TOUCH_HIT_SLOP}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.searchResultCard,
-        pressed && styles.searchResultCardPressed,
-      ]}
-    >
-      <View style={styles.searchResultMedia}>
-        <BusinessMedia badge={business.tag} styles={styles} />
-      </View>
-      <View style={styles.searchResultCopy}>
-        <Text style={[styles.searchResultName, isRtl && styles.rtlText]}>
-          {business.name}
-        </Text>
-        <Text style={[styles.searchResultMeta, isRtl && styles.rtlText]}>
-          {business.category} · {business.status}
-        </Text>
-        <View style={styles.searchResultStats}>
-          <Image
-            alt=""
-            resizeMode="contain"
-            source={mobileIconAssets.common.starRating}
-            style={styles.searchResultStarImage}
-          />
-          <Text style={styles.searchResultRating}>{business.rating}</Text>
-          <Text style={styles.searchResultReviews}>
-            ({business.reviewCount.replace(" تقييم", "")})
-          </Text>
-        </View>
-        <Text style={styles.searchResultPrice}>{business.price}</Text>
-      </View>
-      <View style={styles.searchResultActions}>
-        <Image
-          alt=""
-          resizeMode="contain"
-          source={mobileIconAssets.common.heart}
-          style={styles.searchResultHeartImage}
-        />
-        <Image
-          alt=""
-          resizeMode="contain"
-          source={mobileIconAssets.common.share}
-          style={styles.searchResultShareImage}
-        />
-        <Text style={styles.searchResultDistance}>
-          {index === 0 ? "0.6 كم" : business.distance}
-        </Text>
-      </View>
-    </Pressable>
-  );
-}
-
-function SearchMapApiStatus({
-  isRtl,
-  onRetry,
-  state,
-  styles,
-  text,
-}: {
-  isRtl: boolean;
-  onRetry: () => void;
-  state: MarketplaceState;
-  styles: MobileStyles;
-  text: (typeof labels)[MobileLocale];
-}) {
-  if (state.status === "error") {
-    return (
-      <PremiumStateCard
-        body={state.message}
-        cta={text.marketplaceRetry}
-        icon="!"
-        isRtl={isRtl}
-        label={text.marketplaceErrorTitle}
-        onPress={onRetry}
-        styles={styles}
-        title="تعذر تحميل السوق الحقيقي"
-        tone="warning"
-      />
-    );
-  }
-
-  if (state.status === "loaded") {
-    return (
-      <View style={styles.searchMapBoundaryCard}>
-        <Text style={[styles.boundaryPill, isRtl && styles.rtlText]}>
-          بيانات السوق
-        </Text>
-        <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>
-          تم الحفاظ على مسار السوق الحالي
-        </Text>
-        <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>
-          {state.businesses.length} نشاط من API متاح بدون تغيير منطق الجلب.
-        </Text>
-      </View>
-    );
-  }
-
-  return null;
 }
 
 function SalonDetailScreen({
@@ -3649,7 +3097,6 @@ function MyBookingsScreen({
   onClosePanel,
   onConfirmCancel,
   onEditBooking,
-  onOpenBooking,
   onReturnHome,
   onSelectFilter,
   selectedBooking,
@@ -3664,12 +3111,13 @@ function MyBookingsScreen({
   onClosePanel: () => void;
   onConfirmCancel: (booking: VisualBooking) => void;
   onEditBooking: (booking: VisualBooking) => void;
-  onOpenBooking: (booking: VisualBooking) => void;
   onReturnHome: () => void;
   onSelectFilter: (filter: BookingListFilter) => void;
   selectedBooking: VisualBooking | null;
   styles: MobileStyles;
 }) {
+  const { width } = useWindowDimensions();
+
   if (selectedBooking) {
     return (
       <BookingDetailScreen
@@ -3688,39 +3136,98 @@ function MyBookingsScreen({
   }
 
   const filteredBookings = bookings.filter((booking) => {
+    if (filter === "all") {
+      return true;
+    }
+
     if (filter === "upcoming") {
       return booking.status === "confirmed" || booking.status === "pending";
     }
 
-    if (filter === "past") {
+    if (filter === "completed") {
       return booking.status === "completed";
     }
 
     return booking.status === "cancelled";
   });
+  const upcomingBookings = bookings.filter(
+    (booking) => booking.status === "confirmed" || booking.status === "pending",
+  );
+  const completedBookings = bookings.filter(
+    (booking) => booking.status === "completed",
+  );
+  const cancelledBookings = bookings.filter(
+    (booking) => booking.status === "cancelled",
+  );
+  const imageWidth = width < 380 ? 94 : width < 410 ? 108 : 122;
+  const bookingSections = [
+    {
+      bookings: upcomingBookings,
+      count: upcomingBookings.length,
+      id: "upcoming" as const,
+      subtitle: `لديك ${upcomingBookings.length === 2 ? "حجزين" : `${upcomingBookings.length} حجوزات`} قادمة`,
+      title: "القادمة",
+    },
+    {
+      bookings: completedBookings,
+      count: completedBookings.length,
+      id: "completed" as const,
+      subtitle: "حجوزات تمت بنجاح",
+      title: "المكتملة",
+    },
+    {
+      bookings: cancelledBookings,
+      count: cancelledBookings.length,
+      id: "cancelled" as const,
+      subtitle: "حجوزات أُلغيت محلياً",
+      title: "ملغاة",
+    },
+  ].filter((section) => section.bookings.length > 0);
 
   return (
     <View style={styles.bookingsScreen}>
-      <View style={styles.bookingsTopRow}>
-        <View style={styles.rowCopy}>
-          <Text style={[styles.screenEyebrow, isRtl && styles.rtlText]}>
-            إدارة الحجز
-          </Text>
-          <Text style={[styles.screenTitle, isRtl && styles.rtlText]}>
-            حجوزاتي
-          </Text>
-          <Text style={[styles.screenDescription, isRtl && styles.rtlText]}>
-            بطاقات عرض محلية لإدارة الحجوزات بصرياً بدون أي تعديل حقيقي.
-          </Text>
-        </View>
-        <View style={styles.bookingsBell}>
+      <View style={styles.bookingsHeader}>
+        <PremiumPressable
+          accessibilityLabel="الإشعارات"
+          accessibilityRole="button"
+          hitSlop={TOUCH_HIT_SLOP}
+          scaleTo={0.94}
+          style={styles.bookingsHeaderAction}
+        >
           <Image
             alt=""
             resizeMode="contain"
             source={mobileIconAssets.common.notificationBell}
-            style={styles.bookingsBellIcon}
+            style={styles.bookingsHeaderActionIcon}
           />
+          <View style={styles.bookingsNotificationBadge}>
+            <Text style={styles.bookingsNotificationBadgeText}>2</Text>
+          </View>
+        </PremiumPressable>
+
+        <View style={styles.bookingsHeaderCopy}>
+          <Text style={styles.bookingsHeaderTitle}>
+            حجوزاتي
+          </Text>
+          <Text style={styles.bookingsHeaderSubtitle}>
+            إدارة ومتابعة جميع حجوزاتك
+          </Text>
         </View>
+
+        <PremiumPressable
+          accessibilityLabel="التقويم"
+          accessibilityRole="button"
+          hitSlop={TOUCH_HIT_SLOP}
+          scaleTo={0.94}
+          style={styles.bookingsHeaderAction}
+        >
+          <Image
+            alt=""
+            resizeMode="contain"
+            source={mobileIconAssets.common.calendar}
+            style={styles.bookingsHeaderActionIconGold}
+          />
+        </PremiumPressable>
       </View>
 
       <View style={styles.bookingsSegmentedTabs}>
@@ -3728,17 +3235,17 @@ function MyBookingsScreen({
           const selected = tab.id === filter;
 
           return (
-            <Pressable
+            <PremiumPressable
               accessibilityHint="يغير فلتر حجوزاتي محلياً فقط."
               accessibilityLabel={`عرض الحجوزات ${tab.label}`}
               accessibilityRole="tab"
               accessibilityState={{ selected }}
               key={tab.id}
               onPress={() => onSelectFilter(tab.id)}
-              style={({ pressed }) => [
+              scaleTo={0.97}
+              style={[
                 styles.bookingsSegment,
                 selected && styles.bookingsSegmentActive,
-                pressed && styles.softButtonPressed,
               ]}
             >
               <Text
@@ -3749,34 +3256,126 @@ function MyBookingsScreen({
               >
                 {tab.label}
               </Text>
-            </Pressable>
+            </PremiumPressable>
           );
         })}
       </View>
 
       <View style={styles.bookingsList}>
-        {filteredBookings.length > 0 ? (
-          filteredBookings.map((booking) => (
-            <BookingCard
-              booking={booking}
-              isRtl={isRtl}
+        {filter === "all" && bookingSections.length > 0 ? (
+          bookingSections.map((section, sectionIndex) => (
+            <PremiumEntrance
+              delay={sectionIndex * 70}
+              distance={8}
+              key={section.id}
+              style={styles.bookingSection}
+            >
+              <BookingsSectionHeader
+                count={section.count}
+                id={section.id}
+                styles={styles}
+                subtitle={section.subtitle}
+                title={section.title}
+              />
+              <View style={styles.bookingSectionCards}>
+                {section.bookings.map((booking) => (
+                  <BookingCard
+                    booking={booking}
+                    imageWidth={imageWidth}
+                    key={booking.id}
+                    onCancelBooking={onCancelBooking}
+                    onEditBooking={onEditBooking}
+                    styles={styles}
+                  />
+                ))}
+              </View>
+            </PremiumEntrance>
+          ))
+        ) : filteredBookings.length > 0 ? (
+          filteredBookings.map((booking, index) => (
+            <PremiumEntrance
+              delay={index * 55}
+              distance={8}
               key={booking.id}
-              onCancelBooking={onCancelBooking}
-              onEditBooking={onEditBooking}
-              onOpenBooking={onOpenBooking}
-              styles={styles}
-            />
+            >
+              <BookingCard
+                booking={booking}
+                imageWidth={imageWidth}
+                onCancelBooking={onCancelBooking}
+                onEditBooking={onEditBooking}
+                styles={styles}
+              />
+            </PremiumEntrance>
           ))
         ) : (
-          <PremiumStateCard
-            body="لا توجد بطاقات في هذا التصنيف حالياً. أي تغيير هنا مرئي فقط ولا يقرأ بيانات حقيقية."
-            icon="0"
-            isRtl={isRtl}
-            label="حالة فارغة"
-            styles={styles}
-            title="لا توجد حجوزات هنا"
-          />
+          <BookingsEmptyState filter={filter} styles={styles} />
         )}
+      </View>
+    </View>
+  );
+}
+
+function BookingsSectionHeader({
+  count,
+  id,
+  styles,
+  subtitle,
+  title,
+}: {
+  count: number;
+  id: "cancelled" | "completed" | "upcoming";
+  styles: MobileStyles;
+  subtitle: string;
+  title: string;
+}) {
+  const completed = id === "completed";
+  const cancelled = id === "cancelled";
+
+  return (
+    <View style={styles.bookingSectionHeader}>
+      <View style={styles.bookingSectionDivider} />
+      <View style={styles.bookingSectionHeaderCopy}>
+        <View style={styles.bookingSectionTitleRow}>
+          <View
+            style={[
+              styles.bookingSectionIcon,
+              completed && styles.bookingSectionIconSuccess,
+              cancelled && styles.bookingSectionIconDanger,
+            ]}
+          >
+            {completed ? (
+              <Text style={styles.bookingSectionCheck}>✓</Text>
+            ) : cancelled ? (
+              <Text style={styles.bookingSectionCancel}>×</Text>
+            ) : (
+              <Image
+                alt=""
+                resizeMode="contain"
+                source={mobileIconAssets.common.calendar}
+                style={styles.bookingSectionCalendarIcon}
+              />
+            )}
+          </View>
+          <Text style={styles.bookingSectionTitle}>{title}</Text>
+          <View
+            style={[
+              styles.bookingSectionCount,
+              completed && styles.bookingSectionCountSuccess,
+              cancelled && styles.bookingSectionCountDanger,
+            ]}
+          >
+            <Text
+              style={[
+                styles.bookingSectionCountText,
+                completed && styles.bookingSectionCountTextSuccess,
+                cancelled && styles.bookingSectionCountTextDanger,
+              ]}
+            >
+              {count}
+            </Text>
+          </View>
+        </View>
+        <Text style={styles.bookingSectionSubtitle}>{subtitle}</Text>
       </View>
     </View>
   );
@@ -3784,182 +3383,239 @@ function MyBookingsScreen({
 
 function BookingCard({
   booking,
-  isRtl,
+  imageWidth,
   onCancelBooking,
   onEditBooking,
-  onOpenBooking,
   styles,
 }: {
   booking: VisualBooking;
-  isRtl: boolean;
+  imageWidth: number;
   onCancelBooking: (booking: VisualBooking) => void;
   onEditBooking: (booking: VisualBooking) => void;
-  onOpenBooking: (booking: VisualBooking) => void;
   styles: MobileStyles;
 }) {
   const cancelled = booking.status === "cancelled";
-  const statusPill = (
-    <Text
-      style={[
-        styles.managedStatusPill,
-        booking.status === "pending" && styles.managedStatusPillWarning,
-        booking.status === "completed" && styles.managedStatusPillSuccess,
-        cancelled && styles.managedStatusPillCancelled,
-      ]}
-    >
-      {booking.statusLabel}
-    </Text>
-  );
-  const bookingTitle = (
-    <Text style={[styles.managedBookingTitle, isRtl && styles.rtlText]}>
-      {booking.businessName}
-    </Text>
-  );
+  const completed = booking.status === "completed";
+  const restaurant = booking.businessName === "Mat3am Gold";
+  const artworkKind = restaurant
+    ? "restaurant"
+    : completed
+      ? "gym"
+      : booking.category.includes("عيادة")
+        ? "clinic"
+        : "salon";
 
   return (
-    <Pressable
-      accessibilityHint="يفتح تفاصيل حجز مرئي فقط."
-      accessibilityLabel={`عرض حجز ${booking.businessName}`}
-      accessibilityRole="button"
-      onPress={() => onOpenBooking(booking)}
-      style={({ pressed }) => [
-        styles.managedBookingCard,
-        pressed && styles.softButtonPressed,
-      ]}
+    <View
+      accessibilityLabel={`حجز ${booking.businessName}، ${booking.statusLabel}`}
+      style={styles.managedBookingCard}
     >
-      <View style={styles.managedBookingHeader}>
-        <View style={styles.managedBookingMedia}>
-          <BusinessMedia badge={booking.statusLabel} styles={styles} />
+      <View style={styles.bookingCardPhysicalRow}>
+        <View style={[styles.bookingCardMediaColumn, { width: imageWidth }]}>
+          <BookingBusinessArtwork
+            businessName={booking.businessName}
+            kind={artworkKind}
+            status={booking.status}
+            statusLabel={booking.statusLabel}
+            styles={styles}
+          />
+          <Text style={styles.bookingCardPrice}>{booking.price}</Text>
         </View>
-        <View style={styles.managedBookingCopy}>
-          <View style={styles.managedBookingTitleRow}>
-            {isRtl ? (
-              <>
-                {statusPill}
-                {bookingTitle}
-              </>
-            ) : (
-              <>
-                {bookingTitle}
-                {statusPill}
-              </>
-            )}
+
+        <View style={styles.bookingCardDetails}>
+          <View style={styles.bookingCardTitleRow}>
+            <PremiumPressable
+              accessibilityLabel="المزيد من خيارات الحجز"
+              accessibilityRole="button"
+              hitSlop={TOUCH_HIT_SLOP}
+              scaleTo={0.94}
+              style={styles.bookingOverflowButton}
+            >
+              <Text style={styles.bookingOverflowText}>⋮</Text>
+            </PremiumPressable>
+            <Text
+              numberOfLines={2}
+              style={styles.managedBookingTitle}
+            >
+              {booking.businessName}
+            </Text>
           </View>
-          <Text style={[styles.managedBookingMeta, isRtl && styles.rtlText]}>
+
+          <Text
+            numberOfLines={2}
+            style={[styles.managedBookingMeta, styles.bookingCardContentInset]}
+          >
             {booking.serviceName} · {booking.category}
           </Text>
+
           <View
-            style={[
-              styles.managedBookingInfoGrid,
-              isRtl && styles.managedBookingInfoGridRtl,
-            ]}
+            style={[styles.bookingDateTimeRow, styles.bookingCardContentInset]}
           >
-            <BookingInfoPill
-              iconSource={mobileIconAssets.common.calendar}
-              isRtl={isRtl}
-              label={`${booking.date} · ${booking.time}`}
-              styles={styles}
-            />
-            <BookingInfoPill
-              iconSource={mobileIconAssets.common.paymentCard}
-              isRtl={isRtl}
-              label={booking.price}
-              styles={styles}
-            />
+            <Text
+              adjustsFontSizeToFit
+              minimumFontScale={0.84}
+              numberOfLines={1}
+              style={styles.bookingDateText}
+            >
+              {booking.date}
+            </Text>
+            <View style={styles.bookingTimePill}>
+              <Image
+                alt=""
+                resizeMode="contain"
+                source={mobileIconAssets.common.clock}
+                style={styles.bookingTimeIcon}
+              />
+              <Text style={styles.bookingTimeText}>{booking.time}</Text>
+            </View>
           </View>
-          <Text style={[styles.managedBookingMeta, isRtl && styles.rtlText]}>
-            المختص: {booking.staff}
-          </Text>
+
+          {!completed && !cancelled ? (
+            <View
+              style={[styles.bookingMetadataRow, styles.bookingCardContentInset]}
+            >
+              <Text
+                numberOfLines={1}
+                style={[
+                  styles.bookingMetadataText,
+                  restaurant && styles.bookingMetadataTextFull,
+                ]}
+              >
+                {restaurant
+                  ? booking.paymentMethod
+                  : `مع: ${booking.staff}`}
+              </Text>
+              {!restaurant ? (
+                <View style={styles.bookingStaffAvatar}>
+                  <Text style={styles.bookingStaffAvatarText}>س</Text>
+                </View>
+              ) : null}
+            </View>
+          ) : null}
+
+          {!completed && !cancelled ? (
+            <View style={styles.managedBookingActions}>
+              <BookingActionButton
+                compact
+                icon={booking.status === "pending" ? "cancel" : "edit"}
+                label={booking.status === "pending" ? "إلغاء الحجز" : "تعديل"}
+                onPress={() =>
+                  booking.status === "pending"
+                    ? onCancelBooking(booking)
+                    : onEditBooking(booking)
+                }
+                styles={styles}
+                tone={booking.status === "pending" ? "danger" : "primary"}
+              />
+            </View>
+          ) : null}
         </View>
       </View>
-
-      <View
-        style={[
-          styles.managedBookingActions,
-          isRtl && styles.managedBookingActionsRtl,
-        ]}
-      >
-        <BookingActionButton
-          label="عرض"
-          onPress={() => onOpenBooking(booking)}
-          styles={styles}
-          tone="primary"
-        />
-        <BookingActionButton
-          label="تعديل"
-          onPress={() => onEditBooking(booking)}
-          styles={styles}
-          tone="neutral"
-        />
-        <BookingActionButton
-          disabled={cancelled}
-          label="إلغاء"
-          onPress={() => onCancelBooking(booking)}
-          styles={styles}
-          tone="danger"
-        />
-      </View>
-    </Pressable>
+    </View>
   );
 }
 
-function BookingInfoPill({
-  iconSource,
-  isRtl,
-  label,
+function BookingBusinessArtwork({
+  businessName,
+  kind,
+  status,
+  statusLabel,
   styles,
 }: {
-  iconSource: ImageSourcePropType;
-  isRtl: boolean;
-  label: string;
+  businessName: string;
+  kind: "clinic" | "gym" | "restaurant" | "salon";
+  status: VisualBookingStatus;
+  statusLabel: string;
   styles: MobileStyles;
 }) {
   return (
-    <View style={[styles.bookingInfoPill, isRtl && styles.bookingInfoPillRtl]}>
-      <Image
-        alt=""
-        resizeMode="contain"
-        source={iconSource}
-        style={styles.bookingInfoPillIcon}
-      />
-      <Text style={[styles.bookingInfoPillText, isRtl && styles.rtlText]}>
-        {label}
+    <View
+      style={[
+        styles.bookingArtwork,
+        kind === "restaurant" && styles.bookingArtworkRestaurant,
+        kind === "gym" && styles.bookingArtworkGym,
+        kind === "clinic" && styles.bookingArtworkClinic,
+      ]}
+    >
+      <View style={styles.bookingArtworkGlow} />
+      <View style={styles.bookingArtworkCeiling}>
+        <View style={styles.bookingArtworkLight} />
+        <View style={styles.bookingArtworkLight} />
+        <View style={styles.bookingArtworkLight} />
+      </View>
+      <View style={styles.bookingArtworkWallPanels}>
+        <View style={styles.bookingArtworkWallPanel} />
+        <View style={styles.bookingArtworkWallPanel} />
+        <View style={styles.bookingArtworkWallPanel} />
+      </View>
+      <View style={styles.bookingArtworkFloor} />
+      <Text
+        adjustsFontSizeToFit
+        minimumFontScale={0.65}
+        numberOfLines={2}
+        style={styles.bookingArtworkBrand}
+      >
+        {businessName}
       </Text>
+      <View
+        style={[
+          styles.bookingArtworkStatus,
+          status === "pending" && styles.bookingArtworkStatusPending,
+          status === "cancelled" && styles.bookingArtworkStatusCancelled,
+        ]}
+      >
+        <Text
+          style={[
+            styles.bookingArtworkStatusText,
+            status === "pending" && styles.bookingArtworkStatusTextPending,
+            status === "cancelled" && styles.bookingArtworkStatusTextCancelled,
+          ]}
+        >
+          {statusLabel}
+        </Text>
+      </View>
     </View>
   );
 }
 
 function BookingActionButton({
-  disabled,
+  compact = false,
+  icon,
   label,
   onPress,
   styles,
   tone,
 }: {
-  disabled?: boolean;
+  compact?: boolean;
+  icon?: "cancel" | "edit";
   label: string;
   onPress: () => void;
   styles: MobileStyles;
   tone: "danger" | "neutral" | "primary";
 }) {
   return (
-    <Pressable
+    <PremiumPressable
       accessibilityHint="إجراء إدارة مرئي فقط ولا يغير حجزاً حقيقياً."
       accessibilityLabel={label}
       accessibilityRole="button"
-      accessibilityState={{ disabled }}
-      disabled={disabled}
       hitSlop={TOUCH_HIT_SLOP}
       onPress={onPress}
-      style={({ pressed }) => [
+      scaleTo={0.97}
+      style={[
         styles.bookingActionButton,
+        icon === "edit" && styles.bookingActionButtonEdit,
         tone === "primary" && styles.bookingActionButtonPrimary,
         tone === "danger" && styles.bookingActionButtonDanger,
-        disabled && styles.disabledButton,
-        pressed && !disabled && styles.softButtonPressed,
+        compact && styles.bookingActionButtonCompact,
       ]}
     >
+      {icon ? (
+        <BookingActionGlyph icon={icon} styles={styles} tone={tone} />
+      ) : null}
       <Text
+        adjustsFontSizeToFit
+        minimumFontScale={0.72}
+        numberOfLines={1}
         style={[
           styles.bookingActionButtonText,
           tone === "primary" && styles.bookingActionButtonTextPrimary,
@@ -3968,7 +3624,61 @@ function BookingActionButton({
       >
         {label}
       </Text>
-    </Pressable>
+    </PremiumPressable>
+  );
+}
+
+function BookingActionGlyph({
+  icon,
+  styles,
+  tone,
+}: {
+  icon: "cancel" | "edit";
+  styles: MobileStyles;
+  tone: "danger" | "neutral" | "primary";
+}) {
+  return (
+    <Text
+      style={[
+        styles.bookingActionGlyphText,
+        tone === "primary" && styles.bookingActionGlyphTextPrimary,
+        tone === "danger" && styles.bookingActionGlyphTextDanger,
+      ]}
+    >
+      {icon === "edit" ? "✎" : "×"}
+    </Text>
+  );
+}
+
+function BookingsEmptyState({
+  filter,
+  styles,
+}: {
+  filter: BookingListFilter;
+  styles: MobileStyles;
+}) {
+  const labelsByFilter: Record<BookingListFilter, string> = {
+    all: "لا توجد حجوزات حالياً",
+    cancelled: "لا توجد حجوزات ملغاة",
+    completed: "لا توجد حجوزات مكتملة",
+    upcoming: "لا توجد حجوزات قادمة",
+  };
+
+  return (
+    <PremiumEntrance distance={8} style={styles.bookingsEmptyState}>
+      <View style={styles.bookingsEmptyIcon}>
+        <Image
+          alt=""
+          resizeMode="contain"
+          source={mobileIconAssets.common.calendar}
+          style={styles.bookingsEmptyIconImage}
+        />
+      </View>
+      <Text style={styles.bookingsEmptyTitle}>{labelsByFilter[filter]}</Text>
+      <Text style={styles.bookingsEmptyBody}>
+        ستظهر حجوزاتك هنا فور إضافتها، ويمكنك العودة للاستكشاف في أي وقت.
+      </Text>
+    </PremiumEntrance>
   );
 }
 
@@ -4945,6 +4655,9 @@ const createStyles = (theme: MobileTheme) =>
       gap: theme.spacing.sm,
       marginTop: 18,
     },
+    appScroll: {
+      flex: 1,
+    },
     accountActionButton: {
       alignItems: "center",
       backgroundColor: theme.colors.muted,
@@ -5255,36 +4968,171 @@ const createStyles = (theme: MobileTheme) =>
     },
     bookingActionButton: {
       alignItems: "center",
-      backgroundColor: theme.colors.cardElevated,
-      borderColor: theme.colors.border,
-      borderRadius: theme.radii.pill,
+      backgroundColor: "rgba(10, 16, 18, 0.82)",
+      borderColor: "rgba(170, 176, 179, 0.32)",
+      borderRadius: 12,
       borderWidth: 1,
       flex: 1,
+      flexDirection: "row-reverse",
+      gap: 8,
       justifyContent: "center",
-      minHeight: 38,
-      minWidth: 82,
-      paddingHorizontal: 11,
-      paddingVertical: 7,
+      height: 48,
+      minWidth: 0,
+      paddingHorizontal: 4,
+      paddingVertical: 9,
+    },
+    bookingActionButtonCompact: {
+      flex: 0,
+      maxWidth: "100%",
+      minWidth: 118,
+      paddingHorizontal: 14,
     },
     bookingActionButtonDanger: {
-      backgroundColor: theme.colors.dangerSoft,
-      borderColor: theme.colors.danger,
+      backgroundColor: "rgba(83, 17, 27, 0.16)",
+      borderColor: "#ff5969",
+    },
+    bookingActionButtonEdit: {
+      flexDirection: "row",
     },
     bookingActionButtonPrimary: {
-      backgroundColor: theme.colors.gold,
       borderColor: theme.colors.gold,
+      backgroundColor: "rgba(202, 151, 58, 0.08)",
     },
     bookingActionButtonText: {
-      color: theme.colors.foreground,
-      fontFamily: mobileTypography.uiSemiBold,
-      fontSize: 12,
+      color: "#d9d9d5",
+      fontFamily: mobileTypography.uiMedium,
+      flexShrink: 1,
+      fontSize: 12.5,
+      lineHeight: 18,
       textAlign: "center",
     },
     bookingActionButtonTextDanger: {
-      color: theme.colors.danger,
+      color: "#ff6675",
     },
     bookingActionButtonTextPrimary: {
-      color: theme.colors.foregroundInverse,
+      color: theme.colors.gold,
+    },
+    bookingActionGlyphText: {
+      color: "#d9d9d5",
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: 19,
+      lineHeight: 20,
+    },
+    bookingActionGlyphTextDanger: {
+      color: "#ff6675",
+    },
+    bookingActionGlyphTextPrimary: {
+      color: theme.colors.gold,
+    },
+    bookingArtwork: {
+      backgroundColor: "#17140f",
+      borderColor: "rgba(220, 171, 75, 0.35)",
+      borderRadius: 15,
+      borderWidth: 1,
+      height: 132,
+      overflow: "hidden",
+      position: "relative",
+      width: "100%",
+    },
+    bookingArtworkCeiling: {
+      flexDirection: "row",
+      gap: 12,
+      left: 12,
+      position: "absolute",
+      right: 12,
+      top: 10,
+    },
+    bookingArtworkClinic: {
+      backgroundColor: "#24231f",
+    },
+    bookingArtworkFloor: {
+      backgroundColor: "rgba(54, 38, 20, 0.82)",
+      bottom: -20,
+      height: 60,
+      left: -10,
+      position: "absolute",
+      right: -10,
+      transform: [{ skewX: "-12deg" }],
+    },
+    bookingArtworkGlow: {
+      backgroundColor: "rgba(231, 177, 71, 0.16)",
+      borderRadius: 70,
+      height: 120,
+      left: -36,
+      position: "absolute",
+      top: 17,
+      width: 120,
+    },
+    bookingArtworkGym: {
+      backgroundColor: "#111613",
+    },
+    bookingArtworkBrand: {
+      bottom: 35,
+      color: "#e8b85e",
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: 13,
+      left: 8,
+      lineHeight: 17,
+      position: "absolute",
+      right: 8,
+      textAlign: "center",
+    },
+    bookingArtworkLight: {
+      backgroundColor: "#f2cb7e",
+      borderRadius: 2,
+      height: 3,
+      opacity: 0.82,
+      width: 14,
+    },
+    bookingArtworkRestaurant: {
+      backgroundColor: "#16120d",
+    },
+    bookingArtworkStatus: {
+      backgroundColor: "rgba(10, 94, 57, 0.86)",
+      borderColor: "#28d57b",
+      borderRadius: 10,
+      borderWidth: 1,
+      left: 7,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      position: "absolute",
+      top: 7,
+    },
+    bookingArtworkStatusCancelled: {
+      backgroundColor: "rgba(92, 20, 30, 0.88)",
+      borderColor: "#ff5969",
+    },
+    bookingArtworkStatusPending: {
+      backgroundColor: "rgba(66, 46, 12, 0.92)",
+      borderColor: theme.colors.gold,
+    },
+    bookingArtworkStatusText: {
+      color: "#d4ffe3",
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: 10,
+      lineHeight: 14,
+    },
+    bookingArtworkStatusTextCancelled: {
+      color: "#ffadb5",
+    },
+    bookingArtworkStatusTextPending: {
+      color: "#f2c560",
+    },
+    bookingArtworkWallPanel: {
+      backgroundColor: "rgba(121, 88, 40, 0.26)",
+      borderColor: "rgba(238, 188, 86, 0.22)",
+      borderRadius: 3,
+      borderWidth: 1,
+      flex: 1,
+    },
+    bookingArtworkWallPanels: {
+      bottom: 28,
+      flexDirection: "row",
+      gap: 4,
+      left: 8,
+      position: "absolute",
+      right: 8,
+      top: 26,
     },
     bookingDetailActions: {
       gap: 12,
@@ -5369,67 +5217,405 @@ const createStyles = (theme: MobileTheme) =>
       alignSelf: "flex-end",
       textAlign: "center",
     },
-    bookingsBell: {
-      alignItems: "center",
-      backgroundColor: theme.colors.cardElevated,
-      borderColor: theme.colors.border,
-      borderRadius: 22,
-      borderWidth: 1,
-      height: 44,
-      justifyContent: "center",
-      width: 44,
+    bookingCardDetails: {
+      alignItems: "flex-end",
+      direction: "rtl",
+      flex: 1,
+      minWidth: 0,
+      width: "100%",
     },
-    bookingsBellIcon: {
-      height: 22,
-      tintColor: theme.colors.gold,
+    bookingCardContentInset: {
+      paddingRight: 27,
+    },
+    bookingCardMediaColumn: {
+      alignItems: "stretch",
+      flexShrink: 0,
+    },
+    bookingCardPhysicalRow: {
+      alignItems: "stretch",
+      direction: "ltr",
+      flexDirection: "row",
+      gap: 11,
+      width: "100%",
+    },
+    bookingCardPrice: {
+      color: "#39d47d",
+      fontFamily: mobileTypography.uiBold,
+      fontSize: 16,
+      lineHeight: 22,
+      marginTop: 8,
+      textAlign: "left",
+      writingDirection: "ltr",
+    },
+    bookingCardTitleRow: {
+      alignItems: "flex-start",
+      direction: "ltr",
+      flexDirection: "row-reverse",
+      gap: 5,
+      width: "100%",
+    },
+    bookingDateText: {
+      color: "#a9aaae",
+      direction: "rtl",
+      flex: 1,
+      fontFamily: mobileTypography.uiRegular,
+      fontSize: 12,
+      lineHeight: 18,
+      minWidth: 0,
+      textAlign: "right",
+      writingDirection: "rtl",
+    },
+    bookingDateTimeRow: {
+      alignItems: "center",
+      direction: "ltr",
+      flexDirection: "row",
+      gap: 7,
+      marginTop: 10,
+      width: "100%",
+    },
+    bookingMetadataRow: {
+      alignItems: "center",
+      direction: "ltr",
+      flexDirection: "row-reverse",
+      gap: 7,
+      justifyContent: "flex-start",
+      marginTop: 8,
+      minHeight: 25,
+      width: "100%",
+    },
+    bookingMetadataText: {
+      color: "#c4c4c1",
+      direction: "rtl",
+      flexShrink: 1,
+      fontFamily: mobileTypography.uiRegular,
+      fontSize: 12,
+      lineHeight: 18,
+      textAlign: "right",
+      writingDirection: "rtl",
+    },
+    bookingMetadataTextFull: {
+      alignSelf: "stretch",
+      direction: "ltr",
+      flex: 1,
+      textAlign: "right",
+      width: "100%",
+    },
+    bookingOverflowButton: {
+      alignItems: "center",
+      flexShrink: 0,
+      height: 28,
+      justifyContent: "center",
       width: 22,
     },
-    bookingsList: {
+    bookingOverflowText: {
+      color: "#f4f2eb",
+      fontFamily: mobileTypography.uiBold,
+      fontSize: 24,
+      lineHeight: 25,
+      textAlign: "center",
+    },
+    bookingSection: {
+      gap: 10,
+      width: "100%",
+    },
+    bookingSectionCalendarIcon: {
+      height: 18,
+      tintColor: theme.colors.gold,
+      width: 18,
+    },
+    bookingSectionCancel: {
+      color: "#ff7380",
+      fontFamily: mobileTypography.uiBold,
+      fontSize: 18,
+      lineHeight: 19,
+    },
+    bookingSectionCards: {
       gap: 12,
-      paddingBottom: 166,
+    },
+    bookingSectionCheck: {
+      color: "#07140e",
+      fontFamily: mobileTypography.uiBold,
+      fontSize: 14,
+      lineHeight: 16,
+    },
+    bookingSectionCount: {
+      alignItems: "center",
+      backgroundColor: "#f0bb4f",
+      borderRadius: 11,
+      height: 22,
+      justifyContent: "center",
+      minWidth: 22,
+      paddingHorizontal: 5,
+    },
+    bookingSectionCountDanger: {
+      backgroundColor: "rgba(151, 37, 51, 0.42)",
+    },
+    bookingSectionCountSuccess: {
+      backgroundColor: "rgba(17, 102, 60, 0.66)",
+    },
+    bookingSectionCountText: {
+      color: "#181105",
+      fontFamily: mobileTypography.uiBold,
+      fontSize: 11,
+      lineHeight: 14,
+    },
+    bookingSectionCountTextDanger: {
+      color: "#ff8994",
+    },
+    bookingSectionCountTextSuccess: {
+      color: "#43df88",
+    },
+    bookingSectionDivider: {
+      backgroundColor: "rgba(202, 151, 58, 0.2)",
+      flex: 1,
+      height: 1,
+      marginRight: 12,
+    },
+    bookingSectionHeader: {
+      alignItems: "center",
+      direction: "ltr",
+      flexDirection: "row",
+      width: "100%",
+    },
+    bookingSectionHeaderCopy: {
+      alignItems: "flex-end",
+      flexShrink: 0,
+    },
+    bookingSectionIcon: {
+      alignItems: "center",
+      height: 24,
+      justifyContent: "center",
+      width: 24,
+    },
+    bookingSectionIconDanger: {
+      backgroundColor: "rgba(151, 37, 51, 0.16)",
+      borderRadius: 12,
+    },
+    bookingSectionIconSuccess: {
+      backgroundColor: "#35d47d",
+      borderRadius: 12,
+    },
+    bookingSectionSubtitle: {
+      color: "#989a9d",
+      fontFamily: mobileTypography.uiRegular,
+      fontSize: 12,
+      lineHeight: 18,
+      marginTop: 2,
+      textAlign: "right",
+      writingDirection: "rtl",
+    },
+    bookingSectionTitle: {
+      color: "#f3f0e8",
+      fontFamily: mobileTypography.kufiBold,
+      fontSize: 18,
+      lineHeight: 25,
+    },
+    bookingSectionTitleRow: {
+      alignItems: "center",
+      flexDirection: "row-reverse",
+      gap: 7,
+    },
+    bookingStaffAvatar: {
+      alignItems: "center",
+      backgroundColor: "#745239",
+      borderColor: "rgba(223, 181, 100, 0.62)",
+      borderRadius: 13,
+      borderWidth: 1,
+      height: 26,
+      justifyContent: "center",
+      width: 26,
+    },
+    bookingStaffAvatarText: {
+      color: "#f4dfbd",
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: 11,
+    },
+    bookingTimeIcon: {
+      height: 13,
+      tintColor: theme.colors.gold,
+      width: 13,
+    },
+    bookingTimePill: {
+      alignItems: "center",
+      backgroundColor: "rgba(19, 23, 23, 0.92)",
+      borderColor: "rgba(202, 151, 58, 0.34)",
+      borderRadius: 10,
+      borderWidth: 1,
+      flexDirection: "row-reverse",
+      flexShrink: 0,
+      gap: 5,
+      minHeight: 31,
+      paddingHorizontal: 8,
+    },
+    bookingTimeText: {
+      color: "#e7b34e",
+      fontFamily: mobileTypography.uiMedium,
+      fontSize: 12,
+      lineHeight: 17,
+      writingDirection: "rtl",
+    },
+    bookingsEmptyBody: {
+      color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiRegular,
+      fontSize: 13,
+      lineHeight: 21,
+      maxWidth: 270,
+      textAlign: "center",
+      writingDirection: "rtl",
+    },
+    bookingsEmptyIcon: {
+      alignItems: "center",
+      backgroundColor: "rgba(202, 151, 58, 0.1)",
+      borderColor: "rgba(202, 151, 58, 0.38)",
+      borderRadius: 24,
+      borderWidth: 1,
+      height: 48,
+      justifyContent: "center",
+      width: 48,
+    },
+    bookingsEmptyIconImage: {
+      height: 23,
+      tintColor: theme.colors.gold,
+      width: 23,
+    },
+    bookingsEmptyState: {
+      alignItems: "center",
+      backgroundColor: "rgba(10, 19, 18, 0.94)",
+      borderColor: "rgba(202, 151, 58, 0.28)",
+      borderRadius: 20,
+      borderWidth: 1,
+      gap: 9,
+      justifyContent: "center",
+      minHeight: 205,
+      padding: 24,
+    },
+    bookingsEmptyTitle: {
+      color: theme.colors.foreground,
+      fontFamily: mobileTypography.kufiBold,
+      fontSize: 18,
+      lineHeight: 25,
+      textAlign: "center",
+    },
+    bookingsHeader: {
+      alignItems: "center",
+      direction: "ltr",
+      flexDirection: "row",
+      justifyContent: "space-between",
+      width: "100%",
+    },
+    bookingsHeaderAction: {
+      alignItems: "center",
+      backgroundColor: "rgba(9, 15, 15, 0.92)",
+      borderColor: "rgba(202, 151, 58, 0.5)",
+      borderRadius: 14,
+      borderWidth: 1,
+      height: 46,
+      justifyContent: "center",
+      position: "relative",
+      width: 46,
+    },
+    bookingsHeaderActionIcon: {
+      height: 22,
+      tintColor: "#f4f1e9",
+      width: 22,
+    },
+    bookingsHeaderActionIconGold: {
+      height: 23,
+      tintColor: theme.colors.gold,
+      width: 23,
+    },
+    bookingsHeaderCopy: {
+      alignItems: "center",
+      flex: 1,
+      paddingHorizontal: 10,
+    },
+    bookingsHeaderSubtitle: {
+      color: "#a5a5a2",
+      fontFamily: mobileTypography.uiRegular,
+      fontSize: 12,
+      lineHeight: 18,
+      marginTop: 1,
+      textAlign: "center",
+      writingDirection: "rtl",
+    },
+    bookingsHeaderTitle: {
+      color: "#f5f1e8",
+      fontFamily: mobileTypography.kufiBold,
+      fontSize: 25,
+      lineHeight: 32,
+      paddingBottom: 1,
+      paddingTop: 2,
+      textAlign: "center",
+      writingDirection: "rtl",
+    },
+    bookingsList: {
+      gap: 18,
+      paddingBottom: 170,
+    },
+    bookingsNotificationBadge: {
+      alignItems: "center",
+      backgroundColor: "#f2bd4f",
+      borderColor: "#17120a",
+      borderRadius: 9,
+      borderWidth: 1,
+      height: 18,
+      justifyContent: "center",
+      minWidth: 18,
+      paddingHorizontal: 3,
+      position: "absolute",
+      right: -5,
+      top: -5,
+    },
+    bookingsNotificationBadgeText: {
+      color: "#171005",
+      fontFamily: mobileTypography.uiBold,
+      fontSize: 10,
+      lineHeight: 13,
     },
     bookingsScreen: {
-      gap: 16,
-      paddingBottom: 152,
-      paddingHorizontal: 20,
-      paddingTop: 30,
+      gap: 15,
+      paddingBottom: 0,
+      paddingTop: 8,
+      width: "100%",
     },
     bookingsSegment: {
       alignItems: "center",
-      borderRadius: theme.radii.pill,
+      borderRadius: 14,
       flex: 1,
       justifyContent: "center",
-      minHeight: 44,
-      paddingHorizontal: 12,
-      paddingVertical: 10,
+      minHeight: 43,
+      minWidth: 0,
+      paddingHorizontal: 4,
+      paddingVertical: 8,
     },
     bookingsSegmentActive: {
-      backgroundColor: theme.colors.gold,
+      backgroundColor: "#e5b657",
+      shadowColor: "#c89435",
+      shadowOffset: { height: 4, width: 0 },
+      shadowOpacity: 0.26,
+      shadowRadius: 8,
     },
     bookingsSegmentText: {
-      color: theme.colors.mutedForeground,
+      color: "#a9a9a7",
       fontFamily: mobileTypography.uiMedium,
-      fontSize: 12,
+      fontSize: 12.5,
+      lineHeight: 18,
       textAlign: "center",
+      writingDirection: "rtl",
     },
     bookingsSegmentTextActive: {
-      color: theme.colors.foregroundInverse,
+      color: "#201608",
       fontFamily: mobileTypography.uiSemiBold,
     },
     bookingsSegmentedTabs: {
-      backgroundColor: theme.colors.cardElevated,
-      borderColor: theme.colors.border,
-      borderRadius: theme.radii.pill,
+      backgroundColor: "rgba(8, 14, 15, 0.94)",
+      borderColor: "rgba(202, 151, 58, 0.42)",
+      borderRadius: 18,
       borderWidth: 1,
-      flexDirection: "row",
-      gap: 4,
+      direction: "ltr",
+      flexDirection: "row-reverse",
+      gap: 2,
       padding: 4,
-    },
-    bookingsTopRow: {
-      alignItems: "flex-start",
-      flexDirection: "row",
-      gap: 12,
-      justifyContent: "space-between",
     },
     cancelBookingButton: {
       alignItems: "center",
@@ -5449,26 +5635,24 @@ const createStyles = (theme: MobileTheme) =>
       textAlign: "center",
     },
     managedBookingActions: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: 7,
-      marginTop: 10,
-    },
-    managedBookingActionsRtl: {
+      direction: "ltr",
       flexDirection: "row-reverse",
+      gap: 10,
+      marginTop: 10,
+      width: "100%",
     },
     managedBookingCard: {
       backgroundColor: theme.isDark
-        ? "rgba(7, 24, 19, 0.96)"
+        ? "rgba(8, 15, 16, 0.98)"
         : theme.colors.cardElevated,
-      borderColor: theme.colors.goldSoft,
-      borderRadius: 28,
+      borderColor: "rgba(202, 151, 58, 0.34)",
+      borderRadius: 20,
       borderWidth: 1,
-      padding: 14,
+      padding: 11,
       shadowColor: theme.colors.shadow,
-      shadowOffset: { height: 16, width: 0 },
-      shadowOpacity: theme.isDark ? 0.28 : 0.1,
-      shadowRadius: 24,
+      shadowOffset: { height: 12, width: 0 },
+      shadowOpacity: theme.isDark ? 0.24 : 0.08,
+      shadowRadius: 18,
     },
     managedBookingHeader: {
       alignItems: "flex-start",
@@ -5498,18 +5682,28 @@ const createStyles = (theme: MobileTheme) =>
       width: 104,
     },
     managedBookingMeta: {
-      color: theme.colors.mutedForeground,
+      alignSelf: "stretch",
+      color: "#a9aaad",
+      direction: "ltr",
       fontFamily: mobileTypography.uiRegular,
-      fontSize: 12,
-      lineHeight: 18,
-      marginTop: 3,
+      fontSize: 12.5,
+      lineHeight: 19,
+      marginTop: 5,
+      textAlign: "right",
+      width: "100%",
+      writingDirection: "rtl",
     },
     managedBookingTitle: {
-      color: theme.colors.foreground,
+      alignSelf: "stretch",
+      color: "#f4f2ec",
+      flex: 1,
       flexShrink: 1,
-      fontFamily: mobileTypography.kufiBold,
-      fontSize: 18,
-      lineHeight: 24,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: 17,
+      lineHeight: 23,
+      textAlign: "right",
+      width: "100%",
+      writingDirection: "ltr",
     },
     managedBookingTitleRow: {
       alignItems: "flex-start",
@@ -6290,90 +6484,79 @@ const createStyles = (theme: MobileTheme) =>
       backgroundColor: "transparent",
       borderColor: "transparent",
       borderWidth: 0,
-      borderRadius: 36,
+      borderRadius: 30,
       flex: 1,
-      height: 72,
+      height: 62,
       marginHorizontal: 0,
       shadowColor: theme.colors.deepGold,
       shadowOffset: { height: 8, width: 0 },
       shadowOpacity: theme.isDark ? 0.4 : 0.12,
       shadowRadius: 18,
-      transform: [{ translateY: -8 }],
+      transform: [{ translateY: -4 }],
     },
     centerTabButtonActive: {
       backgroundColor: "transparent",
-      transform: [{ translateY: -9 }, { scale: 1.02 }],
+      transform: [{ translateY: -5 }, { scale: 1.02 }],
     },
     centerTabActiveIndicator: {
       backgroundColor: "transparent",
-    },
-    centerTabIcon: {
-      color: theme.colors.foreground,
-      fontFamily: mobileTypography.uiRegular,
-      fontSize: 28,
-      lineHeight: 30,
+      height: 0,
+      marginTop: 0,
+      width: 0,
     },
     centerTabIconImage: {
-      height: 34,
+      height: 42,
       tintColor: theme.colors.foregroundInverse,
-      width: 34,
+      width: 42,
     },
     centerTabHalo: {
       alignItems: "center",
       backgroundColor: theme.isDark
-        ? "rgba(255, 193, 58, 0.82)"
+        ? "#d6a34b"
         : "rgba(246, 195, 67, 0.96)",
       borderColor: theme.isDark
         ? "rgba(255, 246, 205, 0.7)"
         : "rgba(184, 117, 11, 0.28)",
-      borderRadius: 35,
+      borderRadius: 29,
       borderWidth: 2,
-      height: 70,
+      height: 58,
       justifyContent: "center",
       shadowColor: theme.colors.deepGold,
       shadowOffset: { height: 10, width: 0 },
       shadowOpacity: theme.isDark ? 0.44 : 0.14,
       shadowRadius: 18,
-      width: 70,
+      width: 58,
     },
     centerTabInner: {
       alignItems: "center",
-      backgroundColor: theme.isDark ? "#103a2b" : "#f7c24a",
+      backgroundColor: theme.isDark ? "#edb64f" : "#f7c24a",
       borderColor: theme.isDark
         ? "rgba(255, 248, 220, 0.28)"
         : "rgba(255, 253, 248, 0.56)",
-      borderRadius: 28,
+      borderRadius: 25,
       borderWidth: 1,
-      height: 56,
+      height: 50,
       justifyContent: "center",
-      width: 56,
-    },
-    centerTabPlusText: {
-      color: theme.isDark ? theme.colors.cream : theme.colors.foregroundInverse,
-      fontFamily: mobileTypography.uiRegular,
-      fontSize: 41,
-      lineHeight: 44,
-      marginTop: -2,
+      width: 50,
     },
     exploreCompassIcon: {
       alignItems: "center",
-      borderColor: theme.colors.foreground,
-      borderRadius: 15,
-      borderWidth: 2,
-      height: 29,
+      borderColor: theme.colors.mutedForeground,
+      borderRadius: 10,
+      borderWidth: 1.5,
+      height: 20,
       justifyContent: "center",
-      transform: [{ rotate: "-18deg" }],
-      width: 29,
+      width: 20,
     },
     exploreCompassIconActive: {
       borderColor: theme.colors.gold,
     },
     exploreCompassNeedle: {
-      backgroundColor: theme.colors.foreground,
+      backgroundColor: theme.colors.mutedForeground,
       borderRadius: 999,
-      height: 14,
+      height: 10,
       transform: [{ rotate: "45deg" }],
-      width: 4,
+      width: 2.5,
     },
     exploreCompassNeedleActive: {
       backgroundColor: theme.colors.gold,
@@ -6445,11 +6628,13 @@ const createStyles = (theme: MobileTheme) =>
     },
     content: {
       gap: 18,
-      paddingBottom: 170,
+      paddingBottom: 24,
       paddingHorizontal: 20,
     },
     homeContent: {
-      paddingBottom: 128,
+      gap: 0,
+      paddingBottom: 0,
+      paddingHorizontal: 0,
     },
     immersiveContent: {
       paddingHorizontal: 0,
@@ -7739,8 +7924,8 @@ const createStyles = (theme: MobileTheme) =>
       justifyContent: "space-between",
     },
     onboardingActions: {
-      gap: 14,
-      marginTop: 96,
+      gap: 12,
+      marginTop: 34,
     },
     categoryRailCardBlue: {
       borderColor: "#38a9d3",
@@ -7755,20 +7940,22 @@ const createStyles = (theme: MobileTheme) =>
       borderColor: "#db4779",
     },
     onboardingBody: {
-      color: theme.colors.foreground,
+      color: "#f4f0e8",
       fontFamily: mobileTypography.uiRegular,
-      fontSize: 26,
-      lineHeight: 40,
-      marginTop: 28,
+      fontSize: 20,
+      lineHeight: 31,
       textAlign: "center",
+      writingDirection: "rtl",
     },
     onboardingBrand: {
-      color: theme.colors.foreground,
-      fontFamily: mobileTypography.kufiBold,
-      fontSize: 44,
-      letterSpacing: 2,
-      marginTop: 24,
+      color: "#e2b45c",
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: 36,
+      letterSpacing: 9,
+      lineHeight: 44,
+      marginTop: 8,
       textAlign: "center",
+      writingDirection: "ltr",
     },
     onboardingBrandRow: {
       alignItems: "center",
@@ -7776,12 +7963,20 @@ const createStyles = (theme: MobileTheme) =>
       gap: 12,
     },
     onboardingCard: {
-      backgroundColor: theme.colors.hero,
+      backgroundColor: "#05090b",
       borderRadius: 0,
-      flex: 1,
+      flexGrow: 1,
+      justifyContent: "space-between",
+      minHeight: "100%",
       overflow: "hidden",
+      paddingBottom: 22,
       paddingHorizontal: 28,
-      paddingVertical: 28,
+      paddingTop: 44,
+    },
+    onboardingCardCompact: {
+      paddingBottom: 16,
+      paddingHorizontal: 20,
+      paddingTop: 24,
     },
     onboardingGlow: {
       backgroundColor: theme.colors.goldSoft,
@@ -7794,23 +7989,59 @@ const createStyles = (theme: MobileTheme) =>
       width: 260,
     },
     onboardingHighlight: {
-      backgroundColor: theme.colors.card,
-      borderColor: theme.colors.border,
-      borderRadius: theme.radii.pill,
+      alignItems: "center",
+      backgroundColor: "rgba(12, 16, 19, 0.9)",
+      borderColor: "rgba(226, 180, 92, 0.2)",
+      borderRadius: 22,
       borderWidth: 1,
-      color: theme.colors.mutedForeground,
-      fontFamily: mobileTypography.uiSemiBold,
-      fontSize: 11,
-      overflow: "hidden",
-      paddingHorizontal: 11,
-      paddingVertical: 7,
+      flex: 1,
+      gap: 10,
+      justifyContent: "center",
+      minHeight: 104,
+      paddingHorizontal: 8,
+      paddingVertical: 12,
+    },
+    onboardingHighlightIcon: {
+      height: 31,
+      tintColor: "#d9a64d",
+      width: 31,
+    },
+    onboardingHighlightLabel: {
+      color: "#ece7df",
+      fontFamily: mobileTypography.uiMedium,
+      fontSize: 14,
+      lineHeight: 20,
+      textAlign: "center",
+      writingDirection: "rtl",
+    },
+    onboardingHighlightMotionItem: {
+      flex: 1,
     },
     onboardingHighlights: {
       alignSelf: "center",
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: 8,
-      marginTop: 22,
+      direction: "ltr",
+      flexDirection: "row-reverse",
+      gap: 10,
+      marginTop: 26,
+      width: "100%",
+    },
+    onboardingLogoGlow: {
+      backgroundColor: "rgba(226, 180, 92, 0.04)",
+      borderRadius: 80,
+      height: 160,
+      position: "absolute",
+      top: -24,
+      width: 160,
+    },
+    onboardingMotionCentered: {
+      alignItems: "center",
+      width: "100%",
+    },
+    onboardingLogoSection: {
+      alignItems: "center",
+      alignSelf: "center",
+      position: "relative",
+      width: "100%",
     },
     onboardingLogo: {
       alignItems: "center",
@@ -7822,57 +8053,189 @@ const createStyles = (theme: MobileTheme) =>
       width: 156,
     },
     onboardingLogoText: {
-      color: theme.colors.gold,
+      color: "#e5b55a",
       fontFamily: mobileTypography.uiBold,
-      fontSize: 132,
-      lineHeight: 142,
+      fontSize: 88,
+      lineHeight: 100,
+      textAlign: "center",
+      textShadowColor: "rgba(229, 181, 90, 0.34)",
+      textShadowOffset: { height: 2, width: 0 },
+      textShadowRadius: 12,
     },
-    onboardingSecondary: {
+    onboardingLogoTextCompact: {
+      fontSize: 76,
+      lineHeight: 86,
+    },
+    onboardingFooterBrand: {
       alignItems: "center",
-      backgroundColor: "transparent",
-      borderColor: "#5f6b7a",
-      borderRadius: theme.radii.pill,
+      direction: "ltr",
+      flexDirection: "row",
+      gap: 9,
+      marginTop: 20,
+      paddingHorizontal: 4,
+    },
+    onboardingFooterDot: {
+      backgroundColor: "#d8a950",
+      borderRadius: 3,
+      height: 6,
+      width: 6,
+    },
+    onboardingFooterLine: {
+      backgroundColor: "rgba(216, 169, 80, 0.42)",
+      flex: 1,
+      height: 1,
+    },
+    onboardingFooterText: {
+      color: "#c99238",
+      fontFamily: mobileTypography.uiMedium,
+      fontSize: 13,
+      letterSpacing: 5,
+      lineHeight: 18,
+      writingDirection: "ltr",
+    },
+    onboardingPrimary: {
+      alignItems: "center",
+      backgroundColor: "#d5a044",
+      borderColor: "rgba(255, 223, 157, 0.72)",
+      borderRadius: 24,
       borderWidth: 1,
       justifyContent: "center",
-      minHeight: 56,
-      paddingVertical: 15,
+      minHeight: 62,
+      overflow: "hidden",
+      paddingHorizontal: 58,
+      shadowColor: "#d5a044",
+      shadowOffset: { height: 5, width: 0 },
+      shadowOpacity: 0.22,
+      shadowRadius: 12,
     },
-    onboardingSecondaryText: {
-      color: theme.colors.foreground,
-      fontFamily: mobileTypography.uiSemiBold,
-      fontSize: 19,
+    onboardingPrimaryArrow: {
+      height: 24,
+      position: "absolute",
+      right: 24,
+      tintColor: "#171106",
+      width: 24,
     },
-    onboardingScreen: {
-      backgroundColor: theme.colors.hero,
-      flex: 1,
-      paddingHorizontal: 0,
-    },
-    onboardingSlogan: {
-      color: theme.colors.gold,
-      fontFamily: mobileTypography.uiRegular,
-      fontSize: 31,
-      lineHeight: 38,
-      marginTop: 16,
-      textAlign: "center",
-    },
-    onboardingPattern: {
-      bottom: 0,
+    onboardingPrimaryHighlight: {
+      backgroundColor: "rgba(255, 229, 177, 0.3)",
+      height: "54%",
       left: 0,
-      opacity: 0.9,
       position: "absolute",
       right: 0,
       top: 0,
     },
-    onboardingPatternArc: {
-      borderColor: "rgba(255, 193, 58, 0.32)",
-      borderRadius: 240,
-      borderTopWidth: 3,
-      height: 220,
-      left: -44,
+    onboardingPrimaryShade: {
+      backgroundColor: "rgba(120, 72, 7, 0.09)",
+      bottom: 0,
+      height: "46%",
+      left: 0,
       position: "absolute",
-      right: -44,
-      top: 82,
-      transform: [{ rotate: "-8deg" }],
+      right: 0,
+    },
+    onboardingPrimaryText: {
+      color: "#171106",
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: 20,
+      lineHeight: 28,
+      textAlign: "center",
+      writingDirection: "rtl",
+    },
+    onboardingSecondary: {
+      alignItems: "center",
+      backgroundColor: "transparent",
+      borderColor: "rgba(226, 180, 92, 0.82)",
+      borderRadius: 24,
+      borderWidth: 1,
+      justifyContent: "center",
+      minHeight: 58,
+      paddingVertical: 14,
+    },
+    onboardingSecondaryText: {
+      color: "#e7b760",
+      fontFamily: mobileTypography.uiMedium,
+      fontSize: 19,
+      lineHeight: 26,
+      writingDirection: "rtl",
+    },
+    onboardingSafeArea: {
+      backgroundColor: "#05090b",
+    },
+    onboardingScroll: {
+      backgroundColor: "#05090b",
+      flex: 1,
+    },
+    onboardingScreen: {
+      backgroundColor: "#05090b",
+      flex: 1,
+      paddingHorizontal: 0,
+    },
+    onboardingSlogan: {
+      color: "#d9a64d",
+      fontFamily: mobileTypography.uiRegular,
+      fontSize: 18,
+      letterSpacing: 3.2,
+      lineHeight: 24,
+      textAlign: "center",
+      writingDirection: "ltr",
+    },
+    onboardingSloganLine: {
+      backgroundColor: "rgba(217, 166, 77, 0.7)",
+      height: 1,
+      width: 34,
+    },
+    onboardingSloganRow: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 12,
+      justifyContent: "center",
+      marginTop: 4,
+    },
+    onboardingValueSection: {
+      alignItems: "center",
+      marginTop: 34,
+      width: "100%",
+    },
+    onboardingPattern: {
+      bottom: 0,
+      left: 0,
+      position: "absolute",
+      right: 0,
+      top: 0,
+    },
+    onboardingArc: {
+      borderColor: "rgba(218, 166, 74, 0.18)",
+      borderRadius: 500,
+      borderWidth: 1,
+      position: "absolute",
+    },
+    onboardingArcPrimary: {
+      height: 680,
+      left: -470,
+      top: 110,
+      transform: [{ rotate: "-18deg" }],
+      width: 760,
+    },
+    onboardingArcSecondary: {
+      height: 720,
+      right: -540,
+      top: -260,
+      transform: [{ rotate: "18deg" }],
+      width: 820,
+    },
+    onboardingArcTertiary: {
+      bottom: -500,
+      height: 700,
+      right: -310,
+      transform: [{ rotate: "-24deg" }],
+      width: 760,
+    },
+    onboardingAmbientGlow: {
+      backgroundColor: "rgba(225, 178, 89, 0.035)",
+      borderRadius: 210,
+      height: 420,
+      left: -120,
+      position: "absolute",
+      top: 120,
+      width: 420,
     },
     onboardingPatternLine: {
       backgroundColor: "rgba(255, 193, 58, 0.22)",
@@ -8956,126 +9319,6 @@ const createStyles = (theme: MobileTheme) =>
       opacity: 0.86,
       transform: [{ translateY: 1 }, { scale: 0.97 }],
     },
-    mapBusinessPin: {
-      backgroundColor: "#07090d",
-      borderColor: "#ffffff",
-      borderRadius: 45,
-      borderWidth: 6,
-      height: 90,
-      overflow: "hidden",
-      position: "absolute",
-      width: 90,
-      ...createMobileShadow(theme, {
-        darkOpacity: 0.25,
-        height: 8,
-        lightOpacity: 0.08,
-        radius: 18,
-      }),
-    },
-    mapBusinessPinOne: {
-      left: "28%",
-      top: "16%",
-    },
-    mapBusinessPinTwo: {
-      right: "27%",
-      top: "33%",
-    },
-    mapBusinessPinThree: {
-      bottom: "8%",
-      right: "22%",
-    },
-    mapPin: {
-      alignItems: "center",
-      backgroundColor: theme.colors.gold,
-      borderColor: "#ffffff",
-      borderRadius: 25,
-      borderWidth: 6,
-      height: 50,
-      justifyContent: "center",
-      position: "absolute",
-      width: 50,
-    },
-    mapPinDot: {
-      backgroundColor: "#ffffff",
-      borderRadius: 8,
-      height: 16,
-      width: 16,
-    },
-    mapPinFour: {
-      right: "10%",
-      top: "22%",
-    },
-    mapPinGold: {
-      backgroundColor: "#f59e0b",
-    },
-    mapPinGreen: {
-      backgroundColor: "#10b981",
-    },
-    mapPinOne: {
-      left: "8%",
-      top: "40%",
-    },
-    mapPinPurple: {
-      backgroundColor: "#7c3aed",
-    },
-    mapPinRose: {
-      backgroundColor: "#ec4899",
-    },
-    mapPinThree: {
-      bottom: "18%",
-      right: "8%",
-    },
-    mapPinTwo: {
-      bottom: "30%",
-      left: "22%",
-    },
-    mapPulseCore: {
-      backgroundColor: "#1473f9",
-      borderRadius: 22,
-      height: 44,
-      width: 44,
-    },
-    mapPulseMiddle: {
-      alignItems: "center",
-      backgroundColor: "rgba(20, 115, 249, 0.46)",
-      borderRadius: 76,
-      height: 104,
-      justifyContent: "center",
-      width: 104,
-    },
-    mapPulseOuter: {
-      alignItems: "center",
-      backgroundColor: "rgba(20, 115, 249, 0.24)",
-      borderRadius: 88,
-      height: 150,
-      justifyContent: "center",
-      left: "43%",
-      marginLeft: -75,
-      marginTop: -75,
-      position: "absolute",
-      top: "57%",
-      width: 150,
-    },
-    mapRoad: {
-      backgroundColor: "rgba(119, 151, 166, 0.42)",
-      borderRadius: 999,
-      height: 5,
-      left: -50,
-      position: "absolute",
-      width: "125%",
-    },
-    mapRoadOne: {
-      top: 46,
-      transform: [{ rotate: "-25deg" }],
-    },
-    mapRoadThree: {
-      bottom: 62,
-      transform: [{ rotate: "16deg" }],
-    },
-    mapRoadTwo: {
-      top: 142,
-      transform: [{ rotate: "25deg" }],
-    },
     salonActionGrid: {
       flexDirection: "row-reverse",
       gap: 14,
@@ -9794,197 +10037,6 @@ const createStyles = (theme: MobileTheme) =>
       lineHeight: 32,
       textAlign: "center",
     },
-    searchMapBoundaryCard: {
-      backgroundColor: theme.colors.cardElevated,
-      borderColor: theme.colors.goldSoft,
-      borderRadius: theme.radii.card,
-      borderWidth: 1,
-      marginHorizontal: 20,
-      padding: 18,
-    },
-    searchMapCanvas: {
-      backgroundColor: "#dceaf0",
-      borderRadius: 36,
-      height: 410,
-      marginTop: 18,
-      overflow: "hidden",
-      position: "relative",
-    },
-    searchMapChip: {
-      backgroundColor: theme.colors.cardElevated,
-      borderColor: theme.colors.border,
-      borderRadius: theme.radii.pill,
-      borderWidth: 1,
-      color: theme.colors.foreground,
-      fontFamily: mobileTypography.uiMedium,
-      flexGrow: 1,
-      fontSize: 14,
-      overflow: "hidden",
-      paddingHorizontal: 18,
-      paddingVertical: 12,
-      textAlign: "center",
-    },
-    searchMapChipActive: {
-      backgroundColor: theme.colors.gold,
-      borderRadius: theme.radii.pill,
-      color: theme.colors.foregroundInverse,
-      fontFamily: mobileTypography.uiMedium,
-      flexGrow: 1,
-      fontSize: 15,
-      overflow: "hidden",
-      paddingHorizontal: 24,
-      paddingVertical: 13,
-      textAlign: "center",
-    },
-    searchMapChipRow: {
-      flexDirection: "row-reverse",
-      gap: 12,
-      marginTop: 20,
-    },
-    searchMapFilterButton: {
-      alignItems: "center",
-      backgroundColor: theme.colors.cardElevated,
-      borderColor: theme.colors.border,
-      borderRadius: 30,
-      borderWidth: 1,
-      height: 60,
-      justifyContent: "center",
-      width: 60,
-    },
-    searchMapFilterIcon: {
-      color: theme.colors.foreground,
-      fontFamily: mobileTypography.uiSemiBold,
-      fontSize: 26,
-      lineHeight: 28,
-      transform: [{ rotate: "90deg" }],
-    },
-    searchMapFilterIconImage: {
-      height: 23,
-      tintColor: theme.colors.foreground,
-      width: 23,
-    },
-    searchMapScreen: {
-      backgroundColor: theme.colors.background,
-      paddingHorizontal: 20,
-      paddingTop: 14,
-    },
-    searchMapTopRow: {
-      alignItems: "center",
-      flexDirection: "row",
-      gap: 12,
-    },
-    searchResultActions: {
-      alignItems: "center",
-      gap: 13,
-      justifyContent: "center",
-      minWidth: 54,
-    },
-    searchResultCard: {
-      alignItems: "center",
-      backgroundColor: "#f4f6f8",
-      borderRadius: 26,
-      flexDirection: "row-reverse",
-      gap: 16,
-      paddingVertical: 11,
-    },
-    searchResultCardPressed: {
-      opacity: 0.9,
-      transform: [{ translateY: 1 }],
-    },
-    searchResultCopy: {
-      flex: 1,
-      minWidth: 0,
-    },
-    searchResultDistance: {
-      color: "#6b7280",
-      fontFamily: mobileTypography.uiRegular,
-      fontSize: 15,
-    },
-    searchResultHeart: {
-      color: "#111827",
-      fontFamily: mobileTypography.uiSemiBold,
-      fontSize: 38,
-      lineHeight: 40,
-    },
-    searchResultHeartImage: {
-      height: 30,
-      tintColor: "#111827",
-      width: 30,
-    },
-    searchResultMedia: {
-      borderRadius: 20,
-      height: 88,
-      overflow: "hidden",
-      width: 116,
-    },
-    searchResultMeta: {
-      color: "#6b7280",
-      fontFamily: mobileTypography.uiRegular,
-      fontSize: 16,
-      lineHeight: 22,
-      marginTop: 4,
-    },
-    searchResultName: {
-      color: "#101827",
-      fontFamily: mobileTypography.uiSemiBold,
-      fontSize: 24,
-      letterSpacing: -0.4,
-      lineHeight: 31,
-    },
-    searchResultPrice: {
-      color: "#101827",
-      fontFamily: mobileTypography.uiSemiBold,
-      fontSize: 17,
-      marginTop: 8,
-    },
-    searchResultRating: {
-      color: "#101827",
-      fontFamily: mobileTypography.uiSemiBold,
-      fontSize: 17,
-    },
-    searchResultReviews: {
-      color: "#101827",
-      fontFamily: mobileTypography.uiRegular,
-      fontSize: 17,
-    },
-    searchResultShare: {
-      color: "#6b7280",
-      fontFamily: mobileTypography.uiSemiBold,
-      fontSize: 28,
-      lineHeight: 30,
-    },
-    searchResultShareImage: {
-      height: 23,
-      tintColor: "#6b7280",
-      width: 23,
-    },
-    searchResultStarImage: {
-      height: 17,
-      tintColor: theme.colors.deepGold,
-      width: 17,
-    },
-    searchResultStats: {
-      alignItems: "center",
-      flexDirection: "row",
-      gap: 8,
-      marginTop: 10,
-    },
-    searchResultsSheet: {
-      backgroundColor: "#f4f6f8",
-      borderTopLeftRadius: 42,
-      borderTopRightRadius: 42,
-      gap: 12,
-      marginTop: -42,
-      padding: 24,
-      paddingTop: 40,
-    },
-    searchResultsTitle: {
-      color: "#101827",
-      fontFamily: mobileTypography.kufiBold,
-      fontSize: 27,
-      lineHeight: 35,
-      marginBottom: 6,
-    },
     searchActionButton: {
       alignItems: "center",
       backgroundColor: theme.colors.cardElevated,
@@ -10391,38 +10443,38 @@ const createStyles = (theme: MobileTheme) =>
     },
     tabBar: {
       alignItems: "center",
-      backgroundColor: theme.isDark ? "#06130f" : "#fffaf0",
+      backgroundColor: theme.isDark ? "#0c1511" : "#fffaf0",
       borderColor: theme.isDark
         ? "rgba(255, 193, 58, 0.26)"
         : "rgba(184, 117, 11, 0.22)",
-      borderRadius: 23,
+      borderRadius: 20,
       borderWidth: 1,
-      bottom: 18,
-      elevation: 24,
+      direction: "ltr",
+      elevation: 18,
       flexDirection: "row",
-      height: 90,
-      left: 28,
-      paddingBottom: 9,
-      paddingHorizontal: 12,
-      paddingTop: 9,
-      position: "absolute",
-      right: 28,
+      flexShrink: 0,
+      height: 72,
+      marginBottom: 8,
+      marginHorizontal: 16,
+      paddingBottom: 5,
+      paddingHorizontal: 6,
+      paddingTop: 5,
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: -10, width: 0 },
-      shadowOpacity: theme.isDark ? 0.54 : 0.14,
-      shadowRadius: 28,
+      shadowOpacity: theme.isDark ? 0.42 : 0.12,
+      shadowRadius: 22,
       zIndex: 20,
     },
     tabActiveIndicator: {
       backgroundColor: "transparent",
       borderRadius: 999,
-      height: 3,
+      height: 2,
       marginTop: 2,
-      width: 18,
+      width: 28,
     },
     tabActiveIndicatorVisible: {
-      backgroundColor: "transparent",
-      width: 18,
+      backgroundColor: theme.isDark ? "#edb64f" : theme.colors.deepGold,
+      width: 28,
     },
     tabButton: {
       alignItems: "center",
@@ -10430,7 +10482,7 @@ const createStyles = (theme: MobileTheme) =>
       flex: 1,
       gap: 3,
       justifyContent: "center",
-      minHeight: 58,
+      minHeight: 52,
       paddingHorizontal: 0,
     },
     tabButtonActive: {
@@ -10449,20 +10501,20 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.gold,
     },
     tabIconImage: {
-      height: 28,
-      tintColor: theme.colors.foreground,
-      width: 28,
+      height: 25,
+      tintColor: theme.colors.mutedForeground,
+      width: 25,
     },
     tabIconImageActive: {
       tintColor: theme.colors.gold,
     },
     tabLabel: {
-      color: theme.colors.foreground,
+      color: theme.colors.mutedForeground,
       fontFamily: mobileTypography.uiMedium,
-      fontSize: 12,
-      lineHeight: 16,
-      maxWidth: 64,
-      minWidth: 48,
+      fontSize: 11,
+      lineHeight: 15,
+      maxWidth: 60,
+      minWidth: 42,
       textAlign: "center",
     },
     tabLabelActive: {
