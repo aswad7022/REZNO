@@ -1,0 +1,200 @@
+name: Marketplace PR CI
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: marketplace-pr-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: "true"
+  NEXT_TELEMETRY_DISABLED: "1"
+  DATABASE_URL: postgresql://rezno_ci:rezno_ci_password@127.0.0.1:5432/rezno_marketplace_ci_test?schema=public
+  BETTER_AUTH_SECRET: rezno-ci-only-not-a-production-secret
+  BETTER_AUTH_URL: http://127.0.0.1:3000
+
+jobs:
+  static:
+    name: Static validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            apps/mobile/package-lock.json
+
+      - name: Install root dependencies from lockfile
+        run: npm ci
+
+      - name: Install mobile dependencies from lockfile
+        run: npm ci --prefix apps/mobile
+
+      - name: Run root lint
+        run: npm run lint
+
+      - name: Run root TypeScript validation without incremental output
+        run: npx --no-install tsc --noEmit --incremental false
+
+      - name: Run mobile TypeScript validation
+        run: npm run typecheck --prefix apps/mobile
+
+      - name: Validate Prisma schema
+        run: npx --no-install prisma validate
+
+      - name: Generate Prisma client
+        run: npx --no-install prisma generate
+
+      - name: Confirm static validation did not modify tracked files
+        run: git diff --exit-code
+
+  commerce-postgres:
+    name: Commerce PostgreSQL validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: rezno_ci
+          POSTGRES_PASSWORD: rezno_ci_password
+          POSTGRES_DB: rezno_marketplace_ci_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U rezno_ci -d rezno_marketplace_ci_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies from lockfile
+        run: npm ci
+
+      - name: Verify disposable test database and migration count
+        shell: bash
+        run: |
+          node -e 'const name = new URL(process.env.DATABASE_URL).pathname.slice(1); if (!/(?:_test|test_)/.test(name)) throw new Error(`Refusing non-test database: ${name}`)'
+          migration_count="$(find prisma/migrations -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')"
+          if [[ "$migration_count" != "22" ]]; then
+            echo "Expected 22 migrations, found $migration_count" >&2
+            exit 1
+          fi
+
+      - name: Apply all migrations to disposable PostgreSQL
+        run: npx --no-install prisma migrate deploy
+
+      - name: Confirm migration status
+        run: npx --no-install prisma migrate status
+
+      - name: Run complete Commerce unit suite
+        run: npm run test:unit
+
+      - name: Run Commerce PostgreSQL, concurrency, pagination, and Booking regressions
+        run: npm run test:integration
+
+      - name: Confirm database validation did not modify tracked files
+        run: git diff --exit-code
+
+  web-build:
+    name: Web build and live HTTP contracts
+    needs:
+      - static
+      - commerce-postgres
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: rezno_ci
+          POSTGRES_PASSWORD: rezno_ci_password
+          POSTGRES_DB: rezno_marketplace_ci_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U rezno_ci -d rezno_marketplace_ci_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies from lockfile
+        run: npm ci
+
+      - name: Apply migrations for live HTTP validation
+        run: npx --no-install prisma migrate deploy
+
+      - name: Build Next.js production application
+        run: npm run build
+
+      - name: Run complete HTTP suite against production server
+        shell: bash
+        env:
+          COMMERCE_HTTP_BASE_URL: http://127.0.0.1:3000
+        run: |
+          npm run start >"$RUNNER_TEMP/rezno-next.log" 2>&1 &
+          server_pid=$!
+
+          cleanup() {
+            if kill -0 "$server_pid" 2>/dev/null; then
+              kill "$server_pid"
+            fi
+          }
+          trap cleanup EXIT
+
+          ready=0
+          for attempt in {1..60}; do
+            if curl --silent --fail http://127.0.0.1:3000/api/commerce/public/categories >/dev/null; then
+              ready=1
+              break
+            fi
+            sleep 2
+          done
+
+          if [[ "$ready" != "1" ]]; then
+            cat "$RUNNER_TEMP/rezno-next.log"
+            exit 1
+          fi
+
+          npm run test:http
+
+      - name: Confirm build changed only known generated files
+        run: git diff --exit-code -- . ':(exclude)next-env.d.ts' ':(exclude)tsconfig.tsbuildinfo'
