@@ -60,6 +60,20 @@ test(
     const customerBCookie = await signUp(emails.customerBEmail);
     await signUp(emails.merchantEmail);
     const fixture = await prepareMilestone2cHttpFixture(emails);
+    const dualRole = await prisma.role.findFirstOrThrow({
+      where: {
+        commercePermissions: { has: "ORDER_VIEW" },
+        organizationId: fixture.merchant.organization.id,
+      },
+      select: { id: true },
+    });
+    await prisma.organizationMember.create({
+      data: {
+        organizationId: fixture.merchant.organization.id,
+        personId: fixture.customerA.person.id,
+        roleId: dualRole.id,
+      },
+    });
 
     const unauthenticated = await request("/api/commerce/customer/orders");
     assert.equal(unauthenticated.response.status, 401);
@@ -84,18 +98,157 @@ test(
     assert.equal(checkout.response.status, 201);
     const orderId = (checkout.body.data as { id: string }).id;
 
-    const notifications = await request("/api/commerce/customer/notifications", {
+    const cancellation = await request(`/api/commerce/customer/orders/${orderId}/cancel`, {
+      body: { reason: "Changed plans" },
       cookie: customerACookie,
-      headers: { "expo-origin": "rezno://" },
+      method: "POST",
     });
-    assert.equal(notifications.response.status, 200);
-    const notification = (notifications.body.data as Array<{ orderId: string | null }>)[0];
-    assert.equal(notification?.orderId, orderId);
+    assert.equal(cancellation.response.status, 200);
+    const cancellationReplay = await request(`/api/commerce/customer/orders/${orderId}/cancel`, {
+      body: { reason: "Changed plans" },
+      cookie: customerACookie,
+      method: "POST",
+    });
+    assert.equal(cancellationReplay.response.status, 409);
+    assert.equal((cancellationReplay.body.error as { code: string }).code, "ORDER_NOT_CANCELLABLE");
+    assert.equal(await prisma.orderStatusHistory.count({ where: { orderId, newOrderStatus: "CANCELLED" } }), 1);
+    const cancellationConflict = await request(`/api/commerce/customer/orders/${orderId}/cancel`, {
+      body: { reason: "Another attempt" },
+      cookie: customerACookie,
+      method: "POST",
+    });
+    assert.equal(cancellationConflict.response.status, 409);
+    assert.equal((cancellationConflict.body.error as { code: string }).code, "ORDER_NOT_CANCELLABLE");
+
+    const [customerCreated, merchantNew, customerCancelled, merchantCustomerCancelled] = await Promise.all([
+      prisma.notification.findUniqueOrThrow({
+        where: { eventKey: `commerce:${orderId}:order.created:${fixture.customerA.person.id}` },
+      }),
+      prisma.notification.findUniqueOrThrow({
+        where: { eventKey: `commerce:${orderId}:order.new:${fixture.customerA.person.id}` },
+      }),
+      prisma.notification.findUniqueOrThrow({
+        where: { eventKey: `commerce:${orderId}:order.cancelled:${fixture.customerA.person.id}` },
+      }),
+      prisma.notification.findUniqueOrThrow({
+        where: { eventKey: `commerce:${orderId}:order.customer_cancelled:${fixture.customerA.person.id}` },
+      }),
+    ]);
+
+    const [legacyNotification, malformedMetadata, missingEventType, unknownEventType] = await Promise.all([
+      prisma.notification.create({
+        data: {
+          audience: "USER",
+          body: "Legacy booking notification body",
+          recipientPersonId: fixture.customerA.person.id,
+          title: "Legacy booking notification",
+        },
+      }),
+      prisma.notification.create({
+        data: {
+          audience: "USER",
+          body: "Malformed metadata body",
+          eventKey: `commerce:${randomUUID()}:malformed:${fixture.customerA.person.id}`,
+          metadata: "malformed",
+          recipientPersonId: fixture.customerA.person.id,
+          title: "Malformed metadata",
+        },
+      }),
+      prisma.notification.create({
+        data: {
+          audience: "USER",
+          body: "Missing event type body",
+          eventKey: `commerce:${randomUUID()}:missing-event:${fixture.customerA.person.id}`,
+          metadata: { destination: "/customer/notifications", orderId },
+          recipientPersonId: fixture.customerA.person.id,
+          title: "Missing event type",
+        },
+      }),
+      prisma.notification.create({
+        data: {
+          audience: "USER",
+          body: "Unknown event type body",
+          eventKey: `commerce:${orderId}:order.future:${fixture.customerA.person.id}`,
+          metadata: {
+            destination: "/customer/notifications",
+            eventType: "order.future",
+            orderId,
+          },
+          recipientPersonId: fixture.customerA.person.id,
+          title: "Unknown event type",
+        },
+      }),
+    ]);
+
     const crossNotifications = await request("/api/commerce/customer/notifications", {
       cookie: customerBCookie,
     });
     assert.equal(crossNotifications.response.status, 200);
     assert.equal((crossNotifications.body.data as unknown[]).length, 0);
+
+    const crossAdded = await request("/api/commerce/customer/cart/items", {
+      body: { quantity: 1, variantId: fixture.catalogB.variant.id },
+      cookie: customerBCookie,
+      method: "POST",
+    });
+    const crossCart = crossAdded.body.data as { id: string; version: number };
+    const crossCheckout = await request("/api/commerce/customer/checkout", {
+      body: {
+        cartId: crossCart.id,
+        cartVersion: crossCart.version,
+        fulfillmentMethod: "CUSTOMER_PICKUP",
+      },
+      cookie: customerBCookie,
+      headers: { "idempotency-key": randomUUID() },
+      method: "POST",
+    });
+    assert.equal(crossCheckout.response.status, 201);
+    const crossOrderId = (crossCheckout.body.data as { id: string }).id;
+    const crossOwnerNotification = await prisma.notification.create({
+      data: {
+        audience: "USER",
+        body: "Cross-owner customer event body",
+        eventKey: `commerce:${crossOrderId}:order.created:${fixture.customerA.person.id}`,
+        metadata: {
+          destination: "/customer/notifications",
+          eventType: "order.created",
+          orderId: crossOrderId,
+        },
+        recipientPersonId: fixture.customerA.person.id,
+        title: "Cross-owner customer event",
+      },
+    });
+
+    const notifications = await request("/api/commerce/customer/notifications", {
+      cookie: customerACookie,
+      headers: { "expo-origin": "rezno://" },
+    });
+    assert.equal(notifications.response.status, 200);
+    const customerNotifications = notifications.body.data as Array<{
+      body: string;
+      id: string;
+      orderId: string;
+      title: string;
+    }>;
+    const returnedIds = new Set(customerNotifications.map((item) => item.id));
+    assert.equal(returnedIds.has(customerCreated.id), true);
+    assert.equal(returnedIds.has(customerCancelled.id), true);
+    assert.equal(returnedIds.has(merchantNew.id), false);
+    assert.equal(returnedIds.has(merchantCustomerCancelled.id), false);
+    assert.equal(returnedIds.has(legacyNotification.id), false);
+    assert.equal(returnedIds.has(malformedMetadata.id), false);
+    assert.equal(returnedIds.has(missingEventType.id), false);
+    assert.equal(returnedIds.has(unknownEventType.id), false);
+    assert.equal(returnedIds.has(crossOwnerNotification.id), false);
+    assert.equal(customerNotifications.find((item) => item.id === customerCreated.id)?.orderId, orderId);
+    assert.equal(customerNotifications.some((item) => item.title === merchantNew.title), false);
+    assert.equal(customerNotifications.some((item) => item.body === merchantNew.body), false);
+    assert.equal(customerNotifications.some((item) => item.title === merchantCustomerCancelled.title), false);
+    assert.equal(customerNotifications.some((item) => item.body === merchantCustomerCancelled.body), false);
+    assert.deepEqual(
+      Object.keys(customerNotifications.find((item) => item.id === customerCreated.id)!).sort(),
+      ["body", "createdAt", "id", "orderId", "priority", "title"],
+    );
 
     const orders = await request("/api/commerce/customer/orders?limit=1&sort=newest", {
       cookie: customerACookie,
@@ -142,28 +295,6 @@ test(
     });
     assert.equal(crossDelete.response.status, 404);
     assert.equal((crossDelete.body.error as { code: string }).code, "FAVORITE_NOT_FOUND");
-
-    const cancellation = await request(`/api/commerce/customer/orders/${orderId}/cancel`, {
-      body: { reason: "Changed plans" },
-      cookie: customerACookie,
-      method: "POST",
-    });
-    assert.equal(cancellation.response.status, 200);
-    const cancellationReplay = await request(`/api/commerce/customer/orders/${orderId}/cancel`, {
-      body: { reason: "Changed plans" },
-      cookie: customerACookie,
-      method: "POST",
-    });
-    assert.equal(cancellationReplay.response.status, 409);
-    assert.equal((cancellationReplay.body.error as { code: string }).code, "ORDER_NOT_CANCELLABLE");
-    assert.equal(await prisma.orderStatusHistory.count({ where: { orderId, newOrderStatus: "CANCELLED" } }), 1);
-    const cancellationConflict = await request(`/api/commerce/customer/orders/${orderId}/cancel`, {
-      body: { reason: "Another attempt" },
-      cookie: customerACookie,
-      method: "POST",
-    });
-    assert.equal(cancellationConflict.response.status, 409);
-    assert.equal((cancellationConflict.body.error as { code: string }).code, "ORDER_NOT_CANCELLABLE");
 
     let limited: Awaited<ReturnType<typeof request>> | undefined;
     for (let index = 0; index < 11; index += 1) {
