@@ -84,6 +84,19 @@ test(
     assert.equal(checkout.response.status, 201);
     const orderId = (checkout.body.data as { id: string }).id;
 
+    const notifications = await request("/api/commerce/customer/notifications", {
+      cookie: customerACookie,
+      headers: { "expo-origin": "rezno://" },
+    });
+    assert.equal(notifications.response.status, 200);
+    const notification = (notifications.body.data as Array<{ orderId: string | null }>)[0];
+    assert.equal(notification?.orderId, orderId);
+    const crossNotifications = await request("/api/commerce/customer/notifications", {
+      cookie: customerBCookie,
+    });
+    assert.equal(crossNotifications.response.status, 200);
+    assert.equal((crossNotifications.body.data as unknown[]).length, 0);
+
     const orders = await request("/api/commerce/customer/orders?limit=1&sort=newest", {
       cookie: customerACookie,
     });

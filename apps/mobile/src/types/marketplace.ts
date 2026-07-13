@@ -56,11 +56,8 @@ export type MobileMarketplaceResponse = {
 
 export type MobileApiError = {
   error: {
-    code:
-      | "INVALID_QUERY"
-      | "INVALID_LOCATION"
-      | "RATE_LIMITED"
-      | "INTERNAL_ERROR";
+    code: string;
+    details?: Record<string, unknown>;
     message: string;
   };
 };

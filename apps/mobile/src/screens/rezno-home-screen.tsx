@@ -247,6 +247,8 @@ type ReznoHomeScreenProps = {
   locale: MobileLocale;
   marketplaceState: HomeMarketplaceState;
   onOpenBusiness: (business: HomeBusiness) => void;
+  onOpenMessages: () => void;
+  onOpenNotifications: () => void;
   onOpenServiceDiscovery: () => void;
   onRetry: () => void;
   theme: MobileTheme;
@@ -257,6 +259,8 @@ export function ReznoHomeScreen({
   locale,
   marketplaceState,
   onOpenBusiness,
+  onOpenMessages,
+  onOpenNotifications,
   onOpenServiceDiscovery,
   onRetry,
   theme,
@@ -312,6 +316,8 @@ export function ReznoHomeScreen({
         <HeroSection
           copy={copy}
           isRtl={isRtl}
+          onOpenMessages={onOpenMessages}
+          onOpenNotifications={onOpenNotifications}
           styles={styles}
           titleSize={heroTitleSize}
         />
@@ -403,11 +409,15 @@ export function ReznoHomeScreen({
 function HeroSection({
   copy,
   isRtl,
+  onOpenMessages,
+  onOpenNotifications,
   styles,
   titleSize,
 }: {
   copy: HomeCopy;
   isRtl: boolean;
+  onOpenMessages: () => void;
+  onOpenNotifications: () => void;
   styles: HomeStyles;
   titleSize: number;
 }) {
@@ -418,11 +428,13 @@ function HeroSection({
           <HeroQuickAction
             icon={HOME_ICONS.message}
             label={copy.messages}
+            onPress={onOpenMessages}
             styles={styles}
           />
           <HeroQuickAction
             icon={HOME_ICONS.bell}
             label={copy.notificationAccessibility}
+            onPress={onOpenNotifications}
             styles={styles}
           />
         </View>
@@ -504,10 +516,12 @@ function HeroSection({
 function HeroQuickAction({
   icon,
   label,
+  onPress,
   styles,
 }: {
   icon: ImageSourcePropType;
   label: string;
+  onPress: () => void;
   styles: HomeStyles;
 }) {
   return (
@@ -515,6 +529,7 @@ function HeroQuickAction({
       accessibilityLabel={label}
       accessibilityRole="button"
       hitSlop={8}
+      onPress={onPress}
       scaleTo={0.96}
       style={styles.heroActionItem}
     >

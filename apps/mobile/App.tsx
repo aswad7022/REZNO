@@ -17,6 +17,8 @@ import {
 } from "react-native";
 
 import { fetchMobileMarketplace } from "./src/api/marketplace";
+import { commerceApi } from "./src/api/commerce";
+import { commerceNotificationOrderDestination } from "./src/commerce/notification-navigation";
 import {
   BottomTabBar,
   type MobileAppTabId,
@@ -26,7 +28,6 @@ import {
 } from "./src/components/mobile-chrome";
 import { ActivityLauncher } from "./src/components/activity-launcher";
 import {
-  PremiumStateCard,
   SectionHeader,
   SummaryItem,
 } from "./src/components/screen-composition";
@@ -41,6 +42,7 @@ import {
   labels,
   type MobileLocale,
 } from "./src/i18n/labels";
+import { commerceCopy, formatCommerceDate } from "./src/i18n/commerce";
 import {
   createMobileShadow,
   createMobileSurface,
@@ -53,10 +55,10 @@ import {
 } from "./src/theme/tokens";
 import { ReznoHomeScreen } from "./src/screens/rezno-home-screen";
 import { ReznoAiComingSoonScreen } from "./src/screens/rezno-ai-coming-soon-screen";
-import { ReznoMarketShellScreen } from "./src/screens/rezno-market-shell-screen";
+import { CommerceMarketScreen } from "./src/screens/commerce-market-screen";
 import { ReznoNearbySearchScreen } from "./src/screens/rezno-nearby-search-screen";
-import { ReznoOrdersScreen } from "./src/screens/rezno-orders-screen";
 import type { MobileMarketplaceBusiness } from "./src/types/marketplace";
+import type { CommerceNotification } from "./src/types/commerce";
 
 I18nManager.allowRTL(true);
 
@@ -204,42 +206,6 @@ const mobileIconAssets = {
   },
 };
 /* eslint-enable @typescript-eslint/no-require-imports */
-
-const featuredBusinesses: PremiumBusiness[] = [
-  {
-    category: "صالون وتجميل",
-    distance: "1.8 كم",
-    id: "noura-salon",
-    name: "Noura Beauty Lounge",
-    price: "من 25,000 د.ع",
-    rating: "4.9",
-    reviewCount: "128 تقييم",
-    status: "مفتوح الآن",
-    tag: "متاح اليوم",
-  },
-  {
-    category: "مطعم وحجوزات",
-    distance: "2.4 كم",
-    id: "mat3am-gold",
-    name: "Mat3am Gold",
-    price: "طاولة من 4 أشخاص",
-    rating: "4.8",
-    reviewCount: "96 تقييم",
-    status: "حجز سريع",
-    tag: "حجز سريع",
-  },
-  {
-    category: "عيادة أسنان",
-    distance: "3.1 كم",
-    id: "smile-clinic",
-    name: "Smile Studio Clinic",
-    price: "استشارة من 15,000 د.ع",
-    rating: "4.7",
-    reviewCount: "74 تقييم",
-    status: "الأقرب",
-    tag: "مختصون",
-  },
-];
 
 const services: BookingServiceOption[] = [
   { duration: "45 دقيقة", name: "قص وتصفيف", price: "25,000 د.ع", tag: "الأكثر طلباً" },
@@ -696,6 +662,7 @@ export default function App() {
   >([]);
   const [showOnboarding, setShowOnboarding] = useState(true);
   const [themeMode, setThemeMode] = useState<MobileThemeMode>("dark");
+  const [notificationOrderId, setNotificationOrderId] = useState<string | null>(null);
   const [marketplaceState, setMarketplaceState] = useState<MarketplaceState>({
     status: "idle",
   });
@@ -872,6 +839,7 @@ export default function App() {
     setBookingFlowStep(null);
     setSelectedBookingId(null);
     setBookingManagementPanel(null);
+    setNotificationOrderId(null);
 
     if (tabId === "serviceDiscovery" && marketplaceState.status === "idle") {
       loadMarketplace();
@@ -1045,6 +1013,7 @@ export default function App() {
       activeTab !== "customerHome" &&
       activeTab !== "bookings" &&
       activeTab !== "orders" &&
+      activeTab !== "favorites" &&
       activeTab !== "reznoAi" ? (
         <ScreenHeader
           isRtl={isRtl}
@@ -1120,6 +1089,8 @@ export default function App() {
             locale={locale}
             marketplaceState={marketplaceState}
             onOpenBusiness={setSelectedBusiness}
+            onOpenMessages={() => handleTabPress("messages")}
+            onOpenNotifications={() => handleTabPress("messages")}
             onOpenServiceDiscovery={() => handleTabPress("serviceDiscovery")}
             onRetry={loadMarketplace}
             theme={theme}
@@ -1127,10 +1098,11 @@ export default function App() {
         ) : null}
 
         {!selectedBusiness && activeTab === "marketplace" ? (
-          <ReznoMarketShellScreen
+          <CommerceMarketScreen
+            entryPoint="market"
             isRtl={isRtl}
             locale={locale}
-            onOpenServiceDiscovery={() => handleTabPress("serviceDiscovery")}
+            onOpenAccount={() => handleTabPress("account")}
             theme={theme}
           />
         ) : null}
@@ -1144,11 +1116,12 @@ export default function App() {
         ) : null}
 
         {!selectedBusiness && activeTab === "favorites" ? (
-          <FavoritesScreen
+          <CommerceMarketScreen
+            entryPoint="favorites"
             isRtl={isRtl}
-            onOpenBusiness={setSelectedBusiness}
-            onOpenMarketplace={() => handleTabPress("serviceDiscovery")}
-            styles={styles}
+            locale={locale}
+            onOpenAccount={() => handleTabPress("account")}
+            theme={theme}
           />
         ) : null}
 
@@ -1185,15 +1158,30 @@ export default function App() {
         ) : null}
 
         {!selectedBusiness && activeTab === "orders" ? (
-          <ReznoOrdersScreen
+          <CommerceMarketScreen
+            entryPoint="orders"
+            initialOrderId={notificationOrderId ?? undefined}
             isRtl={isRtl}
             locale={locale}
+            onOpenAccount={() => handleTabPress("account")}
+            onExit={notificationOrderId ? () => {
+              setNotificationOrderId(null);
+              setActiveTab("messages");
+            } : undefined}
             theme={theme}
           />
         ) : null}
 
         {!selectedBusiness && activeTab === "messages" ? (
-          <MessagesNotificationsPreviewScreen isRtl={isRtl} styles={styles} />
+          <MessagesNotificationsPreviewScreen
+            isRtl={isRtl}
+            locale={locale}
+            onOpenCommerceOrder={(orderId) => {
+              setNotificationOrderId(orderId);
+              setActiveTab("orders");
+            }}
+            styles={styles}
+          />
         ) : null}
 
         {!selectedBusiness && activeTab === "business" ? (
@@ -1230,51 +1218,6 @@ export default function App() {
         visible={activityMenuOpen}
       />
     </SafeAreaView>
-  );
-}
-
-function FavoritesScreen({
-  isRtl,
-  onOpenBusiness,
-  onOpenMarketplace,
-  styles,
-}: {
-  isRtl: boolean;
-  onOpenBusiness: (business: PremiumBusiness) => void;
-  onOpenMarketplace: () => void;
-  styles: MobileStyles;
-}) {
-  return (
-    <>
-      <PremiumStateCard
-        body="مساحة مرئية آمنة للمفضلة. لا تضيف حفظاً أو مزامنة أو استدعاءات API حالياً."
-        cta="استكشف الخدمات"
-        icon="♡"
-        isRtl={isRtl}
-        label="المفضلة"
-        onPress={onOpenMarketplace}
-        styles={styles}
-        title="أماكنك المفضلة ستكون هنا"
-      />
-      <SectionHeader
-        action="معاينة"
-        isRtl={isRtl}
-        styles={styles}
-        title="اقتراحات قريبة"
-      />
-      <View style={styles.homeBusinessGrid}>
-        {featuredBusinesses.slice(0, 2).map((business) => (
-          <View key={business.id} style={styles.homeBusinessCardSlot}>
-            <PremiumBusinessCard
-              business={business}
-              isRtl={isRtl}
-              onPress={() => onOpenBusiness(business)}
-              styles={styles}
-            />
-          </View>
-        ))}
-      </View>
-    </>
   );
 }
 
@@ -1589,90 +1532,6 @@ function BusinessMedia({
         />
       </View>
     </>
-  );
-}
-
-function PremiumBusinessCard({
-  business,
-  isRtl,
-  onPress,
-  styles,
-}: {
-  business: PremiumBusiness;
-  isRtl: boolean;
-  onPress?: () => void;
-  styles: MobileStyles;
-}) {
-  const content = (
-    <>
-      <View style={styles.businessHero}>
-        <BusinessMedia
-          badge={business.status}
-          styles={styles}
-        />
-      </View>
-      <View style={styles.businessBody}>
-        <View style={styles.businessTitleRow}>
-          <View style={styles.businessCopy}>
-            <Text style={[styles.businessName, isRtl && styles.rtlText]}>
-              {business.name}
-            </Text>
-            <Text style={[styles.businessMeta, isRtl && styles.rtlText]}>
-              {business.category}
-            </Text>
-          </View>
-          <View style={styles.ratingPill}>
-            <Image
-              alt=""
-              resizeMode="contain"
-              source={mobileIconAssets.common.starRating}
-              style={styles.ratingIconImage}
-            />
-            <Text style={styles.ratingText}>{business.rating}</Text>
-          </View>
-        </View>
-        <View style={styles.businessDetailsLine}>
-          <View style={styles.businessDistanceGroup}>
-            <Image
-              alt=""
-              resizeMode="contain"
-              source={mobileIconAssets.common.locationPin}
-              style={styles.businessDistanceIcon}
-            />
-            <Text style={styles.priceText}>{business.distance}</Text>
-          </View>
-          <Text style={styles.businessDetailsDot}>•</Text>
-          <Text style={styles.priceText}>{business.price}</Text>
-        </View>
-        <View style={styles.businessCta}>
-          <Text style={styles.businessCtaText}>احجز الآن</Text>
-        </View>
-      </View>
-    </>
-  );
-
-  if (onPress) {
-    return (
-      <Pressable
-        accessibilityHint="يفتح شاشة تفاصيل النشاط المرئية بدون تنفيذ حجز حقيقي."
-        accessibilityLabel={`فتح تفاصيل ${business.name}`}
-        accessibilityRole="button"
-        hitSlop={TOUCH_HIT_SLOP}
-        onPress={onPress}
-        style={({ pressed }) => [
-          styles.businessCard,
-          pressed && styles.businessCardPressed,
-        ]}
-      >
-        {content}
-      </Pressable>
-    );
-  }
-
-  return (
-    <View style={styles.businessCard}>
-      {content}
-    </View>
   );
 }
 
@@ -3962,11 +3821,36 @@ function BookingManagementPanelCard({
 
 function MessagesNotificationsPreviewScreen({
   isRtl,
+  locale,
+  onOpenCommerceOrder,
   styles,
 }: {
   isRtl: boolean;
+  locale: MobileLocale;
+  onOpenCommerceOrder: (orderId: string) => void;
   styles: MobileStyles;
 }) {
+  const heroCopy = locale === "en"
+    ? {
+        badge: "Safe preview",
+        body: "Order notifications below use the real read-only API. Messages remain a preview; Push, device permissions, WebSocket, and send APIs are not enabled.",
+        eyebrow: "Messages and notifications",
+        title: "Clear order updates without enabling outbound messaging",
+      }
+    : locale === "ckb"
+      ? {
+          badge: "پێشبینینی پارێزراو",
+          body: "ئاگادارکردنەوەکانی داواکاری لە API ـی ڕاستەقینەی تەنها خوێندنەوەوە دێن. پەیامەکان هێشتا پێشبینینن؛ Push و WebSocket و API ـی ناردن چالاک نین.",
+          eyebrow: "پەیام و ئاگادارکردنەوەکان",
+          title: "نوێکارییە ڕوونەکانی داواکاری بەبێ ناردنی پەیام",
+        }
+      : {
+          badge: "معاينة آمنة",
+          body: "إشعارات الطلبات أدناه تأتي من واجهة القراءة الحقيقية. تبقى الرسائل معاينة فقط؛ ولا توجد إشعارات دفع أو WebSocket أو واجهة إرسال.",
+          eyebrow: "الرسائل والإشعارات",
+          title: "تحديثات طلب واضحة بدون تفعيل إرسال الرسائل",
+        };
+
   return (
     <>
       <View style={styles.messageHeroCard}>
@@ -3980,25 +3864,108 @@ function MessagesNotificationsPreviewScreen({
               style={styles.messageHeroIconImage}
             />
           </View>
-          <Text style={styles.messageSafetyBadge}>معاينة آمنة</Text>
+          <Text style={styles.messageSafetyBadge}>{heroCopy.badge}</Text>
         </View>
         <Text style={[styles.screenEyebrow, isRtl && styles.rtlText]}>
-          الرسائل والإشعارات
+          {heroCopy.eyebrow}
         </Text>
         <Text style={[styles.messageHeroTitle, isRtl && styles.rtlText]}>
-          تواصل واضح حول كل حجز بدون منطق إرسال حقيقي
+          {heroCopy.title}
         </Text>
         <Text style={[styles.messageHeroBody, isRtl && styles.rtlText]}>
-          هذه واجهة عرض فقط. لا توجد إشعارات دفع، صلاحيات جهاز، WebSocket، أو
-          إرسال رسائل عبر API.
+          {heroCopy.body}
         </Text>
       </View>
 
-      <NotificationsCenterPreview isRtl={isRtl} styles={styles} />
-      <ConversationListPreview isRtl={isRtl} styles={styles} />
-      <MessageDetailPreview isRtl={isRtl} styles={styles} />
-      <NotificationPreferencesPreview isRtl={isRtl} styles={styles} />
+      <CommerceNotificationsCenter
+        isRtl={isRtl}
+        locale={locale}
+        onOpenOrder={onOpenCommerceOrder}
+        styles={styles}
+      />
+      {locale === "ar" ? (
+        <>
+          <NotificationsCenterPreview isRtl={isRtl} styles={styles} />
+          <ConversationListPreview isRtl={isRtl} styles={styles} />
+          <MessageDetailPreview isRtl={isRtl} styles={styles} />
+          <NotificationPreferencesPreview isRtl={isRtl} styles={styles} />
+        </>
+      ) : null}
     </>
+  );
+}
+
+function CommerceNotificationsCenter({
+  isRtl,
+  locale,
+  onOpenOrder,
+  styles,
+}: {
+  isRtl: boolean;
+  locale: MobileLocale;
+  onOpenOrder: (orderId: string) => void;
+  styles: MobileStyles;
+}) {
+  const copy = commerceCopy[locale];
+  const [items, setItems] = useState<CommerceNotification[]>([]);
+  const [state, setState] = useState<"error" | "loading" | "ready">("loading");
+  const load = useCallback(() => {
+    setState("loading");
+    void commerceApi.listNotifications()
+      .then((result) => {
+        setItems(result.data);
+        setState("ready");
+      })
+      .catch(() => setState("error"));
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(load, 0);
+    return () => clearTimeout(timer);
+  }, [load]);
+
+  return (
+    <View style={styles.notificationPanel}>
+      <SectionHeader isRtl={isRtl} styles={styles} title={copy.notifications} />
+      {state === "loading" ? <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>{copy.loading}</Text> : null}
+      {state === "error" ? (
+        <Pressable accessibilityRole="button" onPress={load} style={styles.notificationCard}>
+          <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>{copy.sessionRequired}</Text>
+          <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>{copy.retry}</Text>
+        </Pressable>
+      ) : null}
+      {state === "ready" && items.length === 0 ? (
+        <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>{copy.noNotifications}</Text>
+      ) : null}
+      {items.map((item) => {
+        const orderId = commerceNotificationOrderDestination(item);
+        const content = (
+          <>
+            <View style={styles.notificationIcon}>
+              <Image alt="" resizeMode="contain" source={mobileIconAssets.common.notificationBell} style={styles.notificationIconImage} />
+            </View>
+            <View style={styles.rowCopy}>
+              <View style={styles.notificationTitleRow}>
+                <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>{item.title}</Text>
+                <Text style={styles.notificationTime}>{formatCommerceDate(item.createdAt, locale)}</Text>
+              </View>
+              <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>{item.body}</Text>
+            </View>
+          </>
+        );
+        return orderId ? (
+          <Pressable
+            accessibilityLabel={item.title}
+            accessibilityRole="button"
+            key={item.id}
+            onPress={() => onOpenOrder(orderId)}
+            style={styles.notificationCard}
+          >
+            {content}
+          </Pressable>
+        ) : <View key={item.id} style={styles.notificationCard}>{content}</View>;
+      })}
+    </View>
   );
 }
 
