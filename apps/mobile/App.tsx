@@ -18,6 +18,7 @@ import {
 
 import { fetchMobileMarketplace } from "./src/api/marketplace";
 import { commerceApi } from "./src/api/commerce";
+import { MobileApiRequestError } from "./src/api/client";
 import { commerceNotificationOrderDestination } from "./src/commerce/notification-navigation";
 import {
   BottomTabBar,
@@ -3910,7 +3911,7 @@ function CommerceNotificationsCenter({
 }) {
   const copy = commerceCopy[locale];
   const [items, setItems] = useState<CommerceNotification[]>([]);
-  const [state, setState] = useState<"error" | "loading" | "ready">("loading");
+  const [state, setState] = useState<"error" | "loading" | "ready" | "unauthenticated">("loading");
   const load = useCallback(() => {
     setState("loading");
     void commerceApi.listNotifications()
@@ -3918,7 +3919,11 @@ function CommerceNotificationsCenter({
         setItems(result.data);
         setState("ready");
       })
-      .catch(() => setState("error"));
+      .catch((error) => setState(
+        error instanceof MobileApiRequestError && error.status === 401
+          ? "unauthenticated"
+          : "error",
+      ));
   }, []);
 
   useEffect(() => {
@@ -3931,7 +3936,13 @@ function CommerceNotificationsCenter({
       <SectionHeader isRtl={isRtl} styles={styles} title={copy.notifications} />
       {state === "loading" ? <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>{copy.loading}</Text> : null}
       {state === "error" ? (
-        <Pressable accessibilityRole="button" onPress={load} style={styles.notificationCard}>
+        <Pressable accessibilityLabel={copy.retry} accessibilityRole="button" onPress={load} style={styles.notificationCard}>
+          <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>{copy.errorGeneric}</Text>
+          <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>{copy.retry}</Text>
+        </Pressable>
+      ) : null}
+      {state === "unauthenticated" ? (
+        <Pressable accessibilityLabel={copy.retry} accessibilityRole="button" onPress={load} style={styles.notificationCard}>
           <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>{copy.sessionRequired}</Text>
           <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>{copy.retry}</Text>
         </Pressable>
