@@ -518,6 +518,62 @@ test("Milestone 2A PostgreSQL commerce foundation", { concurrency: false }, asyn
     assert.equal(completed.payment?.status, "PAID");
   });
 
+  await t.test("transition replay is bound to the exact requested transition", async () => {
+    const customer = await createPerson("transition-replay-customer");
+    const cart = await createPickupCart(customer.id, primary.variant.id);
+    const order = await createPendingOrder({
+      cartId: cart.id,
+      cartVersion: cart.version,
+      customerId: customer.id,
+      fulfillmentMethod: "CUSTOMER_PICKUP",
+      idempotencyKey: randomUUID(),
+    });
+    await confirmOrder(primary.identity, {
+      idempotencyKey: randomUUID(),
+      orderId: order.id,
+    });
+    const transitionKey = randomUUID();
+    const transitionReason = "Packing started";
+    const transitioned = await advanceOrderFulfillment(primary.identity, {
+      idempotencyKey: transitionKey,
+      next: "PREPARING",
+      orderId: order.id,
+      reason: transitionReason,
+    });
+    assert.equal(transitioned.fulfillmentStatus, "PREPARING");
+    const replayed = await advanceOrderFulfillment(primary.identity, {
+      idempotencyKey: transitionKey,
+      next: "PREPARING",
+      orderId: order.id,
+      reason: ` ${transitionReason} `,
+    });
+    assert.equal(replayed.fulfillmentStatus, "PREPARING");
+    await assert.rejects(
+      advanceOrderFulfillment(primary.identity, {
+        idempotencyKey: transitionKey,
+        next: "PREPARING",
+        orderId: order.id,
+        reason: "A different reason",
+      }),
+      expectCommerceCode("IDEMPOTENCY_CONFLICT"),
+    );
+    await assert.rejects(
+      advanceOrderFulfillment(primary.identity, {
+        idempotencyKey: transitionKey,
+        next: "READY_FOR_PICKUP",
+        orderId: order.id,
+        reason: transitionReason,
+      }),
+      expectCommerceCode("IDEMPOTENCY_CONFLICT"),
+    );
+    const persisted = await prisma.order.findUniqueOrThrow({ where: { id: order.id } });
+    assert.equal(persisted.fulfillmentStatus, "PREPARING");
+    assert.equal(
+      await prisma.orderStatusHistory.count({ where: { idempotencyKey: transitionKey } }),
+      1,
+    );
+  });
+
   await t.test("concurrent stock-1 Checkouts create exactly one Order without overselling", async (t) => {
     const scarce = await createProductVariant(primary.identity, {
       optionValues: { size: "scarce" },
@@ -891,7 +947,7 @@ test("Milestone 2A PostgreSQL commerce foundation", { concurrency: false }, asyn
     );
   });
 
-  await t.test("cross-Organization merchant access is denied", async () => {
+  await t.test("cross-Organization merchant access and transition replay are denied", async () => {
     const customer = await createPerson("secondary-order-customer");
     const cart = await createPickupCart(customer.id, secondary.variant.id);
     const order = await createPendingOrder({
@@ -907,6 +963,22 @@ test("Milestone 2A PostgreSQL commerce foundation", { concurrency: false }, asyn
         orderId: order.id,
       }),
       expectCommerceCode("NOT_FOUND"),
+    );
+    const replayKey = randomUUID();
+    await confirmOrder(secondary.identity, {
+      idempotencyKey: replayKey,
+      orderId: order.id,
+    });
+    await assert.rejects(
+      confirmOrder(primary.identity, {
+        idempotencyKey: replayKey,
+        orderId: order.id,
+      }),
+      expectCommerceCode("NOT_FOUND"),
+    );
+    assert.equal(
+      await prisma.orderStatusHistory.count({ where: { idempotencyKey: replayKey } }),
+      1,
     );
   });
 

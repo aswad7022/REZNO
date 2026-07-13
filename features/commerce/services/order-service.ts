@@ -2,6 +2,7 @@ import type {
   CommerceOrderStatus,
   FulfillmentStatus,
   OrderActorType,
+  PaymentStatus,
   Prisma,
 } from "@prisma/client";
 
@@ -52,16 +53,62 @@ export async function getCustomerOrder(customerId: string, orderId: string) {
   return order;
 }
 
-async function replayTransition(transaction: Transaction, orderId: string, idempotencyKey: string) {
+type TransitionReplayScope =
+  | { actorId: string; actorType: "ADMIN" }
+  | { actorId: string; actorType: "MERCHANT"; organizationId: string }
+  | { actorType: "SYSTEM" };
+
+interface TransitionReplayInput {
+  idempotencyKey: string;
+  newFulfillmentStatus?: FulfillmentStatus;
+  newOrderStatus?: CommerceOrderStatus;
+  newPaymentStatus?: PaymentStatus;
+  orderId: string;
+  reason?: string | null;
+  scope: TransitionReplayScope;
+}
+
+async function replayTransition(transaction: Transaction, input: TransitionReplayInput) {
+  if (input.scope.actorType === "MERCHANT") {
+    const authorizedOrder = await transaction.order.findFirst({
+      where: {
+        id: input.orderId,
+        store: { organizationId: input.scope.organizationId },
+      },
+      select: { id: true },
+    });
+    if (!authorizedOrder) commerceError("NOT_FOUND", "Order was not found.");
+  }
+
   const existing = await transaction.orderStatusHistory.findUnique({
-    where: { idempotencyKey },
-    select: { orderId: true },
+    where: { idempotencyKey: input.idempotencyKey },
+    select: {
+      actorId: true,
+      actorType: true,
+      newFulfillmentStatus: true,
+      newOrderStatus: true,
+      newPaymentStatus: true,
+      order: { include: orderResultInclude },
+      orderId: true,
+      reason: true,
+    },
   });
   if (!existing) return null;
-  if (existing.orderId !== orderId) {
+  if (existing.orderId !== input.orderId) {
     commerceError("IDEMPOTENCY_CONFLICT", "Transition key belongs to another Order.");
   }
-  return transaction.order.findUniqueOrThrow({ where: { id: orderId }, include: orderResultInclude });
+  const expectedActorId = input.scope.actorType === "SYSTEM" ? null : input.scope.actorId;
+  if (
+    existing.actorId !== expectedActorId ||
+    existing.actorType !== input.scope.actorType ||
+    existing.newFulfillmentStatus !== (input.newFulfillmentStatus ?? null) ||
+    existing.newOrderStatus !== (input.newOrderStatus ?? null) ||
+    existing.newPaymentStatus !== (input.newPaymentStatus ?? null) ||
+    existing.reason !== (input.reason ?? null)
+  ) {
+    commerceError("IDEMPOTENCY_CONFLICT", "Transition key was already used for a different transition.");
+  }
+  return existing.order;
 }
 
 async function activeReservations(transaction: Transaction, orderId: string) {
@@ -211,7 +258,16 @@ export async function confirmOrder(
 ) {
   return runCommerceSerializable(async (transaction) => {
     const context = await resolveMerchantCommerceContext(identity, "ORDER_MANAGE", transaction);
-    const replay = await replayTransition(transaction, input.orderId, input.idempotencyKey);
+    const replay = await replayTransition(transaction, {
+      idempotencyKey: input.idempotencyKey,
+      newOrderStatus: "CONFIRMED",
+      orderId: input.orderId,
+      scope: {
+        actorId: context.personId,
+        actorType: "MERCHANT",
+        organizationId: context.organizationId,
+      },
+    });
     if (replay) return replay;
     await lockOrder(transaction, input.orderId);
     const order = await transaction.order.findFirst({
@@ -293,7 +349,19 @@ export async function rejectOrder(
   const reason = requiredReason(input.reason);
   return runCommerceSerializable(async (transaction) => {
     const context = await resolveMerchantCommerceContext(identity, "ORDER_MANAGE", transaction);
-    const replay = await replayTransition(transaction, input.orderId, input.idempotencyKey);
+    const replay = await replayTransition(transaction, {
+      idempotencyKey: input.idempotencyKey,
+      newFulfillmentStatus: "CANCELLED",
+      newOrderStatus: "REJECTED",
+      newPaymentStatus: "VOIDED",
+      orderId: input.orderId,
+      reason,
+      scope: {
+        actorId: context.personId,
+        actorType: "MERCHANT",
+        organizationId: context.organizationId,
+      },
+    });
     if (replay) return replay;
     await lockOrder(transaction, input.orderId);
     const order = await transaction.order.findFirst({
@@ -385,7 +453,19 @@ export async function cancelMerchantOrder(
   const reason = requiredReason(input.reason);
   return runCommerceSerializable(async (transaction) => {
     const context = await resolveMerchantCommerceContext(identity, "ORDER_CANCEL", transaction);
-    const replay = await replayTransition(transaction, input.orderId, input.idempotencyKey);
+    const replay = await replayTransition(transaction, {
+      idempotencyKey: input.idempotencyKey,
+      newFulfillmentStatus: "CANCELLED",
+      newOrderStatus: "CANCELLED",
+      newPaymentStatus: "VOIDED",
+      orderId: input.orderId,
+      reason,
+      scope: {
+        actorId: context.personId,
+        actorType: "MERCHANT",
+        organizationId: context.organizationId,
+      },
+    });
     if (replay) return replay;
     await lockOrder(transaction, input.orderId);
     const order = await transaction.order.findFirst({
@@ -429,7 +509,15 @@ export async function cancelOrderByAdmin(
   assertAdminPermission(context, "COMMERCE_ORDERS_MANAGE");
   const reason = requiredReason(input.reason);
   return runCommerceSerializable(async (transaction) => {
-    const replay = await replayTransition(transaction, input.orderId, input.idempotencyKey);
+    const replay = await replayTransition(transaction, {
+      idempotencyKey: input.idempotencyKey,
+      newFulfillmentStatus: "CANCELLED",
+      newOrderStatus: "CANCELLED",
+      newPaymentStatus: "VOIDED",
+      orderId: input.orderId,
+      reason,
+      scope: { actorId: context.userId, actorType: "ADMIN" },
+    });
     if (replay) return replay;
     await lockOrder(transaction, input.orderId);
     const order = await transaction.order.findUnique({ where: { id: input.orderId } });
@@ -520,9 +608,20 @@ export async function advanceOrderFulfillment(
   identity: MerchantIdentityInput,
   input: { idempotencyKey: string; next: FulfillmentStatus; orderId: string; reason?: string },
 ) {
+  const reason = input.reason?.trim() || null;
   return runCommerceSerializable(async (transaction) => {
     const context = await resolveMerchantCommerceContext(identity, "ORDER_MANAGE", transaction);
-    const replay = await replayTransition(transaction, input.orderId, input.idempotencyKey);
+    const replay = await replayTransition(transaction, {
+      idempotencyKey: input.idempotencyKey,
+      newFulfillmentStatus: input.next,
+      orderId: input.orderId,
+      reason,
+      scope: {
+        actorId: context.personId,
+        actorType: "MERCHANT",
+        organizationId: context.organizationId,
+      },
+    });
     if (replay) return replay;
     await lockOrder(transaction, input.orderId);
     const order = await transaction.order.findFirst({
@@ -531,7 +630,6 @@ export async function advanceOrderFulfillment(
     if (!order) commerceError("NOT_FOUND", "Order was not found.");
     if (order.status !== "CONFIRMED") commerceError("INVALID_TRANSITION", "Order is not confirmed.");
     assertFulfillmentTransition(order.fulfillmentMethod, order.fulfillmentStatus, input.next);
-    const reason = input.reason?.trim() || null;
     if (input.next === "DELIVERY_FAILED" && !reason) {
       commerceError("VALIDATION_ERROR", "Delivery failure requires a reason.");
     }
@@ -559,7 +657,17 @@ export async function recordOfflinePaymentPaid(
 ) {
   return runCommerceSerializable(async (transaction) => {
     const context = await resolveMerchantCommerceContext(identity, "ORDER_MANAGE", transaction);
-    const replay = await replayTransition(transaction, input.orderId, input.idempotencyKey);
+    const replay = await replayTransition(transaction, {
+      idempotencyKey: input.idempotencyKey,
+      newOrderStatus: "COMPLETED",
+      newPaymentStatus: "PAID",
+      orderId: input.orderId,
+      scope: {
+        actorId: context.personId,
+        actorType: "MERCHANT",
+        organizationId: context.organizationId,
+      },
+    });
     if (replay) return replay;
     await lockOrder(transaction, input.orderId);
     const order = await transaction.order.findFirst({
@@ -612,7 +720,15 @@ export async function expirePendingOrderInTransaction(
   const order = await transaction.order.findUnique({ where: { id: orderId } });
   if (!order || order.status !== "PENDING" || order.reservationExpiresAt > now) return null;
   const idempotencyKey = `order:${order.id}:expired`;
-  const replay = await replayTransition(transaction, order.id, idempotencyKey);
+  const replay = await replayTransition(transaction, {
+    idempotencyKey,
+    newFulfillmentStatus: "CANCELLED",
+    newOrderStatus: "EXPIRED",
+    newPaymentStatus: "VOIDED",
+    orderId: order.id,
+    reason: "PENDING_RESERVATION_EXPIRED",
+    scope: { actorType: "SYSTEM" },
+  });
   if (replay) return replay;
   await releaseActiveReservations(transaction, {
     actorType: "SYSTEM",
