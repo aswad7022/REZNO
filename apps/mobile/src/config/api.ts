@@ -8,3 +8,5 @@ export const API_BASE_URL =
   typeof configuredApiBaseUrl === "string" && configuredApiBaseUrl.length > 0
     ? configuredApiBaseUrl
     : "http://localhost:3000";
+
+export const MOBILE_AUTH_FLOW_TIMEOUT_MS = 20_000;

@@ -7,65 +7,72 @@ datasource db {
 }
 
 model Person {
-  id                      String                 @id @default(uuid()) @db.Uuid
-  authUserId              String                 @unique
-  firstName               String
-  lastName                String?
-  displayName             String?
-  phone                   String?
-  avatarUrl               String?
-  gender                  Gender?
-  preferredLanguage       LanguageCode           @default(AR)
-  timezone                String                 @default("Asia/Baghdad")
-  status                  EntityStatus           @default(ACTIVE)
-  isOnboarded             Boolean                @default(false)
-  createdAt               DateTime               @default(now()) @db.Timestamptz(6)
-  updatedAt               DateTime               @updatedAt @db.Timestamptz(6)
-  deletedAt               DateTime?              @db.Timestamptz(6)
-  memberships             OrganizationMember[]
-  customerBookings        Booking[]              @relation("BookingCustomer")
-  bookingChanges          BookingStatusHistory[]
-  requestedBookingChanges BookingChangeRequest[] @relation("BookingChangeRequester")
-  reviews                 Review[]               @relation("ReviewCustomer")
-  notifications           Notification[]
-  customerConversations   Conversation[]         @relation("ConversationCustomer")
-  favoriteBusinesses      CustomerFavoriteBusiness[]
-  favoriteServices        CustomerFavoriteService[]
-  sentOrganizationInvitations OrganizationInvitation[] @relation("OrganizationInvitationInvitedBy")
-  receivedOrganizationInvitations OrganizationInvitation[] @relation("OrganizationInvitationRecipient")
+  id                              String                     @id @default(uuid()) @db.Uuid
+  authUserId                      String                     @unique
+  firstName                       String
+  lastName                        String?
+  displayName                     String?
+  phone                           String?
+  avatarUrl                       String?
+  gender                          Gender?
+  preferredLanguage               LanguageCode               @default(AR)
+  timezone                        String                     @default("Asia/Baghdad")
+  status                          EntityStatus               @default(ACTIVE)
+  isOnboarded                     Boolean                    @default(false)
+  createdAt                       DateTime                   @default(now()) @db.Timestamptz(6)
+  updatedAt                       DateTime                   @updatedAt @db.Timestamptz(6)
+  deletedAt                       DateTime?                  @db.Timestamptz(6)
+  memberships                     OrganizationMember[]
+  customerBookings                Booking[]                  @relation("BookingCustomer")
+  bookingChanges                  BookingStatusHistory[]
+  requestedBookingChanges         BookingChangeRequest[]     @relation("BookingChangeRequester")
+  reviews                         Review[]                   @relation("ReviewCustomer")
+  notifications                   Notification[]
+  customerConversations           Conversation[]             @relation("ConversationCustomer")
+  favoriteBusinesses              CustomerFavoriteBusiness[]
+  favoriteServices                CustomerFavoriteService[]
+  commerceAddresses               CustomerAddress[]
+  commerceCarts                   Cart[]
+  commerceCheckoutKeys            CheckoutIdempotency[]
+  commerceOrders                  Order[]
+  favoriteStores                  CustomerFavoriteStore[]
+  favoriteProducts                CustomerFavoriteProduct[]
+  sentOrganizationInvitations     OrganizationInvitation[]   @relation("OrganizationInvitationInvitedBy")
+  receivedOrganizationInvitations OrganizationInvitation[]   @relation("OrganizationInvitationRecipient")
 
   @@index([phone])
 }
 
 model Organization {
-  id                  String                @id @default(uuid()) @db.Uuid
-  name                String
-  slug                String                @unique
-  status              EntityStatus          @default(ACTIVE)
-  businessType        BusinessType          @default(PHYSICAL)
-  vertical            BusinessVertical      @default(OTHER)
-  isVerified          Boolean               @default(false)
-  isActive            Boolean               @default(true)
-  createdAt           DateTime              @default(now()) @db.Timestamptz(6)
-  updatedAt           DateTime              @updatedAt @db.Timestamptz(6)
-  deletedAt           DateTime?             @db.Timestamptz(6)
-  branches            Branch[]
-  profile             BusinessProfile?
-  organizationMembers OrganizationMember[]
-  settings            OrganizationSettings?
-  roles               Role[]
-  services            Service[]
-  bookings            Booking[]
-  reviews             Review[]
-  restaurantTables    RestaurantTable[]
-  menuCategories      MenuCategory[]
-  menuItems           MenuItem[]
+  id                     String                         @id @default(uuid()) @db.Uuid
+  name                   String
+  slug                   String                         @unique
+  status                 EntityStatus                   @default(ACTIVE)
+  businessType           BusinessType                   @default(PHYSICAL)
+  vertical               BusinessVertical               @default(OTHER)
+  isVerified             Boolean                        @default(false)
+  isActive               Boolean                        @default(true)
+  createdAt              DateTime                       @default(now()) @db.Timestamptz(6)
+  updatedAt              DateTime                       @updatedAt @db.Timestamptz(6)
+  deletedAt              DateTime?                      @db.Timestamptz(6)
+  branches               Branch[]
+  profile                BusinessProfile?
+  organizationMembers    OrganizationMember[]
+  settings               OrganizationSettings?
+  roles                  Role[]
+  services               Service[]
+  bookings               Booking[]
+  reviews                Review[]
+  restaurantTables       RestaurantTable[]
+  menuCategories         MenuCategory[]
+  menuItems              MenuItem[]
   restaurantReservations RestaurantReservationDetails[]
-  notifications       Notification[]
-  conversations       Conversation[]
-  favoritedBy         CustomerFavoriteBusiness[]
-  favoritedServices   CustomerFavoriteService[]
-  invitations         OrganizationInvitation[]
+  notifications          Notification[]
+  conversations          Conversation[]
+  favoritedBy            CustomerFavoriteBusiness[]
+  favoritedServices      CustomerFavoriteService[]
+  invitations            OrganizationInvitation[]
+  store                  Store?
 
   @@index([vertical])
   @@index([status, isActive, deletedAt])
@@ -157,15 +164,15 @@ model Service {
 }
 
 model BranchService {
-  id              String      @id @default(uuid()) @db.Uuid
-  branchId        String      @db.Uuid
-  serviceId       String      @db.Uuid
-  price           Decimal     @db.Decimal(10, 2)
-  pricingType     PricingType @default(FIXED)
+  id              String                    @id @default(uuid()) @db.Uuid
+  branchId        String                    @db.Uuid
+  serviceId       String                    @db.Uuid
+  price           Decimal                   @db.Decimal(10, 2)
+  pricingType     PricingType               @default(FIXED)
   durationMinutes Int
-  isAvailable     Boolean     @default(true)
-  branch          Branch      @relation(fields: [branchId], references: [id])
-  service         Service     @relation(fields: [serviceId], references: [id])
+  isAvailable     Boolean                   @default(true)
+  branch          Branch                    @relation(fields: [branchId], references: [id])
+  service         Service                   @relation(fields: [serviceId], references: [id])
   bookings        Booking[]
   favoritedBy     CustomerFavoriteService[]
 
@@ -205,50 +212,51 @@ model OrganizationMember {
 }
 
 model Role {
-  id                  String               @id @default(uuid()) @db.Uuid
-  organizationId      String               @db.Uuid
+  id                  String                   @id @default(uuid()) @db.Uuid
+  organizationId      String                   @db.Uuid
   name                String
   description         String?
   systemRole          SystemRole?
-  isSystem            Boolean              @default(false)
-  createdAt           DateTime             @default(now()) @db.Timestamptz(6)
-  updatedAt           DateTime             @updatedAt @db.Timestamptz(6)
+  commercePermissions CommercePermission[]     @default([])
+  isSystem            Boolean                  @default(false)
+  createdAt           DateTime                 @default(now()) @db.Timestamptz(6)
+  updatedAt           DateTime                 @updatedAt @db.Timestamptz(6)
   organizationMembers OrganizationMember[]
   invitations         OrganizationInvitation[]
-  organization        Organization         @relation(fields: [organizationId], references: [id])
+  organization        Organization             @relation(fields: [organizationId], references: [id])
 
   @@unique([organizationId, name])
 }
 
 model Branch {
-  id             String             @id @default(uuid()) @db.Uuid
-  organizationId String             @db.Uuid
-  name           String
-  slug           String
-  phone          String?
-  email          String?
-  timezone       String             @default("Asia/Baghdad")
-  status         EntityStatus       @default(ACTIVE)
-  addressLine1   String?
-  addressLine2   String?
-  city           String?
-  country        String?
-  latitude       Decimal?           @db.Decimal(9, 6)
-  longitude      Decimal?           @db.Decimal(9, 6)
-  locationLabel  String?
-  nearbyLandmark String?
-  locationInstructions String?
-  createdAt      DateTime           @default(now()) @db.Timestamptz(6)
-  updatedAt      DateTime           @updatedAt @db.Timestamptz(6)
-  deletedAt      DateTime?          @db.Timestamptz(6)
-  organization   Organization       @relation(fields: [organizationId], references: [id])
-  assignments    BranchAssignment[]
-  branchServices BranchService[]
-  businessHours  BusinessHour[]
-  availabilities Availability[]
-  blockedTimes   BlockedTime[]
-  bookings       Booking[]
-  restaurantTables RestaurantTable[]
+  id                     String                         @id @default(uuid()) @db.Uuid
+  organizationId         String                         @db.Uuid
+  name                   String
+  slug                   String
+  phone                  String?
+  email                  String?
+  timezone               String                         @default("Asia/Baghdad")
+  status                 EntityStatus                   @default(ACTIVE)
+  addressLine1           String?
+  addressLine2           String?
+  city                   String?
+  country                String?
+  latitude               Decimal?                       @db.Decimal(9, 6)
+  longitude              Decimal?                       @db.Decimal(9, 6)
+  locationLabel          String?
+  nearbyLandmark         String?
+  locationInstructions   String?
+  createdAt              DateTime                       @default(now()) @db.Timestamptz(6)
+  updatedAt              DateTime                       @updatedAt @db.Timestamptz(6)
+  deletedAt              DateTime?                      @db.Timestamptz(6)
+  organization           Organization                   @relation(fields: [organizationId], references: [id])
+  assignments            BranchAssignment[]
+  branchServices         BranchService[]
+  businessHours          BusinessHour[]
+  availabilities         Availability[]
+  blockedTimes           BlockedTime[]
+  bookings               Booking[]
+  restaurantTables       RestaurantTable[]
   restaurantReservations RestaurantReservationDetails[]
 
   @@unique([organizationId, slug])
@@ -285,20 +293,20 @@ model OrganizationInvitation {
 }
 
 model RestaurantTable {
-  id            String       @id @default(uuid()) @db.Uuid
-  businessId    String       @db.Uuid
-  branchId      String?      @db.Uuid
+  id            String                         @id @default(uuid()) @db.Uuid
+  businessId    String                         @db.Uuid
+  branchId      String?                        @db.Uuid
   name          String
   code          String?
   capacity      Int
   area          String?
   floor         String?
   positionLabel String?
-  isActive      Boolean      @default(true)
-  createdAt     DateTime     @default(now()) @db.Timestamptz(6)
-  updatedAt     DateTime     @updatedAt @db.Timestamptz(6)
-  business      Organization @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  branch        Branch?      @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  isActive      Boolean                        @default(true)
+  createdAt     DateTime                       @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime                       @updatedAt @db.Timestamptz(6)
+  business      Organization                   @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  branch        Branch?                        @relation(fields: [branchId], references: [id], onDelete: SetNull)
   reservations  RestaurantReservationDetails[]
 
   @@index([businessId])
@@ -325,21 +333,21 @@ model MenuCategory {
 }
 
 model MenuItem {
-  id                 String       @id @default(uuid()) @db.Uuid
-  businessId         String       @db.Uuid
-  menuCategoryId     String       @db.Uuid
+  id                 String                      @id @default(uuid()) @db.Uuid
+  businessId         String                      @db.Uuid
+  menuCategoryId     String                      @db.Uuid
   name               String
   description        String?
-  price              Decimal      @db.Decimal(10, 2)
-  currency           String       @default("IQD")
+  price              Decimal                     @db.Decimal(10, 2)
+  currency           String                      @default("IQD")
   imageUrl           String?
-  isAvailable        Boolean      @default(true)
-  sortOrder          Int          @default(0)
+  isAvailable        Boolean                     @default(true)
+  sortOrder          Int                         @default(0)
   preparationMinutes Int?
-  createdAt          DateTime     @default(now()) @db.Timestamptz(6)
-  updatedAt          DateTime     @updatedAt @db.Timestamptz(6)
-  business           Organization @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  category           MenuCategory @relation(fields: [menuCategoryId], references: [id], onDelete: Cascade)
+  createdAt          DateTime                    @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime                    @updatedAt @db.Timestamptz(6)
+  business           Organization                @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  category           MenuCategory                @relation(fields: [menuCategoryId], references: [id], onDelete: Cascade)
   reservationItems   RestaurantReservationItem[]
 
   @@index([businessId])
@@ -392,33 +400,33 @@ model BlockedTime {
 }
 
 model Booking {
-  id                   String                 @id @default(uuid()) @db.Uuid
-  organizationId       String                 @db.Uuid
-  branchId             String                 @db.Uuid
-  customerId           String                 @db.Uuid
-  branchServiceId      String                 @db.Uuid
-  memberId             String?                @db.Uuid
-  status               BookingStatus          @default(CONFIRMED)
-  startsAt             DateTime               @db.Timestamptz(6)
-  endsAt               DateTime               @db.Timestamptz(6)
-  serviceNameSnapshot  String
-  customerNameSnapshot String
-  priceSnapshot        Decimal                @db.Decimal(10, 2)
-  notes                String?
-  cancellationReason   String?
-  cancelledAt          DateTime?              @db.Timestamptz(6)
-  createdAt            DateTime               @default(now()) @db.Timestamptz(6)
-  updatedAt            DateTime               @updatedAt @db.Timestamptz(6)
-  organization         Organization           @relation(fields: [organizationId], references: [id])
-  branch               Branch                 @relation(fields: [branchId], references: [id])
-  customer             Person                 @relation("BookingCustomer", fields: [customerId], references: [id])
-  branchService        BranchService          @relation(fields: [branchServiceId], references: [id])
-  member               OrganizationMember?    @relation(fields: [memberId], references: [id])
-  statusHistory        BookingStatusHistory[]
-  changeRequests       BookingChangeRequest[]
-  review               Review?
+  id                    String                        @id @default(uuid()) @db.Uuid
+  organizationId        String                        @db.Uuid
+  branchId              String                        @db.Uuid
+  customerId            String                        @db.Uuid
+  branchServiceId       String                        @db.Uuid
+  memberId              String?                       @db.Uuid
+  status                BookingStatus                 @default(CONFIRMED)
+  startsAt              DateTime                      @db.Timestamptz(6)
+  endsAt                DateTime                      @db.Timestamptz(6)
+  serviceNameSnapshot   String
+  customerNameSnapshot  String
+  priceSnapshot         Decimal                       @db.Decimal(10, 2)
+  notes                 String?
+  cancellationReason    String?
+  cancelledAt           DateTime?                     @db.Timestamptz(6)
+  createdAt             DateTime                      @default(now()) @db.Timestamptz(6)
+  updatedAt             DateTime                      @updatedAt @db.Timestamptz(6)
+  organization          Organization                  @relation(fields: [organizationId], references: [id])
+  branch                Branch                        @relation(fields: [branchId], references: [id])
+  customer              Person                        @relation("BookingCustomer", fields: [customerId], references: [id])
+  branchService         BranchService                 @relation(fields: [branchServiceId], references: [id])
+  member                OrganizationMember?           @relation(fields: [memberId], references: [id])
+  statusHistory         BookingStatusHistory[]
+  changeRequests        BookingChangeRequest[]
+  review                Review?
   restaurantReservation RestaurantReservationDetails?
-  conversations        Conversation[]
+  conversations         Conversation[]
 
   @@index([organizationId, startsAt])
   @@index([branchId, startsAt, endsAt])
@@ -568,21 +576,21 @@ model RestaurantReservationItem {
 }
 
 model User {
-  id            String    @id
-  name          String
-  email         String    @unique
-  emailVerified Boolean   @default(false)
-  image         String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  accounts      Account[]
-  sessions      Session[]
-  sentMessages  Message[]
-  adminConversations Conversation[] @relation("ConversationAdminUser")
-  createdNotifications Notification[] @relation("NotificationCreator")
-  adminAuditLogs AdminAuditLog[] @relation("AdminAuditLogUser")
-  adminAccess   AdminAccess?
-  grantedAdminAccesses AdminAccess[] @relation("AdminAccessGrantedBy")
+  id                   String          @id
+  name                 String
+  email                String          @unique
+  emailVerified        Boolean         @default(false)
+  image                String?
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  accounts             Account[]
+  sessions             Session[]
+  sentMessages         Message[]
+  adminConversations   Conversation[]  @relation("ConversationAdminUser")
+  createdNotifications Notification[]  @relation("NotificationCreator")
+  adminAuditLogs       AdminAuditLog[] @relation("AdminAuditLogUser")
+  adminAccess          AdminAccess?
+  grantedAdminAccesses AdminAccess[]   @relation("AdminAccessGrantedBy")
 
   @@map("user")
 }
@@ -625,6 +633,8 @@ model Notification {
   body              String
   audience          NotificationAudience
   priority          NotificationPriority @default(NORMAL)
+  eventKey          String?              @unique
+  metadata          Json?
   recipientPersonId String?              @db.Uuid
   businessId        String?              @db.Uuid
   createdByUserId   String?
@@ -654,12 +664,12 @@ model Conversation {
   adminUser   User?            @relation("ConversationAdminUser", fields: [adminUserId], references: [id], onDelete: SetNull)
   messages    Message[]
 
+  @@unique([businessId, customerId, bookingId])
   @@index([type, updatedAt])
   @@index([businessId, updatedAt])
   @@index([customerId, updatedAt])
   @@index([bookingId, updatedAt])
   @@index([adminUserId, updatedAt])
-  @@unique([businessId, customerId, bookingId])
 }
 
 model Message {
@@ -723,6 +733,442 @@ model Verification {
   @@map("verification")
 }
 
+model Store {
+  id                         String                  @id @default(uuid()) @db.Uuid
+  organizationId             String                  @unique @db.Uuid
+  slug                       String                  @unique
+  name                       String
+  description                String?
+  supportPhone               String?
+  logoUrl                    String?
+  coverImageUrl              String?
+  status                     StoreStatus             @default(DRAFT)
+  currency                   String                  @default("IQD") @db.VarChar(3)
+  deliveryEnabled            Boolean                 @default(false)
+  pickupEnabled              Boolean                 @default(false)
+  deliveryFee                Decimal                 @default(0) @db.Decimal(18, 3)
+  minimumOrderValue          Decimal                 @default(0) @db.Decimal(18, 3)
+  preparationEstimateMinutes Int?
+  deliveryEstimateMinutes    Int?
+  deliveryCity               String?
+  deliveryArea               String?
+  pickupCity                 String?
+  pickupArea                 String?
+  pickupStreet               String?
+  pickupAdditionalDetails    String?
+  pickupInstructions         String?
+  reviewReason               String?
+  suspensionReason           String?
+  archiveReason              String?
+  submittedAt                DateTime?               @db.Timestamptz(6)
+  reviewedAt                 DateTime?               @db.Timestamptz(6)
+  reviewedByUserId           String?
+  publishedAt                DateTime?               @db.Timestamptz(6)
+  suspendedAt                DateTime?               @db.Timestamptz(6)
+  archivedAt                 DateTime?               @db.Timestamptz(6)
+  createdAt                  DateTime                @default(now()) @db.Timestamptz(6)
+  updatedAt                  DateTime                @updatedAt @db.Timestamptz(6)
+  organization               Organization            @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  products                   Product[]
+  variants                   ProductVariant[]
+  carts                      Cart[]
+  orders                     Order[]
+  favoritedBy                CustomerFavoriteStore[]
+
+  @@index([organizationId, status])
+  @@index([status, publishedAt])
+}
+
+model MarketplaceCategory {
+  id             String                    @id @default(uuid()) @db.Uuid
+  slug           String                    @unique
+  name           String
+  normalizedName String
+  status         MarketplaceCategoryStatus @default(ACTIVE)
+  displayOrder   Int                       @default(0)
+  createdAt      DateTime                  @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime                  @updatedAt @db.Timestamptz(6)
+  products       Product[]
+
+  @@index([status, displayOrder])
+  @@index([normalizedName])
+}
+
+model Product {
+  id                   String                    @id @default(uuid()) @db.Uuid
+  storeId              String                    @db.Uuid
+  categoryId           String                    @db.Uuid
+  slug                 String
+  name                 String
+  normalizedSearchText String
+  description          String?
+  status               ProductStatus             @default(DRAFT)
+  publishedAt          DateTime?                 @db.Timestamptz(6)
+  suspensionReason     String?
+  suspendedAt          DateTime?                 @db.Timestamptz(6)
+  archivedAt           DateTime?                 @db.Timestamptz(6)
+  createdAt            DateTime                  @default(now()) @db.Timestamptz(6)
+  updatedAt            DateTime                  @updatedAt @db.Timestamptz(6)
+  store                Store                     @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  category             MarketplaceCategory       @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  variants             ProductVariant[]
+  media                ProductMedia[]
+  orderItems           OrderItem[]
+  favoritedBy          CustomerFavoriteProduct[]
+
+  @@unique([storeId, slug])
+  @@unique([id, storeId])
+  @@index([storeId, status, publishedAt])
+  @@index([categoryId, status, publishedAt])
+  @@index([normalizedSearchText])
+  @@index([createdAt, id])
+}
+
+model ProductVariant {
+  id             String                 @id @default(uuid()) @db.Uuid
+  productId      String                 @db.Uuid
+  storeId        String                 @db.Uuid
+  sku            String
+  title          String
+  isDefault      Boolean                @default(false)
+  optionValues   Json                   @default("{}")
+  optionKey      String
+  price          Decimal                @db.Decimal(18, 3)
+  compareAtPrice Decimal?               @db.Decimal(18, 3)
+  currency       String                 @default("IQD") @db.VarChar(3)
+  status         ProductVariantStatus   @default(ACTIVE)
+  archivedAt     DateTime?              @db.Timestamptz(6)
+  createdAt      DateTime               @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime               @updatedAt @db.Timestamptz(6)
+  product        Product                @relation(fields: [productId, storeId], references: [id, storeId], onDelete: Restrict)
+  store          Store                  @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  media          ProductMedia[]
+  inventory      InventoryItem?
+  cartItems      CartItem[]
+  reservations   InventoryReservation[]
+  orderItems     OrderItem[]
+
+  @@unique([storeId, sku])
+  @@unique([productId, optionKey])
+  @@index([productId, status])
+  @@index([storeId, status])
+}
+
+model ProductMedia {
+  id        String           @id @default(uuid()) @db.Uuid
+  productId String           @db.Uuid
+  variantId String?          @db.Uuid
+  url       String
+  mediaType ProductMediaType @default(IMAGE)
+  sortOrder Int              @default(0)
+  altText   String?
+  createdAt DateTime         @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime         @updatedAt @db.Timestamptz(6)
+  product   Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant   ProductVariant?  @relation(fields: [variantId], references: [id], onDelete: SetNull)
+
+  @@unique([productId, sortOrder])
+  @@index([variantId])
+}
+
+model InventoryItem {
+  id                String                 @id @default(uuid()) @db.Uuid
+  variantId         String                 @unique @db.Uuid
+  onHand            Int                    @default(0)
+  reserved          Int                    @default(0)
+  version           Int                    @default(0)
+  lowStockThreshold Int?
+  createdAt         DateTime               @default(now()) @db.Timestamptz(6)
+  updatedAt         DateTime               @updatedAt @db.Timestamptz(6)
+  variant           ProductVariant         @relation(fields: [variantId], references: [id], onDelete: Restrict)
+  movements         StockMovement[]
+  reservations      InventoryReservation[]
+}
+
+model InventoryReservation {
+  id               String                     @id @default(uuid()) @db.Uuid
+  orderId          String                     @db.Uuid
+  orderItemId      String                     @unique @db.Uuid
+  productVariantId String                     @db.Uuid
+  inventoryItemId  String                     @db.Uuid
+  quantity         Int
+  status           InventoryReservationStatus @default(ACTIVE)
+  deterministicKey String                     @unique
+  expiresAt        DateTime                   @db.Timestamptz(6)
+  releasedAt       DateTime?                  @db.Timestamptz(6)
+  consumedAt       DateTime?                  @db.Timestamptz(6)
+  createdAt        DateTime                   @default(now()) @db.Timestamptz(6)
+  updatedAt        DateTime                   @updatedAt @db.Timestamptz(6)
+  order            Order                      @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  orderItem        OrderItem                  @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
+  productVariant   ProductVariant             @relation(fields: [productVariantId], references: [id], onDelete: Restrict)
+  inventoryItem    InventoryItem              @relation(fields: [inventoryItemId], references: [id], onDelete: Restrict)
+  movements        StockMovement[]
+
+  @@index([orderId, status])
+  @@index([status, expiresAt])
+  @@index([inventoryItemId])
+}
+
+model StockMovement {
+  id                String                @id @default(uuid()) @db.Uuid
+  inventoryItemId   String                @db.Uuid
+  orderId           String?               @db.Uuid
+  reservationId     String?               @db.Uuid
+  type              StockMovementType
+  quantity          Int
+  onHandDelta       Int
+  reservedDelta     Int
+  resultingOnHand   Int
+  resultingReserved Int
+  idempotencyKey    String                @unique
+  actorType         OrderActorType
+  actorId           String?
+  reason            String?
+  metadata          Json?
+  createdAt         DateTime              @default(now()) @db.Timestamptz(6)
+  inventoryItem     InventoryItem         @relation(fields: [inventoryItemId], references: [id], onDelete: Restrict)
+  order             Order?                @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  reservation       InventoryReservation? @relation(fields: [reservationId], references: [id], onDelete: Restrict)
+
+  @@index([inventoryItemId, createdAt])
+  @@index([orderId, createdAt])
+  @@index([reservationId])
+}
+
+model CustomerAddress {
+  id                String    @id @default(uuid()) @db.Uuid
+  customerId        String    @db.Uuid
+  label             String?
+  recipientName     String
+  phone             String
+  city              String
+  area              String
+  street            String
+  additionalDetails String
+  landmark          String?
+  latitude          Decimal?  @db.Decimal(9, 6)
+  longitude         Decimal?  @db.Decimal(9, 6)
+  isDefault         Boolean   @default(false)
+  archivedAt        DateTime? @db.Timestamptz(6)
+  createdAt         DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt         DateTime  @updatedAt @db.Timestamptz(6)
+  customer          Person    @relation(fields: [customerId], references: [id], onDelete: Restrict)
+
+  @@index([customerId, archivedAt, updatedAt])
+}
+
+model Cart {
+  id         String     @id @default(uuid()) @db.Uuid
+  customerId String     @db.Uuid
+  storeId    String     @db.Uuid
+  status     CartStatus @default(ACTIVE)
+  currency   String     @default("IQD") @db.VarChar(3)
+  version    Int        @default(1)
+  expiresAt  DateTime?  @db.Timestamptz(6)
+  createdAt  DateTime   @default(now()) @db.Timestamptz(6)
+  updatedAt  DateTime   @updatedAt @db.Timestamptz(6)
+  customer   Person     @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  store      Store      @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  items      CartItem[]
+
+  @@index([customerId, status])
+  @@index([status, expiresAt])
+  @@index([storeId])
+}
+
+model CartItem {
+  id                String         @id @default(uuid()) @db.Uuid
+  cartId            String         @db.Uuid
+  productVariantId  String         @db.Uuid
+  quantity          Int
+  unitPriceSnapshot Decimal        @db.Decimal(18, 3)
+  createdAt         DateTime       @default(now()) @db.Timestamptz(6)
+  updatedAt         DateTime       @updatedAt @db.Timestamptz(6)
+  cart              Cart           @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productVariant    ProductVariant @relation(fields: [productVariantId], references: [id], onDelete: Restrict)
+
+  @@unique([cartId, productVariantId])
+  @@index([productVariantId])
+}
+
+model CheckoutIdempotency {
+  id           String                    @id @default(uuid()) @db.Uuid
+  customerId   String                    @db.Uuid
+  key          String                    @db.Uuid
+  requestHash  String
+  status       CheckoutIdempotencyStatus @default(PROCESSING)
+  orderId      String?                   @unique @db.Uuid
+  responseData Json?
+  expiresAt    DateTime                  @db.Timestamptz(6)
+  createdAt    DateTime                  @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime                  @updatedAt @db.Timestamptz(6)
+  customer     Person                    @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  order        Order?                    @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  @@unique([customerId, key])
+  @@index([status, createdAt])
+  @@index([expiresAt])
+}
+
+model Order {
+  id                         String                 @id @default(uuid()) @db.Uuid
+  orderNumber                String                 @unique
+  customerId                 String                 @db.Uuid
+  storeId                    String                 @db.Uuid
+  status                     CommerceOrderStatus    @default(PENDING)
+  fulfillmentStatus          FulfillmentStatus      @default(UNFULFILLED)
+  paymentStatus              PaymentStatus          @default(UNPAID)
+  paymentMethod              PaymentMethod
+  fulfillmentMethod          FulfillmentMethod
+  currency                   String                 @default("IQD") @db.VarChar(3)
+  subtotal                   Decimal                @db.Decimal(18, 3)
+  discountTotal              Decimal                @default(0) @db.Decimal(18, 3)
+  deliveryFee                Decimal                @default(0) @db.Decimal(18, 3)
+  taxTotal                   Decimal                @default(0) @db.Decimal(18, 3)
+  grandTotal                 Decimal                @db.Decimal(18, 3)
+  storeNameSnapshot          String
+  storeSlugSnapshot          String
+  storeLogoUrlSnapshot       String?
+  storePhoneSnapshot         String?
+  customerNameSnapshot       String
+  customerPhoneSnapshot      String
+  pickupAddressSnapshot      String?
+  pickupInstructionsSnapshot String?
+  preparationEstimateMinutes Int?
+  deliveryEstimateMinutes    Int?
+  customerInstructions       String?
+  reservationExpiresAt       DateTime               @db.Timestamptz(6)
+  confirmedAt                DateTime?              @db.Timestamptz(6)
+  completedAt                DateTime?              @db.Timestamptz(6)
+  cancelledAt                DateTime?              @db.Timestamptz(6)
+  cancellationReason         String?
+  rejectionReason            String?
+  createdAt                  DateTime               @default(now()) @db.Timestamptz(6)
+  updatedAt                  DateTime               @updatedAt @db.Timestamptz(6)
+  customer                   Person                 @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  store                      Store                  @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  items                      OrderItem[]
+  address                    OrderAddress?
+  history                    OrderStatusHistory[]
+  payment                    Payment?
+  reservations               InventoryReservation[]
+  stockMovements             StockMovement[]
+  checkoutIdempotency        CheckoutIdempotency?
+
+  @@index([customerId, createdAt, id])
+  @@index([storeId, status, createdAt])
+  @@index([status, reservationExpiresAt])
+}
+
+model OrderItem {
+  id                   String                @id @default(uuid()) @db.Uuid
+  orderId              String                @db.Uuid
+  productId            String?               @db.Uuid
+  productVariantId     String?               @db.Uuid
+  productNameSnapshot  String
+  variantTitleSnapshot String
+  optionValuesSnapshot Json
+  skuSnapshot          String
+  imageUrlSnapshot     String?
+  unitPrice            Decimal               @db.Decimal(18, 3)
+  compareAtPrice       Decimal?              @db.Decimal(18, 3)
+  quantity             Int
+  lineSubtotal         Decimal               @db.Decimal(18, 3)
+  lineDiscount         Decimal               @default(0) @db.Decimal(18, 3)
+  lineTotal            Decimal               @db.Decimal(18, 3)
+  currency             String                @default("IQD") @db.VarChar(3)
+  createdAt            DateTime              @default(now()) @db.Timestamptz(6)
+  order                Order                 @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  product              Product?              @relation(fields: [productId], references: [id], onDelete: SetNull)
+  productVariant       ProductVariant?       @relation(fields: [productVariantId], references: [id], onDelete: SetNull)
+  inventoryReservation InventoryReservation?
+
+  @@index([orderId])
+  @@index([productId])
+  @@index([productVariantId])
+}
+
+model OrderAddress {
+  id                String   @id @default(uuid()) @db.Uuid
+  orderId           String   @unique @db.Uuid
+  recipientName     String
+  phone             String
+  city              String
+  area              String
+  street            String
+  additionalDetails String
+  landmark          String?
+  latitude          Decimal? @db.Decimal(9, 6)
+  longitude         Decimal? @db.Decimal(9, 6)
+  createdAt         DateTime @default(now()) @db.Timestamptz(6)
+  order             Order    @relation(fields: [orderId], references: [id], onDelete: Restrict)
+}
+
+model OrderStatusHistory {
+  id                        String               @id @default(uuid()) @db.Uuid
+  orderId                   String               @db.Uuid
+  previousOrderStatus       CommerceOrderStatus?
+  newOrderStatus            CommerceOrderStatus?
+  previousFulfillmentStatus FulfillmentStatus?
+  newFulfillmentStatus      FulfillmentStatus?
+  previousPaymentStatus     PaymentStatus?
+  newPaymentStatus          PaymentStatus?
+  actorType                 OrderActorType
+  actorId                   String?
+  reason                    String?
+  idempotencyKey            String               @unique
+  metadata                  Json?
+  createdAt                 DateTime             @default(now()) @db.Timestamptz(6)
+  order                     Order                @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  @@index([orderId, createdAt])
+}
+
+model Payment {
+  id             String          @id @default(uuid()) @db.Uuid
+  orderId        String          @unique @db.Uuid
+  method         PaymentMethod
+  status         PaymentStatus   @default(UNPAID)
+  amount         Decimal         @db.Decimal(18, 3)
+  currency       String          @default("IQD") @db.VarChar(3)
+  paidAt         DateTime?       @db.Timestamptz(6)
+  voidedAt       DateTime?       @db.Timestamptz(6)
+  recordedByType OrderActorType?
+  recordedById   String?
+  createdAt      DateTime        @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime        @updatedAt @db.Timestamptz(6)
+  order          Order           @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  @@index([status, createdAt])
+}
+
+model CustomerFavoriteStore {
+  id         String   @id @default(uuid()) @db.Uuid
+  customerId String   @db.Uuid
+  storeId    String   @db.Uuid
+  createdAt  DateTime @default(now()) @db.Timestamptz(6)
+  customer   Person   @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  store      Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, storeId])
+  @@index([customerId, createdAt])
+  @@index([storeId])
+}
+
+model CustomerFavoriteProduct {
+  id         String   @id @default(uuid()) @db.Uuid
+  customerId String   @db.Uuid
+  productId  String   @db.Uuid
+  createdAt  DateTime @default(now()) @db.Timestamptz(6)
+  customer   Person   @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, productId])
+  @@index([customerId, createdAt])
+  @@index([productId])
+}
+
 enum AccountStatus {
   PENDING
   ACTIVE
@@ -752,6 +1198,7 @@ enum LanguageCode {
   AR
   EN
   TR
+  KU
 }
 
 enum EntityStatus {
@@ -849,4 +1296,124 @@ enum ConversationType {
   CUSTOMER_BUSINESS
   ADMIN_USER
   ADMIN_BUSINESS
+}
+
+enum CommercePermission {
+  STORE_VIEW
+  STORE_MANAGE
+  PRODUCT_VIEW
+  PRODUCT_CREATE
+  PRODUCT_UPDATE
+  PRODUCT_ARCHIVE
+  INVENTORY_VIEW
+  INVENTORY_ADJUST
+  ORDER_VIEW
+  ORDER_MANAGE
+  ORDER_CANCEL
+  REPORTS_VIEW
+}
+
+enum StoreStatus {
+  DRAFT
+  PENDING_REVIEW
+  ACTIVE
+  REJECTED
+  SUSPENDED
+  ARCHIVED
+}
+
+enum MarketplaceCategoryStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum ProductStatus {
+  DRAFT
+  PUBLISHED
+  SUSPENDED
+  ARCHIVED
+}
+
+enum ProductVariantStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum ProductMediaType {
+  IMAGE
+  VIDEO
+}
+
+enum InventoryReservationStatus {
+  ACTIVE
+  CONSUMED
+  RELEASED
+  EXPIRED
+}
+
+enum StockMovementType {
+  RESERVE
+  RELEASE
+  CONSUME
+  RESTOCK
+  ADJUSTMENT_IN
+  ADJUSTMENT_OUT
+}
+
+enum CartStatus {
+  ACTIVE
+  CONVERTED
+  EXPIRED
+  ABANDONED
+}
+
+enum CheckoutIdempotencyStatus {
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum CommerceOrderStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  REJECTED
+  CANCELLED
+  EXPIRED
+}
+
+enum FulfillmentStatus {
+  UNFULFILLED
+  PREPARING
+  READY_FOR_PICKUP
+  OUT_FOR_DELIVERY
+  DELIVERED
+  PICKED_UP
+  DELIVERY_FAILED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  UNPAID
+  PAID
+  VOIDED
+}
+
+enum PaymentMethod {
+  CASH_ON_DELIVERY
+  PAY_AT_PICKUP
+}
+
+enum FulfillmentMethod {
+  STORE_DELIVERY
+  CUSTOMER_PICKUP
+}
+
+enum OrderActorType {
+  CUSTOMER
+  MERCHANT
+  ADMIN
+  SYSTEM
 }

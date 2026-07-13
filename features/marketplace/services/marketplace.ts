@@ -259,6 +259,7 @@ export async function searchMarketplace(options?: {
           : null,
         branchLocationLabel: displayBranch?.locationLabel ?? null,
         branchNearbyLandmark: displayBranch?.nearbyLandmark ?? null,
+        createdAt: organization.createdAt,
         matchingServiceName: matchingOffering?.service.name ?? null,
         matchingServicePrice: matchingOffering?.price.toString() ?? null,
         serviceCount: new Set(
@@ -337,6 +338,7 @@ export async function searchMarketplace(options?: {
       branchLongitude: business.branchLongitude,
       branchLocationLabel: business.branchLocationLabel,
       branchNearbyLandmark: business.branchNearbyLandmark,
+      createdAt: business.createdAt,
     }));
 }
 
@@ -517,6 +519,7 @@ export const getPublicBusiness = cache(
         : null,
       branchLocationLabel: organization.branches[0]?.locationLabel ?? null,
       branchNearbyLandmark: organization.branches[0]?.nearbyLandmark ?? null,
+      createdAt: organization.createdAt,
       startingPrice:
         prices.length > 0 ? Math.min(...prices).toString() : null,
       website: organization.profile?.website ?? null,

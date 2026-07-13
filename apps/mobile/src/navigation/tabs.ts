@@ -13,7 +13,7 @@ export type MobileTab = {
 
 export const MOBILE_TABS: MobileTab[] = [
   { id: "customerHome", icon: "⌂" },
-  { id: "marketplace", icon: "⌕" },
+  { id: "marketplace", icon: "▦" },
   { id: "bookings", icon: "◷" },
   { id: "messages", icon: "✉" },
   { id: "business", icon: "▣" },

@@ -214,6 +214,7 @@ export const getCustomerFavoriteBusinesses = cache(async () => {
       branchLongitude: branch?.longitude ? Number(branch.longitude) : null,
       branchLocationLabel: branch?.locationLabel ?? null,
       branchNearbyLandmark: branch?.nearbyLandmark ?? null,
+      createdAt: organization.createdAt,
     };
   });
 });

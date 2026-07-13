@@ -1365,7 +1365,15 @@
       "NOTIFICATIONS_SEND": "إرسال الإشعارات",
       "SETTINGS_VIEW": "عرض الإعدادات",
       "SETTINGS_MANAGE": "إدارة الإعدادات",
-      "AUDIT_LOG_VIEW": "عرض سجل التدقيق"
+      "AUDIT_LOG_VIEW": "عرض سجل التدقيق",
+      "COMMERCE_STORES_VIEW": "عرض متاجر السوق",
+      "COMMERCE_STORES_REVIEW": "مراجعة متاجر السوق",
+      "COMMERCE_CATALOG_VIEW": "عرض كتالوج السوق",
+      "COMMERCE_CATALOG_MODERATE": "الإشراف على كتالوج السوق",
+      "COMMERCE_INVENTORY_VIEW": "عرض مخزون السوق",
+      "COMMERCE_INVENTORY_MANAGE": "إدارة مخزون السوق",
+      "COMMERCE_ORDERS_VIEW": "عرض طلبات السوق",
+      "COMMERCE_ORDERS_MANAGE": "إدارة طلبات السوق"
     }
   },
   "Messages": {
