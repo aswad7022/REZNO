@@ -1035,6 +1035,7 @@ export default function App() {
         />
       ) : (
         <ScrollView
+          automaticallyAdjustKeyboardInsets
           contentContainerStyle={[
             styles.content,
             activeTab === "customerHome" &&
@@ -1042,6 +1043,7 @@ export default function App() {
               styles.homeContent,
             selectedBusiness && styles.immersiveContent,
           ]}
+          keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
           style={styles.appScroll}
         >

@@ -736,7 +736,9 @@ function Summary({ isRtl, label, styles, value }: { isRtl: boolean; label: strin
 }
 
 function isCartStoreConflict(error: unknown) {
-  return error instanceof MobileApiRequestError && error.details?.kind === "CART_STORE_CONFLICT";
+  return error instanceof MobileApiRequestError && (
+    error.code === "CART_STORE_CONFLICT" || error.details?.kind === "CART_STORE_CONFLICT"
+  );
 }
 
 function isCartVersionConflict(error: unknown) {
