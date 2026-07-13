@@ -219,7 +219,122 @@ test(
       },
     });
 
-    const notifications = await request("/api/commerce/customer/notifications", {
+    const customerEventTypes = [
+      "order.confirmed",
+      "order.preparing",
+      "order.ready_for_pickup",
+      "order.out_for_delivery",
+      "order.delivered",
+      "order.expired",
+    ] as const;
+    const additionalCustomerNotifications = await Promise.all(
+      customerEventTypes.map((eventType, index) => prisma.notification.create({
+        data: {
+          audience: "USER",
+          body: `Authorized customer pagination body ${index}`,
+          eventKey: `commerce:${orderId}:${eventType}:${fixture.customerA.person.id}:pagination-${index}`,
+          metadata: {
+            destination: "/customer/notifications",
+            eventType,
+            orderId,
+          },
+          recipientPersonId: fixture.customerA.person.id,
+          title: `Authorized customer pagination ${index}`,
+        },
+      })),
+    );
+    const additionalMerchantNotifications = await Promise.all(
+      Array.from({ length: 18 }, (_, index) => prisma.notification.create({
+        data: {
+          audience: "USER",
+          body: `Merchant-only pagination body ${index}`,
+          eventKey: `commerce:${orderId}:order.new:${fixture.customerA.person.id}:pagination-${index}`,
+          metadata: {
+            destination: "/merchant/orders",
+            eventType: "order.new",
+            orderId,
+          },
+          recipientPersonId: fixture.customerA.person.id,
+          title: `Merchant-only pagination ${index}`,
+        },
+      })),
+    );
+    const additionalCrossOwnerNotifications = await Promise.all(
+      Array.from({ length: 7 }, (_, index) => prisma.notification.create({
+        data: {
+          audience: "USER",
+          body: `Cross-owner pagination body ${index}`,
+          eventKey: `commerce:${crossOrderId}:order.created:${fixture.customerA.person.id}:pagination-${index}`,
+          metadata: {
+            destination: "/customer/notifications",
+            eventType: "order.created",
+            orderId: crossOrderId,
+          },
+          recipientPersonId: fixture.customerA.person.id,
+          title: `Cross-owner pagination ${index}`,
+        },
+      })),
+    );
+    const invalidOrderNotification = await prisma.notification.create({
+      data: {
+        audience: "USER",
+        body: "Invalid Order pagination body",
+        eventKey: `commerce:${randomUUID()}:order.created:${fixture.customerA.person.id}:invalid-order`,
+        metadata: {
+          destination: "/customer/notifications",
+          eventType: "order.created",
+          orderId: "not-a-uuid",
+        },
+        recipientPersonId: fixture.customerA.person.id,
+        title: "Invalid Order pagination",
+      },
+    });
+
+    const authorizedNotifications = [customerCreated, customerCancelled, ...additionalCustomerNotifications];
+    const merchantNotifications = [merchantNew, merchantCustomerCancelled, ...additionalMerchantNotifications];
+    const crossOwnerNotifications = [crossOwnerNotification, ...additionalCrossOwnerNotifications];
+    const timestamp = Date.now();
+    await Promise.all([
+      prisma.notification.updateMany({
+        data: { createdAt: new Date(timestamp - 20_000) },
+        where: { id: { in: authorizedNotifications.slice(0, 4).map(({ id }) => id) } },
+      }),
+      prisma.notification.updateMany({
+        data: { createdAt: new Date(timestamp - 60_000) },
+        where: { id: { in: authorizedNotifications.slice(4).map(({ id }) => id) } },
+      }),
+      prisma.notification.updateMany({
+        data: { createdAt: new Date(timestamp) },
+        where: { id: { in: merchantNotifications.slice(0, 10).map(({ id }) => id) } },
+      }),
+      prisma.notification.updateMany({
+        data: { createdAt: new Date(timestamp - 40_000) },
+        where: { id: { in: merchantNotifications.slice(10).map(({ id }) => id) } },
+      }),
+      prisma.notification.updateMany({
+        data: { createdAt: new Date(timestamp - 10_000) },
+        where: { id: { in: crossOwnerNotifications.slice(0, 4).map(({ id }) => id) } },
+      }),
+      prisma.notification.updateMany({
+        data: { createdAt: new Date(timestamp - 40_000) },
+        where: { id: { in: crossOwnerNotifications.slice(4).map(({ id }) => id) } },
+      }),
+      prisma.notification.update({
+        data: { createdAt: new Date(timestamp - 30_000) },
+        where: { id: invalidOrderNotification.id },
+      }),
+    ]);
+    const expectedAuthorized = await prisma.notification.findMany({
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      select: { id: true },
+      where: { id: { in: authorizedNotifications.map(({ id }) => id) } },
+    });
+
+    const unauthenticatedNotifications = await request("/api/commerce/customer/notifications?limit=5");
+    assert.equal(unauthenticatedNotifications.response.status, 401);
+    assert.equal((unauthenticatedNotifications.body.error as { code: string }).code, "UNAUTHENTICATED");
+
+    const notifications = await request("/api/commerce/customer/notifications?limit=5", {
       cookie: customerACookie,
       headers: { "expo-origin": "rezno://" },
     });
@@ -230,23 +345,46 @@ test(
       orderId: string;
       title: string;
     }>;
-    const returnedIds = new Set(customerNotifications.map((item) => item.id));
-    assert.equal(returnedIds.has(customerCreated.id), true);
-    assert.equal(returnedIds.has(customerCancelled.id), true);
-    assert.equal(returnedIds.has(merchantNew.id), false);
-    assert.equal(returnedIds.has(merchantCustomerCancelled.id), false);
-    assert.equal(returnedIds.has(legacyNotification.id), false);
-    assert.equal(returnedIds.has(malformedMetadata.id), false);
-    assert.equal(returnedIds.has(missingEventType.id), false);
-    assert.equal(returnedIds.has(unknownEventType.id), false);
-    assert.equal(returnedIds.has(crossOwnerNotification.id), false);
-    assert.equal(customerNotifications.find((item) => item.id === customerCreated.id)?.orderId, orderId);
-    assert.equal(customerNotifications.some((item) => item.title === merchantNew.title), false);
-    assert.equal(customerNotifications.some((item) => item.body === merchantNew.body), false);
-    assert.equal(customerNotifications.some((item) => item.title === merchantCustomerCancelled.title), false);
-    assert.equal(customerNotifications.some((item) => item.body === merchantCustomerCancelled.body), false);
+    const firstPageInfo = notifications.body.pageInfo as { hasNextPage: boolean; nextCursor: string | null };
+    assert.deepEqual(customerNotifications.map(({ id }) => id), expectedAuthorized.slice(0, 5).map(({ id }) => id));
+    assert.equal(customerNotifications.length, 5);
+    assert.equal(firstPageInfo.hasNextPage, true);
+    assert.equal(typeof firstPageInfo.nextCursor, "string");
+
+    const secondPageResponse = await request(
+      `/api/commerce/customer/notifications?limit=5&cursor=${encodeURIComponent(firstPageInfo.nextCursor!)}`,
+      { cookie: customerACookie, headers: { "expo-origin": "rezno://" } },
+    );
+    assert.equal(secondPageResponse.response.status, 200);
+    const secondPage = secondPageResponse.body.data as typeof customerNotifications;
+    const secondPageInfo = secondPageResponse.body.pageInfo as { hasNextPage: boolean; nextCursor: string | null };
+    assert.deepEqual(secondPage.map(({ id }) => id), expectedAuthorized.slice(5).map(({ id }) => id));
+    assert.equal(secondPage.length, 3);
+    assert.equal(secondPageInfo.hasNextPage, false);
+    assert.equal(secondPageInfo.nextCursor, null);
+
+    const allCustomerNotifications = [...customerNotifications, ...secondPage];
+    const returnedIds = new Set(allCustomerNotifications.map((item) => item.id));
+    assert.equal(returnedIds.size, expectedAuthorized.length);
+    assert.deepEqual([...returnedIds].sort(), expectedAuthorized.map(({ id }) => id).sort());
+    for (const notification of [
+      ...merchantNotifications,
+      legacyNotification,
+      malformedMetadata,
+      missingEventType,
+      unknownEventType,
+      ...crossOwnerNotifications,
+      invalidOrderNotification,
+    ]) {
+      assert.equal(returnedIds.has(notification.id), false);
+    }
+    assert.equal(allCustomerNotifications.find((item) => item.id === customerCreated.id)?.orderId, orderId);
+    for (const notification of merchantNotifications) {
+      assert.equal(allCustomerNotifications.some((item) => item.title === notification.title), false);
+      assert.equal(allCustomerNotifications.some((item) => item.body === notification.body), false);
+    }
     assert.deepEqual(
-      Object.keys(customerNotifications.find((item) => item.id === customerCreated.id)!).sort(),
+      Object.keys(allCustomerNotifications.find((item) => item.id === customerCreated.id)!).sort(),
       ["body", "createdAt", "id", "orderId", "priority", "title"],
     );
 

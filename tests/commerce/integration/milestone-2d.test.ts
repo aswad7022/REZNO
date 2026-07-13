@@ -16,6 +16,7 @@ import {
   removeFavoriteProduct,
   removeFavoriteStore,
 } from "../../../features/commerce/services/customer-favorite-service";
+import { listCustomerNotifications } from "../../../features/commerce/services/customer-notification-service";
 import {
   getCustomerOrderDetail,
   listCustomerOrders,
@@ -116,6 +117,202 @@ test("Milestone 2D PostgreSQL Orders, Favorites, and Notifications", { concurren
       assert.ok(notification.title.length > 0);
       assert.ok(notification.body.length > 0);
     }
+  });
+
+  await t.test("customer Notification pages fill from authorized records across mixed dual-role feeds", async () => {
+    const { catalogA, customers, merchantA } = await seedMilestone2cFixture();
+    const customer = customers[0]!;
+    const otherCustomer = customers[1]!;
+    const ownerMembership = await prisma.organizationMember.findUniqueOrThrow({
+      where: {
+        personId_organizationId: {
+          organizationId: merchantA.organization.id,
+          personId: merchantA.person.id,
+        },
+      },
+      select: { roleId: true },
+    });
+    await prisma.organizationMember.create({
+      data: {
+        organizationId: merchantA.organization.id,
+        personId: customer.id,
+        roleId: ownerMembership.roleId,
+      },
+    });
+
+    const ownedOrders: Awaited<ReturnType<typeof checkout>>[] = [];
+    for (let index = 0; index < 8; index += 1) {
+      ownedOrders.push(await checkout(customer.id, catalogA.variant.id));
+    }
+    const otherOrder = await checkout(otherCustomer.id, catalogA.variant.id);
+    const validNotifications = await prisma.notification.findMany({
+      where: {
+        eventKey: { contains: ":order.created:" },
+        recipientPersonId: customer.id,
+      },
+      orderBy: { id: "asc" },
+    });
+    assert.equal(validNotifications.length, 8);
+
+    const baseTime = new Date("2026-07-13T10:00:00.000Z");
+    for (const [index, notification] of validNotifications.entries()) {
+      await prisma.notification.update({
+        where: { id: notification.id },
+        data: {
+          createdAt: new Date(
+            baseTime.getTime() - (index < 2 ? 1_000 : index * 1_000),
+          ),
+        },
+      });
+    }
+
+    await prisma.notification.createMany({
+      data: Array.from({ length: 11 }, (_, index) => ({
+        audience: "USER" as const,
+        body: `Merchant pagination body ${index}`,
+        createdAt: new Date(baseTime.getTime() + 60_000),
+        eventKey: `commerce:${ownedOrders[index % ownedOrders.length]!.id}:order.new:${customer.id}:pagination-${index}`,
+        metadata: {
+          destination: "/business/notifications",
+          eventType: "order.new",
+          orderId: ownedOrders[index % ownedOrders.length]!.id,
+        },
+        recipientPersonId: customer.id,
+        title: `Merchant pagination title ${index}`,
+      })),
+    });
+    await prisma.notification.updateMany({
+      where: {
+        eventKey: { contains: ":order.new:" },
+        recipientPersonId: customer.id,
+      },
+      data: { createdAt: new Date(baseTime.getTime() + 60_000) },
+    });
+    assert.equal(
+      await prisma.notification.count({
+        where: {
+          eventKey: { contains: ":order.new:" },
+          recipientPersonId: customer.id,
+        },
+      }),
+      20,
+    );
+
+    const crossOwnerNotifications = await Promise.all(
+      Array.from({ length: 8 }, (_, index) => prisma.notification.create({
+        data: {
+          audience: "USER",
+          body: `Cross-owner pagination body ${index}`,
+          createdAt: new Date(baseTime.getTime() + (index < 4 ? 30_000 : -3_500)),
+          eventKey: `commerce:${otherOrder.id}:order.confirmed:${customer.id}:cross-${index}`,
+          metadata: {
+            destination: "/customer/notifications",
+            eventType: "order.confirmed",
+            orderId: otherOrder.id,
+          },
+          recipientPersonId: customer.id,
+          title: `Cross-owner pagination title ${index}`,
+        },
+      })),
+    );
+    const [legacy, malformed, missingEvent, unknownEvent, invalidOrderId] = await Promise.all([
+      prisma.notification.create({
+        data: {
+          audience: "USER",
+          body: "Legacy pagination body",
+          createdAt: new Date(baseTime.getTime() + 50_000),
+          recipientPersonId: customer.id,
+          title: "Legacy pagination title",
+        },
+      }),
+      prisma.notification.create({
+        data: {
+          audience: "USER",
+          body: "Malformed pagination body",
+          createdAt: new Date(baseTime.getTime() + 50_000),
+          eventKey: `commerce:${randomUUID()}:malformed:${customer.id}`,
+          metadata: "malformed",
+          recipientPersonId: customer.id,
+          title: "Malformed pagination title",
+        },
+      }),
+      prisma.notification.create({
+        data: {
+          audience: "USER",
+          body: "Missing-event pagination body",
+          createdAt: new Date(baseTime.getTime() + 50_000),
+          eventKey: `commerce:${randomUUID()}:missing:${customer.id}`,
+          metadata: { destination: "/customer/notifications", orderId: ownedOrders[0]!.id },
+          recipientPersonId: customer.id,
+          title: "Missing-event pagination title",
+        },
+      }),
+      prisma.notification.create({
+        data: {
+          audience: "USER",
+          body: "Unknown-event pagination body",
+          createdAt: new Date(baseTime.getTime() + 50_000),
+          eventKey: `commerce:${randomUUID()}:order.future:${customer.id}`,
+          metadata: {
+            destination: "/customer/notifications",
+            eventType: "order.future",
+            orderId: ownedOrders[0]!.id,
+          },
+          recipientPersonId: customer.id,
+          title: "Unknown-event pagination title",
+        },
+      }),
+      prisma.notification.create({
+        data: {
+          audience: "USER",
+          body: "Invalid-order pagination body",
+          createdAt: new Date(baseTime.getTime() + 20_000),
+          eventKey: `commerce:${randomUUID()}:order.confirmed:${customer.id}`,
+          metadata: {
+            destination: "/customer/notifications",
+            eventType: "order.confirmed",
+            orderId: "not-a-uuid",
+          },
+          recipientPersonId: customer.id,
+          title: "Invalid-order pagination title",
+        },
+      }),
+    ]);
+
+    const expectedIds = (await prisma.notification.findMany({
+      where: { id: { in: validNotifications.map((item) => item.id) } },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      select: { id: true },
+    })).map((item) => item.id);
+    const excludedIds = new Set([
+      ...crossOwnerNotifications.map((item) => item.id),
+      legacy.id,
+      malformed.id,
+      missingEvent.id,
+      unknownEvent.id,
+      invalidOrderId.id,
+    ]);
+
+    const pageOne = await listCustomerNotifications(customer.id, { limit: 5 });
+    assert.equal(pageOne.data.length, 5);
+    assert.equal(pageOne.pageInfo.hasNextPage, true);
+    assert.ok(pageOne.pageInfo.nextCursor);
+    assert.deepEqual(pageOne.data.map((item) => item.id), expectedIds.slice(0, 5));
+
+    const pageTwo = await listCustomerNotifications(customer.id, {
+      cursor: pageOne.pageInfo.nextCursor!,
+      limit: 5,
+    });
+    assert.deepEqual(pageTwo.data.map((item) => item.id), expectedIds.slice(5));
+    assert.equal(pageTwo.pageInfo.hasNextPage, false);
+    assert.equal(pageTwo.pageInfo.nextCursor, null);
+
+    const allPages = [...pageOne.data, ...pageTwo.data];
+    assert.deepEqual(allPages.map((item) => item.id), expectedIds);
+    assert.equal(new Set(allPages.map((item) => item.id)).size, expectedIds.length);
+    assert.equal(allPages.some((item) => excludedIds.has(item.id)), false);
+    assert.equal(allPages.some((item) => item.title.startsWith("Merchant pagination")), false);
+    assert.equal(allPages.some((item) => item.body.startsWith("Merchant pagination")), false);
   });
 
   await t.test("customer Orders are owner-scoped, paginated, and preserve immutable snapshots", async () => {

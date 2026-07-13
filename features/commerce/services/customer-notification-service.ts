@@ -1,3 +1,5 @@
+import type { Prisma } from "@prisma/client";
+
 import { decodePublicCursor, encodePublicCursor, publicQueryFingerprint } from "@/features/commerce/public/cursor";
 import { commerceError } from "@/features/commerce/domain/errors";
 import type { CommerceNotificationEvent } from "@/features/commerce/domain/notification-events";
@@ -29,6 +31,23 @@ const CUSTOMER_NOTIFICATION_EVENTS = [
 
 const CUSTOMER_NOTIFICATION_EVENT_SET: ReadonlySet<string> = new Set(CUSTOMER_NOTIFICATION_EVENTS);
 
+const customerNotificationSelect = {
+  body: true,
+  createdAt: true,
+  id: true,
+  metadata: true,
+  priority: true,
+  title: true,
+} satisfies Prisma.NotificationSelect;
+
+type CustomerNotificationCandidate = Prisma.NotificationGetPayload<{
+  select: typeof customerNotificationSelect;
+}>;
+
+type AuthorizedCustomerNotification = CustomerNotificationCandidate & {
+  customerMetadata: { eventType: string; orderId: string };
+};
+
 export async function listCustomerNotifications(
   customerId: string,
   query: CustomerNotificationQuery,
@@ -42,63 +61,65 @@ export async function listCustomerNotifications(
     ? decodePublicCursor(query.cursor, { fingerprint, sort: "notifications_newest" })
     : null;
   const cursorDate = cursor ? strictDate(cursor.sortValue) : null;
-  const rows = await prisma.notification.findMany({
-    where: {
-      audience: "USER",
-      eventKey: { startsWith: "commerce:" },
-      recipientPersonId: customer.personId,
-      ...(cursorDate
-        ? {
-            OR: [
-              { createdAt: { lt: cursorDate } },
-              { createdAt: cursorDate, id: { lt: cursor!.id } },
-            ],
-          }
-        : {}),
-    },
-    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-    select: {
-      body: true,
-      createdAt: true,
-      id: true,
-      metadata: true,
-      priority: true,
-      title: true,
-    },
-    take: query.limit + 1,
-  });
-  const candidates = rows.slice(0, query.limit);
-  const candidateMetadata = new Map(
-    candidates.map((row) => [row.id, customerNotificationMetadata(row.metadata)]),
-  );
-  const candidateOrderIds = candidates
-    .map((row) => candidateMetadata.get(row.id)?.orderId)
-    .filter((value): value is string => Boolean(value));
-  const ownedOrders = candidateOrderIds.length
-    ? await prisma.order.findMany({
-        where: { customerId: customer.personId, id: { in: candidateOrderIds } },
-        select: { id: true },
-      })
-    : [];
-  const ownedOrderIds = new Set(ownedOrders.map((order) => order.id));
-  const last = candidates.at(-1);
+  const targetSize = query.limit + 1;
+  const batchSize = targetSize;
+  const authorized: AuthorizedCustomerNotification[] = [];
+  let scanCursor = cursorDate && cursor
+    ? { createdAt: cursorDate, id: cursor.id }
+    : null;
+
+  while (authorized.length < targetSize) {
+    const candidates = await prisma.notification.findMany({
+      where: customerNotificationCandidateWhere(customer.personId, scanCursor),
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      select: customerNotificationSelect,
+      take: batchSize,
+    });
+    if (candidates.length === 0) break;
+
+    const candidateMetadata = new Map(
+      candidates.map((row) => [row.id, customerNotificationMetadata(row.metadata)]),
+    );
+    const candidateOrderIds = Array.from(new Set(
+      candidates
+        .map((row) => candidateMetadata.get(row.id)?.orderId)
+        .filter((value): value is string => Boolean(value)),
+    ));
+    const ownedOrders = candidateOrderIds.length
+      ? await prisma.order.findMany({
+          where: { customerId: customer.personId, id: { in: candidateOrderIds } },
+          select: { id: true },
+        })
+      : [];
+    const ownedOrderIds = new Set(ownedOrders.map((order) => order.id));
+
+    for (const candidate of candidates) {
+      const metadata = candidateMetadata.get(candidate.id);
+      if (!metadata || !ownedOrderIds.has(metadata.orderId)) continue;
+      authorized.push({ ...candidate, customerMetadata: metadata });
+      if (authorized.length === targetSize) break;
+    }
+
+    const lastCandidate = candidates.at(-1)!;
+    scanCursor = { createdAt: lastCandidate.createdAt, id: lastCandidate.id };
+    if (candidates.length < batchSize) break;
+  }
+
+  const page = authorized.slice(0, query.limit);
+  const last = page.at(-1);
 
   return {
-    data: candidates.flatMap((row) => {
-      const metadata = candidateMetadata.get(row.id);
-      if (!metadata || !ownedOrderIds.has(metadata.orderId)) return [];
-      return [{
-        body: row.body,
-        createdAt: row.createdAt.toISOString(),
-        id: row.id,
-        orderId: metadata.orderId,
-        priority: row.priority,
-        title: row.title,
-      }];
-    }),
+    data: page.map((row) => ({
+      body: row.body,
+      createdAt: row.createdAt.toISOString(),
+      id: row.id,
+      orderId: row.customerMetadata.orderId,
+      priority: row.priority,
+      title: row.title,
+    })),
     pageInfo: {
-      hasNextPage: rows.length > query.limit,
-      nextCursor: rows.length > query.limit && last
+      hasNextPage: authorized.length > query.limit,
+      nextCursor: authorized.length > query.limit && last
         ? encodePublicCursor({
             fingerprint,
             id: last.id,
@@ -107,6 +128,33 @@ export async function listCustomerNotifications(
           })
         : null,
     },
+  };
+}
+
+function customerNotificationCandidateWhere(
+  customerId: string,
+  cursor: { createdAt: Date; id: string } | null,
+): Prisma.NotificationWhereInput {
+  return {
+    AND: [
+      { metadata: { path: ["destination"], equals: "/customer/notifications" } },
+      {
+        OR: CUSTOMER_NOTIFICATION_EVENTS.map((eventType) => ({
+          metadata: { path: ["eventType"], equals: eventType },
+        })),
+      },
+    ],
+    audience: "USER",
+    eventKey: { not: null, startsWith: "commerce:" },
+    recipientPersonId: customerId,
+    ...(cursor
+      ? {
+          OR: [
+            { createdAt: { lt: cursor.createdAt } },
+            { createdAt: cursor.createdAt, id: { lt: cursor.id } },
+          ],
+        }
+      : {}),
   };
 }
 
