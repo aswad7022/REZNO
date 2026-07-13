@@ -934,7 +934,7 @@ export default function App() {
     setAuthMode(mode);
   };
 
-  const handleAuthSuccess = async (user: MobileAuthUser) => {
+  const handleAuthSuccess = async (user: MobileAuthUser, phone?: string) => {
     const setupAttempt = ++authSetupAttempt.current;
     setAuthSession({ status: "authenticated", user });
     setAuthSetupUser(user);
@@ -942,7 +942,7 @@ export default function App() {
     setAuthActionError(null);
 
     try {
-      await completeMobileCustomerOnboarding();
+      await completeMobileCustomerOnboarding(phone);
       if (authSetupAttempt.current !== setupAttempt) return false;
       setAuthSetupUser(null);
       setAuthMode(null);

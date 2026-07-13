@@ -14,6 +14,7 @@ import { signInWithEmail, signUpWithEmail } from "../auth/client";
 import {
   MOBILE_AUTH_MIN_PASSWORD_LENGTH,
   validateMobileAuthForm,
+  validateMobilePhone,
   type MobileAuthMode,
   type MobileAuthValidationCode,
 } from "../auth/form";
@@ -55,6 +56,10 @@ export type MobileAuthCopy = {
   password: string;
   passwordHint: string;
   passwordTooShort: string;
+  phone: string;
+  phoneHint: string;
+  phoneInvalid: string;
+  phoneRequired: string;
   sessionError: string;
   sessionLoading: string;
   setupDescription: string;
@@ -91,10 +96,14 @@ export const mobileAuthCopy: Record<MobileLocale, MobileAuthCopy> = {
     password: "كلمة المرور",
     passwordHint: "ثمانية أحرف على الأقل.",
     passwordTooShort: `يجب ألا تقل كلمة المرور عن ${MOBILE_AUTH_MIN_PASSWORD_LENGTH} أحرف.`,
+    phone: "رقم الهاتف",
+    phoneHint: "أدخل رقماً يمكن للمتجر استخدامه لتنسيق استلام طلبك.",
+    phoneInvalid: "أدخل رقم هاتف صحيحاً من 7 إلى 15 رقماً.",
+    phoneRequired: "رقم الهاتف مطلوب لإكمال حساب العميل.",
     sessionError: "تعذر التحقق من الجلسة. يمكنك المحاولة عبر تسجيل الدخول.",
     sessionLoading: "جاري التحقق من الجلسة...",
     setupDescription:
-      "تم حفظ جلسة حسابك. أكمل إعداد ملف العميل لاستخدام السلة والطلبات والمفضلة.",
+      "تم حفظ جلسة حسابك. أضف رقم هاتف صحيحاً لإكمال ملف العميل واستخدام الدفع عند الاستلام.",
     setupFailure:
       "تم حفظ جلسة الحساب، لكن تعذر إكمال ملف العميل. أعد المحاولة دون إنشاء الحساب من جديد.",
     signedIn: "تم تسجيل الدخول",
@@ -127,10 +136,14 @@ export const mobileAuthCopy: Record<MobileLocale, MobileAuthCopy> = {
     password: "وشەی نهێنی",
     passwordHint: "لانیکەم هەشت پیت.",
     passwordTooShort: `وشەی نهێنی دەبێت لانیکەم ${MOBILE_AUTH_MIN_PASSWORD_LENGTH} پیت بێت.`,
+    phone: "ژمارەی تەلەفۆن",
+    phoneHint: "ژمارەیەک بنووسە کە فرۆشگا بتوانێت بۆ وەرگرتنی داواکاری پەیوەندیت پێوە بکات.",
+    phoneInvalid: "ژمارەی تەلەفۆنێکی دروست لە 7 بۆ 15 ژمارە بنووسە.",
+    phoneRequired: "ژمارەی تەلەفۆن بۆ تەواوکردنی هەژماری کڕیار پێویستە.",
     sessionError: "پشکنینی دانیشتن سەرکەوتوو نەبوو. دووبارە بچۆ ژوورەوە.",
     sessionLoading: "دانیشتن پشکنین دەکرێت...",
     setupDescription:
-      "دانیشتنەکەت پارێزرا. ڕێکخستنی کڕیار تەواو بکە بۆ سەبەتە و داواکارییەکان.",
+      "دانیشتنەکەت پارێزرا. ژمارەی تەلەفۆنێکی دروست زیاد بکە بۆ تەواوکردنی پرۆفایلی کڕیار.",
     setupFailure:
       "دانیشتنەکەت پارێزرا، بەڵام پرۆفایلی کڕیار تەواو نەبوو. دووبارە هەوڵ بدە.",
     signedIn: "چوویتە ژوورەوە",
@@ -163,10 +176,14 @@ export const mobileAuthCopy: Record<MobileLocale, MobileAuthCopy> = {
     password: "Password",
     passwordHint: "At least eight characters.",
     passwordTooShort: `Password must be at least ${MOBILE_AUTH_MIN_PASSWORD_LENGTH} characters.`,
+    phone: "Phone number",
+    phoneHint: "Use a number the store can contact for pickup coordination.",
+    phoneInvalid: "Enter a valid phone number with 7 to 15 digits.",
+    phoneRequired: "A phone number is required to finish customer setup.",
     sessionError: "We could not verify your session. You can try signing in again.",
     sessionLoading: "Checking your session...",
     setupDescription:
-      "Your account session is saved. Finish the customer profile to use cart, orders, and favorites.",
+      "Your account session is saved. Add a valid phone number to finish the customer profile and use pickup checkout.",
     setupFailure:
       "Your session is saved, but the customer profile could not be completed. Retry without creating the account again.",
     signedIn: "Signed in",
@@ -192,7 +209,7 @@ export function MobileAuthScreen({
   initialMode: MobileAuthMode;
   initialSetupUser?: MobileAuthUser | null;
   locale: MobileLocale;
-  onAuthenticated: (user: MobileAuthUser) => Promise<boolean>;
+  onAuthenticated: (user: MobileAuthUser, phone?: string) => Promise<boolean>;
   onBack: () => void;
   theme: MobileTheme;
 }) {
@@ -206,6 +223,7 @@ export function MobileAuthScreen({
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [phone, setPhone] = useState("");
   const [pending, setPending] = useState(false);
   const [validationCode, setValidationCode] =
     useState<MobileAuthValidationCode | null>(null);
@@ -224,9 +242,19 @@ export function MobileAuthScreen({
   };
 
   const finishSetup = async (user: MobileAuthUser) => {
+    const phoneValidation = validateMobilePhone(phone);
+    if (!phoneValidation.ok) {
+      setValidationCode(phoneValidation.code);
+      setRequestError(null);
+      return;
+    }
+
     setPending(true);
+    setValidationCode(null);
     setRequestError(null);
-    const completed = await onAuthenticated(user).catch(() => false);
+    const completed = await onAuthenticated(user, phoneValidation.value).catch(
+      () => false,
+    );
     if (completed) return;
     setRequestError(copy.setupFailure);
     setPending(false);
@@ -239,7 +267,12 @@ export function MobileAuthScreen({
       return;
     }
 
-    const validation = validateMobileAuthForm(mode, { email, name, password });
+    const validation = validateMobileAuthForm(mode, {
+      email,
+      name,
+      password,
+      phone,
+    });
     if (!validation.ok) {
       setValidationCode(validation.code);
       setRequestError(null);
@@ -269,9 +302,10 @@ export function MobileAuthScreen({
         return;
       }
 
-      const completed = await onAuthenticated(result.data.user).catch(
-        () => false,
-      );
+      const completed = await onAuthenticated(
+        result.data.user,
+        mode === "signup" ? validation.values.phone : undefined,
+      ).catch(() => false);
       if (completed) return;
       setSetupUser(result.data.user);
       setRequestError(copy.setupFailure);
@@ -285,6 +319,32 @@ export function MobileAuthScreen({
   const errorMessage = validationCode
     ? validationMessage(validationCode, copy)
     : requestError;
+  const phoneField = (
+    <AuthField label={copy.phone} styles={styles}>
+      <TextInput
+        accessibilityHint={copy.phoneHint}
+        accessibilityLabel={copy.phone}
+        autoComplete="tel"
+        editable={!pending}
+        keyboardType="phone-pad"
+        maxLength={30}
+        onChangeText={(value) => {
+          setPhone(value);
+          clearError();
+        }}
+        onSubmitEditing={() => {
+          if (setupUser) void submit();
+        }}
+        placeholder="+964 750 000 0000"
+        placeholderTextColor={theme.colors.disabledText}
+        returnKeyType={setupUser ? "done" : "next"}
+        style={[styles.input, styles.inputLtr]}
+        textContentType="telephoneNumber"
+        value={phone}
+      />
+      <Text style={[styles.hint, isRtl && styles.rtl]}>{copy.phoneHint}</Text>
+    </AuthField>
+  );
 
   return (
     <KeyboardAvoidingView
@@ -375,6 +435,7 @@ export function MobileAuthScreen({
                     />
                   </AuthField>
                 ) : null}
+                {mode === "signup" ? phoneField : null}
                 <AuthField label={copy.email} styles={styles}>
                   <TextInput
                     accessibilityLabel={copy.email}
@@ -432,6 +493,8 @@ export function MobileAuthScreen({
             </>
           ) : null}
 
+          {setupUser ? <View style={styles.fields}>{phoneField}</View> : null}
+
           {errorMessage ? (
             <View accessibilityLiveRegion="polite" style={styles.error}>
               <Text style={[styles.errorText, isRtl && styles.rtl]}>
@@ -480,6 +543,8 @@ function validationMessage(
   if (code === "EMAIL_INVALID") return copy.emailInvalid;
   if (code === "EMAIL_REQUIRED") return copy.emailRequired;
   if (code === "NAME_REQUIRED") return copy.nameRequired;
+  if (code === "PHONE_INVALID") return copy.phoneInvalid;
+  if (code === "PHONE_REQUIRED") return copy.phoneRequired;
   return copy.passwordTooShort;
 }
 
