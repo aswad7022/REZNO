@@ -29,9 +29,9 @@ export const labels: Record<MobileLocale, MobileLabels> = {
   ar: {
     apiBaseUrl: "رابط واجهة REZNO",
     appTagline: "تطبيق الحجز وإدارة الأعمال",
-    integrationBoundary: "حدود التكامل",
+    integrationBoundary: "تكامل الحساب",
     integrationBoundaryBody:
-      "هذا الأساس لا يغير مصادقة الويب أو منطق الحجز. تسجيل الدخول الحقيقي مع Better Auth يحتاج موافقة منفصلة.",
+      "يستخدم تطبيق الموبايل الآن Better Auth نفسه لتسجيل الدخول وإنشاء الحساب، دون تغيير منطق الحجز في الويب.",
     marketplaceEmptyBody:
       "لا توجد أنشطة عامة مطابقة حالياً. جرّب لاحقاً أو غيّر معايير البحث عند توفرها.",
     marketplaceEmptyTitle: "لا توجد نتائج",
@@ -57,9 +57,9 @@ export const labels: Record<MobileLocale, MobileLabels> = {
   en: {
     apiBaseUrl: "REZNO API URL",
     appTagline: "Booking and business management",
-    integrationBoundary: "Integration boundary",
+    integrationBoundary: "Account integration",
     integrationBoundaryBody:
-      "This foundation does not change web authentication or booking logic. Real Better Auth mobile integration needs separate approval.",
+      "The mobile app now uses the existing Better Auth service for sign-in and account creation without changing web booking logic.",
     marketplaceEmptyBody:
       "There are no matching public businesses yet. Try again later or adjust filters when search is available.",
     marketplaceEmptyTitle: "No results yet",
@@ -85,9 +85,9 @@ export const labels: Record<MobileLocale, MobileLabels> = {
   ckb: {
     apiBaseUrl: "بەستەری API ـی REZNO",
     appTagline: "حجزکردن و بەڕێوەبردنی کار",
-    integrationBoundary: "سنووری پەیوەستکردن",
+    integrationBoundary: "پەیوەستکردنی هەژمار",
     integrationBoundaryBody:
-      "ئەم بناغەیە دەستکاری چوونەژوورەوەی وێب یان لۆجیکی حجز ناکات. پەیوەستکردنی ڕاستەقینەی Better Auth بۆ مۆبایل پێویستی بە ڕەزامەندی جیاواز هەیە.",
+      "ئەپەکەی مۆبایل ئێستا Better Auth بەکاردێنێت بۆ چوونەژوورەوە و دروستکردنی هەژمار، بەبێ گۆڕینی لۆجیکی حجز لە وێب.",
     marketplaceEmptyBody:
       "هیچ کارێکی گشتی هاوتا نییە. دواتر هەوڵبدەرەوە یان کاتێک گەڕان بەردەست بوو پاڵێوەکان بگۆڕە.",
     marketplaceEmptyTitle: "هیچ ئەنجامێک نییە",

@@ -12,6 +12,7 @@ import {
 } from "@/features/identity/server";
 import { isReservedBusinessSlug } from "@/features/business/lib/business-slug";
 import { businessOnboardingSchema } from "@/features/onboarding/schemas/onboarding";
+import { completeCustomerOnboardingProfile } from "@/features/onboarding/services/customer-onboarding";
 import type { BusinessOnboardingState } from "@/features/onboarding/types";
 import { prisma } from "@/lib/db/prisma";
 import { getSafeInternalPath } from "@/lib/navigation/safe-redirect";
@@ -31,12 +32,9 @@ function safeNextPath(value: string | undefined): string {
 export async function completeCustomerOnboarding(
   nextPath?: string,
 ): Promise<never> {
-  const { person } = await requireActiveIdentity();
+  const { session } = await requireActiveIdentity();
 
-  await prisma.person.update({
-    where: { id: person.id },
-    data: { isOnboarded: true },
-  });
+  await completeCustomerOnboardingProfile(session.user.id);
 
   redirect(safeNextPath(nextPath));
 }

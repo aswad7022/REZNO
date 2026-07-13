@@ -1,18 +1,14 @@
 import * as SecureStore from "expo-secure-store";
 
+import {
+  mergeMobileSessionCookies,
+  type StoredMobileCookies,
+} from "./session-cookie-state";
+
 const COOKIE_STORAGE_KEY = "rezno_cookie";
 
-type StoredCookie = { expires?: string | null; value?: string };
-
 export function readMobileSessionCookie() {
-  const stored = SecureStore.getItem(COOKIE_STORAGE_KEY);
-  if (!stored) return "";
-  let parsed: Record<string, StoredCookie>;
-  try {
-    parsed = JSON.parse(stored) as Record<string, StoredCookie>;
-  } catch {
-    return "";
-  }
+  const parsed = readStoredCookies();
   const now = Date.now();
   return Object.entries(parsed)
     .filter(([, value]) => {
@@ -23,4 +19,23 @@ export function readMobileSessionCookie() {
     })
     .map(([name, value]) => `${name}=${value.value}`)
     .join("; ");
+}
+
+export async function persistMobileSessionCookies(setCookieHeader: string) {
+  const next = mergeMobileSessionCookies(
+    readStoredCookies(),
+    setCookieHeader,
+  );
+  await SecureStore.setItemAsync(COOKIE_STORAGE_KEY, JSON.stringify(next));
+}
+
+function readStoredCookies(): StoredMobileCookies {
+  const stored = SecureStore.getItem(COOKIE_STORAGE_KEY);
+  if (!stored) return {};
+
+  try {
+    return JSON.parse(stored) as StoredMobileCookies;
+  } catch {
+    return {};
+  }
 }
