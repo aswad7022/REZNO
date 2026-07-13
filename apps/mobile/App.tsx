@@ -1,7 +1,7 @@
 import { StatusBar } from "expo-status-bar";
 import { useFonts } from "expo-font";
 import { requireOptionalNativeModule } from "expo-modules-core";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   I18nManager,
   Image,
@@ -17,8 +17,14 @@ import {
 } from "react-native";
 
 import { fetchMobileMarketplace } from "./src/api/marketplace";
+import { completeMobileCustomerOnboarding } from "./src/api/onboarding";
 import { commerceApi } from "./src/api/commerce";
 import { MobileApiRequestError } from "./src/api/client";
+import {
+  getMobileSession,
+  signOutMobile,
+} from "./src/auth/client";
+import type { MobileAuthMode } from "./src/auth/form";
 import { commerceNotificationOrderDestination } from "./src/commerce/notification-navigation";
 import {
   BottomTabBar,
@@ -56,6 +62,12 @@ import {
 } from "./src/theme/tokens";
 import { ReznoHomeScreen } from "./src/screens/rezno-home-screen";
 import { ReznoAiComingSoonScreen } from "./src/screens/rezno-ai-coming-soon-screen";
+import {
+  MobileAuthScreen,
+  mobileAuthCopy,
+  type MobileAuthCopy,
+  type MobileAuthUser,
+} from "./src/screens/mobile-auth-screen";
 import { CommerceMarketScreen } from "./src/screens/commerce-market-screen";
 import { ReznoNearbySearchScreen } from "./src/screens/rezno-nearby-search-screen";
 import type { MobileMarketplaceBusiness } from "./src/types/marketplace";
@@ -160,6 +172,12 @@ type VisualBooking = {
 };
 
 type MobileThemeMode = "system" | "light" | "dark";
+
+type MobileAuthSessionState =
+  | { status: "authenticated"; user: MobileAuthUser }
+  | { status: "error" }
+  | { status: "loading" }
+  | { status: "unauthenticated" };
 
 type DevMenuPreferencesModule = {
   getPreferencesAsync(): Promise<{ showFloatingActionButton?: boolean }>;
@@ -374,11 +392,6 @@ const onboardingHighlights = [
   { icon: mobileIconAssets.common.starRating, label: "عروض" },
   { icon: mobileIconAssets.common.message, label: "رسائل" },
   { icon: mobileIconAssets.categories.salon, label: "أعمال" },
-];
-
-const accountActions = [
-  { label: "تسجيل الدخول", tone: "primary" },
-  { label: "إنشاء حساب", tone: "secondary" },
 ];
 
 const bookingFilterTabs: { id: BookingListFilter; label: string }[] = [
@@ -609,7 +622,7 @@ const accountNotificationRows = [
 
 const privacySecurityRows = [
   {
-    body: "بيانات الحساب والجلسات ستدار لاحقاً عبر تكامل auth معتمد.",
+    body: "تُدار جلسة الموبايل عبر Better Auth وتُحفظ بياناتها الحساسة في SecureStore.",
     label: "أمان الجلسة",
   },
   {
@@ -621,7 +634,7 @@ const privacySecurityRows = [
 const helpFaqRows = [
   "كيف أتابع حجزي؟",
   "كيف أضيف عملي لاحقاً؟",
-  "متى تتوفر إعدادات الحساب الحقيقية؟",
+  "كيف أسجّل الدخول أو أنشئ حساباً؟",
 ];
 
 const accountManagementActions = [
@@ -662,6 +675,17 @@ export default function App() {
     string[]
   >([]);
   const [showOnboarding, setShowOnboarding] = useState(true);
+  const [authMode, setAuthMode] = useState<MobileAuthMode | null>(null);
+  const [authSession, setAuthSession] = useState<MobileAuthSessionState>({
+    status: "loading",
+  });
+  const [authSetupUser, setAuthSetupUser] = useState<MobileAuthUser | null>(
+    null,
+  );
+  const [authSetupPending, setAuthSetupPending] = useState(false);
+  const authSetupAttempt = useRef(0);
+  const [authActionError, setAuthActionError] = useState<string | null>(null);
+  const [signOutPending, setSignOutPending] = useState(false);
   const [themeMode, setThemeMode] = useState<MobileThemeMode>("dark");
   const [notificationOrderId, setNotificationOrderId] = useState<string | null>(null);
   const [marketplaceState, setMarketplaceState] = useState<MarketplaceState>({
@@ -674,6 +698,54 @@ export default function App() {
   const styles = useMemo(() => createStyles(theme), [theme]);
   const text = labels[locale];
   const isRtl = getTextDirection(locale) === "rtl";
+
+  useEffect(() => {
+    let cancelled = false;
+    const sessionAttempt = ++authSetupAttempt.current;
+
+    void getMobileSession()
+      .then(async (result) => {
+        if (cancelled || authSetupAttempt.current !== sessionAttempt) return;
+
+        if (result.error) {
+          setAuthSession({ status: "error" });
+          return;
+        }
+
+        if (!result.data?.user) {
+          setAuthSession({ status: "unauthenticated" });
+          return;
+        }
+
+        const user = result.data.user;
+        setAuthSession({ status: "authenticated", user });
+        setAuthSetupUser(user);
+        setAuthSetupPending(true);
+        try {
+          await completeMobileCustomerOnboarding();
+          if (!cancelled && authSetupAttempt.current === sessionAttempt) {
+            setAuthSetupUser(null);
+          }
+        } catch {
+          if (!cancelled && authSetupAttempt.current === sessionAttempt) {
+            setAuthSetupUser(user);
+          }
+        } finally {
+          if (!cancelled && authSetupAttempt.current === sessionAttempt) {
+            setAuthSetupPending(false);
+          }
+        }
+      })
+      .catch(() => {
+        if (!cancelled && authSetupAttempt.current === sessionAttempt) {
+          setAuthSession({ status: "error" });
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if ((!showOnboarding && activeTab !== "bookings") || !DEV_MENU_PREFERENCES) {
@@ -857,6 +929,60 @@ export default function App() {
     setShowOnboarding(false);
   };
 
+  const handleOpenAuth = (mode: MobileAuthMode) => {
+    setAuthActionError(null);
+    setAuthMode(mode);
+  };
+
+  const handleAuthSuccess = async (user: MobileAuthUser) => {
+    const setupAttempt = ++authSetupAttempt.current;
+    setAuthSession({ status: "authenticated", user });
+    setAuthSetupUser(user);
+    setAuthSetupPending(true);
+    setAuthActionError(null);
+
+    try {
+      await completeMobileCustomerOnboarding();
+      if (authSetupAttempt.current !== setupAttempt) return false;
+      setAuthSetupUser(null);
+      setAuthMode(null);
+      setShowOnboarding(false);
+      return true;
+    } catch {
+      if (authSetupAttempt.current === setupAttempt) setAuthSetupUser(user);
+      return false;
+    } finally {
+      if (authSetupAttempt.current === setupAttempt) {
+        setAuthSetupPending(false);
+      }
+    }
+  };
+
+  const handleSignOut = async () => {
+    if (signOutPending) return;
+
+    authSetupAttempt.current += 1;
+    setAuthSetupPending(false);
+    setSignOutPending(true);
+    setAuthActionError(null);
+
+    try {
+      const result = await signOutMobile();
+      if (result.error) {
+        setAuthActionError(mobileAuthCopy[locale].authFailure);
+        return;
+      }
+
+      setAuthSession({ status: "unauthenticated" });
+      setAuthSetupUser(null);
+      setAuthSetupPending(false);
+    } catch {
+      setAuthActionError(mobileAuthCopy[locale].authFailure);
+    } finally {
+      setSignOutPending(false);
+    }
+  };
+
   const updateBookingDraft = (updates: Partial<BookingDraft>) => {
     setBookingDraft((currentDraft) => ({
       ...currentDraft,
@@ -990,13 +1116,32 @@ export default function App() {
     );
   }
 
+  if (authMode) {
+    return (
+      <SafeAreaView style={styles.shell}>
+        <StatusBar style={theme.isDark ? "light" : "dark"} />
+        <MobileAuthScreen
+          initialMode={authMode}
+          initialSetupUser={authSetupUser}
+          locale={locale}
+          onAuthenticated={handleAuthSuccess}
+          onBack={() => setAuthMode(null)}
+          theme={theme}
+        />
+      </SafeAreaView>
+    );
+  }
+
   if (showOnboarding) {
     return (
       <SafeAreaView style={[styles.shell, styles.onboardingSafeArea]}>
         <StatusBar style="light" />
         <View style={styles.onboardingScreen}>
           <WelcomeOnboardingCard
+            copy={mobileAuthCopy[locale]}
             isRtl={isRtl}
+            onSignIn={() => handleOpenAuth("signin")}
+            onSignUp={() => handleOpenAuth("signup")}
             onStart={handleEnterApp}
             styles={styles}
           />
@@ -1193,10 +1338,20 @@ export default function App() {
 
         {!selectedBusiness && activeTab === "account" ? (
           <AccountScreen
+            authActionError={authActionError}
+            authSession={authSession}
+            authSetupPending={authSetupPending}
+            authSetupUser={authSetupUser}
             isRtl={isRtl}
             locale={locale}
             onLocaleChange={setLocale}
+            onOpenAuth={handleOpenAuth}
+            onOpenSetup={() => setAuthMode("signin")}
+            onSignOut={() => {
+              void handleSignOut();
+            }}
             onThemeModeChange={setThemeMode}
+            signOutPending={signOutPending}
             styles={styles}
             text={text}
             themeMode={themeMode}
@@ -1289,11 +1444,17 @@ function QuickBookingEntryScreen({
 }
 
 function WelcomeOnboardingCard({
+  copy,
   isRtl,
+  onSignIn,
+  onSignUp,
   onStart,
   styles,
 }: {
+  copy: MobileAuthCopy;
   isRtl: boolean;
+  onSignIn: () => void;
+  onSignUp: () => void;
   onStart: () => void;
   styles: MobileStyles;
 }) {
@@ -1403,14 +1564,26 @@ function WelcomeOnboardingCard({
           />
         </PremiumPressable>
         <PremiumPressable
-          accessibilityHint="يفتح تجربة تسجيل الدخول الحالية."
-          accessibilityLabel="تسجيل الدخول"
+          accessibilityHint={copy.signInDescription}
+          accessibilityLabel={copy.signIn}
           accessibilityRole="button"
-          onPress={onStart}
+          onPress={onSignIn}
           scaleTo={0.98}
           style={styles.onboardingSecondary}
         >
-          <Text style={styles.onboardingSecondaryText}>تسجيل الدخول</Text>
+          <Text style={styles.onboardingSecondaryText}>{copy.signIn}</Text>
+        </PremiumPressable>
+        <PremiumPressable
+          accessibilityHint={copy.signUpDescription}
+          accessibilityLabel={copy.createAccount}
+          accessibilityRole="button"
+          onPress={onSignUp}
+          scaleTo={0.98}
+          style={styles.onboardingSignupLink}
+        >
+          <Text style={styles.onboardingSignupLinkText}>
+            {copy.createAccount}
+          </Text>
         </PremiumPressable>
         <View style={styles.onboardingFooterBrand}>
           <View style={styles.onboardingFooterLine} />
@@ -1423,7 +1596,6 @@ function WelcomeOnboardingCard({
     </ScrollView>
   );
 }
-
 function SearchDiscoveryPanel({
   isRtl,
   onOpenMarketplace,
@@ -3911,38 +4083,72 @@ function CommerceNotificationsCenter({
 }) {
   const copy = commerceCopy[locale];
   const [items, setItems] = useState<CommerceNotification[]>([]);
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [retryRequest, setRetryRequest] = useState<{
+    append: boolean;
+    cursor: string | null;
+  } | null>(null);
   const [state, setState] = useState<"error" | "loading" | "ready" | "unauthenticated">("loading");
-  const load = useCallback(() => {
+  const requestSequence = useRef(0);
+  const load = useCallback(async (cursor: string | null, append: boolean) => {
+    const requestId = requestSequence.current + 1;
+    requestSequence.current = requestId;
     setState("loading");
-    void commerceApi.listNotifications()
-      .then((result) => {
-        setItems(result.data);
-        setState("ready");
-      })
-      .catch((error) => setState(
-        error instanceof MobileApiRequestError && error.status === 401
-          ? "unauthenticated"
-          : "error",
-      ));
+    setRetryRequest(null);
+
+    try {
+      const result = await commerceApi.listNotifications(cursor ?? undefined);
+      if (requestSequence.current !== requestId) return;
+
+      setItems((current) => append ? [...current, ...result.data] : result.data);
+      setHasNextPage(result.pageInfo.hasNextPage);
+      setNextCursor(result.pageInfo.nextCursor);
+      setState("ready");
+    } catch (error) {
+      if (requestSequence.current !== requestId) return;
+
+      if (error instanceof MobileApiRequestError && error.status === 401) {
+        setItems([]);
+        setHasNextPage(false);
+        setNextCursor(null);
+        setState("unauthenticated");
+        return;
+      }
+
+      setRetryRequest({ append, cursor });
+      setState("error");
+    }
   }, []);
 
   useEffect(() => {
-    const timer = setTimeout(load, 0);
-    return () => clearTimeout(timer);
+    const timer = setTimeout(() => void load(null, false), 0);
+    return () => {
+      clearTimeout(timer);
+      requestSequence.current += 1;
+    };
   }, [load]);
 
   return (
     <View style={styles.notificationPanel}>
       <SectionHeader isRtl={isRtl} styles={styles} title={copy.notifications} />
-      {state === "loading" ? <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>{copy.loading}</Text> : null}
+      {state === "loading" && items.length === 0 ? <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>{copy.loading}</Text> : null}
       {state === "error" ? (
-        <Pressable accessibilityLabel={copy.retry} accessibilityRole="button" onPress={load} style={styles.notificationCard}>
+        <Pressable
+          accessibilityLabel={copy.retry}
+          accessibilityRole="button"
+          onPress={() => void load(
+            retryRequest?.cursor ?? null,
+            retryRequest?.append ?? false,
+          )}
+          style={styles.notificationCard}
+        >
           <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>{copy.errorGeneric}</Text>
           <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>{copy.retry}</Text>
         </Pressable>
       ) : null}
       {state === "unauthenticated" ? (
-        <Pressable accessibilityLabel={copy.retry} accessibilityRole="button" onPress={load} style={styles.notificationCard}>
+        <Pressable accessibilityLabel={copy.retry} accessibilityRole="button" onPress={() => void load(null, false)} style={styles.notificationCard}>
           <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>{copy.sessionRequired}</Text>
           <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>{copy.retry}</Text>
         </Pressable>
@@ -3978,6 +4184,19 @@ function CommerceNotificationsCenter({
           </Pressable>
         ) : <View key={item.id} style={styles.notificationCard}>{content}</View>;
       })}
+      {hasNextPage && nextCursor ? (
+        <Pressable
+          accessibilityLabel={copy.loadMore}
+          accessibilityRole="button"
+          disabled={state === "loading"}
+          onPress={() => void load(nextCursor, true)}
+          style={styles.notificationCard}
+        >
+          <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>
+            {state === "loading" ? copy.loading : copy.loadMore}
+          </Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -4379,35 +4598,75 @@ function BusinessInsightsPreview({
 }
 
 function AccountScreen({
+  authActionError,
+  authSession,
+  authSetupPending,
+  authSetupUser,
   isRtl,
   locale,
   onLocaleChange,
+  onOpenAuth,
+  onOpenSetup,
+  onSignOut,
   onThemeModeChange,
+  signOutPending,
   styles,
   text,
   themeMode,
 }: {
+  authActionError: string | null;
+  authSession: MobileAuthSessionState;
+  authSetupPending: boolean;
+  authSetupUser: MobileAuthUser | null;
   isRtl: boolean;
   locale: MobileLocale;
   onLocaleChange: (locale: MobileLocale) => void;
+  onOpenAuth: (mode: MobileAuthMode) => void;
+  onOpenSetup: () => void;
+  onSignOut: () => void;
   onThemeModeChange: (mode: MobileThemeMode) => void;
+  signOutPending: boolean;
   styles: MobileStyles;
   text: (typeof labels)[MobileLocale];
   themeMode: MobileThemeMode;
 }) {
+  const copy = mobileAuthCopy[locale];
+  const authenticatedUser =
+    authSession.status === "authenticated" ? authSession.user : null;
+  const accountTitle = authenticatedUser?.name || copy.accountGuestTitle;
+  const accountDescription = authenticatedUser
+    ? authSetupUser
+      ? copy.setupDescription
+      : copy.accountDescription
+    : authSession.status === "loading"
+      ? copy.sessionLoading
+      : authSession.status === "error"
+        ? copy.sessionError
+        : copy.accountGuestDescription;
+  const accountStatus = authenticatedUser
+    ? authSetupUser
+      ? authSetupPending
+        ? copy.finishingSetup
+        : copy.finishSetup
+      : copy.signedIn
+    : authSession.status === "loading"
+      ? copy.sessionLoading
+      : copy.signedOut;
+  const avatarLabel = authenticatedUser?.name.trim().charAt(0) || "R";
+
   return (
     <>
       <View style={styles.accountHeroCard}>
         <View style={styles.profileHeroTopRow}>
           <View style={styles.accountAvatar}>
-            <Text style={styles.accountAvatarText}>ر</Text>
+            <Text style={styles.accountAvatarText}>{avatarLabel}</Text>
           </View>
           <View style={styles.profileStatusStack}>
             <View style={styles.statusBadge}>
-              <Text style={styles.statusBadgeText}>حساب آمن</Text>
+              <Text style={styles.statusBadgeText}>{accountStatus}</Text>
             </View>
             <Text style={[styles.profileMembershipText, isRtl && styles.rtlText]}>
-              عضو REZNO الموحد
+              {authenticatedUser?.email ?? "REZNO"}
             </Text>
           </View>
         </View>
@@ -4415,48 +4674,116 @@ function AccountScreen({
           الملف الشخصي
         </Text>
         <Text style={[styles.screenTitle, isRtl && styles.rtlText]}>
-          إعداداتك وتجربتك في مكان واحد
+          {accountTitle}
         </Text>
         <Text style={[styles.screenDescription, isRtl && styles.rtlText]}>
-          معاينة آمنة لحساب العميل والتفضيلات. لا توجد قراءة مستخدم حقيقية أو
-          تغيير جلسة في هذه المرحلة.
+          {accountDescription}
         </Text>
-        <View style={styles.profileStatsGrid}>
-          {profileOverviewStats.map((stat) => (
-            <View key={stat.label} style={styles.profileStatCard}>
-              <Text style={[styles.profileStatValue, isRtl && styles.rtlText]}>
-                {stat.value}
-              </Text>
-              <Text style={[styles.profileStatLabel, isRtl && styles.rtlText]}>
-                {stat.label}
-              </Text>
-              <Text style={[styles.profileStatMeta, isRtl && styles.rtlText]}>
-                {stat.meta}
-              </Text>
-            </View>
-          ))}
-        </View>
+        {authenticatedUser ? (
+          <View style={styles.profileStatsGrid}>
+            {profileOverviewStats.map((stat) => (
+              <View key={stat.label} style={styles.profileStatCard}>
+                <Text style={[styles.profileStatValue, isRtl && styles.rtlText]}>
+                  {stat.value}
+                </Text>
+                <Text style={[styles.profileStatLabel, isRtl && styles.rtlText]}>
+                  {stat.label}
+                </Text>
+                <Text style={[styles.profileStatMeta, isRtl && styles.rtlText]}>
+                  {stat.meta}
+                </Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
+        {authActionError || (authSetupUser && !authSetupPending) ? (
+          <View accessibilityLiveRegion="polite" style={styles.authError}>
+            <Text style={[styles.authErrorText, isRtl && styles.rtlText]}>
+              {authActionError ?? copy.setupFailure}
+            </Text>
+          </View>
+        ) : null}
         <View style={styles.accountActionRow}>
-          {accountActions.map((action) => (
-            <Pressable
-              accessibilityRole="button"
-              disabled
-              key={action.label}
-              style={[
-                styles.accountActionButton,
-                action.tone === "primary" && styles.accountActionButtonPrimary,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.accountActionText,
-                  action.tone === "primary" && styles.accountActionTextPrimary,
+          {authenticatedUser ? (
+            <>
+              {authSetupUser ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{
+                    busy: authSetupPending,
+                    disabled: authSetupPending,
+                  }}
+                  disabled={authSetupPending}
+                  onPress={onOpenSetup}
+                  style={({ pressed }) => [
+                    styles.accountActionButton,
+                    styles.accountActionButtonPrimary,
+                    pressed && !authSetupPending && styles.softButtonPressed,
+                  ]}
+                >
+                  <Text style={styles.accountActionTextPrimary}>
+                    {authSetupPending
+                      ? copy.finishingSetup
+                      : copy.finishSetup}
+                  </Text>
+                </Pressable>
+              ) : null}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{
+                  busy: signOutPending,
+                  disabled: signOutPending,
+                }}
+                disabled={signOutPending}
+                onPress={onSignOut}
+                style={({ pressed }) => [
+                  styles.accountActionButton,
+                  !authSetupUser && styles.accountActionButtonPrimary,
+                  pressed && !signOutPending && styles.softButtonPressed,
                 ]}
               >
-                {action.label}
-              </Text>
-            </Pressable>
-          ))}
+                <Text
+                  style={
+                    authSetupUser
+                      ? styles.accountActionText
+                      : styles.accountActionTextPrimary
+                  }
+                >
+                  {signOutPending ? copy.sessionLoading : copy.signOut}
+                </Text>
+              </Pressable>
+            </>
+          ) : (
+            <>
+              <Pressable
+                accessibilityRole="button"
+                disabled={authSession.status === "loading"}
+                onPress={() => onOpenAuth("signin")}
+                style={({ pressed }) => [
+                  styles.accountActionButton,
+                  styles.accountActionButtonPrimary,
+                  pressed && styles.softButtonPressed,
+                ]}
+              >
+                <Text style={styles.accountActionTextPrimary}>
+                  {copy.signIn}
+                </Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                disabled={authSession.status === "loading"}
+                onPress={() => onOpenAuth("signup")}
+                style={({ pressed }) => [
+                  styles.accountActionButton,
+                  pressed && styles.softButtonPressed,
+                ]}
+              >
+                <Text style={styles.accountActionText}>
+                  {copy.createAccount}
+                </Text>
+              </Pressable>
+            </>
+          )}
         </View>
       </View>
 
@@ -4685,6 +5012,21 @@ const createStyles = (theme: MobileTheme) =>
     },
     appScroll: {
       flex: 1,
+    },
+    authError: {
+      backgroundColor: theme.colors.dangerSoft,
+      borderColor: theme.colors.danger,
+      borderRadius: 16,
+      borderWidth: 1,
+      marginTop: 14,
+      paddingHorizontal: 14,
+      paddingVertical: 11,
+    },
+    authErrorText: {
+      color: theme.colors.danger,
+      fontFamily: mobileTypography.uiMedium,
+      fontSize: 13,
+      lineHeight: 20,
     },
     accountActionButton: {
       alignItems: "center",
@@ -8192,6 +8534,19 @@ const createStyles = (theme: MobileTheme) =>
       fontSize: 19,
       lineHeight: 26,
       writingDirection: "rtl",
+    },
+    onboardingSignupLink: {
+      alignItems: "center",
+      justifyContent: "center",
+      minHeight: 42,
+      paddingHorizontal: 12,
+    },
+    onboardingSignupLinkText: {
+      color: "#d8d1c6",
+      fontFamily: mobileTypography.uiMedium,
+      fontSize: 15,
+      lineHeight: 22,
+      textAlign: "center",
     },
     onboardingSafeArea: {
       backgroundColor: "#05090b",

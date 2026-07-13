@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 import {
   Alert,
   BackHandler,
@@ -26,10 +34,22 @@ import {
 } from "../components/commerce-ui";
 import { PremiumPressable } from "../components/premium-motion";
 import {
+  beginKeyedMutation,
+  canApplyCheckoutCompletion,
+  canApplyResourceSnapshot,
   canRenderCustomerCancellation,
+  checkoutDraftForCart,
+  collectAllCursorPages,
+  finishKeyedMutation,
+  hasBackDestination,
+  isConfirmedEmptyResource,
   isLatestRequest,
   optimisticSet,
+  resolvedSetMembership,
   resolveCheckoutAttempt,
+  rollbackOptimisticSet,
+  type CheckoutDraft,
+  type ResourceLoadState,
 } from "../commerce/state";
 import {
   commerceCopy,
@@ -44,6 +64,7 @@ import type {
   CommerceAddress,
   CommerceAddressInput,
   CommerceCart,
+  CommerceCollection,
   CommerceOrderDetail,
   CommerceOrderSummary,
   CommerceProduct,
@@ -53,7 +74,6 @@ import type {
   CommerceVariant,
   FavoriteProduct,
   FavoriteStore,
-  FulfillmentMethod,
 } from "../types/commerce";
 import type { MobileTheme } from "../theme/tokens";
 
@@ -71,8 +91,15 @@ type Route =
   | { kind: "favorites" }
   | { kind: "addresses"; returnToCheckout: boolean };
 
-type LoadState = "error" | "idle" | "loading" | "ready";
+type LoadState = ResourceLoadState;
 type PendingReplacement = { incomingStore?: string; quantity: number; variantId: string } | null;
+
+type FavoriteResources = {
+  loadProducts: (cursor?: string) => Promise<CommerceCollection<FavoriteProduct> | null>;
+  loadStores: (cursor?: string) => Promise<CommerceCollection<FavoriteStore> | null>;
+  productState: LoadState;
+  storeState: LoadState;
+};
 
 const FONT = {
   kufiBold: "NotoKufiArabic-Bold",
@@ -115,12 +142,75 @@ export function CommerceMarketScreen({
   );
   const [route, setRoute] = useState<Route>(initialRoute);
   const [history, setHistory] = useState<Route[]>([]);
-  const [cart, setCart] = useState<CommerceCart | null>(null);
+  const [cart, setCartSnapshot] = useState<CommerceCart | null>(null);
+  const [cartLoadState, setCartLoadState] = useState<LoadState>("loading");
   const [sessionAvailable, setSessionAvailable] = useState<boolean | null>(null);
   const [favoriteStoreIds, setFavoriteStoreIds] = useState<Set<string>>(new Set());
   const [favoriteProductIds, setFavoriteProductIds] = useState<Set<string>>(new Set());
+  const [favoriteStoreLoadState, setFavoriteStoreLoadState] = useState<LoadState>("loading");
+  const [favoriteProductLoadState, setFavoriteProductLoadState] = useState<LoadState>("loading");
+  const [checkoutDraft, setCheckoutDraft] = useState<CheckoutDraft | null>(null);
+  const [checkoutSubmitting, setCheckoutSubmitting] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [pendingReplacement, setPendingReplacement] = useState<PendingReplacement>(null);
+  const cartRequestSequenceRef = useRef(0);
+  const favoriteStoreIdsRef = useRef<Set<string>>(new Set());
+  const favoriteProductIdsRef = useRef<Set<string>>(new Set());
+  const favoriteStoreLoadSequenceRef = useRef(0);
+  const favoriteProductLoadSequenceRef = useRef(0);
+  const favoriteStoreRevisionRef = useRef(0);
+  const favoriteProductRevisionRef = useRef(0);
+  const favoriteStoreMutationTokensRef = useRef(new Map<string, number>());
+  const favoriteProductMutationTokensRef = useRef(new Map<string, number>());
+  const favoriteMutationSequenceRef = useRef(0);
+
+  const updateFavoriteStoreIds = useCallback((updater: (current: ReadonlySet<string>) => Set<string>) => {
+    const next = updater(favoriteStoreIdsRef.current);
+    favoriteStoreIdsRef.current = next;
+    setFavoriteStoreIds(next);
+  }, []);
+
+  const updateFavoriteProductIds = useCallback((updater: (current: ReadonlySet<string>) => Set<string>) => {
+    const next = updater(favoriteProductIdsRef.current);
+    favoriteProductIdsRef.current = next;
+    setFavoriteProductIds(next);
+  }, []);
+
+  const clearPrivateSnapshots = useCallback(() => {
+    cartRequestSequenceRef.current += 1;
+    favoriteStoreLoadSequenceRef.current += 1;
+    favoriteProductLoadSequenceRef.current += 1;
+    favoriteStoreRevisionRef.current += 1;
+    favoriteProductRevisionRef.current += 1;
+    favoriteStoreMutationTokensRef.current.clear();
+    favoriteProductMutationTokensRef.current.clear();
+    setCartSnapshot(null);
+    updateFavoriteStoreIds(() => new Set());
+    updateFavoriteProductIds(() => new Set());
+    setCheckoutDraft(null);
+    setCheckoutSubmitting(false);
+    setPendingReplacement(null);
+    setCartLoadState("error");
+    setFavoriteStoreLoadState("error");
+    setFavoriteProductLoadState("error");
+  }, [updateFavoriteProductIds, updateFavoriteStoreIds]);
+
+  const beginCartRequest = useCallback(() => {
+    cartRequestSequenceRef.current += 1;
+    return cartRequestSequenceRef.current;
+  }, []);
+
+  const isLatestCartRequest = useCallback((sequence: number) => (
+    isLatestRequest(sequence, cartRequestSequenceRef.current)
+  ), []);
+
+  const setCart = useCallback((nextCart: CommerceCart | null, requestSequence?: number) => {
+    if (requestSequence !== undefined && !isLatestRequest(requestSequence, cartRequestSequenceRef.current)) return false;
+    setCartSnapshot(nextCart);
+    setCartLoadState("ready");
+    setSessionAvailable((current) => current === false ? false : true);
+    return true;
+  }, []);
 
   const navigate = useCallback((next: Route) => {
     setHistory((current) => [...current, route]);
@@ -129,6 +219,7 @@ export function CommerceMarketScreen({
   }, [route]);
 
   const goBack = useCallback(() => {
+    if (route.kind === "checkout" && checkoutSubmitting) return;
     if (history.length === 0) {
       onExit?.();
       return;
@@ -139,7 +230,7 @@ export function CommerceMarketScreen({
       return previous ? current.slice(0, -1) : current;
     });
     setNotice(null);
-  }, [history.length, onExit]);
+  }, [checkoutSubmitting, history.length, onExit, route.kind]);
 
   useEffect(() => {
     const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
@@ -152,33 +243,83 @@ export function CommerceMarketScreen({
 
   const handlePrivateError = useCallback((error: unknown) => {
     if (error instanceof MobileApiRequestError && error.status === 401) {
+      clearPrivateSnapshots();
       setSessionAvailable(false);
       setNotice(copy.sessionRequired);
-      return;
+      return true;
     }
     setNotice(messageForError(error, copy));
-  }, [copy]);
+    return false;
+  }, [clearPrivateSnapshots, copy]);
 
-  const refreshPrivateContext = useCallback(async () => {
+  const refreshCart = useCallback(async () => {
+    const sequence = beginCartRequest();
+    setCartLoadState("loading");
     try {
-      const [nextCart, stores, products] = await Promise.all([
-        commerceApi.getCart(),
-        commerceApi.listFavoriteStores(),
-        commerceApi.listFavoriteProducts(),
-      ]);
-      setCart(nextCart);
-      setFavoriteStoreIds(new Set(stores.data.map((item) => item.store.id)));
-      setFavoriteProductIds(new Set(products.data.map((item) => item.product.id)));
-      setSessionAvailable(true);
+      setCart(await commerceApi.getCart(), sequence);
     } catch (error) {
-      if (error instanceof MobileApiRequestError && error.status === 401) setSessionAvailable(false);
+      if (isUnauthorizedError(error)) handlePrivateError(error);
+      else if (isLatestCartRequest(sequence)) {
+        setCartLoadState("error");
+        handlePrivateError(error);
+      }
     }
-  }, []);
+  }, [beginCartRequest, handlePrivateError, isLatestCartRequest, setCart]);
+
+  const loadFavoriteStores = useCallback(async (cursor?: string) => {
+    const sequence = ++favoriteStoreLoadSequenceRef.current;
+    const startedRevision = favoriteStoreRevisionRef.current;
+    setFavoriteStoreLoadState("loading");
+    try {
+      const result = await collectAllCursorPages(commerceApi.listFavoriteStores, cursor);
+      if (!canApplyResourceSnapshot(sequence, favoriteStoreLoadSequenceRef.current, startedRevision, favoriteStoreRevisionRef.current)) return null;
+      const ids = result.data.map((item) => item.store.id);
+      updateFavoriteStoreIds((current) => cursor ? new Set([...current, ...ids]) : new Set(ids));
+      setFavoriteStoreLoadState("ready");
+      setSessionAvailable((current) => current === false ? false : true);
+      return result;
+    } catch (error) {
+      if (isUnauthorizedError(error)) handlePrivateError(error);
+      else if (canApplyResourceSnapshot(sequence, favoriteStoreLoadSequenceRef.current, startedRevision, favoriteStoreRevisionRef.current)) {
+        setFavoriteStoreLoadState("error");
+        handlePrivateError(error);
+      }
+      return null;
+    }
+  }, [handlePrivateError, updateFavoriteStoreIds]);
+
+  const loadFavoriteProducts = useCallback(async (cursor?: string) => {
+    const sequence = ++favoriteProductLoadSequenceRef.current;
+    const startedRevision = favoriteProductRevisionRef.current;
+    setFavoriteProductLoadState("loading");
+    try {
+      const result = await collectAllCursorPages(commerceApi.listFavoriteProducts, cursor);
+      if (!canApplyResourceSnapshot(sequence, favoriteProductLoadSequenceRef.current, startedRevision, favoriteProductRevisionRef.current)) return null;
+      const ids = result.data.map((item) => item.product.id);
+      updateFavoriteProductIds((current) => cursor ? new Set([...current, ...ids]) : new Set(ids));
+      setFavoriteProductLoadState("ready");
+      setSessionAvailable((current) => current === false ? false : true);
+      return result;
+    } catch (error) {
+      if (isUnauthorizedError(error)) handlePrivateError(error);
+      else if (canApplyResourceSnapshot(sequence, favoriteProductLoadSequenceRef.current, startedRevision, favoriteProductRevisionRef.current)) {
+        setFavoriteProductLoadState("error");
+        handlePrivateError(error);
+      }
+      return null;
+    }
+  }, [handlePrivateError, updateFavoriteProductIds]);
 
   useEffect(() => {
-    const timer = setTimeout(() => void refreshPrivateContext(), 0);
+    const timer = setTimeout(() => {
+      void refreshCart();
+      if (entryPoint !== "favorites") {
+        void loadFavoriteStores();
+        void loadFavoriteProducts();
+      }
+    }, 0);
     return () => clearTimeout(timer);
-  }, [refreshPrivateContext]);
+  }, [entryPoint, loadFavoriteProducts, loadFavoriteStores, refreshCart]);
 
   useEffect(() => {
     if (!initialOrderId) return;
@@ -227,16 +368,29 @@ export function CommerceMarketScreen({
       handlePrivateError(new MobileApiRequestError("", 401));
       return false;
     }
-    const wasFavorite = favoriteStoreIds.has(store.id);
-    setFavoriteStoreIds(optimisticSet(favoriteStoreIds, store.id, !wasFavorite));
+    const token = ++favoriteMutationSequenceRef.current;
+    if (!beginKeyedMutation(favoriteStoreMutationTokensRef.current, store.id, token)) return false;
+    const wasFavorite = favoriteStoreIdsRef.current.has(store.id);
+    favoriteStoreRevisionRef.current += 1;
+    updateFavoriteStoreIds((current) => optimisticSet(current, store.id, !wasFavorite));
     try {
       if (wasFavorite) await commerceApi.removeFavoriteStore(store.id);
       else await commerceApi.addFavoriteStore(store.id);
-      setSessionAvailable(true);
-      return true;
+      const latest = finishKeyedMutation(favoriteStoreMutationTokensRef.current, store.id, token);
+      if (latest) {
+        favoriteStoreRevisionRef.current += 1;
+        setSessionAvailable((current) => current === false ? false : true);
+        void loadFavoriteStores();
+      }
+      return latest;
     } catch (error) {
-      setFavoriteStoreIds(optimisticSet(favoriteStoreIds, store.id, wasFavorite));
-      handlePrivateError(error);
+      const latest = finishKeyedMutation(favoriteStoreMutationTokensRef.current, store.id, token);
+      if (latest) {
+        favoriteStoreRevisionRef.current += 1;
+        updateFavoriteStoreIds((current) => rollbackOptimisticSet(current, store.id, !wasFavorite, wasFavorite));
+      }
+      if (isUnauthorizedError(error) || latest) handlePrivateError(error);
+      if (latest && !isUnauthorizedError(error)) void loadFavoriteStores();
       return false;
     }
   };
@@ -246,68 +400,103 @@ export function CommerceMarketScreen({
       handlePrivateError(new MobileApiRequestError("", 401));
       return false;
     }
-    const wasFavorite = favoriteProductIds.has(product.id);
-    setFavoriteProductIds(optimisticSet(favoriteProductIds, product.id, !wasFavorite));
+    const token = ++favoriteMutationSequenceRef.current;
+    if (!beginKeyedMutation(favoriteProductMutationTokensRef.current, product.id, token)) return false;
+    const wasFavorite = favoriteProductIdsRef.current.has(product.id);
+    favoriteProductRevisionRef.current += 1;
+    updateFavoriteProductIds((current) => optimisticSet(current, product.id, !wasFavorite));
     try {
       if (wasFavorite) await commerceApi.removeFavoriteProduct(product.id);
       else await commerceApi.addFavoriteProduct(product.id);
-      setSessionAvailable(true);
-      return true;
+      const latest = finishKeyedMutation(favoriteProductMutationTokensRef.current, product.id, token);
+      if (latest) {
+        favoriteProductRevisionRef.current += 1;
+        setSessionAvailable((current) => current === false ? false : true);
+        void loadFavoriteProducts();
+      }
+      return latest;
     } catch (error) {
-      setFavoriteProductIds(optimisticSet(favoriteProductIds, product.id, wasFavorite));
-      handlePrivateError(error);
+      const latest = finishKeyedMutation(favoriteProductMutationTokensRef.current, product.id, token);
+      if (latest) {
+        favoriteProductRevisionRef.current += 1;
+        updateFavoriteProductIds((current) => rollbackOptimisticSet(current, product.id, !wasFavorite, wasFavorite));
+      }
+      if (isUnauthorizedError(error) || latest) handlePrivateError(error);
+      if (latest && !isUnauthorizedError(error)) void loadFavoriteProducts();
       return false;
     }
   };
 
   const addToCart = async (variant: CommerceVariant, quantity: number, incomingStore?: string) => {
+    const sequence = beginCartRequest();
     setNotice(null);
     try {
       const next = await commerceApi.addCartItem(variant.id, quantity, cart?.version);
-      setCart(next);
-      setSessionAvailable(true);
+      if (!setCart(next, sequence)) return;
       navigate({ kind: "cart" });
     } catch (error) {
+      if (!isLatestCartRequest(sequence) && !isUnauthorizedError(error)) return;
       if (isCartStoreConflict(error) && cart) {
         setPendingReplacement({ incomingStore, quantity, variantId: variant.id });
         return;
       }
-      if (isCartVersionConflict(error)) await refreshCartAfterConflict(setCart, handlePrivateError);
+      if (isCartVersionConflict(error)) await refreshCart();
       handlePrivateError(error);
     }
   };
 
   const replaceCart = async () => {
     if (!pendingReplacement || !cart) return;
+    const sequence = beginCartRequest();
     try {
       const next = await commerceApi.replaceCart(
         cart.id, cart.version, pendingReplacement.variantId, pendingReplacement.quantity,
       );
-      setCart(next);
+      if (!setCart(next, sequence)) return;
       setPendingReplacement(null);
       navigate({ kind: "cart" });
     } catch (error) {
+      if (!isLatestCartRequest(sequence) && !isUnauthorizedError(error)) return;
       setPendingReplacement(null);
-      if (isCartVersionConflict(error)) await refreshCartAfterConflict(setCart, handlePrivateError);
+      if (isCartVersionConflict(error)) await refreshCart();
       handlePrivateError(error);
     }
   };
 
+  const canGoBack = hasBackDestination(history.length, Boolean(onExit));
+  const favoriteResources = useMemo<FavoriteResources>(() => ({
+    loadProducts: loadFavoriteProducts,
+    loadStores: loadFavoriteStores,
+    productState: favoriteProductLoadState,
+    storeState: favoriteStoreLoadState,
+  }), [favoriteProductLoadState, favoriteStoreLoadState, loadFavoriteProducts, loadFavoriteStores]);
+
   const common = {
+    beginCartRequest,
+    canGoBack,
     cart,
+    cartLoadState,
+    checkoutDraft,
+    checkoutSubmitting,
     copy,
     favoriteProductIds,
+    favoriteResources,
     favoriteStoreIds,
     goBack,
+    handlePrivateError,
     isRtl,
+    isLatestCartRequest,
     locale,
     navigate,
     notice,
     onOpenAccount,
     openProduct,
     openStore,
+    refreshCart,
     sessionAvailable,
     setCart,
+    setCheckoutDraft,
+    setCheckoutSubmitting,
     setNotice,
     theme,
     toggleProductFavorite,
@@ -348,20 +537,31 @@ export function CommerceMarketScreen({
 }
 
 type CommonProps = {
+  beginCartRequest: () => number;
+  canGoBack: boolean;
   cart: CommerceCart | null;
+  cartLoadState: LoadState;
+  checkoutDraft: CheckoutDraft | null;
+  checkoutSubmitting: boolean;
   copy: CommerceCopy;
   favoriteProductIds: Set<string>;
+  favoriteResources: FavoriteResources;
   favoriteStoreIds: Set<string>;
   goBack: () => void;
+  handlePrivateError: (error: unknown) => boolean;
   isRtl: boolean;
+  isLatestCartRequest: (sequence: number) => boolean;
   locale: MobileLocale;
   navigate: (route: Route) => void;
   notice: string | null;
   onOpenAccount: () => void;
   openProduct: (storeSlug: string, productSlug: string) => Promise<void>;
   openStore: (storeSlug: string) => Promise<void>;
+  refreshCart: () => Promise<void>;
   sessionAvailable: boolean | null;
-  setCart: (cart: CommerceCart | null) => void;
+  setCart: (cart: CommerceCart | null, requestSequence?: number) => boolean;
+  setCheckoutDraft: Dispatch<SetStateAction<CheckoutDraft | null>>;
+  setCheckoutSubmitting: Dispatch<SetStateAction<boolean>>;
   setNotice: (notice: string | null) => void;
   theme: MobileTheme;
   toggleProductFavorite: (product: CommerceProduct) => Promise<boolean>;
@@ -369,7 +569,7 @@ type CommonProps = {
 };
 
 function MarketHome(props: CommonProps) {
-  const { cart, copy, favoriteProductIds, favoriteStoreIds, isRtl, locale, navigate, openProduct, openStore, theme, toggleProductFavorite, toggleStoreFavorite } = props;
+  const { cart, copy, favoriteProductIds, favoriteResources, favoriteStoreIds, isRtl, locale, navigate, openProduct, openStore, sessionAvailable, theme, toggleProductFavorite, toggleStoreFavorite } = props;
   const styles = useMemo(() => createStyles(theme), [theme]);
   const [mode, setMode] = useState<CatalogMode>("products");
   const [query, setQuery] = useState("");
@@ -384,6 +584,8 @@ function MarketHome(props: CommonProps) {
   const [cursor, setCursor] = useState<string | null>(null);
   const [hasNext, setHasNext] = useState(false);
   const requestSequence = useRef(0);
+  const membershipState = mode === "products" ? favoriteResources.productState : favoriteResources.storeState;
+  const retryMembership = mode === "products" ? favoriteResources.loadProducts : favoriteResources.loadStores;
 
   useEffect(() => {
     const controller = new AbortController();
@@ -431,7 +633,7 @@ function MarketHome(props: CommonProps) {
 
   return (
     <View style={styles.stack}>
-      <CommerceHeader cartQuantity={cart?.totalQuantity} copy={copy} isRtl={isRtl} onCart={() => navigate({ kind: "cart" })} title={copy.market} theme={theme} />
+      <CommerceHeader cartQuantity={sessionAvailable !== false ? cart?.totalQuantity : undefined} copy={copy} isRtl={isRtl} onCart={() => navigate({ kind: "cart" })} title={copy.market} theme={theme} />
       <View accessibilityRole="search" style={[styles.search, isRtl && styles.rowRtl]}>
         <Image alt="" source={COMMERCE_ICONS.search} style={styles.searchIcon} />
         <TextInput
@@ -463,12 +665,13 @@ function MarketHome(props: CommonProps) {
       </View>
       {state === "loading" && (mode === "products" ? products : stores).length === 0 ? <CommerceState title={copy.loading} theme={theme} /> : null}
       {state === "error" ? <CommerceState body={copy.errorGeneric} buttonLabel={copy.retry} onPress={() => void load(false)} theme={theme} title={copy.errorGeneric} /> : null}
+      {sessionAvailable !== false && membershipState === "error" ? <CommerceState body={copy.errorGeneric} buttonLabel={copy.retry} onPress={() => void retryMembership()} theme={theme} title={copy.favorites} /> : null}
       {state === "ready" && mode === "products" && products.length === 0 ? <CommerceState body={copy.emptyBody} theme={theme} title={query ? copy.noResults : copy.emptyTitle} /> : null}
       {state === "ready" && mode === "stores" && stores.length === 0 ? <CommerceState body={copy.emptyBody} theme={theme} title={query ? copy.noResults : copy.emptyTitle} /> : null}
       {mode === "products" ? products.map((product) => (
-        <ProductCard copy={copy} favorite={favoriteProductIds.has(product.id)} isRtl={isRtl} key={product.id} locale={locale} onFavorite={() => void toggleProductFavorite(product)} onPress={() => void openProduct(product.storeSlug, product.productSlug)} product={product} theme={theme} />
+        <ProductCard copy={copy} favorite={sessionAvailable === true ? resolvedSetMembership(favoriteProductIds, product.id, favoriteResources.productState) : undefined} isRtl={isRtl} key={product.id} locale={locale} onFavorite={() => void toggleProductFavorite(product)} onPress={() => void openProduct(product.storeSlug, product.productSlug)} product={product} theme={theme} />
       )) : stores.map((store) => (
-        <StoreCard copy={copy} favorite={favoriteStoreIds.has(store.id)} isRtl={isRtl} key={store.id} locale={locale} onFavorite={() => void toggleStoreFavorite(store)} onPress={() => void openStore(store.slug)} store={store} theme={theme} />
+        <StoreCard copy={copy} favorite={sessionAvailable === true ? resolvedSetMembership(favoriteStoreIds, store.id, favoriteResources.storeState) : undefined} isRtl={isRtl} key={store.id} locale={locale} onFavorite={() => void toggleStoreFavorite(store)} onPress={() => void openStore(store.slug)} store={store} theme={theme} />
       ))}
       {hasNext ? <CommerceButton disabled={state === "loading"} label={state === "loading" ? copy.loading : copy.loadMore} onPress={() => void load(true)} secondary theme={theme} /> : null}
     </View>
@@ -476,12 +679,15 @@ function MarketHome(props: CommonProps) {
 }
 
 function StoreDetail(props: CommonProps & { store: CommerceStore }) {
-  const { cart, copy, favoriteProductIds, favoriteStoreIds, goBack, isRtl, locale, navigate, openProduct, store, theme, toggleProductFavorite, toggleStoreFavorite } = props;
+  const { cart, copy, favoriteProductIds, favoriteResources, favoriteStoreIds, goBack, isRtl, locale, navigate, openProduct, sessionAvailable, store, theme, toggleProductFavorite, toggleStoreFavorite } = props;
   const styles = useMemo(() => createStyles(theme), [theme]);
   const [products, setProducts] = useState<CommerceProduct[]>([]);
   const [state, setState] = useState<LoadState>("loading");
   const [cursor, setCursor] = useState<string | null>(null);
   const [hasNext, setHasNext] = useState(false);
+  const storeFavorite = sessionAvailable === true
+    ? resolvedSetMembership(favoriteStoreIds, store.id, favoriteResources.storeState)
+    : undefined;
   const load = async (append = false) => {
     setState("loading");
     try {
@@ -494,10 +700,10 @@ function StoreDetail(props: CommonProps & { store: CommerceStore }) {
   };
   useEffect(() => { const timer = setTimeout(() => void load(), 0); return () => clearTimeout(timer); }, [store.slug]); // eslint-disable-line react-hooks/exhaustive-deps
   return <View style={styles.stack}>
-    <CommerceHeader cartQuantity={cart?.totalQuantity} copy={copy} isRtl={isRtl} onBack={goBack} onCart={() => navigate({ kind: "cart" })} title={store.name} theme={theme} />
+    <CommerceHeader cartQuantity={sessionAvailable !== false ? cart?.totalQuantity : undefined} copy={copy} isRtl={isRtl} onBack={goBack} onCart={() => navigate({ kind: "cart" })} title={store.name} theme={theme} />
     {store.coverImageUrl ? <Image alt={store.name} source={{ uri: store.coverImageUrl }} style={styles.heroImage} /> : null}
     <View style={styles.panel}>
-      <View style={[styles.between, isRtl && styles.rowRtl]}><Text style={[styles.title, isRtl ? styles.rtl : styles.ltr]}>{store.name}</Text><IconButton active={favoriteStoreIds.has(store.id)} icon={COMMERCE_ICONS.favorite} label={copy.favorites} onPress={() => void toggleStoreFavorite(store)} theme={theme} /></View>
+      <View style={[styles.between, isRtl && styles.rowRtl]}><Text style={[styles.title, isRtl ? styles.rtl : styles.ltr]}>{store.name}</Text>{storeFavorite === undefined ? null : <IconButton active={storeFavorite} icon={COMMERCE_ICONS.favorite} label={copy.favorites} onPress={() => void toggleStoreFavorite(store)} theme={theme} />}</View>
       {store.description ? <Text style={[styles.body, isRtl ? styles.rtl : styles.ltr]}>{store.description}</Text> : null}
       <Text style={[styles.goldText, isRtl ? styles.rtl : styles.ltr]}>{copy.minimumOrder}: {formatCommerceMoney(store.minimumOrderValue, store.currency, locale)}</Text>
       {store.delivery.enabled ? <Text style={[styles.muted, isRtl ? styles.rtl : styles.ltr]}>{copy.delivery} · {formatCommerceMoney(store.delivery.fee, store.currency, locale)}</Text> : null}
@@ -506,25 +712,29 @@ function StoreDetail(props: CommonProps & { store: CommerceStore }) {
     <Text style={[styles.sectionTitle, isRtl ? styles.rtl : styles.ltr]}>{copy.products}</Text>
     {state === "loading" && !products.length ? <CommerceState title={copy.loading} theme={theme} /> : null}
     {state === "error" ? <CommerceState buttonLabel={copy.retry} onPress={() => void load()} theme={theme} title={copy.errorGeneric} /> : null}
+    {sessionAvailable !== false && (favoriteResources.storeState === "error" || favoriteResources.productState === "error") ? <CommerceState buttonLabel={copy.retry} onPress={() => { void favoriteResources.loadStores(); void favoriteResources.loadProducts(); }} theme={theme} title={copy.favorites} /> : null}
     {state === "ready" && !products.length ? <CommerceState body={copy.emptyBody} theme={theme} title={copy.emptyTitle} /> : null}
-    {products.map((product) => <ProductCard copy={copy} favorite={favoriteProductIds.has(product.id)} isRtl={isRtl} key={product.id} locale={locale} onFavorite={() => void toggleProductFavorite(product)} onPress={() => void openProduct(product.storeSlug, product.productSlug)} product={product} theme={theme} />)}
+    {products.map((product) => <ProductCard copy={copy} favorite={sessionAvailable === true ? resolvedSetMembership(favoriteProductIds, product.id, favoriteResources.productState) : undefined} isRtl={isRtl} key={product.id} locale={locale} onFavorite={() => void toggleProductFavorite(product)} onPress={() => void openProduct(product.storeSlug, product.productSlug)} product={product} theme={theme} />)}
     {hasNext ? <CommerceButton label={copy.loadMore} onPress={() => void load(true)} secondary theme={theme} /> : null}
   </View>;
 }
 
 function ProductDetail(props: CommonProps & { addToCart: (variant: CommerceVariant, quantity: number, incomingStore?: string) => Promise<void>; product: CommerceProductDetail }) {
-  const { addToCart, cart, copy, favoriteProductIds, goBack, isRtl, locale, navigate, product, theme, toggleProductFavorite } = props;
+  const { addToCart, cart, copy, favoriteProductIds, favoriteResources, goBack, isRtl, locale, navigate, product, sessionAvailable, theme, toggleProductFavorite } = props;
   const styles = useMemo(() => createStyles(theme), [theme]);
   const selectable = product.variants.filter((variant) => variant.inStock);
   const automatic = product.variants.length === 1 || (selectable.length === 1 && selectable[0]?.isDefault);
   const [variantId, setVariantId] = useState<string | null>(automatic ? selectable[0]?.id ?? null : null);
   const [quantity, setQuantity] = useState(1);
   const selected = product.variants.find((variant) => variant.id === variantId) ?? null;
+  const favorite = sessionAvailable === true
+    ? resolvedSetMembership(favoriteProductIds, product.id, favoriteResources.productState)
+    : undefined;
   return <View style={styles.stack}>
-    <CommerceHeader cartQuantity={cart?.totalQuantity} copy={copy} isRtl={isRtl} onBack={goBack} onCart={() => navigate({ kind: "cart" })} title={product.name} theme={theme} />
+    <CommerceHeader cartQuantity={sessionAvailable !== false ? cart?.totalQuantity : undefined} copy={copy} isRtl={isRtl} onBack={goBack} onCart={() => navigate({ kind: "cart" })} title={product.name} theme={theme} />
     {product.media[0]?.url ? <Image alt={product.media[0].altText ?? product.name} source={{ uri: product.media[0].url }} style={styles.detailImage} /> : <View style={styles.mediaFallback}><Image alt="" source={COMMERCE_ICONS.catalog} style={styles.mediaIcon} /></View>}
     <View style={styles.panel}>
-      <View style={[styles.between, isRtl && styles.rowRtl]}><View style={styles.flex}><Text style={[styles.title, isRtl ? styles.rtl : styles.ltr]}>{product.name}</Text><Text style={[styles.muted, isRtl ? styles.rtl : styles.ltr]}>{product.store.name} · {product.category.name}</Text></View><IconButton active={favoriteProductIds.has(product.id)} icon={COMMERCE_ICONS.favorite} label={copy.favorites} onPress={() => void toggleProductFavorite(product)} theme={theme} /></View>
+      <View style={[styles.between, isRtl && styles.rowRtl]}><View style={styles.flex}><Text style={[styles.title, isRtl ? styles.rtl : styles.ltr]}>{product.name}</Text><Text style={[styles.muted, isRtl ? styles.rtl : styles.ltr]}>{product.store.name} · {product.category.name}</Text></View>{favorite === undefined ? null : <IconButton active={favorite} icon={COMMERCE_ICONS.favorite} label={copy.favorites} onPress={() => void toggleProductFavorite(product)} theme={theme} />}</View>
       {product.description ? <Text style={[styles.body, isRtl ? styles.rtl : styles.ltr]}>{product.description}</Text> : null}
       <Text style={[styles.sectionTitle, isRtl ? styles.rtl : styles.ltr]}>{copy.selectVariant}</Text>
       <View style={[styles.wrap, isRtl && styles.rowRtl]}>{product.variants.map((variant) => <Chip disabled={!variant.inStock} key={variant.id} label={`${variant.title} · ${formatCommerceMoney(variant.price, variant.currency, locale)}`} onPress={() => setVariantId(variant.id)} selected={variantId === variant.id} theme={theme} />)}</View>
@@ -532,25 +742,30 @@ function ProductDetail(props: CommonProps & { addToCart: (variant: CommerceVaria
       <View style={[styles.quantityRow, isRtl && styles.rowRtl]}><Text style={styles.label}>{copy.quantity}</Text><QuantityControl copy={copy} quantity={quantity} setQuantity={setQuantity} theme={theme} /></View>
       <CommerceButton disabled={!selected?.inStock} label={selected ? copy.addToCart : copy.selectVariant} onPress={() => selected ? void addToCart(selected, quantity, product.store.name) : undefined} theme={theme} />
     </View>
+    {sessionAvailable !== false && favoriteResources.productState === "error" ? <CommerceState buttonLabel={copy.retry} onPress={() => void favoriteResources.loadProducts()} theme={theme} title={copy.favorites} /> : null}
   </View>;
 }
 
 function CartScreen(props: CommonProps) {
-  const { cart, copy, goBack, isRtl, locale, navigate, onOpenAccount, sessionAvailable, setCart, setNotice, theme } = props;
+  const { beginCartRequest, cart, cartLoadState, copy, goBack, handlePrivateError, isLatestCartRequest, isRtl, locale, navigate, onOpenAccount, refreshCart, sessionAvailable, setCart, setNotice, theme } = props;
   const styles = useMemo(() => createStyles(theme), [theme]);
   const mutate = async (operation: () => Promise<CommerceCart | null>) => {
+    const sequence = beginCartRequest();
     setNotice(null);
-    try { setCart(await operation()); }
+    try { setCart(await operation(), sequence); }
     catch (error) {
-      if (isCartVersionConflict(error)) await refreshCartAfterConflict(setCart, (value) => setNotice(messageForError(value, copy)));
-      setNotice(messageForError(error, copy));
+      if (!isLatestCartRequest(sequence) && !isUnauthorizedError(error)) return;
+      if (isCartVersionConflict(error)) await refreshCart();
+      handlePrivateError(error);
     }
   };
   return <View style={styles.stack}>
     <CommerceHeader copy={copy} isRtl={isRtl} onBack={goBack} title={copy.cart} theme={theme} />
     {sessionAvailable === false ? <CommerceState body={copy.sessionRequired} buttonLabel={copy.retry} onPress={onOpenAccount} theme={theme} title={copy.sessionRequired} /> : null}
-    {sessionAvailable !== false && !cart ? <CommerceState body={copy.cartEmpty} buttonLabel={copy.continueShopping} onPress={() => navigate({ kind: "market" })} theme={theme} title={copy.cart} /> : null}
-    {cart ? <>
+    {sessionAvailable !== false && cartLoadState === "loading" && !cart ? <CommerceState title={copy.loading} theme={theme} /> : null}
+    {sessionAvailable !== false && cartLoadState === "error" ? <CommerceState body={copy.errorGeneric} buttonLabel={copy.retry} onPress={() => void refreshCart()} theme={theme} title={copy.errorGeneric} /> : null}
+    {sessionAvailable !== false && isConfirmedEmptyResource(cartLoadState, Boolean(cart)) ? <CommerceState body={copy.cartEmpty} buttonLabel={copy.continueShopping} onPress={() => navigate({ kind: "market" })} theme={theme} title={copy.cart} /> : null}
+    {sessionAvailable !== false && cart ? <>
       <View style={styles.panel}><Text style={[styles.title, isRtl ? styles.rtl : styles.ltr]}>{cart.store.name}</Text><Text style={[styles.goldText, isRtl ? styles.rtl : styles.ltr]}>{copy.subtotal}: {formatCommerceMoney(cart.informationalSubtotal, cart.currency, locale)}</Text></View>
       {cart.items.map((item) => <View key={item.cartItemId} style={styles.lineCard}>
         <View style={[styles.lineTop, isRtl && styles.rowRtl]}>{item.primaryMediaUrl ? <Image alt={item.productName} source={{ uri: item.primaryMediaUrl }} style={styles.thumbnail} /> : null}<View style={styles.flex}><Text style={[styles.lineTitle, isRtl ? styles.rtl : styles.ltr]}>{item.productName}</Text><Text style={[styles.muted, isRtl ? styles.rtl : styles.ltr]}>{item.variantTitle}</Text><Text style={[styles.goldText, isRtl ? styles.rtl : styles.ltr]}>{formatCommerceMoney(item.unitPrice, item.currency, locale)}</Text>{!item.isAvailable ? <Text style={styles.danger}>{copy.notAvailable}</Text> : null}{item.priceChanged ? <Text style={styles.warning}>{copy.subtotal}</Text> : null}</View></View>
@@ -565,96 +780,190 @@ function CartScreen(props: CommonProps) {
 }
 
 function CheckoutScreen(props: CommonProps) {
-  const { cart, copy, goBack, isRtl, locale, navigate, setCart, setNotice, theme } = props;
+  const { beginCartRequest, cart, checkoutDraft, checkoutSubmitting: submitting, copy, goBack, handlePrivateError, isLatestCartRequest, isRtl, locale, navigate, onOpenAccount, sessionAvailable, setCart, setCheckoutDraft, setCheckoutSubmitting, setNotice, theme } = props;
   const styles = useMemo(() => createStyles(theme), [theme]);
   const [addresses, setAddresses] = useState<CommerceAddress[]>([]);
   const [storeDetails, setStoreDetails] = useState<CommerceStore | null>(null);
-  const [addressId, setAddressId] = useState<string | null>(null);
-  const [fulfillment, setFulfillment] = useState<FulfillmentMethod>(cart?.store ? "CUSTOMER_PICKUP" : "CUSTOMER_PICKUP");
-  const [instructions, setInstructions] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const attempt = useRef<{ key: string; signature: string } | null>(null);
-  useEffect(() => {
+  const mountedRef = useRef(false);
+  const submissionInFlightRef = useRef(false);
+  const submissionSequenceRef = useRef(0);
+  const draft = cart ? checkoutDraftForCart(checkoutDraft, cart) : null;
+  const checkoutCartId = cart?.id;
+  const checkoutStoreId = cart?.store.id;
+  const checkoutStoreSlug = cart?.store.slug;
+  const latestCartIdentityRef = useRef({ id: checkoutCartId, version: cart?.version });
+  const updateDraft = (patch: Partial<Pick<CheckoutDraft, "addressId" | "customerInstructions" | "fulfillmentMethod">>) => {
     if (!cart) return;
-    void Promise.all([commerceApi.getCart(), commerceApi.listAddresses(), commerceApi.getStore(cart.store.slug)]).then(([currentCart, result, store]) => {
-      setCart(currentCart);
-      setAddresses(result.data);
-      setAddressId(result.data.find((item) => item.isDefault)?.id ?? result.data[0]?.id ?? null);
-      setStoreDetails(store);
-      if (!store.pickup.enabled && store.delivery.enabled) setFulfillment("STORE_DELIVERY");
-    }).catch((error) => setNotice(messageForError(error, copy)));
-  }, [cart?.store.slug]); // eslint-disable-line react-hooks/exhaustive-deps
+    setCheckoutDraft((current) => ({ ...checkoutDraftForCart(current, cart), ...patch, attempt: null }));
+  };
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+
+  useEffect(() => {
+    latestCartIdentityRef.current = { id: checkoutCartId, version: cart?.version };
+  }, [cart?.version, checkoutCartId]);
+
+  useEffect(() => {
+    if (!checkoutCartId || !checkoutStoreId || !checkoutStoreSlug) return;
+    let active = true;
+    const cartRequestSequence = beginCartRequest();
+    const requestedCart = { id: checkoutCartId, store: { id: checkoutStoreId } };
+    const load = async () => {
+      const [cartResult, addressesResult, storeResult] = await Promise.allSettled([
+        commerceApi.getCart(),
+        commerceApi.listAddresses(),
+        commerceApi.getStore(checkoutStoreSlug),
+      ]);
+      if (!active) return;
+      const unauthorized = [cartResult, addressesResult].find(
+        (result) => result.status === "rejected" && isUnauthorizedError(result.reason),
+      );
+      if (unauthorized?.status === "rejected") {
+        setAddresses([]);
+        setStoreDetails(null);
+        handlePrivateError(unauthorized.reason);
+        return;
+      }
+      if (cartResult.status === "fulfilled") setCart(cartResult.value, cartRequestSequence);
+      else if (isLatestCartRequest(cartRequestSequence)) handlePrivateError(cartResult.reason);
+      if (addressesResult.status === "fulfilled") {
+        const nextAddresses = addressesResult.value.data;
+        setAddresses(nextAddresses);
+        setCheckoutDraft((current) => {
+          const currentDraft = checkoutDraftForCart(current, requestedCart);
+          const currentAddressExists = nextAddresses.some((item) => item.id === currentDraft.addressId);
+          const addressId = currentAddressExists
+            ? currentDraft.addressId
+            : nextAddresses.find((item) => item.isDefault)?.id ?? nextAddresses[0]?.id ?? null;
+          return addressId === currentDraft.addressId ? currentDraft : { ...currentDraft, addressId };
+        });
+      } else handlePrivateError(addressesResult.reason);
+      if (storeResult.status === "fulfilled") {
+        const store = storeResult.value;
+        setStoreDetails(store);
+        setCheckoutDraft((current) => {
+          const currentDraft = checkoutDraftForCart(current, requestedCart);
+          let fulfillmentMethod = currentDraft.fulfillmentMethod;
+          if (fulfillmentMethod === "CUSTOMER_PICKUP" && !store.pickup.enabled && store.delivery.enabled) {
+            fulfillmentMethod = "STORE_DELIVERY";
+          } else if (fulfillmentMethod === "STORE_DELIVERY" && !store.delivery.enabled && store.pickup.enabled) {
+            fulfillmentMethod = "CUSTOMER_PICKUP";
+          }
+          return fulfillmentMethod === currentDraft.fulfillmentMethod
+            ? currentDraft
+            : { ...currentDraft, fulfillmentMethod };
+        });
+      } else setNotice(messageForError(storeResult.reason, copy));
+    };
+    void load();
+    return () => { active = false; };
+  }, [beginCartRequest, checkoutCartId, checkoutStoreId, checkoutStoreSlug, copy, handlePrivateError, isLatestCartRequest, setCart, setCheckoutDraft, setNotice]);
+
+  if (sessionAvailable === false) return <View style={styles.stack}><CommerceHeader copy={copy} isRtl={isRtl} title={copy.checkout} theme={theme} /><CommerceState body={copy.sessionRequired} buttonLabel={copy.retry} onPress={onOpenAccount} theme={theme} title={copy.sessionRequired} /></View>;
   if (!cart) return <View style={styles.stack}><CommerceHeader copy={copy} isRtl={isRtl} onBack={goBack} title={copy.checkout} theme={theme} /><CommerceState body={copy.cartEmpty} theme={theme} title={copy.cartEmpty} /></View>;
+  const addressId = draft?.addressId ?? null;
+  const fulfillment = draft?.fulfillmentMethod ?? "CUSTOMER_PICKUP";
+  const instructions = draft?.customerInstructions ?? "";
   const checkoutInput = { addressId: fulfillment === "STORE_DELIVERY" ? addressId : null, cartId: cart.id, cartVersion: cart.version, customerInstructions: instructions.trim() || null, fulfillmentMethod: fulfillment };
   const submit = async () => {
     if (fulfillment === "STORE_DELIVERY" && !addressId) return setNotice(copy.addressRequired);
-    if (submitting) return;
-    setSubmitting(true); setNotice(null);
-    attempt.current = resolveCheckoutAttempt(attempt.current, checkoutInput, createUuid);
+    if (submissionInFlightRef.current) return;
+    submissionInFlightRef.current = true;
+    const submissionSequence = ++submissionSequenceRef.current;
+    const cartRequestSequence = beginCartRequest();
+    const submittedCart = { id: cart.id, version: cart.version };
+    setCheckoutSubmitting(true); setNotice(null);
+    const attempt = resolveCheckoutAttempt(draft?.attempt ?? null, checkoutInput, createUuid);
+    setCheckoutDraft((current) => ({ ...checkoutDraftForCart(current, cart), attempt }));
     try {
-      const receipt = await commerceApi.checkout(checkoutInput, attempt.current.key);
-      attempt.current = null;
-      setCart(null);
+      const receipt = await commerceApi.checkout(checkoutInput, attempt.key);
+      const latestCart = latestCartIdentityRef.current;
+      if (!canApplyCheckoutCompletion({
+        cartRequestIsLatest: isLatestCartRequest(cartRequestSequence),
+        currentCart: latestCart,
+        latestSubmissionSequence: submissionSequenceRef.current,
+        mounted: mountedRef.current,
+        submissionSequence,
+        submittedCart,
+      })) return;
+      if (!setCart(null, cartRequestSequence)) return;
+      setCheckoutDraft(null);
+      setCheckoutSubmitting(false);
       navigate({ kind: "receipt", receipt });
-    } catch (error) { setNotice(messageForError(error, copy)); }
-    finally { setSubmitting(false); }
+    } catch (error) {
+      if (mountedRef.current && submissionSequence === submissionSequenceRef.current) handlePrivateError(error);
+    } finally {
+      if (submissionSequence === submissionSequenceRef.current) {
+        submissionInFlightRef.current = false;
+        if (mountedRef.current) setCheckoutSubmitting(false);
+      }
+    }
   };
   return <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.stack}>
-    <CommerceHeader copy={copy} isRtl={isRtl} onBack={goBack} title={copy.checkout} theme={theme} />
+    <CommerceHeader copy={copy} isRtl={isRtl} onBack={submitting ? undefined : goBack} title={copy.checkout} theme={theme} />
     <View style={styles.panel}><Text style={[styles.title, isRtl ? styles.rtl : styles.ltr]}>{cart.store.name}</Text><Text style={[styles.goldText, isRtl ? styles.rtl : styles.ltr]}>{copy.subtotal}: {formatCommerceMoney(cart.informationalSubtotal, cart.currency, locale)}</Text><Text style={[styles.muted, isRtl ? styles.rtl : styles.ltr]}>{copy.checkoutHint}</Text></View>
     <Text style={[styles.sectionTitle, isRtl ? styles.rtl : styles.ltr]}>{copy.fulfillment}</Text>
-    <View style={[styles.segment, isRtl && styles.rowRtl]}><Chip disabled={storeDetails ? !storeDetails.pickup.enabled : false} label={copy.pickup} onPress={() => { setFulfillment("CUSTOMER_PICKUP"); attempt.current = null; }} selected={fulfillment === "CUSTOMER_PICKUP"} theme={theme} /><Chip disabled={storeDetails ? !storeDetails.delivery.enabled : false} label={copy.delivery} onPress={() => { setFulfillment("STORE_DELIVERY"); attempt.current = null; }} selected={fulfillment === "STORE_DELIVERY"} theme={theme} /></View>
-    {fulfillment === "STORE_DELIVERY" ? <><Text style={[styles.sectionTitle, isRtl ? styles.rtl : styles.ltr]}>{copy.selectAddress}</Text>{addresses.map((address) => <PremiumPressable accessibilityRole="radio" accessibilityState={{ checked: address.id === addressId }} key={address.id} onPress={() => { setAddressId(address.id); attempt.current = null; }} style={[styles.addressChoice, address.id === addressId && styles.selected]}><Text style={[styles.lineTitle, isRtl ? styles.rtl : styles.ltr]}>{address.recipientName}</Text><Text style={[styles.muted, isRtl ? styles.rtl : styles.ltr]}>{address.city} · {address.area} · {address.street}</Text></PremiumPressable>)}<CommerceButton label={copy.addAddress} onPress={() => navigate({ kind: "addresses", returnToCheckout: true })} secondary theme={theme} /></> : null}
-    <TextInput accessibilityLabel={copy.customerInstructions} multiline maxLength={1000} onChangeText={(value) => { setInstructions(value); attempt.current = null; }} placeholder={copy.customerInstructions} placeholderTextColor={theme.colors.mutedForeground} style={[styles.textArea, isRtl ? styles.rtl : styles.ltr]} value={instructions} />
+    <View style={[styles.segment, isRtl && styles.rowRtl]}><Chip disabled={submitting || (storeDetails ? !storeDetails.pickup.enabled : false)} label={copy.pickup} onPress={() => updateDraft({ fulfillmentMethod: "CUSTOMER_PICKUP" })} selected={fulfillment === "CUSTOMER_PICKUP"} theme={theme} /><Chip disabled={submitting || (storeDetails ? !storeDetails.delivery.enabled : false)} label={copy.delivery} onPress={() => updateDraft({ fulfillmentMethod: "STORE_DELIVERY" })} selected={fulfillment === "STORE_DELIVERY"} theme={theme} /></View>
+    {fulfillment === "STORE_DELIVERY" ? <><Text style={[styles.sectionTitle, isRtl ? styles.rtl : styles.ltr]}>{copy.selectAddress}</Text>{addresses.map((address) => <PremiumPressable accessibilityRole="radio" accessibilityState={{ checked: address.id === addressId, disabled: submitting }} disabled={submitting} key={address.id} onPress={() => updateDraft({ addressId: address.id })} style={[styles.addressChoice, address.id === addressId && styles.selected]}><Text style={[styles.lineTitle, isRtl ? styles.rtl : styles.ltr]}>{address.recipientName}</Text><Text style={[styles.muted, isRtl ? styles.rtl : styles.ltr]}>{address.city} · {address.area} · {address.street}</Text></PremiumPressable>)}<CommerceButton disabled={submitting} label={copy.addAddress} onPress={() => navigate({ kind: "addresses", returnToCheckout: true })} secondary theme={theme} /></> : null}
+    <TextInput accessibilityLabel={copy.customerInstructions} editable={!submitting} multiline maxLength={1000} onChangeText={(value) => updateDraft({ customerInstructions: value })} placeholder={copy.customerInstructions} placeholderTextColor={theme.colors.mutedForeground} style={[styles.textArea, isRtl ? styles.rtl : styles.ltr]} value={instructions} />
     <Text style={[styles.muted, isRtl ? styles.rtl : styles.ltr]}>{copy.payment}: {fulfillment === "STORE_DELIVERY" ? copy.cashOnDelivery : copy.payAtPickup}</Text>
     <CommerceButton disabled={submitting || !cart.availability || (fulfillment === "STORE_DELIVERY" && !addressId)} label={submitting ? copy.loading : copy.confirm} onPress={() => void submit()} theme={theme} />
   </KeyboardAvoidingView>;
 }
 
 function ReceiptScreen(props: CommonProps & { receipt: CommerceReceipt }) {
-  const { copy, isRtl, locale, navigate, receipt, theme } = props;
+  const { copy, handlePrivateError, isRtl, locale, navigate, onOpenAccount, receipt, sessionAvailable, theme } = props;
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const openOrder = async () => {
+    try { navigate({ kind: "order", order: await commerceApi.getOrder(receipt.id) }); }
+    catch (error) { handlePrivateError(error); }
+  };
+  if (sessionAvailable === false) return <View style={styles.stack}><CommerceHeader copy={copy} isRtl={isRtl} title={copy.receipt} theme={theme} /><CommerceState body={copy.sessionRequired} buttonLabel={copy.retry} onPress={onOpenAccount} theme={theme} title={copy.sessionRequired} /></View>;
   return <View style={styles.stack}>
     <CommerceHeader copy={copy} isRtl={isRtl} title={copy.receipt} theme={theme} />
     <CommerceState body={copy.successBody} theme={theme} title={copy.successTitle} />
     <View style={styles.panel}><Summary label={copy.orderNumber} value={receipt.orderNumber} isRtl={isRtl} styles={styles} /><Summary label={copy.status} value={commerceStatusLabel(receipt.status, locale)} isRtl={isRtl} styles={styles} /><Summary label={copy.fulfillment} value={commerceStatusLabel(receipt.fulfillmentStatus, locale)} isRtl={isRtl} styles={styles} /><Summary label={copy.payment} value={`${commercePaymentMethodLabel(receipt.paymentMethod, copy)} · ${commerceStatusLabel(receipt.paymentStatus, locale)}`} isRtl={isRtl} styles={styles} /><Summary label={copy.total} value={formatCommerceMoney(receipt.grandTotal, receipt.currency, locale)} isRtl={isRtl} styles={styles} /><Text style={styles.muted}>{formatCommerceDate(receipt.createdAt, locale)}</Text></View>
     {receipt.items.map((item, index) => <View key={`${item.productName}-${index}`} style={styles.lineCard}><Text style={[styles.lineTitle, isRtl ? styles.rtl : styles.ltr]}>{item.productName}</Text><Text style={[styles.muted, isRtl ? styles.rtl : styles.ltr]}>{item.variantTitle} · {item.quantity}</Text><Text style={styles.goldText}>{formatCommerceMoney(item.lineTotal, item.currency, locale)}</Text></View>)}
     {receipt.address ? <View style={styles.panel}><Text style={[styles.sectionTitle, isRtl ? styles.rtl : styles.ltr]}>{copy.address}</Text><Text style={[styles.body, isRtl ? styles.rtl : styles.ltr]}>{receipt.address.recipientName} · {receipt.address.city} · {receipt.address.area} · {receipt.address.street}</Text></View> : null}
-    <CommerceButton label={copy.viewOrder} onPress={() => void commerceApi.getOrder(receipt.id).then((order) => navigate({ kind: "order", order }))} theme={theme} />
+    <CommerceButton label={copy.viewOrder} onPress={() => void openOrder()} theme={theme} />
     <CommerceButton label={copy.orders} onPress={() => navigate({ kind: "orders" })} secondary theme={theme} />
     <CommerceButton label={copy.market} onPress={() => navigate({ kind: "market" })} secondary theme={theme} />
   </View>;
 }
 
 function OrdersScreen(props: CommonProps) {
-  const { copy, goBack, isRtl, locale, navigate, onOpenAccount, sessionAvailable, theme } = props;
+  const { canGoBack, copy, goBack, handlePrivateError, isRtl, locale, navigate, onOpenAccount, sessionAvailable, theme } = props;
   const styles = useMemo(() => createStyles(theme), [theme]);
   const [orders, setOrders] = useState<CommerceOrderSummary[]>([]);
   const [state, setState] = useState<LoadState>("loading");
   const [cursor, setCursor] = useState<string | null>(null);
   const [hasNext, setHasNext] = useState(false);
-  const load = async (append = false) => { setState("loading"); try { const result = await commerceApi.listOrders(append ? cursor ?? undefined : undefined); setOrders((current) => append ? [...current, ...result.data] : result.data); setCursor(result.pageInfo.nextCursor); setHasNext(result.pageInfo.hasNextPage); setState("ready"); } catch { setState("error"); } };
+  const load = async (append = false) => { setState("loading"); try { const result = await commerceApi.listOrders(append ? cursor ?? undefined : undefined); setOrders((current) => append ? [...current, ...result.data] : result.data); setCursor(result.pageInfo.nextCursor); setHasNext(result.pageInfo.hasNextPage); setState("ready"); } catch (error) { if (isUnauthorizedError(error)) { setOrders([]); setCursor(null); setHasNext(false); } setState("error"); handlePrivateError(error); } };
   useEffect(() => { const timer = setTimeout(() => void load(), 0); return () => clearTimeout(timer); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  const open = async (id: string) => { try { navigate({ kind: "order", order: await commerceApi.getOrder(id) }); } catch { setState("error"); } };
+  const open = async (id: string) => { try { navigate({ kind: "order", order: await commerceApi.getOrder(id) }); } catch (error) { setState("error"); handlePrivateError(error); } };
   return <View style={styles.stack}>
-    <CommerceHeader copy={copy} isRtl={isRtl} onBack={goBack} title={copy.orders} theme={theme} />
+    <CommerceHeader copy={copy} isRtl={isRtl} onBack={canGoBack ? goBack : undefined} title={copy.orders} theme={theme} />
     {sessionAvailable === false ? <CommerceState body={copy.sessionRequired} buttonLabel={copy.retry} onPress={onOpenAccount} theme={theme} title={copy.sessionRequired} /> : null}
-    {state === "loading" && !orders.length ? <CommerceState title={copy.loading} theme={theme} /> : null}
-    {state === "error" ? <CommerceState buttonLabel={copy.retry} onPress={() => void load()} theme={theme} title={copy.errorGeneric} /> : null}
-    {state === "ready" && !orders.length ? <CommerceState body={copy.emptyBody} theme={theme} title={copy.emptyTitle} /> : null}
-    {orders.map((order) => <PremiumPressable accessibilityLabel={`${copy.orderNumber} ${order.orderNumber}`} accessibilityRole="button" key={order.id} onPress={() => void open(order.id)} style={styles.lineCard}><View style={[styles.between, isRtl && styles.rowRtl]}><View style={styles.flex}><Text style={[styles.lineTitle, isRtl ? styles.rtl : styles.ltr]}>{order.store.name}</Text><Text style={[styles.muted, isRtl ? styles.rtl : styles.ltr]}>{order.orderNumber} · {commerceStatusLabel(order.status, locale)}</Text><Text style={[styles.muted, isRtl ? styles.rtl : styles.ltr]}>{formatCommerceDate(order.createdAt, locale)}</Text></View><Text style={styles.goldText}>{formatCommerceMoney(order.grandTotal, order.currency, locale)}</Text></View></PremiumPressable>)}
-    {hasNext ? <CommerceButton label={copy.loadMore} onPress={() => void load(true)} secondary theme={theme} /> : null}
+    {sessionAvailable !== false && state === "loading" && !orders.length ? <CommerceState title={copy.loading} theme={theme} /> : null}
+    {sessionAvailable !== false && state === "error" ? <CommerceState buttonLabel={copy.retry} onPress={() => void load()} theme={theme} title={copy.errorGeneric} /> : null}
+    {sessionAvailable !== false && state === "ready" && !orders.length ? <CommerceState body={copy.emptyBody} theme={theme} title={copy.emptyTitle} /> : null}
+    {sessionAvailable !== false ? orders.map((order) => <PremiumPressable accessibilityLabel={`${copy.orderNumber} ${order.orderNumber}`} accessibilityRole="button" key={order.id} onPress={() => void open(order.id)} style={styles.lineCard}><View style={[styles.between, isRtl && styles.rowRtl]}><View style={styles.flex}><Text style={[styles.lineTitle, isRtl ? styles.rtl : styles.ltr]}>{order.store.name}</Text><Text style={[styles.muted, isRtl ? styles.rtl : styles.ltr]}>{order.orderNumber} · {commerceStatusLabel(order.status, locale)}</Text><Text style={[styles.muted, isRtl ? styles.rtl : styles.ltr]}>{formatCommerceDate(order.createdAt, locale)}</Text></View><Text style={styles.goldText}>{formatCommerceMoney(order.grandTotal, order.currency, locale)}</Text></View></PremiumPressable>) : null}
+    {sessionAvailable !== false && hasNext ? <CommerceButton label={copy.loadMore} onPress={() => void load(true)} secondary theme={theme} /> : null}
   </View>;
 }
 
 function OrderDetail(props: CommonProps & { order: CommerceOrderDetail }) {
-  const { copy, goBack, isRtl, locale, order: initialOrder, setNotice, theme } = props;
+  const { copy, goBack, handlePrivateError, isRtl, locale, onOpenAccount, order: initialOrder, sessionAvailable, setNotice, theme } = props;
   const styles = useMemo(() => createStyles(theme), [theme]);
   const [order, setOrder] = useState(initialOrder);
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const cancel = () => Alert.alert(copy.cancelOrder, copy.cancelReason, [{ text: copy.cancel, style: "cancel" }, { text: copy.confirm, style: "destructive", onPress: () => void submitCancellation() }]);
-  const submitCancellation = async () => { if (reason.trim().length < 2 || submitting) return; setSubmitting(true); try { setOrder(await commerceApi.cancelOrder(order.id, reason.trim())); setNotice(copy.orderCancelled); } catch (error) { setNotice(messageForError(error, copy)); } finally { setSubmitting(false); } };
+  const submitCancellation = async () => { if (reason.trim().length < 2 || submitting) return; setSubmitting(true); try { setOrder(await commerceApi.cancelOrder(order.id, reason.trim())); setNotice(copy.orderCancelled); } catch (error) { handlePrivateError(error); } finally { setSubmitting(false); } };
+  if (sessionAvailable === false) return <View style={styles.stack}><CommerceHeader copy={copy} isRtl={isRtl} title={copy.order} theme={theme} /><CommerceState body={copy.sessionRequired} buttonLabel={copy.retry} onPress={onOpenAccount} theme={theme} title={copy.sessionRequired} /></View>;
   return <View style={styles.stack}>
     <CommerceHeader copy={copy} isRtl={isRtl} onBack={goBack} title={copy.order} theme={theme} />
     <View style={styles.panel}><Text style={[styles.title, isRtl ? styles.rtl : styles.ltr]}>{order.store.name}</Text><Summary label={copy.orderNumber} value={order.orderNumber} isRtl={isRtl} styles={styles} /><Summary label={copy.status} value={commerceStatusLabel(order.status, locale)} isRtl={isRtl} styles={styles} /><Summary label={copy.fulfillment} value={commerceStatusLabel(order.fulfillmentStatus, locale)} isRtl={isRtl} styles={styles} /><Summary label={copy.payment} value={`${commercePaymentMethodLabel(order.paymentMethod, copy)} · ${commerceStatusLabel(order.paymentStatus, locale)}`} isRtl={isRtl} styles={styles} /><Summary label={copy.total} value={formatCommerceMoney(order.grandTotal, order.currency, locale)} isRtl={isRtl} styles={styles} /></View>
@@ -669,50 +978,111 @@ function OrderDetail(props: CommonProps & { order: CommerceOrderDetail }) {
 }
 
 function FavoritesScreen(props: CommonProps) {
-  const { copy, goBack, isRtl, locale, openProduct, openStore, onOpenAccount, sessionAvailable, theme, toggleProductFavorite, toggleStoreFavorite } = props;
+  const { canGoBack, copy, favoriteProductIds, favoriteResources, favoriteStoreIds, goBack, isRtl, locale, openProduct, openStore, onOpenAccount, sessionAvailable, theme, toggleProductFavorite, toggleStoreFavorite } = props;
   const styles = useMemo(() => createStyles(theme), [theme]);
   const [stores, setStores] = useState<FavoriteStore[]>([]);
   const [products, setProducts] = useState<FavoriteProduct[]>([]);
   const [mode, setMode] = useState<"products" | "stores">("stores");
-  const [state, setState] = useState<LoadState>("loading");
   const [storeCursor, setStoreCursor] = useState<string | null>(null);
   const [productCursor, setProductCursor] = useState<string | null>(null);
   const [storeHasNext, setStoreHasNext] = useState(false);
   const [productHasNext, setProductHasNext] = useState(false);
-  const load = async () => { setState("loading"); try { const [storeResult, productResult] = await Promise.all([commerceApi.listFavoriteStores(), commerceApi.listFavoriteProducts()]); setStores(storeResult.data); setProducts(productResult.data); setStoreCursor(storeResult.pageInfo.nextCursor); setProductCursor(productResult.pageInfo.nextCursor); setStoreHasNext(storeResult.pageInfo.hasNextPage); setProductHasNext(productResult.pageInfo.hasNextPage); setState("ready"); } catch { setState("error"); } };
-  const loadMore = async () => { setState("loading"); try { if (mode === "stores" && storeCursor) { const result = await commerceApi.listFavoriteStores(storeCursor); setStores((current) => [...current, ...result.data]); setStoreCursor(result.pageInfo.nextCursor); setStoreHasNext(result.pageInfo.hasNextPage); } else if (mode === "products" && productCursor) { const result = await commerceApi.listFavoriteProducts(productCursor); setProducts((current) => [...current, ...result.data]); setProductCursor(result.pageInfo.nextCursor); setProductHasNext(result.pageInfo.hasNextPage); } setState("ready"); } catch { setState("error"); } };
-  useEffect(() => { const timer = setTimeout(() => void load(), 0); return () => clearTimeout(timer); }, []);
-  const removeStore = async (store: CommerceStore) => { if (await toggleStoreFavorite(store)) setStores((current) => current.filter((item) => item.store.id !== store.id)); };
-  const removeProduct = async (product: CommerceProduct) => { if (await toggleProductFavorite(product)) setProducts((current) => current.filter((item) => item.product.id !== product.id)); };
+  const { loadProducts, loadStores, productState, storeState } = favoriteResources;
+  const refreshStores = useCallback(async () => {
+    const result = await loadStores();
+    if (!result) return;
+    setStores(result.data);
+    setStoreCursor(result.pageInfo.nextCursor);
+    setStoreHasNext(result.pageInfo.hasNextPage);
+  }, [loadStores]);
+  const refreshProducts = useCallback(async () => {
+    const result = await loadProducts();
+    if (!result) return;
+    setProducts(result.data);
+    setProductCursor(result.pageInfo.nextCursor);
+    setProductHasNext(result.pageInfo.hasNextPage);
+  }, [loadProducts]);
+  const loadMore = async () => {
+    if (mode === "stores" && storeCursor) {
+      const result = await loadStores(storeCursor);
+      if (!result) return;
+      setStores((current) => [...current, ...result.data]);
+      setStoreCursor(result.pageInfo.nextCursor);
+      setStoreHasNext(result.pageInfo.hasNextPage);
+    } else if (mode === "products" && productCursor) {
+      const result = await loadProducts(productCursor);
+      if (!result) return;
+      setProducts((current) => [...current, ...result.data]);
+      setProductCursor(result.pageInfo.nextCursor);
+      setProductHasNext(result.pageInfo.hasNextPage);
+    }
+  };
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void refreshStores();
+      void refreshProducts();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [refreshProducts, refreshStores]);
+  const visibleStores = stores.filter((item) => favoriteStoreIds.has(item.store.id));
+  const visibleProducts = products.filter((item) => favoriteProductIds.has(item.product.id));
+  const state = mode === "stores" ? storeState : productState;
+  const items = mode === "stores" ? visibleStores : visibleProducts;
   return <View style={styles.stack}>
-    <CommerceHeader copy={copy} isRtl={isRtl} onBack={goBack} title={copy.favorites} theme={theme} />
+    <CommerceHeader copy={copy} isRtl={isRtl} onBack={canGoBack ? goBack : undefined} title={copy.favorites} theme={theme} />
     <View style={[styles.segment, isRtl && styles.rowRtl]}><Chip label={copy.favoriteStores} onPress={() => setMode("stores")} selected={mode === "stores"} theme={theme} /><Chip label={copy.favoriteProducts} onPress={() => setMode("products")} selected={mode === "products"} theme={theme} /></View>
     {sessionAvailable === false ? <CommerceState body={copy.sessionRequired} buttonLabel={copy.retry} onPress={onOpenAccount} theme={theme} title={copy.sessionRequired} /> : null}
-    {state === "loading" ? <CommerceState title={copy.loading} theme={theme} /> : null}
-    {state === "error" ? <CommerceState buttonLabel={copy.retry} onPress={() => void load()} theme={theme} title={copy.errorGeneric} /> : null}
-    {state === "ready" && mode === "stores" && !stores.length ? <CommerceState body={copy.emptyBody} theme={theme} title={copy.emptyTitle} /> : null}
-    {state === "ready" && mode === "products" && !products.length ? <CommerceState body={copy.emptyBody} theme={theme} title={copy.emptyTitle} /> : null}
-    {mode === "stores" ? stores.map(({ store }) => <StoreCard copy={copy} favorite isRtl={isRtl} key={store.id} locale={locale} onFavorite={() => void removeStore(store)} onPress={() => void openStore(store.slug)} store={store} theme={theme} />) : products.map(({ product }) => <ProductCard copy={copy} favorite isRtl={isRtl} key={product.id} locale={locale} onFavorite={() => void removeProduct(product)} onPress={() => void openProduct(product.storeSlug, product.productSlug)} product={product} theme={theme} />)}
-    {(mode === "stores" ? storeHasNext : productHasNext) ? <CommerceButton disabled={state === "loading"} label={state === "loading" ? copy.loading : copy.loadMore} onPress={() => void loadMore()} secondary theme={theme} /> : null}
+    {sessionAvailable !== false && state === "loading" && !items.length ? <CommerceState title={copy.loading} theme={theme} /> : null}
+    {sessionAvailable !== false && state === "error" ? <CommerceState buttonLabel={copy.retry} onPress={() => void (mode === "stores" ? refreshStores() : refreshProducts())} theme={theme} title={copy.errorGeneric} /> : null}
+    {sessionAvailable !== false && isConfirmedEmptyResource(state, Boolean(items.length)) ? <CommerceState body={copy.emptyBody} theme={theme} title={copy.emptyTitle} /> : null}
+    {sessionAvailable !== false && mode === "stores" ? visibleStores.map(({ store }) => <StoreCard copy={copy} favorite isRtl={isRtl} key={store.id} locale={locale} onFavorite={() => void toggleStoreFavorite(store)} onPress={() => void openStore(store.slug)} store={store} theme={theme} />) : null}
+    {sessionAvailable !== false && mode === "products" ? visibleProducts.map(({ product }) => <ProductCard copy={copy} favorite isRtl={isRtl} key={product.id} locale={locale} onFavorite={() => void toggleProductFavorite(product)} onPress={() => void openProduct(product.storeSlug, product.productSlug)} product={product} theme={theme} />) : null}
+    {sessionAvailable !== false && (mode === "stores" ? storeHasNext : productHasNext) ? <CommerceButton disabled={state === "loading"} label={state === "loading" ? copy.loading : copy.loadMore} onPress={() => void loadMore()} secondary theme={theme} /> : null}
   </View>;
 }
 
 function AddressesScreen(props: CommonProps & { returnToCheckout: boolean }) {
-  const { copy, goBack, isRtl, returnToCheckout, theme } = props;
+  const { cart, copy, goBack, handlePrivateError, isRtl, onOpenAccount, returnToCheckout, sessionAvailable, setCheckoutDraft, theme } = props;
   const styles = useMemo(() => createStyles(theme), [theme]);
   const [addresses, setAddresses] = useState<CommerceAddress[]>([]);
   const [form, setForm] = useState<CommerceAddressInput>(EMPTY_ADDRESS);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [state, setState] = useState<LoadState>("loading");
-  const load = async () => { setState("loading"); try { setAddresses((await commerceApi.listAddresses()).data); setState("ready"); } catch { setState("error"); } };
-  useEffect(() => { const timer = setTimeout(() => void load(), 0); return () => clearTimeout(timer); }, []);
+  const load = useCallback(async () => { setState("loading"); try { setAddresses((await commerceApi.listAddresses()).data); setState("ready"); } catch (error) { if (isUnauthorizedError(error)) setAddresses([]); setState("error"); handlePrivateError(error); } }, [handlePrivateError]);
+  useEffect(() => { const timer = setTimeout(() => void load(), 0); return () => clearTimeout(timer); }, [load]);
   const valid = form.recipientName.trim() && /^\+?[0-9][0-9 ()-]{5,28}$/.test(form.phone.trim()) && form.city.trim() && form.area.trim() && form.street.trim() && form.additionalDetails.trim();
-  const save = async () => { if (!valid) return; try { if (editingId) await commerceApi.updateAddress(editingId, form); else await commerceApi.createAddress(form); setForm(EMPTY_ADDRESS); setEditingId(null); await load(); if (returnToCheckout) goBack(); } catch { setState("error"); } };
+  const save = async () => {
+    if (!valid) return;
+    try {
+      const saved = editingId
+        ? await commerceApi.updateAddress(editingId, form)
+        : await commerceApi.createAddress(form);
+      setForm(EMPTY_ADDRESS);
+      setEditingId(null);
+      if (returnToCheckout && cart) {
+        setCheckoutDraft((current) => ({
+          ...checkoutDraftForCart(current, cart),
+          addressId: saved.id,
+          attempt: null,
+          fulfillmentMethod: "STORE_DELIVERY",
+        }));
+        goBack();
+        return;
+      }
+      await load();
+    } catch (error) { if (isUnauthorizedError(error)) setAddresses([]); setState("error"); handlePrivateError(error); }
+  };
+  const mutateAddress = async (operation: () => Promise<unknown>) => {
+    try { await operation(); await load(); }
+    catch (error) { if (isUnauthorizedError(error)) setAddresses([]); setState("error"); handlePrivateError(error); }
+  };
   const edit = (address: CommerceAddress) => { setEditingId(address.id); setForm({ additionalDetails: address.additionalDetails, area: address.area, city: address.city, landmark: address.landmark, phone: address.phone, recipientName: address.recipientName, street: address.street }); };
+  if (sessionAvailable === false) return <View style={styles.stack}><CommerceHeader copy={copy} isRtl={isRtl} title={copy.addresses} theme={theme} /><CommerceState body={copy.sessionRequired} buttonLabel={copy.retry} onPress={onOpenAccount} theme={theme} title={copy.sessionRequired} /></View>;
   return <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.stack}>
     <CommerceHeader copy={copy} isRtl={isRtl} onBack={goBack} title={copy.addresses} theme={theme} />
-    {state === "loading" ? <CommerceState title={copy.loading} theme={theme} /> : null}
-    {addresses.map((address) => <View key={address.id} style={[styles.addressChoice, address.isDefault && styles.selected]}><Text style={[styles.lineTitle, isRtl ? styles.rtl : styles.ltr]}>{address.recipientName}</Text><Text style={[styles.muted, isRtl ? styles.rtl : styles.ltr]}>{address.phone}\n{address.city} · {address.area} · {address.street}</Text><View style={[styles.wrap, isRtl && styles.rowRtl]}><CommerceButton label={copy.updateAddress} onPress={() => edit(address)} secondary theme={theme} />{!address.isDefault ? <CommerceButton label={copy.setDefault} onPress={() => void commerceApi.setDefaultAddress(address.id).then(load)} secondary theme={theme} /> : null}<CommerceButton danger label={copy.remove} onPress={() => void commerceApi.deleteAddress(address.id).then(load)} secondary theme={theme} /></View></View>)}
+    {state === "loading" && !addresses.length ? <CommerceState title={copy.loading} theme={theme} /> : null}
+    {state === "error" ? <CommerceState buttonLabel={copy.retry} onPress={() => void load()} theme={theme} title={copy.errorGeneric} /> : null}
+    {addresses.map((address) => <View key={address.id} style={[styles.addressChoice, address.isDefault && styles.selected]}><Text style={[styles.lineTitle, isRtl ? styles.rtl : styles.ltr]}>{address.recipientName}</Text><Text style={[styles.muted, isRtl ? styles.rtl : styles.ltr]}>{address.phone}\n{address.city} · {address.area} · {address.street}</Text><View style={[styles.wrap, isRtl && styles.rowRtl]}><CommerceButton label={copy.updateAddress} onPress={() => edit(address)} secondary theme={theme} />{!address.isDefault ? <CommerceButton label={copy.setDefault} onPress={() => void mutateAddress(() => commerceApi.setDefaultAddress(address.id))} secondary theme={theme} /> : null}<CommerceButton danger label={copy.remove} onPress={() => void mutateAddress(() => commerceApi.deleteAddress(address.id))} secondary theme={theme} /></View></View>)}
     <View style={styles.panel}><Text style={[styles.sectionTitle, isRtl ? styles.rtl : styles.ltr]}>{editingId ? copy.updateAddress : copy.addAddress}</Text><AddressField label={copy.recipientName} name="recipientName" setForm={setForm} form={form} isRtl={isRtl} styles={styles} theme={theme} /><AddressField label={copy.phone} name="phone" setForm={setForm} form={form} isRtl={isRtl} styles={styles} theme={theme} keyboardType="phone-pad" /><AddressField label={copy.city} name="city" setForm={setForm} form={form} isRtl={isRtl} styles={styles} theme={theme} /><AddressField label={copy.area} name="area" setForm={setForm} form={form} isRtl={isRtl} styles={styles} theme={theme} /><AddressField label={copy.street} name="street" setForm={setForm} form={form} isRtl={isRtl} styles={styles} theme={theme} /><AddressField label={copy.addressDetails} name="additionalDetails" setForm={setForm} form={form} isRtl={isRtl} styles={styles} theme={theme} multiline /><AddressField label={copy.landmark} name="landmark" setForm={setForm} form={form} isRtl={isRtl} styles={styles} theme={theme} /><CommerceButton disabled={!valid} label={editingId ? copy.updateAddress : copy.createAddress} onPress={() => void save()} theme={theme} /></View>
   </KeyboardAvoidingView>;
 }
@@ -745,8 +1115,8 @@ function isCartVersionConflict(error: unknown) {
   return error instanceof MobileApiRequestError && error.code === "CART_VERSION_CONFLICT";
 }
 
-async function refreshCartAfterConflict(setCart: (cart: CommerceCart | null) => void, onError: (error: unknown) => void) {
-  try { setCart(await commerceApi.getCart()); } catch (error) { onError(error); }
+function isUnauthorizedError(error: unknown) {
+  return error instanceof MobileApiRequestError && error.status === 401;
 }
 
 function messageForError(error: unknown, copy: CommerceCopy) {

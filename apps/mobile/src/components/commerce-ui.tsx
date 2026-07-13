@@ -166,7 +166,7 @@ export function StoreCard({
   theme,
 }: {
   copy: CommerceCopy;
-  favorite: boolean;
+  favorite?: boolean;
   isRtl: boolean;
   locale: MobileLocale;
   onFavorite: () => void;
@@ -183,7 +183,7 @@ export function StoreCard({
           <PremiumPressable accessibilityLabel={store.name} accessibilityRole="button" onPress={onPress} style={styles.cardTitlePress}>
             <Text numberOfLines={2} style={[styles.cardTitle, isRtl ? styles.rtl : styles.ltr]}>{store.name}</Text>
           </PremiumPressable>
-          <IconButton active={favorite} icon={COMMERCE_ICONS.favorite} label={copy.favorites} onPress={onFavorite} theme={theme} />
+          {favorite === undefined ? null : <IconButton active={favorite} icon={COMMERCE_ICONS.favorite} label={copy.favorites} onPress={onFavorite} theme={theme} />}
         </View>
         {store.description ? <Text numberOfLines={2} style={[styles.cardBody, isRtl ? styles.rtl : styles.ltr]}>{store.description}</Text> : null}
         <View style={[styles.metaRow, isRtl && styles.rowRtl]}>
@@ -209,7 +209,7 @@ export function ProductCard({
   theme,
 }: {
   copy: CommerceCopy;
-  favorite: boolean;
+  favorite?: boolean;
   isRtl: boolean;
   locale: MobileLocale;
   onFavorite: () => void;
@@ -230,7 +230,7 @@ export function ProductCard({
             <Text numberOfLines={2} style={[styles.cardTitle, isRtl ? styles.rtl : styles.ltr]}>{product.name}</Text>
             <Text numberOfLines={1} style={[styles.cardBody, isRtl ? styles.rtl : styles.ltr]}>{product.store.name}</Text>
           </PremiumPressable>
-          <IconButton active={favorite} icon={COMMERCE_ICONS.favorite} label={copy.favorites} onPress={onFavorite} theme={theme} />
+          {favorite === undefined ? null : <IconButton active={favorite} icon={COMMERCE_ICONS.favorite} label={copy.favorites} onPress={onFavorite} theme={theme} />}
         </View>
         <Text style={[styles.price, isRtl ? styles.rtl : styles.ltr]}>{price}</Text>
         <Text style={[product.inStock ? styles.available : styles.unavailable, isRtl ? styles.rtl : styles.ltr]}>
