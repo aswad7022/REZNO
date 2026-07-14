@@ -1,7 +1,5 @@
 "use server";
 
-import { randomUUID } from "node:crypto";
-import { Prisma } from "@prisma/client";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
@@ -13,8 +11,11 @@ import {
 import { isReservedBusinessSlug } from "@/features/business/lib/business-slug";
 import { businessOnboardingSchema } from "@/features/onboarding/schemas/onboarding";
 import { completeCustomerOnboardingProfile } from "@/features/onboarding/services/customer-onboarding";
+import {
+  BusinessOnboardingProvisioningError,
+  provisionBusinessOnboarding,
+} from "@/features/onboarding/services/business-onboarding";
 import type { BusinessOnboardingState } from "@/features/onboarding/types";
-import { prisma } from "@/lib/db/prisma";
 import { getSafeInternalPath } from "@/lib/navigation/safe-redirect";
 
 function slugify(value: string): string {
@@ -80,64 +81,23 @@ export async function completeBusinessOnboarding(
       fieldErrors: { slug: t("slugReserved") },
     };
   }
-  const organizationId = randomUUID();
-  const ownerRoleId = randomUUID();
   const branchSlug = slugify(branchName) || "main";
+  let organizationId: string;
 
   try {
-    await prisma.$transaction(
-      async (transaction) => {
-        await transaction.organization.create({
-          data: {
-            id: organizationId,
-            name: organizationName,
-            slug: organizationSlug,
-            vertical,
-            branches: {
-              create: {
-                name: branchName,
-                slug: branchSlug,
-              },
-            },
-            profile: {
-              create: {},
-            },
-            roles: {
-              create: {
-                id: ownerRoleId,
-                name: "Owner",
-                description: "Full access to the organization.",
-                isSystem: true,
-                systemRole: "OWNER",
-              },
-            },
-            settings: {
-              create: {},
-            },
-          },
-        });
-
-        await transaction.organizationMember.create({
-          data: {
-            organizationId,
-            personId: identity.person.id,
-            roleId: ownerRoleId,
-          },
-        });
-
-        await transaction.person.update({
-          where: { id: identity.person.id },
-          data: { isOnboarded: true },
-        });
-      },
-      {
-        isolationLevel: "Serializable",
-      },
-    );
+    const result = await provisionBusinessOnboarding({
+      branchName,
+      branchSlug,
+      organizationName,
+      organizationSlug,
+      personId: identity.person.id,
+      vertical,
+    });
+    organizationId = result.organizationId;
   } catch (error) {
     if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === "P2002"
+      error instanceof BusinessOnboardingProvisioningError &&
+      error.code === "SLUG_TAKEN"
     ) {
       return {
         status: "error",
