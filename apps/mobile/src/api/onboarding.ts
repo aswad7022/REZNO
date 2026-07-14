@@ -5,7 +5,7 @@ type CustomerOnboardingResponse = {
   data: { isOnboarded: true };
 };
 
-export async function completeMobileCustomerOnboarding() {
+export async function completeMobileCustomerOnboarding(phone?: string) {
   const controller = new AbortController();
   const timeout = setTimeout(
     () => controller.abort(),
@@ -18,6 +18,7 @@ export async function completeMobileCustomerOnboarding() {
         "/api/mobile/onboarding/customer",
         {
           authenticated: true,
+          body: phone === undefined ? {} : { phone },
           method: "POST",
           signal: controller.signal,
         },

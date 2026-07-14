@@ -56,7 +56,7 @@ async function personForEmail(email: string) {
 }
 
 test(
-  "mobile customer onboarding is authenticated, tenant-bound, idempotent, and unlocks Commerce",
+  "mobile customer onboarding is authenticated, phone-gated, tenant-bound, idempotent, and unlocks Commerce",
   {
     concurrency: false,
     skip: baseUrl
@@ -100,13 +100,36 @@ test(
       personForEmail(inactiveEmail),
     ]);
     assert.equal(caller.isOnboarded, false);
+    assert.equal(caller.phone, null);
     assert.equal(untouched.isOnboarded, false);
+
+    const missingPhone = await request("/api/mobile/onboarding/customer", {
+      cookie: callerCookie,
+      method: "POST",
+    });
+    assert.equal(missingPhone.response.status, 400);
+    assert.equal(
+      (missingPhone.body.error as { code: string }).code,
+      "PHONE_REQUIRED",
+    );
+
+    const invalidPhone = await request("/api/mobile/onboarding/customer", {
+      body: { phone: "+964-call-me" },
+      cookie: callerCookie,
+      method: "POST",
+    });
+    assert.equal(invalidPhone.response.status, 400);
+    assert.equal(
+      (invalidPhone.body.error as { code: string }).code,
+      "PHONE_INVALID",
+    );
 
     const completed = await request("/api/mobile/onboarding/customer", {
       body: {
         authUserId: untouched.authUserId,
         isOnboarded: true,
         personId: untouched.id,
+        phone: "+964 (750) 000-0000",
       },
       cookie: callerCookie,
       method: "POST",
@@ -119,6 +142,7 @@ test(
       prisma.person.findUniqueOrThrow({ where: { id: untouched.id } }),
     ]);
     assert.equal(callerAfter.isOnboarded, true);
+    assert.equal(callerAfter.phone, "+9647500000000");
     assert.equal(
       untouchedAfter.isOnboarded,
       false,
@@ -150,7 +174,11 @@ test(
     });
     const inactiveAttempt = await request(
       "/api/mobile/onboarding/customer",
-      { cookie: inactiveCookie, method: "POST" },
+      {
+        body: { phone: "+9647500000001" },
+        cookie: inactiveCookie,
+        method: "POST",
+      },
     );
     assert.equal(inactiveAttempt.response.status, 403);
     assert.equal(
