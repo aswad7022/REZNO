@@ -102,8 +102,8 @@ jobs:
         run: |
           node -e 'const name = new URL(process.env.DATABASE_URL).pathname.slice(1); if (!/(?:_test|test_)/.test(name)) throw new Error(`Refusing non-test database: ${name}`)'
           migration_count="$(find prisma/migrations -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')"
-          if [[ "$migration_count" != "23" ]]; then
-            echo "Expected 23 migrations, found $migration_count" >&2
+          if [[ "$migration_count" != "24" ]]; then
+            echo "Expected 24 migrations, found $migration_count" >&2
             exit 1
           fi
 
@@ -113,10 +113,10 @@ jobs:
       - name: Confirm migration status
         run: npx --no-install prisma migrate status
 
-      - name: Run complete Commerce unit suite
+      - name: Run complete unit suite
         run: npm run test:unit
 
-      - name: Run Commerce PostgreSQL, concurrency, pagination, and Booking regressions
+      - name: Run PostgreSQL, concurrency, pagination, Identity, Commerce, and Booking regressions
         run: npm run test:integration
 
       - name: Confirm database validation did not modify tracked files

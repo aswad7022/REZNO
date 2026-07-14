@@ -174,6 +174,7 @@ export type NearbySearchBusiness = {
   price: string;
   rating: string;
   reviewCount: string;
+  slug: string;
   status: string;
   tag: string;
 };
@@ -1081,6 +1082,7 @@ function deriveVisualQaResults(
       price: copy.priceUnavailable,
       rating: fixture.rating.toFixed(1),
       reviewCount: `${fixture.reviewCount} ${labels[locale].marketplaceReviews}`,
+      slug: fixture.id,
       status: fixture.status,
       tag: fixture.badge,
     },
@@ -1167,6 +1169,7 @@ function mapNearbyResult(
       price,
       rating: rating === null ? "—" : rating.toFixed(1),
       reviewCount: `${reviewCount} ${labels[locale].marketplaceReviews}`,
+      slug: source.slug,
       status,
       tag: serviceLabel ?? category,
     },

@@ -226,6 +226,7 @@ export type HomeBusiness = {
   price: string;
   rating: string;
   reviewCount: string;
+  slug: string;
   status: string;
   tag: string;
 };
@@ -1347,6 +1348,7 @@ function mapMarketplaceBusiness(
     price,
     rating,
     reviewCount: String(business.reviewCount),
+    slug: business.slug,
     status,
     tag: status,
   };
