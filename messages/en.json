@@ -550,6 +550,7 @@
     "slotReasons": {
       "AVAILABLE": "Choose a suitable time.",
       "INVALID_DATE": "Choose a valid date.",
+      "DATE_OUT_OF_RANGE": "Choose a date within the next 90 days.",
       "SERVICE_NOT_ASSIGNED": "This service is not assigned to a location available for booking.",
       "SERVICE_INACTIVE": "This service is inactive or currently unavailable to book.",
       "OFFERING_UNAVAILABLE": "This service is no longer available to book.",

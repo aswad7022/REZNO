@@ -13,6 +13,7 @@ export interface BookingSlot {
 export type BookingSlotReason =
   | "AVAILABLE"
   | "INVALID_DATE"
+  | "DATE_OUT_OF_RANGE"
   | "SERVICE_NOT_ASSIGNED"
   | "SERVICE_INACTIVE"
   | "OFFERING_UNAVAILABLE"
@@ -37,6 +38,66 @@ export interface PublicOffering {
   durationMinutes: number;
   timezone: string;
   staffSelectionMode: StaffSelectionMode;
+}
+
+export interface PublicBookingBusiness {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  logoUrl: string | null;
+  coverImageUrl: string | null;
+  categoryName: string | null;
+  vertical: string;
+  supportsServiceBooking: boolean;
+}
+
+export interface PublicBookingService {
+  id: string;
+  name: string;
+  description: string | null;
+  imageUrl: string | null;
+  categoryName: string;
+  staffSelectionMode: StaffSelectionMode;
+  branchCount: number;
+  startingPrice: string;
+  durationMinutes: number;
+}
+
+export interface PublicBookingBranch {
+  branchServiceId: string;
+  branchId: string;
+  name: string;
+  city: string | null;
+  address: string | null;
+  locationLabel: string | null;
+  timezone: string;
+  price: string;
+  pricingType: string;
+  durationMinutes: number;
+  staffSelectionMode: StaffSelectionMode;
+}
+
+export interface PublicBookingStaffMember {
+  id: string;
+  name: string;
+  photoUrl: string | null;
+  specialties: string[];
+}
+
+export interface PersistedBookingDetail {
+  id: string;
+  reference: string;
+  businessName: string;
+  branchName: string;
+  serviceName: string;
+  memberName: string | null;
+  startsAt: string;
+  endsAt: string;
+  timezone: string;
+  price: string;
+  status: BookingStatus;
+  createdAt: string;
 }
 
 export interface BookingListItem {

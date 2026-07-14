@@ -2,6 +2,7 @@ import "server-only";
 
 import { TZDate } from "@date-fns/tz";
 
+import { parseBookingDate } from "@/features/bookings/domain/date";
 import { prisma } from "@/lib/db/prisma";
 import type {
   BookingSlot,
@@ -10,29 +11,8 @@ import type {
 
 const ACTIVE_BOOKING_STATUSES = ["PENDING", "CONFIRMED"] as const;
 
-function parseDate(date: string) {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
-  if (!match) return null;
-  const parsed = {
-    year: Number(match[1]),
-    month: Number(match[2]) - 1,
-    day: Number(match[3]),
-  };
-  const normalized = new Date(
-    Date.UTC(parsed.year, parsed.month, parsed.day),
-  );
-  if (
-    normalized.getUTCFullYear() !== parsed.year ||
-    normalized.getUTCMonth() !== parsed.month ||
-    normalized.getUTCDate() !== parsed.day
-  ) {
-    return null;
-  }
-  return parsed;
-}
-
 function atLocalTime(
-  date: NonNullable<ReturnType<typeof parseDate>>,
+  date: NonNullable<ReturnType<typeof parseBookingDate>>,
   time: string,
   timezone: string,
 ): Date {
@@ -63,14 +43,24 @@ export async function getBookingSlotResult(
   branchServiceId: string,
   dateValue: string,
 ): Promise<BookingSlotResult> {
-  const date = parseDate(dateValue);
+  const date = parseBookingDate(dateValue);
   if (!date) return { slots: [], reason: "INVALID_DATE" };
 
   const offering = await prisma.branchService.findUnique({
     where: { id: branchServiceId },
     include: {
       service: {
-        include: { staffAssignments: true },
+        include: {
+          staffAssignments: {
+            where: {
+              member: {
+                deletedAt: null,
+                status: "ACTIVE",
+                person: { deletedAt: null, status: "ACTIVE" },
+              },
+            },
+          },
+        },
       },
       branch: {
         include: {
@@ -79,11 +69,18 @@ export async function getBookingSlotResult(
           },
           businessHours: true,
           assignments: {
+            where: {
+              member: {
+                deletedAt: null,
+                status: "ACTIVE",
+                person: { deletedAt: null, status: "ACTIVE" },
+              },
+            },
             include: {
               member: {
                 include: {
                   person: true,
-                  availabilities: true,
+                  availabilities: { where: { isActive: true } },
                 },
               },
             },
@@ -97,6 +94,9 @@ export async function getBookingSlotResult(
     },
   });
   if (!offering) return { slots: [], reason: "SERVICE_NOT_ASSIGNED" };
+  if (offering.service.organizationId !== offering.branch.organizationId) {
+    return { slots: [], reason: "OFFERING_UNAVAILABLE" };
+  }
   if (!offering.isAvailable || offering.service.status !== "ACTIVE") {
     return { slots: [], reason: "SERVICE_INACTIVE" };
   }
@@ -112,29 +112,45 @@ export async function getBookingSlotResult(
     return { slots: [], reason: "OFFERING_UNAVAILABLE" };
   }
 
-  const dayOfWeek = new Date(
-    Date.UTC(date.year, date.month, date.day),
-  ).getUTCDay();
+  const timezone = offering.branch.timezone;
+  let today: NonNullable<ReturnType<typeof parseBookingDate>>;
+  try {
+    const todayValue = new Intl.DateTimeFormat("en-CA", {
+      timeZone: timezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date());
+    const parsedToday = parseBookingDate(todayValue);
+    if (!parsedToday) return { slots: [], reason: "OFFERING_UNAVAILABLE" };
+    today = parsedToday;
+  } catch {
+    return { slots: [], reason: "OFFERING_UNAVAILABLE" };
+  }
+  const selectedDay = Date.UTC(date.year, date.month, date.day);
+  const currentDay = Date.UTC(today.year, today.month, today.day);
+  if (selectedDay < currentDay || selectedDay > currentDay + 90 * 86_400_000) {
+    return { slots: [], reason: "DATE_OUT_OF_RANGE" };
+  }
+  const dayOfWeek = new Date(selectedDay).getUTCDay();
   const businessHours = offering.branch.businessHours.find(
     (hours) => hours.dayOfWeek === dayOfWeek && hours.isOpen,
   );
   if (!businessHours) {
     return {
       slots: [],
-      reason: offering.branch.businessHours.some((hours) => hours.isOpen)
+      reason: offering.branch.businessHours.length > 0
         ? "CLOSED_ON_DATE"
         : "HOURS_NOT_CONFIGURED",
     };
   }
-
-  const timezone = offering.branch.timezone;
   const businessStart = atLocalTime(date, businessHours.openTime, timezone);
   const businessEnd = atLocalTime(date, businessHours.closeTime, timezone);
   const now = new Date();
   const globalBlocks = offering.branch.blockedTimes.filter(
     (blocked) => blocked.memberId === null,
   );
-  const slots: BookingSlot[] = [];
+  const slotsByKey = new Map<string, BookingSlot>();
 
   const assignedMemberIds = new Set(
     offering.service.staffAssignments.map((assignment) => assignment.memberId),
@@ -186,31 +202,32 @@ export async function getBookingSlotResult(
   }
 
   for (const member of candidates) {
-    const availability =
+    const availabilityWindows =
       member.id === null
-        ? null
-        : member.availabilities.find(
+        ? []
+        : member.availabilities.filter(
             (item) =>
               item.branchId === offering.branchId &&
               item.dayOfWeek === dayOfWeek &&
               item.isActive,
           );
-    const windowStart = availability
-      ? new Date(
-          Math.max(
-            businessStart.getTime(),
-            atLocalTime(date, availability.startTime, timezone).getTime(),
-          ),
-        )
-      : businessStart;
-    const windowEnd = availability
-      ? new Date(
-          Math.min(
-            businessEnd.getTime(),
-            atLocalTime(date, availability.endTime, timezone).getTime(),
-          ),
-        )
-      : businessEnd;
+    const windows =
+      member.id === null
+        ? [{ start: businessStart, end: businessEnd }]
+        : availabilityWindows.map((availability) => ({
+            start: new Date(
+              Math.max(
+                businessStart.getTime(),
+                atLocalTime(date, availability.startTime, timezone).getTime(),
+              ),
+            ),
+            end: new Date(
+              Math.min(
+                businessEnd.getTime(),
+                atLocalTime(date, availability.endTime, timezone).getTime(),
+              ),
+            ),
+          }));
     const occupied = [
       ...globalBlocks,
       ...offering.branch.blockedTimes.filter(
@@ -224,26 +241,29 @@ export async function getBookingSlotResult(
       ),
     ];
 
-    for (
-      let start = windowStart;
-      start.getTime() + offering.durationMinutes * 60_000 <= windowEnd.getTime();
-      start = new Date(start.getTime() + 15 * 60_000)
-    ) {
-      const end = new Date(
-        start.getTime() + offering.durationMinutes * 60_000,
-      );
-      if (start <= now || overlaps(start, end, occupied)) continue;
-      slots.push({
-        startsAt: start.toISOString(),
-        endsAt: end.toISOString(),
-        memberId: member.id,
-        memberName:
-          member.person?.displayName ?? member.person?.firstName ?? null,
-      });
+    for (const window of windows) {
+      for (
+        let start = window.start;
+        start.getTime() + offering.durationMinutes * 60_000 <= window.end.getTime();
+        start = new Date(start.getTime() + 15 * 60_000)
+      ) {
+        const end = new Date(
+          start.getTime() + offering.durationMinutes * 60_000,
+        );
+        if (start <= now || overlaps(start, end, occupied)) continue;
+        const slot = {
+          startsAt: start.toISOString(),
+          endsAt: end.toISOString(),
+          memberId: member.id,
+          memberName:
+            member.person?.displayName ?? member.person?.firstName ?? null,
+        };
+        slotsByKey.set(`${slot.startsAt}:${slot.memberId ?? "none"}`, slot);
+      }
     }
   }
 
-  const sortedSlots = slots.sort((a, b) =>
+  const sortedSlots = [...slotsByKey.values()].sort((a, b) =>
     a.startsAt.localeCompare(b.startsAt),
   );
   return {

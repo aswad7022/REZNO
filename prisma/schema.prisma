@@ -418,6 +418,8 @@ model Booking {
   notes                 String?
   cancellationReason    String?
   cancelledAt           DateTime?                     @db.Timestamptz(6)
+  creationIdempotencyKey String?                       @db.Uuid
+  creationRequestHash   String?                        @db.VarChar(64)
   createdAt             DateTime                      @default(now()) @db.Timestamptz(6)
   updatedAt             DateTime                      @updatedAt @db.Timestamptz(6)
   organization          Organization                  @relation(fields: [organizationId], references: [id])
@@ -436,6 +438,7 @@ model Booking {
   @@index([customerId, startsAt])
   @@index([memberId, startsAt, endsAt])
   @@index([status, startsAt])
+  @@unique([customerId, creationIdempotencyKey])
 }
 
 model BookingStatusHistory {

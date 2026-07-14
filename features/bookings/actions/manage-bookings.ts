@@ -1,5 +1,7 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
+
 import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -13,6 +15,8 @@ import {
   bookingStatusSchema,
   createBookingSchema,
 } from "@/features/bookings/schemas/booking";
+import { BookingDomainError } from "@/features/bookings/domain/errors";
+import { createCustomerBooking } from "@/features/bookings/services/booking-creation";
 import { generateBookingSlots } from "@/features/bookings/services/slots";
 import { prisma } from "@/lib/db/prisma";
 import { logServerError } from "@/lib/logging/server";
@@ -56,142 +60,30 @@ export async function createBooking(formData: FormData): Promise<void> {
     redirect(bookingErrorUrl("invalid", branchServiceId, date));
   }
 
-  const selectedSlot = (await generateBookingSlots(
-    parsed.data.branchServiceId,
-    parsed.data.date,
-  )).find(
-    (slot) =>
-      slot.startsAt === parsed.data.startsAt &&
-      slot.memberId === parsed.data.memberId,
-  );
-
-  if (!selectedSlot) {
-    redirect(
-      bookingErrorUrl(
-        "unavailable",
-        parsed.data.branchServiceId,
-        parsed.data.date,
-      ),
-    );
-  }
-
-  const offering = await prisma.branchService.findFirst({
-    where: {
-      id: parsed.data.branchServiceId,
-      isAvailable: true,
-      service: { status: "ACTIVE" },
-      branch: {
-        deletedAt: null,
-        status: "ACTIVE",
-        organization: {
-          deletedAt: null,
-          isActive: true,
-          status: "ACTIVE",
-          settings: { bookingEnabled: true, marketplaceVisible: true },
-        },
-      },
-    },
-    include: {
-      service: true,
-      branch: true,
-    },
-  });
-
-  if (!offering) {
-    redirect(
-      bookingErrorUrl(
-        "unavailable",
-        parsed.data.branchServiceId,
-        parsed.data.date,
-      ),
-    );
-  }
-
-  const startsAt = new Date(selectedSlot.startsAt);
-  const endsAt = new Date(selectedSlot.endsAt);
-  if (startsAt <= new Date()) {
-    redirect(
-      bookingErrorUrl(
-        "unavailable",
-        parsed.data.branchServiceId,
-        parsed.data.date,
-      ),
-    );
-  }
-
   let createdBookingId: string | null = null;
-  let failedUnexpectedly = false;
+  let failure: "failed" | "unavailable" = "unavailable";
 
   try {
-    await prisma.$transaction(
-      async (transaction) => {
-        const [conflict, blocked] = await Promise.all([
-          transaction.booking.findFirst({
-            where: {
-              branchId: offering.branchId,
-              memberId: parsed.data.memberId,
-              status: { in: [...ACTIVE_STATUSES] },
-              startsAt: { lt: endsAt },
-              endsAt: { gt: startsAt },
-            },
-            select: { id: true },
-          }),
-          transaction.blockedTime.findFirst({
-            where: {
-              branchId: offering.branchId,
-              OR: [
-                { memberId: null },
-                ...(parsed.data.memberId
-                  ? [{ memberId: parsed.data.memberId }]
-                  : []),
-              ],
-              startsAt: { lt: endsAt },
-              endsAt: { gt: startsAt },
-            },
-            select: { id: true },
-          }),
-        ]);
-
-        if (conflict || blocked) return;
-
-        const booking = await transaction.booking.create({
-          data: {
-            organizationId: offering.branch.organizationId,
-            branchId: offering.branchId,
-            branchServiceId: offering.id,
-            customerId: identity.person.id,
-            memberId: parsed.data.memberId,
-            startsAt,
-            endsAt,
-            serviceNameSnapshot: offering.service.name,
-            customerNameSnapshot:
-              identity.person.displayName ?? identity.person.firstName,
-            priceSnapshot: offering.price,
-            statusHistory: {
-              create: {
-                toStatus: "CONFIRMED",
-                changedByPersonId: identity.person.id,
-              },
-            },
-          },
-        });
-        createdBookingId = booking.id;
-      },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-    );
-  } catch (error) {
-    failedUnexpectedly = true;
-    logServerError("booking.create", error, {
-      branchServiceId: parsed.data.branchServiceId,
+    const result = await createCustomerBooking({
+      ...parsed.data,
       customerId: identity.person.id,
+      idempotencyKey: randomUUID(),
     });
-    createdBookingId = null;
+    createdBookingId = result.booking.id;
+  } catch (error) {
+    if (!(error instanceof BookingDomainError)) {
+      failure = "failed";
+      logServerError("booking.create", error, {
+        branchServiceId: parsed.data.branchServiceId,
+        customerId: identity.person.id,
+      });
+    }
   }
 
   if (!createdBookingId) {
     redirect(
       bookingErrorUrl(
-        failedUnexpectedly ? "failed" : "unavailable",
+        failure,
         parsed.data.branchServiceId,
         parsed.data.date,
       ),
