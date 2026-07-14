@@ -10,7 +10,10 @@
     "userInterfaceStyle": "light",
     "ios": {
       "bundleIdentifier": "com.rezno.mobile",
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.rezno.mobile",

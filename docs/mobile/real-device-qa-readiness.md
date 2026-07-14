@@ -34,21 +34,39 @@ external gates below pass:
 4. The staging Commerce migrations are applied and the public catalog routes
    return `200` with at least one published, in-stock QA product.
 
-At the time of this audit, the last gate fails:
+Checkpoint verified on 2026-07-14:
 
 ```text
+EAS account                                alhakeem7
+EAS project                                @alhakeem7/rezno-mobile
+EAS project ID                             ef209c9c-0d04-4731-a998-6241fef1b29d
 GET /api/auth/get-session                  200
-GET /api/mobile/marketplace                200 (empty)
-GET /api/commerce/public/categories        500 INTERNAL_ERROR
-GET /api/commerce/public/stores?limit=1    500 INTERNAL_ERROR
-GET /api/commerce/public/products?limit=1  500 INTERNAL_ERROR
+GET /api/commerce/public/categories        200
+GET /api/commerce/public/stores?limit=1    200 (QA Store visible)
+GET /api/commerce/public/products?limit=1  200 (QA Product visible and in stock)
+Android Preview build                      FINISHED
+Android physical-device smoke              PENDING
+iOS Preview build                          BLOCKED before submission
 ```
 
-The Commerce tables are introduced by
-`20260712105932_commerce_milestone_2a_foundation`. Because the repository has
-no Vercel deployment hook that runs `prisma migrate deploy`, pending staging
-migrations are the leading explanation. This is an inference until the staging
-database status or Vercel logs are inspected.
+The staging database is explicitly named `rezno_staging`. All 22 migrations
+are applied, and the guarded Commerce QA fixture is present. A second fixture
+run was a no-op (`stockAdded=0`), confirming repeatability. Vercel staging is
+connected to that database and exposes the QA Store and Product.
+
+The Android Preview build is EAS build
+`2d962e3c-45e5-4959-9255-f2de514be4d8`, built from commit
+`19cefb1bb3b5d3a6797a6e3f3f80795ea2065bea` with the `preview` profile and
+internal distribution. Keep the install URL in the restricted EAS dashboard;
+the repository is public, so do not commit the install or artifact URL here.
+
+The iOS Preview attempt reached Apple signing but was not submitted. EAS has no
+Apple Team available for account `alhakeem7`; `eas device:list` reports
+`No Apple teams found`. An authorized operator must sign in interactively to a
+paid Apple Developer team, register the target iPhone UDID, and allow EAS to
+create or select the Distribution Certificate and Ad Hoc provisioning profile.
+No Apple ID, password, verification code, UDID, certificate, or provisioning
+material belongs in this document or any shared log.
 
 ## Repository pre-flight
 
@@ -293,13 +311,13 @@ source "$HOME/.nvm/nvm.sh"
 nvm use 24
 cd apps/mobile
 
-npx eas-cli login
-npx eas-cli whoami
-npx eas-cli project:info
-npx eas-cli env:list development --format short
-npx eas-cli env:list preview --format short
-npx eas-cli device:create
-npx eas-cli device:list
+npx --yes eas-cli@21.0.0 login
+npx --yes eas-cli@21.0.0 whoami
+npx --yes eas-cli@21.0.0 project:info
+npx --yes eas-cli@21.0.0 env:list development --format short
+npx --yes eas-cli@21.0.0 env:list preview --format short
+npx --yes eas-cli@21.0.0 device:create
+npx --yes eas-cli@21.0.0 device:list
 ```
 
 Do not use `--include-sensitive` or `--include-file-content` in shared logs.
@@ -307,14 +325,20 @@ Do not use `--include-sensitive` or `--include-file-content` in shared logs.
 Create one build at a time:
 
 ```bash
-npx eas-cli build --platform ios --profile development
-npx eas-cli build --platform ios --profile preview
+npx --yes eas-cli@21.0.0 build --platform ios --profile development
+npx --yes eas-cli@21.0.0 build --platform ios --profile preview
 ```
 
 Install from the EAS internal-distribution link. Development requires Metro;
 Preview does not. If a new iPhone was registered after an existing ad hoc
 profile was created, create a new interactive build or explicitly refresh the
 ad hoc profile through the supported EAS workflow.
+
+The verified 2026-07-14 Preview attempt used the second build command above.
+It confirmed EAS authentication, project linkage, the staging API environment,
+and standard/exempt encryption metadata before stopping at Apple Developer
+login. Resume only in the operator's private terminal; do not pass Apple
+credentials through chat, command arguments, tracked files, or shared logs.
 
 ## Android — local physical-device path
 
@@ -389,6 +413,13 @@ development-client shell with the current JavaScript through Metro when the
 native fingerprint remains compatible. It is not a current Preview artifact,
 does not contain the merged JavaScript bundle by itself, and is not evidence of
 physical-device QA.
+
+The current Android Preview APK is EAS build
+`2d962e3c-45e5-4959-9255-f2de514be4d8`. EAS reports `FINISHED`, internal
+distribution, profile `preview`, SDK `57.0.0`, and source commit
+`19cefb1bb3b5d3a6797a6e3f3f80795ea2065bea`. Its successful cloud build is
+build evidence only; installation and the physical-device checklist remain
+pending until a tester records device evidence.
 
 ## Authenticated Marketplace smoke checklist
 
