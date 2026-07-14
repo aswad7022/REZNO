@@ -177,7 +177,7 @@ DATABASE_URL='<staging database URL supplied securely>' \
   npx --no-install prisma migrate status
 ```
 
-Expected migration count at this baseline: `22`. Never use `prisma migrate
+Expected migration count at this baseline: `23`. Never use `prisma migrate
 reset` against staging. After migration, repeat the HTTP gate.
 
 If the endpoints return `200` but no Commerce Product is visible, use the

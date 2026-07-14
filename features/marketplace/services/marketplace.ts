@@ -390,6 +390,8 @@ export const getPublicBusiness = cache(
           where: {
             isPublicProfessional: true,
             publicSlug: { not: null },
+            deletedAt: null,
+            status: "ACTIVE",
             person: { status: "ACTIVE", deletedAt: null },
           },
           include: {
@@ -653,6 +655,8 @@ export const getPublicProfessionalProfile = cache(
       where: {
         publicSlug: staffSlug,
         isPublicProfessional: true,
+        deletedAt: null,
+        status: "ACTIVE",
         person: { status: "ACTIVE", deletedAt: null },
         organization: {
           slug: businessSlug,

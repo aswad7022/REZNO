@@ -55,7 +55,13 @@ export async function getBusinessSetupStatus(): Promise<BusinessSetupStatus> {
         select: { id: true },
       },
       organizationMembers: {
-        where: { role: { systemRole: { in: ["STAFF", "MANAGER", "RECEPTIONIST"] } } },
+        where: {
+          deletedAt: null,
+          status: "ACTIVE",
+          role: {
+            systemRole: { in: ["STAFF", "MANAGER", "RECEPTIONIST"] },
+          },
+        },
         select: { id: true },
       },
     },

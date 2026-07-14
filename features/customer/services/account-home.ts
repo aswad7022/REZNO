@@ -115,6 +115,8 @@ export async function getCustomerAccountHomeData(): Promise<AccountHomeData> {
     prisma.organizationMember.findMany({
       where: {
         personId: person.id,
+        deletedAt: null,
+        status: "ACTIVE",
         organization: {
           deletedAt: null,
           isActive: true,

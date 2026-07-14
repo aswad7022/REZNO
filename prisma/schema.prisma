@@ -188,6 +188,8 @@ model OrganizationMember {
   roleId                 String                   @db.Uuid
   createdAt              DateTime                 @default(now()) @db.Timestamptz(6)
   updatedAt              DateTime                 @updatedAt @db.Timestamptz(6)
+  status                 EntityStatus             @default(ACTIVE)
+  deletedAt              DateTime?                @db.Timestamptz(6)
   photoUrl               String?
   bio                    String?
   specialties            String[]                 @default([])
@@ -207,6 +209,7 @@ model OrganizationMember {
   @@unique([personId, organizationId])
   @@unique([organizationId, publicSlug])
   @@index([organizationId])
+  @@index([organizationId, status, deletedAt])
   @@index([organizationId, isPublicProfessional])
   @@index([roleId])
 }
@@ -601,6 +604,7 @@ model AdminAccess {
   role        AdminAccessRole   @default(ADMIN)
   status      AdminAccessStatus @default(ACTIVE)
   permissions String[]          @default([])
+  expiresAt   DateTime?         @db.Timestamptz(6)
   grantedById String?
   createdAt   DateTime          @default(now()) @db.Timestamptz(6)
   updatedAt   DateTime          @updatedAt @db.Timestamptz(6)
@@ -609,6 +613,7 @@ model AdminAccess {
 
   @@index([userId])
   @@index([status])
+  @@index([status, expiresAt])
   @@index([role])
 }
 

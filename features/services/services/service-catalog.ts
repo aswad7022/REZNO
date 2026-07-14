@@ -59,7 +59,7 @@ export async function getCurrentServiceCatalog(): Promise<ServiceCatalogData> {
       orderBy: { name: "asc" },
     }),
     prisma.organizationMember.findMany({
-      where: { organizationId },
+      where: { organizationId, deletedAt: null, status: "ACTIVE" },
       include: { person: true },
       orderBy: { person: { firstName: "asc" } },
     }),

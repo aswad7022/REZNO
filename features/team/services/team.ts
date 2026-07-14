@@ -12,6 +12,8 @@ export async function getCurrentOrganizationTeam(): Promise<TeamManagementData> 
     prisma.organizationMember.findMany({
       where: {
         organizationId,
+        deletedAt: null,
+        status: "ACTIVE",
         ...(membership.role.systemRole === "STAFF"
           ? { id: membership.id }
           : {}),

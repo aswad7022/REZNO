@@ -20,7 +20,12 @@ export async function getMemberAvailability(
   const { membership: currentMembership } = await requireBusinessIdentity();
   const organizationId = currentMembership.organizationId;
   const member = await prisma.organizationMember.findFirst({
-    where: { id: memberId, organizationId },
+    where: {
+      id: memberId,
+      organizationId,
+      deletedAt: null,
+      status: "ACTIVE",
+    },
     include: {
       person: true,
       assignments: {

@@ -10,8 +10,8 @@ import {
 import {
   allAdminPermissions,
   type AdminPermission,
-  normalizeAdminPermissions,
 } from "@/features/admin/config/permissions";
+import { resolveAdminGrant } from "@/features/admin/policies/admin-authorization";
 import { prisma } from "@/lib/db/prisma";
 import { logServerError } from "@/lib/logging/server";
 
@@ -74,19 +74,17 @@ function accessFromDatabase(
   identity: Awaited<ReturnType<typeof requireActiveIdentity>>,
   adminAccess: AdminAccess,
 ): CurrentAdminAccess | null {
-  if (adminAccess.status !== "ACTIVE") {
-    return null;
-  }
-
-  const isSuperAdmin = adminAccess.role === "SUPER_ADMIN";
+  const grant = resolveAdminGrant({
+    databaseAccess: adminAccess,
+    envSuperAdmin: false,
+  });
+  if (!grant) return null;
 
   return {
     identity,
-    isSuperAdmin,
-    role: adminAccess.role,
-    permissions: isSuperAdmin
-      ? allAdminPermissions
-      : normalizeAdminPermissions(adminAccess.permissions),
+    isSuperAdmin: grant.isSuperAdmin,
+    role: grant.role,
+    permissions: grant.permissions,
     adminAccess,
     source: "database",
   };
@@ -159,7 +157,10 @@ export async function getAdminAccessState() {
 
   if (adminEmails.size === 0) {
     const activeAdmins = await prisma.adminAccess.count({
-      where: { status: "ACTIVE" },
+      where: {
+        status: "ACTIVE",
+        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+      },
     });
 
     if (activeAdmins === 0) {
