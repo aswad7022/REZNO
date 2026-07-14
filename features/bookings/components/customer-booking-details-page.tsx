@@ -102,6 +102,7 @@ export async function CustomerBookingDetailsPage({
             rejectChange: t("changeRequest.reject"),
             pendingChangeStaff: t("staff"),
             waitingForCustomer: t("changeRequest.waiting"),
+            waitingForBusiness: t("changeRequest.waitingForBusiness"),
             transitions: {
               CONFIRMED: t("actions.CONFIRMED"),
               CANCELLED: t("actions.CANCELLED"),
