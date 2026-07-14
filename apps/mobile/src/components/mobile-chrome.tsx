@@ -135,11 +135,14 @@ type MobileChromeStyles = {
   exploreCompassNeedle: StyleProp<ViewStyle>;
   exploreCompassNeedleActive: StyleProp<ViewStyle>;
   header: StyleProp<ViewStyle>;
+  headerAction: StyleProp<ViewStyle>;
+  headerActionText: StyleProp<TextStyle>;
   headerBackButton: StyleProp<ViewStyle>;
   headerBackIcon: StyleProp<ImageStyle>;
   headerPageCopy: StyleProp<ViewStyle>;
   headerPageSubtitle: StyleProp<TextStyle>;
   headerPageTitle: StyleProp<TextStyle>;
+  headerRtl: StyleProp<ViewStyle>;
   headerSpacer: StyleProp<ViewStyle>;
   localeButton: StyleProp<ViewStyle>;
   localeButtonActive: StyleProp<ViewStyle>;
@@ -174,6 +177,7 @@ export function ScreenHeader({
   backLabel = "Back",
   isRtl,
   onBack,
+  pageAction,
   pageSubtitle,
   pageTitle,
   styles,
@@ -184,6 +188,7 @@ export function ScreenHeader({
   locale?: MobileLocale;
   onLocaleChange?: (locale: MobileLocale) => void;
   onBack?: () => void;
+  pageAction?: string;
   pageSubtitle?: string;
   pageTitle?: string;
   styles: MobileChromeStyles;
@@ -191,7 +196,7 @@ export function ScreenHeader({
 }) {
   if (pageTitle) {
     return (
-      <View style={styles.header}>
+      <View style={[styles.header, isRtl && styles.headerRtl]}>
         {onBack ? (
           <PremiumPressable
             accessibilityLabel={backLabel}
@@ -229,7 +234,19 @@ export function ScreenHeader({
             </Text>
           ) : null}
         </View>
-        <View style={styles.headerSpacer} />
+        {pageAction ? (
+          <View style={styles.headerAction}>
+            <Text
+              maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+              numberOfLines={1}
+              style={styles.headerActionText}
+            >
+              {pageAction}
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.headerSpacer} />
+        )}
       </View>
     );
   }

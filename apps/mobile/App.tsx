@@ -62,8 +62,12 @@ import {
   ACCOUNT_ACTION_LAYOUT,
   ACCOUNT_GUEST_AUTH_ACTIONS,
   ACCOUNT_NOTIFICATION_ROW_LAYOUT,
+  ACCOUNT_VISUAL_LAYOUT,
+  FULL_SCREEN_BACKGROUND_LAYOUT,
   HELP_CENTER_ROW_LAYOUT,
   MESSAGE_PREVIEW_ROW_LAYOUT,
+  NOTIFICATION_CARD_LAYOUT,
+  NOTIFICATIONS_LANDING_LAYOUT,
   getTextWritingDirection,
   resolveVisualQaInitialScreen,
   resolveVisualQaLocale,
@@ -79,7 +83,10 @@ import {
   lightMobileTheme,
   type MobileTheme,
 } from "./src/theme/tokens";
-import { ReznoHomeScreen } from "./src/screens/rezno-home-screen";
+import {
+  ReznoHomeScreen,
+  getReznoHomeScreenBackground,
+} from "./src/screens/rezno-home-screen";
 import { ReznoAiComingSoonScreen } from "./src/screens/rezno-ai-coming-soon-screen";
 import {
   MobileAuthScreen,
@@ -174,6 +181,13 @@ type BookingListFilter = "all" | "upcoming" | "completed" | "cancelled";
 type BookingManagementPanel = "cancel" | "edit" | null;
 
 type AccountSection = "help" | "notifications" | "overview";
+
+type MessagesPreviewSection =
+  | "conversation"
+  | "landing"
+  | "messages"
+  | "notificationCenter"
+  | "orderNotifications";
 
 type VisualBookingStatus = "cancelled" | "completed" | "confirmed" | "pending";
 
@@ -610,13 +624,6 @@ const quickReplyPreview = [
   "أرسل الموقع",
 ];
 
-const notificationPreferenceRows = [
-  { enabled: true, label: "تذكيرات الحجز" },
-  { enabled: true, label: "ردود الأعمال" },
-  { enabled: false, label: "العروض" },
-  { enabled: true, label: "تحديثات النظام" },
-];
-
 const profileOverviewStats = [
   { label: "الحجوزات", value: "12", meta: "عرض تجريبي" },
   { label: "الأعمال", value: "2", meta: "عضويات مرئية" },
@@ -669,6 +676,88 @@ const accountSectionCopy: Record<MobileLocale, {
   en: { helpSubtitle: "Clear answers inside the app", helpTitle: "Help center", notificationsSubtitle: "Visual controls without device permissions", notificationsTitle: "Notification preferences" },
 };
 
+const accountActivityRows: Record<MobileLocale, Array<{
+  destination: MobileAppTabId;
+  meta: string;
+  title: string;
+}>> = {
+  ar: [
+    { destination: "favorites", meta: "الأعمال والخدمات المحفوظة", title: "مفضلاتي" },
+    { destination: "orders", meta: "متابعة طلبات السوق", title: "طلباتي" },
+    { destination: "bookings", meta: "المواعيد القادمة والسابقة", title: "حجوزاتي" },
+  ],
+  ckb: [
+    { destination: "favorites", meta: "خزمەتگوزارییە پاشەکەوتکراوەکان", title: "دڵخوازەکانم" },
+    { destination: "orders", meta: "بەدواداچوونی داواکارییەکان", title: "داواکارییەکانم" },
+    { destination: "bookings", meta: "کاتە حجزکراوەکان", title: "حجزەکانم" },
+  ],
+  en: [
+    { destination: "favorites", meta: "Saved businesses and services", title: "Favorites" },
+    { destination: "orders", meta: "Track marketplace orders", title: "Orders" },
+    { destination: "bookings", meta: "Upcoming and past appointments", title: "Bookings" },
+  ],
+};
+
+const messagesNotificationsCopy: Record<MobileLocale, {
+  badge: string;
+  body: string;
+  infoTitle: string;
+  sectionDescriptions: Record<Exclude<MessagesPreviewSection, "conversation" | "landing">, string>;
+  sectionTitles: Record<MessagesPreviewSection, string>;
+}> = {
+  ar: {
+    badge: "معاينة آمنة",
+    body: "إشعارات الطلبات أدناه تأتي من واجهة القراءة الحقيقية. تبقى الرسائل معاينة فقط، ولا توجد إشعارات دفع أو WebSocket أو واجهة إرسال.",
+    infoTitle: "حدود واضحة لهذه المعاينة",
+    sectionDescriptions: {
+      messages: "محادثات معاينة فقط بدون واجهة إرسال.",
+      notificationCenter: "تنبيهات الحجز والخدمة في قائمة مدمجة.",
+      orderNotifications: "تحديثات طلب حقيقية للقراءة فقط.",
+    },
+    sectionTitles: {
+      conversation: "محادثة الحجز",
+      landing: "الرسائل والإشعارات",
+      messages: "الرسائل",
+      notificationCenter: "مركز الإشعارات",
+      orderNotifications: "إشعارات الطلبات",
+    },
+  },
+  ckb: {
+    badge: "پێشبینینی پارێزراو",
+    body: "ئاگادارکردنەوەکانی داواکاری لە API ـی ڕاستەقینەی تەنها خوێندنەوەوە دێن. پەیامەکان هێشتا پێشبینینن و Push و WebSocket و API ـی ناردن چالاک نین.",
+    infoTitle: "سنووری ڕوونی ئەم پێشبینینە",
+    sectionDescriptions: {
+      messages: "پەیامی پێشبینین بەبێ ناردن.",
+      notificationCenter: "ئاگادارکردنەوەی حجز و خزمەتگوزاری.",
+      orderNotifications: "نوێکاریی داواکاری تەنها بۆ خوێندنەوە.",
+    },
+    sectionTitles: {
+      conversation: "گفتوگۆی حجز",
+      landing: "پەیام و ئاگادارکردنەوەکان",
+      messages: "پەیامەکان",
+      notificationCenter: "ناوەندی ئاگادارکردنەوە",
+      orderNotifications: "ئاگادارکردنەوەی داواکاری",
+    },
+  },
+  en: {
+    badge: "Safe preview",
+    body: "Order notifications use the real read-only API. Messages remain preview-only; Push, device permissions, WebSocket, and send APIs are not enabled.",
+    infoTitle: "Clear preview boundaries",
+    sectionDescriptions: {
+      messages: "Preview conversations with no send interface.",
+      notificationCenter: "Booking and service alerts in one compact list.",
+      orderNotifications: "Real read-only order updates.",
+    },
+    sectionTitles: {
+      conversation: "Booking conversation",
+      landing: "Messages and notifications",
+      messages: "Messages",
+      notificationCenter: "Notification center",
+      orderNotifications: "Order notifications",
+    },
+  },
+};
+
 export default function App() {
   return (
     <SafeAreaProvider>
@@ -701,7 +790,12 @@ function ReznoApp() {
           visualQaInitialScreen === "signIn" ||
           visualQaInitialScreen === "signUp"
         ? "account"
-      : visualQaInitialScreen;
+      : visualQaInitialScreen === "conversationPreview" ||
+          visualQaInitialScreen === "messages" ||
+          visualQaInitialScreen === "notificationCenter" ||
+          visualQaInitialScreen === "notificationsLanding"
+        ? "messages"
+        : visualQaInitialScreen;
   const [locale, setLocale] = useState<MobileLocale>(
     resolveVisualQaLocale(process.env.EXPO_PUBLIC_REZNO_VISUAL_QA_LOCALE) ??
       DEFAULT_LOCALE,
@@ -755,6 +849,15 @@ function ReznoApp() {
         ? "notifications"
         : "overview",
   );
+  const [messagesSection, setMessagesSection] = useState<MessagesPreviewSection>(
+    visualQaInitialScreen === "conversationPreview"
+      ? "conversation"
+      : visualQaInitialScreen === "notificationCenter"
+        ? "notificationCenter"
+        : visualQaInitialScreen === "messages"
+          ? "messages"
+          : "landing",
+  );
   const appScrollRef = useRef<ScrollView>(null);
   const [notificationOrderId, setNotificationOrderId] = useState<string | null>(null);
   const [marketplaceState, setMarketplaceState] = useState<MarketplaceState>({
@@ -768,7 +871,12 @@ function ReznoApp() {
   const styles = useMemo(() => createStyles(theme, layout), [layout, theme]);
   const text = labels[locale];
   const accountCopy = accountSectionCopy[locale];
+  const messagesCopy = messagesNotificationsCopy[locale];
   const isRtl = getTextDirection(locale) === "rtl";
+  const screenBackgroundColor =
+    activeTab === "customerHome" && !selectedBusiness
+      ? getReznoHomeScreenBackground(theme)
+      : theme.colors.background;
 
   useEffect(() => {
     let cancelled = false;
@@ -996,6 +1104,7 @@ function ReznoApp() {
     setNotificationOrderId(null);
 
     if (tabId === "account") setAccountSection("overview");
+    if (tabId === "messages") setMessagesSection("landing");
 
     if (tabId === "serviceDiscovery" && marketplaceState.status === "idle") {
       loadMarketplace();
@@ -1008,6 +1117,16 @@ function ReznoApp() {
   const handleAccountSectionChange = (section: AccountSection) => {
     setAccountSection(section);
     requestAnimationFrame(() => appScrollRef.current?.scrollTo({ animated: false, y: 0 }));
+  };
+
+  const handleMessagesSectionChange = (section: MessagesPreviewSection) => {
+    setMessagesSection(section);
+    requestAnimationFrame(() => appScrollRef.current?.scrollTo({ animated: false, y: 0 }));
+  };
+
+  const handleOpenMessagesSection = (section: MessagesPreviewSection) => {
+    handleTabPress("messages");
+    setMessagesSection(section);
   };
 
   const handleEnterApp = () => {
@@ -1250,7 +1369,17 @@ function ReznoApp() {
   }
 
   return (
-    <SafeAreaView edges={["left", "right", "top"]} style={styles.shell}>
+    <SafeAreaView
+      edges={["left", "right", "top"]}
+      style={[styles.shell, { backgroundColor: screenBackgroundColor }]}
+    >
+      <View
+        pointerEvents={FULL_SCREEN_BACKGROUND_LAYOUT.decorativeLayerPointerEvents}
+        style={[
+          StyleSheet.absoluteFill,
+          { backgroundColor: screenBackgroundColor },
+        ]}
+      />
       <StatusBar style={theme.isDark ? "light" : "dark"} />
       {!selectedBusiness &&
       activeTab !== "marketplace" &&
@@ -1264,10 +1393,33 @@ function ReznoApp() {
           backLabel={mobileAuthCopy[locale].back}
           isRtl={isRtl}
           locale={locale}
-          onBack={activeTab === "account" && accountSection !== "overview" ? () => handleAccountSectionChange("overview") : undefined}
+          onBack={
+            activeTab === "account" && accountSection !== "overview"
+              ? () => handleAccountSectionChange("overview")
+              : activeTab === "messages" && messagesSection !== "landing"
+                ? () => handleMessagesSectionChange("landing")
+                : undefined
+          }
           onLocaleChange={setLocale}
+          pageAction={
+            activeTab === "messages" && messagesSection === "notificationCenter"
+              ? locale === "en"
+                ? "Manage"
+                : locale === "ckb"
+                  ? "بەڕێوەبردن"
+                  : "إدارة"
+              : undefined
+          }
           pageSubtitle={activeTab === "account" && accountSection === "notifications" ? accountCopy.notificationsSubtitle : activeTab === "account" && accountSection === "help" ? accountCopy.helpSubtitle : undefined}
-          pageTitle={activeTab === "account" && accountSection === "notifications" ? accountCopy.notificationsTitle : activeTab === "account" && accountSection === "help" ? accountCopy.helpTitle : undefined}
+          pageTitle={
+            activeTab === "messages"
+              ? messagesCopy.sectionTitles[messagesSection]
+              : activeTab === "account" && accountSection === "notifications"
+                ? accountCopy.notificationsTitle
+                : activeTab === "account" && accountSection === "help"
+                  ? accountCopy.helpTitle
+                  : undefined
+          }
           styles={styles}
           text={text}
         />
@@ -1341,8 +1493,8 @@ function ReznoApp() {
             locale={locale}
             marketplaceState={marketplaceState}
             onOpenBusiness={setSelectedBusiness}
-            onOpenMessages={() => handleTabPress("messages")}
-            onOpenNotifications={() => handleTabPress("messages")}
+            onOpenMessages={() => handleOpenMessagesSection("messages")}
+            onOpenNotifications={() => handleOpenMessagesSection("notificationCenter")}
             onOpenServiceDiscovery={() => handleTabPress("serviceDiscovery")}
             onRetry={loadMarketplace}
             theme={theme}
@@ -1430,10 +1582,12 @@ function ReznoApp() {
           <MessagesNotificationsPreviewScreen
             isRtl={isRtl}
             locale={locale}
+            onSectionChange={handleMessagesSectionChange}
             onOpenCommerceOrder={(orderId) => {
               setNotificationOrderId(orderId);
               setActiveTab("orders");
             }}
+            section={messagesSection}
             styles={styles}
           />
         ) : null}
@@ -1451,6 +1605,7 @@ function ReznoApp() {
             isRtl={isRtl}
             locale={locale}
             onLocaleChange={setLocale}
+            onNavigate={handleTabPress}
             onOpenAuth={handleOpenAuth}
             onOpenSetup={() => setAuthMode("signin")}
             onSectionChange={handleAccountSectionChange}
@@ -4144,84 +4299,136 @@ function MessagesNotificationsPreviewScreen({
   isRtl,
   locale,
   onOpenCommerceOrder,
+  onSectionChange,
+  section,
   styles,
 }: {
   isRtl: boolean;
   locale: MobileLocale;
   onOpenCommerceOrder: (orderId: string) => void;
+  onSectionChange: (section: MessagesPreviewSection) => void;
+  section: MessagesPreviewSection;
   styles: MobileStyles;
 }) {
-  const heroCopy = locale === "en"
-    ? {
-        badge: "Safe preview",
-        body: "Order notifications below use the real read-only API. Messages remain a preview; Push, device permissions, WebSocket, and send APIs are not enabled.",
-        eyebrow: "Messages and notifications",
-        title: "Clear order updates without enabling outbound messaging",
-      }
-    : locale === "ckb"
-      ? {
-          badge: "پێشبینینی پارێزراو",
-          body: "ئاگادارکردنەوەکانی داواکاری لە API ـی ڕاستەقینەی تەنها خوێندنەوەوە دێن. پەیامەکان هێشتا پێشبینینن؛ Push و WebSocket و API ـی ناردن چالاک نین.",
-          eyebrow: "پەیام و ئاگادارکردنەوەکان",
-          title: "نوێکارییە ڕوونەکانی داواکاری بەبێ ناردنی پەیام",
-        }
-      : {
-          badge: "معاينة آمنة",
-          body: "إشعارات الطلبات أدناه تأتي من واجهة القراءة الحقيقية. تبقى الرسائل معاينة فقط؛ ولا توجد إشعارات دفع أو WebSocket أو واجهة إرسال.",
-          eyebrow: "الرسائل والإشعارات",
-          title: "تحديثات طلب واضحة بدون تفعيل إرسال الرسائل",
-        };
+  const copy = messagesNotificationsCopy[locale];
 
-  return (
-    <>
-      <View style={styles.messageHeroCard}>
-        <View style={styles.messageHeroGlow} />
-        <View style={styles.messageHeroTopRow}>
-          <View style={styles.messageHeroIcon}>
-            <Image
-              alt=""
-              resizeMode="contain"
-              source={mobileIconAssets.common.message}
-              style={styles.messageHeroIconImage}
-            />
-          </View>
-          <Text style={styles.messageSafetyBadge}>{heroCopy.badge}</Text>
-        </View>
-        <Text
-          maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
-          style={[styles.screenEyebrow, isRtl && styles.rtlText]}
-        >
-          {heroCopy.eyebrow}
-        </Text>
-        <Text
-          maxFontSizeMultiplier={DISPLAY_MAX_FONT_SIZE_MULTIPLIER}
-          style={[styles.messageHeroTitle, isRtl && styles.rtlText]}
-        >
-          {heroCopy.title}
-        </Text>
-        <Text
-          maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
-          style={[styles.messageHeroBody, isRtl && styles.rtlText]}
-        >
-          {heroCopy.body}
-        </Text>
-      </View>
-
+  if (section === "orderNotifications") {
+    return (
       <CommerceNotificationsCenter
         isRtl={isRtl}
         locale={locale}
         onOpenOrder={onOpenCommerceOrder}
         styles={styles}
       />
-      {locale === "ar" ? (
-        <>
-          <NotificationsCenterPreview isRtl={isRtl} styles={styles} />
-          <ConversationListPreview isRtl={isRtl} styles={styles} />
-          <MessageDetailPreview isRtl={isRtl} styles={styles} />
-          <NotificationPreferencesPreview isRtl={isRtl} styles={styles} />
-        </>
-      ) : null}
+    );
+  }
+
+  if (section === "notificationCenter") {
+    return <NotificationsCenterPreview isRtl={isRtl} styles={styles} />;
+  }
+
+  if (section === "messages") {
+    return (
+      <ConversationListPreview
+        isRtl={isRtl}
+        onOpenConversation={() => onSectionChange("conversation")}
+        styles={styles}
+      />
+    );
+  }
+
+  if (section === "conversation") {
+    return (
+      <>
+        <MessageDetailPreview isRtl={isRtl} styles={styles} />
+        <NotificationPreferencesPreview isRtl={isRtl} styles={styles} />
+      </>
+    );
+  }
+
+  return (
+    <>
+      <View style={styles.notificationLandingInfoCard}>
+        <View style={[styles.notificationLandingInfoHeader, isRtl && styles.flexRowRtl]}>
+          <View style={styles.notificationLandingIcon}>
+            <Image
+              alt=""
+              resizeMode="contain"
+              source={mobileIconAssets.common.message}
+              style={styles.notificationLandingIconImage}
+            />
+          </View>
+          <Text style={styles.messageSafetyBadge}>{copy.badge}</Text>
+        </View>
+        <Text
+          maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+          style={[styles.notificationLandingInfoTitle, isRtl && styles.rtlText]}
+        >
+          {copy.infoTitle}
+        </Text>
+        <Text
+          maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+          style={[styles.notificationLandingInfoBody, isRtl && styles.rtlText]}
+        >
+          {copy.body}
+        </Text>
+      </View>
+
+      <View style={styles.notificationLandingSections}>
+        {NOTIFICATIONS_LANDING_LAYOUT.sectionOrder.map((destination) => (
+          <NotificationLandingDestination
+            description={copy.sectionDescriptions[destination]}
+            isRtl={isRtl}
+            key={destination}
+            onPress={() => onSectionChange(destination)}
+            styles={styles}
+            title={copy.sectionTitles[destination]}
+          />
+        ))}
+      </View>
     </>
+  );
+}
+
+function NotificationLandingDestination({
+  description,
+  isRtl,
+  onPress,
+  styles,
+  title,
+}: {
+  description: string;
+  isRtl: boolean;
+  onPress: () => void;
+  styles: MobileStyles;
+  title: string;
+}) {
+  return (
+    <PremiumPressable
+      accessibilityHint={description}
+      accessibilityLabel={title}
+      accessibilityRole="button"
+      onPress={onPress}
+      style={[styles.notificationLandingRow, isRtl && styles.flexRowRtl]}
+    >
+      <View style={styles.notificationLandingRowIcon}>
+        <Image
+          alt=""
+          resizeMode="contain"
+          source={mobileIconAssets.common.notificationBell}
+          style={styles.notificationLandingRowIconImage}
+        />
+      </View>
+      <View style={styles.rowCopy}>
+        <Text style={[styles.notificationLandingRowTitle, isRtl && styles.rtlText]}>
+          {title}
+        </Text>
+        <Text style={[styles.notificationLandingRowBody, isRtl && styles.rtlText]}>
+          {description}
+        </Text>
+      </View>
+      <Text style={styles.preferenceChevron}>{isRtl ? "‹" : "›"}</Text>
+    </PremiumPressable>
   );
 }
 
@@ -4286,7 +4493,6 @@ function CommerceNotificationsCenter({
 
   return (
     <View style={styles.notificationPanel}>
-      <SectionHeader isRtl={isRtl} styles={styles} title={copy.notifications} />
       {state === "loading" && items.length === 0 ? (
         <Text
           maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
@@ -4303,7 +4509,7 @@ function CommerceNotificationsCenter({
             retryRequest?.cursor ?? null,
             retryRequest?.append ?? false,
           )}
-          style={styles.notificationCard}
+          style={[styles.notificationCard, isRtl && styles.flexRowRtl]}
         >
           <Text
             maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
@@ -4320,7 +4526,7 @@ function CommerceNotificationsCenter({
         </Pressable>
       ) : null}
       {state === "unauthenticated" ? (
-        <Pressable accessibilityLabel={copy.retry} accessibilityRole="button" onPress={() => void load(null, false)} style={styles.notificationCard}>
+        <Pressable accessibilityLabel={copy.retry} accessibilityRole="button" onPress={() => void load(null, false)} style={[styles.notificationCard, isRtl && styles.flexRowRtl]}>
           <Text
             maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
             style={[styles.rowTitle, isRtl && styles.rtlText]}
@@ -4351,11 +4557,11 @@ function CommerceNotificationsCenter({
               <Image alt="" resizeMode="contain" source={mobileIconAssets.common.notificationBell} style={styles.notificationIconImage} />
             </View>
             <View style={styles.rowCopy}>
-              <View style={styles.notificationTitleRow}>
+              <View style={[styles.notificationTitleRow, isRtl && styles.flexRowRtl]}>
                 <Text
                   maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
                   numberOfLines={2}
-                  style={[styles.rowTitle, isRtl && styles.rtlText]}
+                  style={[styles.notificationTitle, isRtl && styles.rtlText]}
                 >
                   {item.title}
                 </Text>
@@ -4368,7 +4574,7 @@ function CommerceNotificationsCenter({
               </View>
               <Text
                 maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
-                style={[styles.rowMeta, isRtl && styles.rtlText]}
+                style={[styles.notificationBody, isRtl && styles.rtlText]}
               >
                 {item.body}
               </Text>
@@ -4381,11 +4587,11 @@ function CommerceNotificationsCenter({
             accessibilityRole="button"
             key={item.id}
             onPress={() => onOpenOrder(orderId)}
-            style={styles.notificationCard}
+            style={[styles.notificationCard, isRtl && styles.flexRowRtl]}
           >
             {content}
           </Pressable>
-        ) : <View key={item.id} style={styles.notificationCard}>{content}</View>;
+        ) : <View key={item.id} style={[styles.notificationCard, isRtl && styles.flexRowRtl]}>{content}</View>;
       })}
       {hasNextPage && nextCursor ? (
         <Pressable
@@ -4393,7 +4599,7 @@ function CommerceNotificationsCenter({
           accessibilityRole="button"
           disabled={state === "loading"}
           onPress={() => void load(nextCursor, true)}
-          style={styles.notificationCard}
+          style={[styles.notificationCard, isRtl && styles.flexRowRtl]}
         >
           <Text
             maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
@@ -4416,17 +4622,14 @@ function NotificationsCenterPreview({
 }) {
   return (
     <View style={styles.notificationPanel}>
-      <SectionHeader
-        action="إدارة"
-        isRtl={isRtl}
-        styles={styles}
-        title="مركز الإشعارات"
-      />
       {notificationPreviewItems.map((item, index) => (
         <View
+          accessibilityLabel={`${item.title}. ${item.body}. ${item.time}`}
+          accessible
           key={item.title}
           style={[
             styles.notificationCard,
+            isRtl && styles.flexRowRtl,
             index === 0 && styles.notificationCardUnread,
           ]}
         >
@@ -4445,11 +4648,11 @@ function NotificationsCenterPreview({
             />
           </View>
           <View style={styles.rowCopy}>
-            <View style={styles.notificationTitleRow}>
+            <View style={[styles.notificationTitleRow, isRtl && styles.flexRowRtl]}>
               <Text
                 maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
                 numberOfLines={2}
-                style={[styles.rowTitle, isRtl && styles.rtlText]}
+                style={[styles.notificationTitle, isRtl && styles.rtlText]}
               >
                 {item.title}
               </Text>
@@ -4462,7 +4665,7 @@ function NotificationsCenterPreview({
             </View>
             <Text
               maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
-              style={[styles.rowMeta, isRtl && styles.rtlText]}
+              style={[styles.notificationBody, isRtl && styles.rtlText]}
             >
               {item.body}
             </Text>
@@ -4481,19 +4684,27 @@ function NotificationsCenterPreview({
 
 function ConversationListPreview({
   isRtl,
+  onOpenConversation,
   styles,
 }: {
   isRtl: boolean;
+  onOpenConversation: () => void;
   styles: MobileStyles;
 }) {
   return (
     <View style={styles.conversationPanel}>
-      <SectionHeader isRtl={isRtl} styles={styles} title="المحادثات" />
       {conversationPreviewItems.map((conversation) => {
         const nameIsLtr = getTextWritingDirection(conversation.name) === "ltr";
 
         return (
-          <View key={conversation.name} style={styles.conversationRow}>
+          <PremiumPressable
+            accessibilityHint="يفتح معاينة المحادثة بدون تفعيل الإرسال."
+            accessibilityLabel={conversation.name}
+            accessibilityRole="button"
+            key={conversation.name}
+            onPress={onOpenConversation}
+            style={[styles.conversationRow, isRtl && styles.flexRowRtl]}
+          >
             <View style={styles.conversationAvatar}>
               <Text
                 maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
@@ -4505,9 +4716,10 @@ function ConversationListPreview({
             <View style={styles.rowCopy}>
               <Text
                 maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+                ellipsizeMode="tail"
                 numberOfLines={1}
                 style={[
-                  styles.rowTitle,
+                  styles.conversationName,
                   nameIsLtr ? styles.ltrText : isRtl && styles.rtlText,
                 ]}
               >
@@ -4515,8 +4727,9 @@ function ConversationListPreview({
               </Text>
               <Text
                 maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+                ellipsizeMode="tail"
                 numberOfLines={2}
-                style={[styles.rowMeta, isRtl && styles.rtlText]}
+                style={[styles.conversationPreview, isRtl && styles.rtlText]}
               >
                 {conversation.lastMessage}
               </Text>
@@ -4544,7 +4757,7 @@ function ConversationListPreview({
                 </Text>
               ) : null}
             </View>
-          </View>
+          </PremiumPressable>
         );
       })}
     </View>
@@ -4561,15 +4774,25 @@ function MessageDetailPreview({
   return (
     <View style={styles.chatPanel}>
       <View style={styles.chatHeader}>
-        <View>
-          <Text style={[styles.screenEyebrow, isRtl && styles.rtlText]}>
+        <View style={[styles.chatMetaRow, isRtl && styles.flexRowRtl]}>
+          <Text
+            maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+            style={[styles.screenEyebrow, isRtl && styles.rtlText]}
+          >
             محادثة الحجز
           </Text>
-          <Text style={[styles.chatTitle, isRtl && styles.rtlText]}>
-            Noura Beauty Lounge
-          </Text>
+          <Text style={styles.messageSafetyBadge}>بدون إرسال</Text>
         </View>
-        <Text style={styles.messageSafetyBadge}>بدون إرسال</Text>
+        <Text
+          adjustsFontSizeToFit
+          ellipsizeMode="tail"
+          maxFontSizeMultiplier={DISPLAY_MAX_FONT_SIZE_MULTIPLIER}
+          minimumFontScale={0.88}
+          numberOfLines={1}
+          style={[styles.chatTitle, styles.ltrText]}
+        >
+          Noura Beauty Lounge
+        </Text>
       </View>
       {messageBubblePreview.map((message) => (
         <View
@@ -4580,6 +4803,7 @@ function MessageDetailPreview({
           ]}
         >
           <Text
+            maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
             style={[
               styles.chatBubbleText,
               message.from === "customer" && styles.chatBubbleTextCustomer,
@@ -4589,6 +4813,7 @@ function MessageDetailPreview({
             {message.body}
           </Text>
           <Text
+            maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
             style={[
               styles.chatBubbleTime,
               message.from === "customer" && styles.chatBubbleTimeCustomer,
@@ -4600,15 +4825,19 @@ function MessageDetailPreview({
       ))}
       <View style={styles.quickReplyRow}>
         {quickReplyPreview.map((reply) => (
-          <Text key={reply} style={styles.quickReplyChip}>
+          <Text
+            key={reply}
+            maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+            style={styles.quickReplyChip}
+          >
             {reply}
           </Text>
         ))}
       </View>
       <View style={styles.messagePlaceholderRow}>
-        <Text style={styles.messagePlaceholderChip}>مرفق</Text>
-        <Text style={styles.messagePlaceholderChip}>موقع</Text>
-        <Text style={styles.messagePlaceholderChip}>دفع بصري</Text>
+        <Text maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER} style={styles.messagePlaceholderChip}>مرفق</Text>
+        <Text maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER} style={styles.messagePlaceholderChip}>موقع</Text>
+        <Text maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER} style={styles.messagePlaceholderChip}>دفع بصري</Text>
       </View>
     </View>
   );
@@ -4624,11 +4853,23 @@ function NotificationPreferencesPreview({
   return (
     <View style={styles.preferencesPanel}>
       <SectionHeader isRtl={isRtl} styles={styles} title="تفضيلات الإشعارات" />
-      {notificationPreferenceRows.map((row) => (
-        <View key={row.label} style={styles.preferenceRow}>
-          <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>
-            {row.label}
-          </Text>
+      {accountNotificationRows.map((row) => (
+        <View
+          accessibilityLabel={`${row.label}. ${row.meta}`}
+          accessibilityRole="switch"
+          accessibilityState={{ checked: row.enabled, disabled: true }}
+          accessible
+          key={row.label}
+          style={[styles.preferenceRow, isRtl && styles.flexRowRtl]}
+        >
+          <View style={styles.preferenceCopy}>
+            <Text style={[styles.preferenceRowTitle, isRtl && styles.rtlText]}>
+              {row.label}
+            </Text>
+            <Text style={[styles.preferenceRowMeta, isRtl && styles.rtlText]}>
+              {row.meta}
+            </Text>
+          </View>
           <View
             style={[
               styles.preferenceToggle,
@@ -4644,9 +4885,11 @@ function NotificationPreferencesPreview({
           </View>
         </View>
       ))}
-      <Text style={[styles.preferenceNote, isRtl && styles.rtlText]}>
-        المفاتيح بصرية فقط ولا تحفظ أي إعدادات أو تطلب صلاحيات جهاز.
-      </Text>
+      <View style={styles.preferenceInfoCard}>
+        <Text style={[styles.preferenceNote, isRtl && styles.rtlText]}>
+          المفاتيح بصرية فقط ولا تحفظ أي إعدادات أو تطلب صلاحيات جهاز.
+        </Text>
+      </View>
     </View>
   );
 }
@@ -4862,6 +5105,7 @@ function AccountScreen({
   isRtl,
   locale,
   onLocaleChange,
+  onNavigate,
   onOpenAuth,
   onOpenSetup,
   onSectionChange,
@@ -4880,6 +5124,7 @@ function AccountScreen({
   isRtl: boolean;
   locale: MobileLocale;
   onLocaleChange: (locale: MobileLocale) => void;
+  onNavigate: (tabId: MobileAppTabId) => void;
   onOpenAuth: (mode: MobileAuthMode) => void;
   onOpenSetup: () => void;
   onSectionChange: (section: AccountSection) => void;
@@ -4927,7 +5172,7 @@ function AccountScreen({
   return (
     <>
       <View style={styles.accountHeroCard}>
-        <View style={styles.profileHeroTopRow}>
+        <View style={[styles.profileHeroTopRow, isRtl && styles.flexRowRtl]}>
           <View style={styles.accountAvatar}>
             <Text style={styles.accountAvatarText}>{avatarLabel}</Text>
           </View>
@@ -4940,24 +5185,27 @@ function AccountScreen({
             </Text>
           </View>
         </View>
-        <Text
-          maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
-          style={[styles.screenEyebrow, isRtl && styles.rtlText]}
-        >
-          الملف الشخصي
-        </Text>
-        <Text
-          maxFontSizeMultiplier={DISPLAY_MAX_FONT_SIZE_MULTIPLIER}
-          style={[styles.screenTitle, isRtl && styles.rtlText]}
-        >
-          {accountTitle}
-        </Text>
-        <Text
-          maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
-          style={[styles.screenDescription, isRtl && styles.rtlText]}
-        >
-          {accountDescription}
-        </Text>
+        <View style={styles.accountHeroCopy}>
+          <Text
+            maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+            style={[styles.accountEyebrow, isRtl && styles.rtlText]}
+          >
+            الملف الشخصي
+          </Text>
+          <Text
+            maxFontSizeMultiplier={DISPLAY_MAX_FONT_SIZE_MULTIPLIER}
+            numberOfLines={2}
+            style={[styles.accountTitle, isRtl && styles.rtlText]}
+          >
+            {accountTitle}
+          </Text>
+          <Text
+            maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+            style={[styles.accountDescription, isRtl && styles.rtlText]}
+          >
+            {accountDescription}
+          </Text>
+        </View>
         {authenticatedUser ? (
           <View style={styles.profileStatsGrid}>
             {profileOverviewStats.map((stat) => (
@@ -5073,7 +5321,7 @@ function AccountScreen({
       </View>
 
       <View style={styles.settingsCard}>
-        <Text style={[styles.cardTitle, isRtl && styles.rtlText]}>
+        <Text style={[styles.accountSectionTitle, isRtl && styles.rtlText]}>
           اللغة والمظهر
         </Text>
         <Text style={[styles.cardBody, isRtl && styles.rtlText]}>
@@ -5098,6 +5346,7 @@ function AccountScreen({
                 onPress={() => onLocaleChange(row.locale)}
                 style={({ pressed }) => [
                   styles.accountPreferenceRow,
+                  isRtl && styles.flexRowRtl,
                   pressed && styles.softButtonPressed,
                 ]}
               >
@@ -5140,6 +5389,7 @@ function AccountScreen({
                 onPress={() => onThemeModeChange(row.mode)}
                 style={({ pressed }) => [
                   styles.accountPreferenceRow,
+                  isRtl && styles.flexRowRtl,
                   pressed && styles.softButtonPressed,
                 ]}
               >
@@ -5167,7 +5417,7 @@ function AccountScreen({
       </View>
 
       <View style={styles.accountDestinationsCard}>
-        <Text style={[styles.cardTitle, isRtl && styles.rtlText]}>إعدادات الحساب</Text>
+        <Text style={[styles.accountSectionTitle, isRtl && styles.rtlText]}>إعدادات الحساب</Text>
         <AccountDestinationRow
           isRtl={isRtl}
           meta={accountSectionCopy[locale].notificationsSubtitle}
@@ -5184,8 +5434,22 @@ function AccountScreen({
         />
       </View>
 
+      <View style={styles.accountDestinationsCard}>
+        <Text style={[styles.accountSectionTitle, isRtl && styles.rtlText]}>نشاطي</Text>
+        {accountActivityRows[locale].map((row) => (
+          <AccountDestinationRow
+            isRtl={isRtl}
+            key={row.destination}
+            meta={row.meta}
+            onPress={() => onNavigate(row.destination)}
+            styles={styles}
+            title={row.title}
+          />
+        ))}
+      </View>
+
       <View style={styles.privacyCard}>
-        <Text style={[styles.cardTitle, isRtl && styles.rtlText]}>
+        <Text style={[styles.accountSectionTitle, isRtl && styles.rtlText]}>
           الأمان والخصوصية
         </Text>
         <Text style={[styles.cardBody, isRtl && styles.rtlText]}>
@@ -5238,7 +5502,7 @@ function AccountDestinationRow({ isRtl, meta, onPress, styles, title }: {
       accessibilityRole="button"
       hitSlop={TOUCH_HIT_SLOP}
       onPress={onPress}
-      style={styles.accountDestinationRow}
+      style={[styles.accountDestinationRow, isRtl && styles.flexRowRtl]}
     >
       <View style={styles.preferenceCopy}>
         <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>{title}</Text>
@@ -5262,20 +5526,22 @@ function AccountNotificationPreferencesScreen({ isRtl, styles }: {
           accessibilityState={{ checked: row.enabled, disabled: true }}
           accessible
           key={row.label}
-          style={styles.preferenceRow}
+          style={[styles.preferenceRow, isRtl && styles.flexRowRtl]}
         >
           <View style={styles.preferenceCopy}>
-            <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>{row.label}</Text>
-            <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>{row.meta}</Text>
+            <Text style={[styles.preferenceRowTitle, isRtl && styles.rtlText]}>{row.label}</Text>
+            <Text style={[styles.preferenceRowMeta, isRtl && styles.rtlText]}>{row.meta}</Text>
           </View>
           <View style={[styles.preferenceToggle, row.enabled && styles.preferenceToggleActive]}>
             <View style={[styles.preferenceKnob, row.enabled && styles.preferenceKnobActive]} />
           </View>
         </View>
       ))}
-      <Text style={[styles.preferenceNote, isRtl && styles.rtlText]}>
-        المفاتيح بصرية فقط ولا تطلب إذن إشعارات أو تحفظ تفضيلات.
-      </Text>
+      <View style={styles.preferenceInfoCard}>
+        <Text style={[styles.preferenceNote, isRtl && styles.rtlText]}>
+          المفاتيح بصرية فقط ولا تطلب إذن إشعارات أو تحفظ تفضيلات.
+        </Text>
+      </View>
     </View>
   );
 }
@@ -5332,6 +5598,7 @@ const createStyles = (
       marginTop: 18,
     },
     appScroll: {
+      backgroundColor: FULL_SCREEN_BACKGROUND_LAYOUT.scrollBackground,
       flex: 1,
     },
     authError: {
@@ -5407,18 +5674,18 @@ const createStyles = (
     accountDestinationsCard: {
       backgroundColor: theme.colors.card,
       borderColor: theme.colors.border,
-      borderRadius: 24,
+      borderRadius: 20,
       borderWidth: 1,
       gap: layout.verticalSpacing,
-      padding: layout.cardPadding,
+      padding: layout.isCompactHeight ? 14 : 16,
     },
     accountAvatar: {
       alignItems: "center",
       backgroundColor: theme.colors.gold,
-      borderRadius: 26,
-      height: 52,
+      borderRadius: ACCOUNT_VISUAL_LAYOUT.avatarSize / 2,
+      height: ACCOUNT_VISUAL_LAYOUT.avatarSize,
       justifyContent: "center",
-      width: 52,
+      width: ACCOUNT_VISUAL_LAYOUT.avatarSize,
     },
     accountAvatarText: {
       color: theme.colors.foregroundInverse,
@@ -5428,13 +5695,53 @@ const createStyles = (
     accountHeroCard: {
       backgroundColor: theme.colors.hero,
       borderColor: theme.colors.goldSoft,
-      borderRadius: layout.borderRadius,
+      borderRadius: 22,
       borderWidth: 1,
-      padding: layout.cardPadding,
+      padding: layout.isCompactHeight ? 14 : 16,
       shadowColor: theme.colors.shadow,
-      shadowOffset: { height: 26, width: 0 },
-      shadowOpacity: theme.isDark ? 0.38 : 0.13,
-      shadowRadius: 38,
+      shadowOffset: { height: 14, width: 0 },
+      shadowOpacity: theme.isDark ? 0.24 : 0.08,
+      shadowRadius: 24,
+    },
+    accountHeroCopy: {
+      gap: 4,
+      minWidth: 0,
+    },
+    accountEyebrow: {
+      color: theme.colors.gold,
+      fontFamily: mobileTypography.uiMedium,
+      fontSize: 14,
+      lineHeight: 19,
+    },
+    accountTitle: {
+      color: theme.colors.foreground,
+      flexShrink: 1,
+      fontFamily: mobileTypography.kufiBold,
+      fontSize: Math.min(
+        layout.typography.pageTitle,
+        ACCOUNT_VISUAL_LAYOUT.titleMaximum,
+      ),
+      letterSpacing: -0.2,
+      lineHeight: layout.typography.pageTitle + 8,
+    },
+    accountDescription: {
+      color: theme.colors.mutedForeground,
+      flexShrink: 1,
+      fontFamily: mobileTypography.uiRegular,
+      fontSize: Math.min(
+        layout.typography.body,
+        ACCOUNT_VISUAL_LAYOUT.bodyMaximum,
+      ),
+      lineHeight: 22,
+    },
+    accountSectionTitle: {
+      color: theme.colors.foreground,
+      fontFamily: mobileTypography.kufiBold,
+      fontSize: Math.min(
+        layout.typography.sectionTitle,
+        ACCOUNT_VISUAL_LAYOUT.sectionTitleMaximum,
+      ),
+      lineHeight: layout.typography.sectionTitle + 7,
     },
     accountPreferenceDot: {
       backgroundColor: theme.colors.muted,
@@ -7770,12 +8077,28 @@ const createStyles = (
     },
     header: {
       alignItems: "center",
-      backgroundColor: theme.colors.background,
+      backgroundColor: "transparent",
       flexDirection: "row",
       gap: 8,
       minHeight: layout.headerHeight,
       paddingHorizontal: layout.pagePadding,
       paddingVertical: layout.isCompactHeight ? 8 : 10,
+    },
+    headerRtl: {
+      flexDirection: "row-reverse",
+    },
+    headerAction: {
+      alignItems: "center",
+      height: layout.touchTarget,
+      justifyContent: "center",
+      width: layout.touchTarget,
+    },
+    headerActionText: {
+      color: theme.colors.gold,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: 14,
+      lineHeight: 20,
+      textAlign: "center",
     },
     headerBackButton: {
       alignItems: "center",
@@ -7808,8 +8131,8 @@ const createStyles = (
     headerPageTitle: {
       color: theme.colors.foreground,
       fontFamily: mobileTypography.kufiBold,
-      fontSize: layout.isCompactHeight ? 17 : 18,
-      lineHeight: layout.isCompactHeight ? 23 : 25,
+      fontSize: layout.typography.pageTitle,
+      lineHeight: layout.typography.pageTitle + 7,
       textAlign: "center",
     },
     headerSpacer: {
@@ -8408,8 +8731,8 @@ const createStyles = (
     chatBubbleText: {
       color: theme.colors.foreground,
       fontFamily: mobileTypography.uiSemiBold,
-      fontSize: 14,
-      lineHeight: 21,
+      fontSize: 15,
+      lineHeight: 22,
     },
     chatBubbleTextCustomer: {
       color: theme.colors.foregroundInverse,
@@ -8417,7 +8740,7 @@ const createStyles = (
     chatBubbleTime: {
       color: theme.colors.mutedForeground,
       fontFamily: mobileTypography.uiRegular,
-      fontSize: 10,
+      fontSize: 12,
       marginTop: 6,
     },
     chatBubbleTimeCustomer: {
@@ -8425,6 +8748,10 @@ const createStyles = (
       opacity: 0.75,
     },
     chatHeader: {
+      gap: 6,
+      width: "100%",
+    },
+    chatMetaRow: {
       alignItems: "center",
       flexDirection: "row",
       justifyContent: "space-between",
@@ -8432,24 +8759,24 @@ const createStyles = (
     chatPanel: {
       backgroundColor: theme.colors.cardElevated,
       borderColor: theme.colors.goldSoft,
-      borderRadius: theme.radii.card,
+      borderRadius: 22,
       borderWidth: 1,
-      gap: 14,
-      padding: 20,
+      gap: 12,
+      padding: layout.isCompactHeight ? 14 : 16,
     },
     chatTitle: {
       color: theme.colors.foreground,
-      fontFamily: mobileTypography.kufiBold,
-      fontSize: 20,
-      marginTop: 4,
+      fontFamily: mobileTypography.uiBold,
+      fontSize: Math.min(layout.typography.pageTitle, 22),
+      lineHeight: 29,
     },
     conversationAvatar: {
       alignItems: "center",
       backgroundColor: theme.colors.goldSoft,
-      borderRadius: 22,
-      height: 44,
+      borderRadius: MESSAGE_PREVIEW_ROW_LAYOUT.avatarSize / 2,
+      height: MESSAGE_PREVIEW_ROW_LAYOUT.avatarSize,
       justifyContent: "center",
-      width: 44,
+      width: MESSAGE_PREVIEW_ROW_LAYOUT.avatarSize,
     },
     conversationAvatarText: {
       color: theme.colors.deepGold,
@@ -8457,12 +8784,8 @@ const createStyles = (
       fontSize: 16,
     },
     conversationPanel: {
-      backgroundColor: theme.colors.card,
-      borderColor: theme.colors.goldSoft,
-      borderRadius: theme.radii.card,
-      borderWidth: 1,
+      backgroundColor: "transparent",
       gap: layout.verticalSpacing,
-      padding: layout.cardPadding,
     },
     conversationMeta: {
       alignItems: "flex-end",
@@ -8471,21 +8794,44 @@ const createStyles = (
       width: MESSAGE_PREVIEW_ROW_LAYOUT.metaColumnWidth,
     },
     conversationRow: {
-      alignItems: "flex-start",
+      alignItems: "center",
       backgroundColor: theme.colors.cardElevated,
       borderColor: theme.colors.border,
-      borderRadius: 22,
+      borderRadius: 18,
       borderWidth: 1,
       flexDirection: "row",
       gap: 10,
       padding: layout.isCompactHeight ? 12 : 14,
     },
+    conversationName: {
+      color: theme.colors.foreground,
+      flexShrink: 1,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: Math.min(
+        layout.typography.cardTitle,
+        MESSAGE_PREVIEW_ROW_LAYOUT.businessNameMaximum,
+      ),
+      lineHeight: 23,
+      minWidth: 0,
+    },
+    conversationPreview: {
+      color: theme.colors.mutedForeground,
+      flexShrink: 1,
+      fontFamily: mobileTypography.uiRegular,
+      fontSize: Math.min(
+        layout.typography.body,
+        MESSAGE_PREVIEW_ROW_LAYOUT.previewMaximum,
+      ),
+      lineHeight: 20,
+      marginTop: 2,
+      minWidth: 0,
+    },
     conversationStatus: {
       color: theme.colors.gold,
       fontFamily: mobileTypography.uiMedium,
-      fontSize: 11,
-      lineHeight: 15,
-      marginTop: 6,
+      fontSize: 12,
+      lineHeight: 16,
+      marginTop: 4,
     },
     marketplaceMode: {
       backgroundColor: theme.colors.cardElevated,
@@ -8517,65 +8863,6 @@ const createStyles = (
       justifyContent: "flex-start",
       marginBottom: 12,
     },
-    messageHeroBody: {
-      color: theme.colors.mutedForeground,
-      fontFamily: mobileTypography.uiRegular,
-      fontSize: layout.typography.body,
-      lineHeight: 22,
-      marginTop: 8,
-    },
-    messageHeroCard: {
-      backgroundColor: theme.colors.hero,
-      borderColor: theme.isDark ? theme.colors.goldSoft : theme.colors.gold,
-      borderRadius: layout.borderRadius,
-      borderWidth: 1,
-      overflow: "hidden",
-      padding: layout.cardPadding,
-      shadowColor: theme.colors.shadow,
-      shadowOffset: { height: 20, width: 0 },
-      shadowOpacity: theme.isDark ? 0.36 : 0.13,
-      shadowRadius: 32,
-    },
-    messageHeroGlow: {
-      backgroundColor: theme.colors.goldSoft,
-      borderRadius: 999,
-      height: 96,
-      opacity: 0.85,
-      position: "absolute",
-      right: -32,
-      top: -38,
-      width: 96,
-    },
-    messageHeroIcon: {
-      alignItems: "center",
-      backgroundColor: theme.colors.gold,
-      borderRadius: 20,
-      height: 40,
-      justifyContent: "center",
-      width: 40,
-    },
-    messageHeroIconText: {
-      color: theme.colors.foregroundInverse,
-      fontFamily: mobileTypography.uiBold,
-      fontSize: 22,
-    },
-    messageHeroIconImage: {
-      height: 20,
-      tintColor: theme.colors.foregroundInverse,
-      width: 20,
-    },
-    messageHeroTitle: {
-      color: theme.colors.foreground,
-      fontFamily: mobileTypography.kufiBold,
-      fontSize: layout.typography.pageTitle,
-      lineHeight: layout.typography.pageTitle + 8,
-      marginTop: 12,
-    },
-    messageHeroTopRow: {
-      alignItems: "center",
-      flexDirection: "row",
-      justifyContent: "space-between",
-    },
     messagePlaceholderChip: {
       backgroundColor: theme.colors.muted,
       borderRadius: theme.radii.pill,
@@ -8603,6 +8890,86 @@ const createStyles = (
       overflow: "hidden",
       paddingHorizontal: 10,
       paddingVertical: 7,
+    },
+    notificationLandingInfoCard: {
+      backgroundColor: theme.colors.card,
+      borderColor: theme.colors.goldSoft,
+      borderRadius: 20,
+      borderWidth: 1,
+      gap: 8,
+      padding: layout.isCompactHeight ? 14 : 16,
+    },
+    notificationLandingInfoHeader: {
+      alignItems: "center",
+      flexDirection: "row",
+      justifyContent: "space-between",
+    },
+    notificationLandingIcon: {
+      alignItems: "center",
+      backgroundColor: theme.colors.goldSoft,
+      borderRadius: 18,
+      height: 36,
+      justifyContent: "center",
+      width: 36,
+    },
+    notificationLandingIconImage: {
+      height: 18,
+      tintColor: theme.colors.gold,
+      width: 18,
+    },
+    notificationLandingInfoTitle: {
+      color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: layout.typography.cardTitle,
+      lineHeight: 23,
+    },
+    notificationLandingInfoBody: {
+      color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiRegular,
+      fontSize: layout.typography.body,
+      lineHeight: 22,
+    },
+    notificationLandingSections: {
+      gap: 12,
+    },
+    notificationLandingRow: {
+      alignItems: "center",
+      backgroundColor: theme.colors.cardElevated,
+      borderColor: theme.colors.border,
+      borderRadius: 18,
+      borderWidth: 1,
+      flexDirection: "row",
+      gap: 12,
+      minHeight: 72,
+      padding: 14,
+    },
+    notificationLandingRowIcon: {
+      alignItems: "center",
+      backgroundColor: theme.colors.goldSoft,
+      borderRadius: 18,
+      height: 36,
+      justifyContent: "center",
+      width: 36,
+    },
+    notificationLandingRowIconImage: {
+      height: 18,
+      tintColor: theme.colors.gold,
+      width: 18,
+    },
+    notificationLandingRowTitle: {
+      color: theme.colors.foreground,
+      flexShrink: 1,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: layout.typography.cardTitle,
+      lineHeight: 22,
+    },
+    notificationLandingRowBody: {
+      color: theme.colors.mutedForeground,
+      flexShrink: 1,
+      fontFamily: mobileTypography.uiRegular,
+      fontSize: layout.typography.secondary,
+      lineHeight: 19,
+      marginTop: 2,
     },
     myBookingCard: {
       backgroundColor: theme.colors.cardElevated,
@@ -8635,14 +9002,14 @@ const createStyles = (
       marginTop: 8,
     },
     notificationCard: {
-      alignItems: "flex-start",
+      alignItems: "center",
       backgroundColor: theme.colors.cardElevated,
       borderColor: theme.colors.border,
-      borderRadius: 22,
+      borderRadius: 18,
       borderWidth: 1,
       flexDirection: "row",
-      gap: 12,
-      padding: 14,
+      gap: NOTIFICATION_CARD_LAYOUT.gap,
+      padding: NOTIFICATION_CARD_LAYOUT.padding,
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: 8, width: 0 },
       shadowOpacity: theme.isDark ? 0.12 : 0.04,
@@ -8655,10 +9022,10 @@ const createStyles = (
     notificationIcon: {
       alignItems: "center",
       backgroundColor: theme.colors.gold,
-      borderRadius: 20,
-      height: 40,
+      borderRadius: NOTIFICATION_CARD_LAYOUT.iconSize / 2,
+      height: NOTIFICATION_CARD_LAYOUT.iconSize,
       justifyContent: "center",
-      width: 40,
+      width: NOTIFICATION_CARD_LAYOUT.iconSize,
     },
     notificationIconText: {
       color: theme.colors.foregroundInverse,
@@ -8671,12 +9038,32 @@ const createStyles = (
       width: 20,
     },
     notificationPanel: {
-      backgroundColor: theme.colors.cardElevated,
-      borderColor: theme.colors.goldSoft,
-      borderRadius: theme.radii.card,
-      borderWidth: 1,
+      backgroundColor: "transparent",
       gap: layout.verticalSpacing,
-      padding: layout.cardPadding,
+    },
+    notificationTitle: {
+      color: theme.colors.foreground,
+      flex: 1,
+      flexShrink: 1,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: Math.min(
+        layout.typography.cardTitle,
+        NOTIFICATION_CARD_LAYOUT.titleMaximum,
+      ),
+      lineHeight: 23,
+      minWidth: 0,
+    },
+    notificationBody: {
+      color: theme.colors.mutedForeground,
+      flexShrink: 1,
+      fontFamily: mobileTypography.uiRegular,
+      fontSize: Math.min(
+        layout.typography.body,
+        NOTIFICATION_CARD_LAYOUT.bodyMaximum,
+      ),
+      lineHeight: 21,
+      marginTop: 3,
+      minWidth: 0,
     },
     notificationStatusChip: {
       alignSelf: "flex-start",
@@ -8686,8 +9073,8 @@ const createStyles = (
       borderWidth: 1,
       color: theme.colors.deepGold,
       fontFamily: mobileTypography.uiMedium,
-      fontSize: 11,
-      lineHeight: 15,
+      fontSize: 12,
+      lineHeight: 16,
       marginTop: 8,
       overflow: "hidden",
       paddingHorizontal: 9,
@@ -8697,7 +9084,10 @@ const createStyles = (
       color: theme.colors.mutedForeground,
       flexShrink: 0,
       fontFamily: mobileTypography.uiMedium,
-      fontSize: 11,
+      fontSize: Math.min(
+        layout.typography.metadata,
+        NOTIFICATION_CARD_LAYOUT.timestampMaximum,
+      ),
     },
     notificationTitleRow: {
       alignItems: "flex-start",
@@ -9404,10 +9794,10 @@ const createStyles = (
     privacyCard: {
       backgroundColor: theme.colors.successSoft,
       borderColor: theme.colors.success,
-      borderRadius: 24,
+      borderRadius: 20,
       borderWidth: 1,
       gap: layout.verticalSpacing,
-      padding: layout.cardPadding,
+      padding: layout.isCompactHeight ? 14 : 16,
     },
     privacyGrid: {
       gap: 10,
@@ -9433,9 +9823,8 @@ const createStyles = (
     preferenceNote: {
       color: theme.colors.mutedForeground,
       fontFamily: mobileTypography.uiRegular,
-      fontSize: 12,
-      lineHeight: 19,
-      marginTop: 6,
+      fontSize: layout.typography.secondary,
+      lineHeight: 20,
     },
     preferenceChevron: {
       color: theme.colors.gold,
@@ -9443,9 +9832,9 @@ const createStyles = (
       fontSize: 20,
     },
     preferenceCopy: {
-      flex: 1,
+      flex: ACCOUNT_NOTIFICATION_ROW_LAYOUT.textColumnFlex,
       flexShrink: 1,
-      minWidth: 0,
+      minWidth: ACCOUNT_NOTIFICATION_ROW_LAYOUT.textColumnMinWidth,
     },
     preferenceGroupTitle: {
       color: theme.colors.deepGold,
@@ -9460,7 +9849,7 @@ const createStyles = (
       alignItems: "center",
       backgroundColor: theme.colors.cardElevated,
       borderColor: theme.colors.goldSoft,
-      borderRadius: 20,
+      borderRadius: 18,
       borderWidth: 1,
       flexDirection: "row",
       gap: 12,
@@ -9468,19 +9857,44 @@ const createStyles = (
       minHeight: layout.isCompactHeight
         ? ACCOUNT_NOTIFICATION_ROW_LAYOUT.compactMinHeight
         : ACCOUNT_NOTIFICATION_ROW_LAYOUT.defaultMinHeight,
-      padding: layout.isCompactHeight ? 12 : 14,
+      padding: 14,
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: 7, width: 0 },
       shadowOpacity: theme.isDark ? 0.12 : 0.04,
       shadowRadius: 12,
     },
     preferencesPanel: {
-      backgroundColor: theme.colors.cardElevated,
+      backgroundColor: theme.colors.card,
       borderColor: theme.colors.goldSoft,
-      borderRadius: theme.radii.card,
+      borderRadius: 20,
       borderWidth: 1,
-      gap: layout.sectionGap,
-      padding: layout.cardPadding,
+      gap: 12,
+      padding: layout.isCompactHeight ? 14 : 16,
+    },
+    preferenceInfoCard: {
+      backgroundColor: theme.colors.goldSoft,
+      borderColor: theme.colors.gold,
+      borderRadius: 16,
+      borderWidth: 1,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+    },
+    preferenceRowTitle: {
+      color: theme.colors.foreground,
+      flexShrink: 1,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: layout.typography.cardTitle,
+      lineHeight: 23,
+      minWidth: 0,
+    },
+    preferenceRowMeta: {
+      color: theme.colors.mutedForeground,
+      flexShrink: 1,
+      fontFamily: mobileTypography.uiRegular,
+      fontSize: layout.typography.secondary,
+      lineHeight: 19,
+      marginTop: 2,
+      minWidth: 0,
     },
     preferenceToggle: {
       backgroundColor: theme.colors.muted,
@@ -9488,7 +9902,7 @@ const createStyles = (
       flexShrink: 0,
       justifyContent: "center",
       padding: 3,
-      width: 44,
+      width: ACCOUNT_NOTIFICATION_ROW_LAYOUT.switchWidth,
     },
     preferenceToggleActive: {
       backgroundColor: theme.colors.gold,
@@ -9990,6 +10404,9 @@ const createStyles = (
     ltrText: {
       textAlign: "left",
       writingDirection: "ltr",
+    },
+    flexRowRtl: {
+      flexDirection: "row-reverse",
     },
     rtlText: {
       textAlign: "right",
@@ -11010,9 +11427,9 @@ const createStyles = (
     settingsCard: {
       backgroundColor: theme.colors.card,
       borderColor: theme.colors.border,
-      borderRadius: 24,
+      borderRadius: 20,
       borderWidth: 1,
-      padding: layout.cardPadding,
+      padding: layout.isCompactHeight ? 14 : 16,
     },
     supportCard: {
       backgroundColor: theme.colors.card,
@@ -11218,7 +11635,7 @@ const createStyles = (
       marginTop: 14,
     },
     bottomNavSafeArea: {
-      backgroundColor: theme.colors.background,
+      backgroundColor: "transparent",
       flexShrink: 0,
     },
     stepBody: {
@@ -11441,10 +11858,13 @@ const createStyles = (
       borderRadius: 999,
       color: theme.colors.foregroundInverse,
       fontFamily: mobileTypography.uiMedium,
+      height: MESSAGE_PREVIEW_ROW_LAYOUT.unreadBadgeSize,
       fontSize: 11,
+      lineHeight: MESSAGE_PREVIEW_ROW_LAYOUT.unreadBadgeSize,
+      minWidth: MESSAGE_PREVIEW_ROW_LAYOUT.unreadBadgeSize,
       overflow: "hidden",
-      paddingHorizontal: 8,
-      paddingVertical: 5,
+      paddingHorizontal: 6,
+      textAlign: "center",
     },
     voiceButton: {
       alignItems: "center",

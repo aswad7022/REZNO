@@ -263,6 +263,10 @@ type ReznoHomeScreenProps = {
   theme: MobileTheme;
 };
 
+export function getReznoHomeScreenBackground(theme: MobileTheme) {
+  return theme.isDark ? "#060f0e" : theme.colors.background;
+}
+
 export function ReznoHomeScreen({
   isRtl,
   locale,
@@ -1467,7 +1471,7 @@ const createStyles = (
 ) => {
   const palette = theme.isDark
     ? {
-        background: "#060f0e",
+        background: getReznoHomeScreenBackground(theme),
         border: "rgba(204, 156, 71, 0.26)",
         card: "#141b18",
         cardDeep: "#0b1918",
@@ -2334,7 +2338,7 @@ const createStyles = (
       writingDirection: "rtl",
     },
     screen: {
-      backgroundColor: palette.background,
+      backgroundColor: "transparent",
       direction: "ltr",
       gap: layout.verticalSpacing,
       paddingBottom: layout.verticalSpacing,
