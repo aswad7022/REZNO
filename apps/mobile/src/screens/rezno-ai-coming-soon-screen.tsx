@@ -1,7 +1,8 @@
 import { useMemo } from "react";
-import { Image, StyleSheet, Text, View, type ImageSourcePropType } from "react-native";
+import { Image, StyleSheet, View, type ImageSourcePropType } from "react-native";
 
 import { PremiumEntrance } from "../components/premium-motion";
+import { LayoutText as Text } from "../components/layout-text";
 import type { MobileLocale } from "../i18n/labels";
 import type { MobileResponsiveLayout } from "../layout/responsive-metrics";
 import { useMobileResponsiveLayout } from "../layout/use-mobile-responsive-layout";

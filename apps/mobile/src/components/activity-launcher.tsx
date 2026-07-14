@@ -5,14 +5,18 @@ import {
   Modal,
   Pressable,
   StyleSheet,
-  Text,
   View,
   type ImageSourcePropType,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import type { MobileLocale } from "../i18n/labels";
-import type { MobileResponsiveLayout } from "../layout/responsive-metrics";
+import { LayoutText as Text } from "./layout-text";
+import {
+  DISPLAY_MAX_FONT_SIZE_MULTIPLIER,
+  LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER,
+  type MobileResponsiveLayout,
+} from "../layout/responsive-metrics";
 import { useMobileResponsiveLayout } from "../layout/use-mobile-responsive-layout";
 import type { MobileAppTabId } from "./mobile-chrome";
 import { PremiumEntrance, PremiumPressable, useReducedMotionPreference } from "./premium-motion";
@@ -141,8 +145,18 @@ export function ActivityLauncher({
         >
           {useFallbackSheet ? (
             <View accessibilityViewIsModal style={styles.sheet}>
-              <Text style={[styles.sheetTitle, direction]}>{copy.title}</Text>
-              <Text style={[styles.sheetHint, direction]}>{copy.hint}</Text>
+              <Text
+                maxFontSizeMultiplier={DISPLAY_MAX_FONT_SIZE_MULTIPLIER}
+                style={[styles.sheetTitle, direction]}
+              >
+                {copy.title}
+              </Text>
+              <Text
+                maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+                style={[styles.sheetHint, direction]}
+              >
+                {copy.hint}
+              </Text>
               <View style={styles.sheetList}>
                 {destinations.map((destination) => (
                   <ActivityButton
@@ -166,8 +180,18 @@ export function ActivityLauncher({
                 style={styles.arcPanel}
               >
                 <View style={styles.arcHeading}>
-                  <Text style={[styles.arcTitle, direction]}>{copy.title}</Text>
-                  <Text style={[styles.arcHint, direction]}>{copy.hint}</Text>
+                  <Text
+                    maxFontSizeMultiplier={DISPLAY_MAX_FONT_SIZE_MULTIPLIER}
+                    style={[styles.arcTitle, direction]}
+                  >
+                    {copy.title}
+                  </Text>
+                  <Text
+                    maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+                    style={[styles.arcHint, direction]}
+                  >
+                    {copy.hint}
+                  </Text>
                 </View>
                 <View style={styles.arcRow}>
                   {destinations.map((destination, index) => (
@@ -245,7 +269,11 @@ function ActivityButton({
           style={styles.activityIcon}
         />
       </View>
-      <Text numberOfLines={1} style={[styles.activityLabel, direction]}>
+      <Text
+        maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+        numberOfLines={1}
+        style={[styles.activityLabel, direction]}
+      >
         {label}
       </Text>
     </PremiumPressable>

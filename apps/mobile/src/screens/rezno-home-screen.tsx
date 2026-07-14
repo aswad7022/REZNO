@@ -4,7 +4,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   View,
   type ImageSourcePropType,
 } from "react-native";
@@ -14,8 +13,14 @@ import {
   PremiumEntrance,
   PremiumPressable,
 } from "../components/premium-motion";
-import type { MobileResponsiveLayout } from "../layout/responsive-metrics";
+import { LayoutText as Text } from "../components/layout-text";
 import {
+  DISPLAY_MAX_FONT_SIZE_MULTIPLIER,
+  LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER,
+  type MobileResponsiveLayout,
+} from "../layout/responsive-metrics";
+import {
+  HOME_HERO_TITLE_MAX_LINES,
   HOME_HEADER_ACTION_MODE,
   homeHeaderActionLabelsAreVisible,
 } from "../layout/screen-contracts";
@@ -279,21 +284,12 @@ export function ReznoHomeScreen({
     66,
     (width - pagePadding * 2 - HOME_LAYOUT.categoryGap * 3) / 4,
   );
-  const categoryHeight = Math.min(
-    layout.categoryTileHeight,
-    Math.max(68, categoryWidth * 0.9),
-  );
+  const categoryHeight = layout.categoryTileHeight;
   const businessCardWidth = Math.min(
     HOME_LAYOUT.maxBusinessCardWidth,
     Math.max(HOME_LAYOUT.minBusinessCardWidth, Math.round(width * 0.42)),
   );
-  const heroTitleSize = layout.isCompactHeight
-    ? layout.isNarrowWidth
-      ? 19
-      : 21
-    : width >= HOME_LAYOUT.standardBreakpoint
-      ? 24
-      : 22;
+  const heroTitleSize = layout.typography.heroTitle;
   const businessSections = useMemo(
     () => deriveHomeBusinessSections(marketplaceState, locale, copy),
     [copy, locale, marketplaceState],
@@ -447,6 +443,7 @@ function HeroSection({
         <View style={styles.heroIdentity}>
           <Text
             adjustsFontSizeToFit
+            maxFontSizeMultiplier={DISPLAY_MAX_FONT_SIZE_MULTIPLIER}
             minimumFontScale={0.82}
             numberOfLines={1}
             style={[
@@ -487,6 +484,7 @@ function HeroSection({
           />
           <Text
             adjustsFontSizeToFit
+            maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
             minimumFontScale={0.88}
             numberOfLines={1}
             style={[
@@ -502,8 +500,9 @@ function HeroSection({
         <View style={styles.heroTitleWrap}>
           <Text
             adjustsFontSizeToFit
+            maxFontSizeMultiplier={DISPLAY_MAX_FONT_SIZE_MULTIPLIER}
             minimumFontScale={0.96}
-            numberOfLines={copy.heroTitleLines}
+            numberOfLines={Math.min(copy.heroTitleLines, HOME_HERO_TITLE_MAX_LINES)}
             style={[
               styles.heroTitle,
               { fontSize: titleSize, lineHeight: titleSize + 4 },
@@ -589,6 +588,7 @@ function SearchControl({
         style={styles.searchIcon}
       />
       <Text
+        maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
         numberOfLines={1}
         style={[
           styles.searchPlaceholder,
@@ -652,6 +652,7 @@ function CategoryCard({
       )}
       <Text
         adjustsFontSizeToFit
+        maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
         minimumFontScale={0.78}
         numberOfLines={1}
         style={styles.categoryLabel}
@@ -722,6 +723,7 @@ function SectionHeader({
   const titleNode = (
     <Text
       adjustsFontSizeToFit
+      maxFontSizeMultiplier={DISPLAY_MAX_FONT_SIZE_MULTIPLIER}
       minimumFontScale={0.85}
       numberOfLines={1}
       style={[
@@ -744,7 +746,12 @@ function SectionHeader({
         pressed && styles.pressed,
       ]}
     >
-      <Text style={styles.sectionActionText}>{action}</Text>
+      <Text
+        maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+        style={styles.sectionActionText}
+      >
+        {action}
+      </Text>
       <Text style={styles.sectionChevron}>{isRtl ? "‹" : "›"}</Text>
     </Pressable>
   );
@@ -926,6 +933,7 @@ function MarketplaceFeedback({
         style={[styles.feedbackCard, isRtl && styles.feedbackCardRtl]}
       >
         <Text
+          maxFontSizeMultiplier={DISPLAY_MAX_FONT_SIZE_MULTIPLIER}
           style={[
             styles.feedbackTitle,
             isRtl ? styles.rtlText : styles.ltrText,
@@ -934,6 +942,7 @@ function MarketplaceFeedback({
           {title}
         </Text>
         <Text
+          maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
           numberOfLines={2}
           style={[
             styles.feedbackBody,
@@ -952,7 +961,12 @@ function MarketplaceFeedback({
             pressed && styles.pressed,
           ]}
         >
-          <Text style={styles.feedbackButtonText}>{action}</Text>
+          <Text
+            maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+            style={styles.feedbackButtonText}
+          >
+            {action}
+          </Text>
         </Pressable>
       </View>
     </View>
@@ -1016,6 +1030,7 @@ function BusinessCard({
 
       <View style={styles.businessBody}>
         <Text
+          maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
           numberOfLines={2}
           style={[
             styles.businessName,
@@ -1029,6 +1044,7 @@ function BusinessCard({
           {business.name}
         </Text>
         <Text
+          maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
           numberOfLines={1}
           style={[
             styles.businessCategory,
@@ -1051,6 +1067,7 @@ function BusinessCard({
               style={styles.distanceIcon}
             />
             <Text
+              maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
               numberOfLines={1}
               style={[
                 styles.distanceText,
@@ -1065,6 +1082,7 @@ function BusinessCard({
             </Text>
           </View>
           <Text
+            maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
             numberOfLines={1}
             style={[
               styles.businessPrice,
@@ -1075,7 +1093,10 @@ function BusinessCard({
           </Text>
         </View>
         <View style={styles.bookingButton}>
-          <Text style={[styles.bookingButtonText, isRtl && styles.rtlText]}>
+          <Text
+            maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+            style={[styles.bookingButtonText, isRtl && styles.rtlText]}
+          >
             {copy.bookNow}
           </Text>
         </View>
@@ -1734,15 +1755,15 @@ const createStyles = (
       flexWrap: "wrap",
     },
     categoryIcon: {
-      height: layout.isCompactHeight ? 25 : 29,
-      marginBottom: layout.isCompactHeight ? 2 : 4,
+      height: layout.isCompactHeight ? 27 : 29,
+      marginBottom: 4,
       tintColor: palette.goldBright,
-      width: layout.isCompactHeight ? 25 : 29,
+      width: layout.isCompactHeight ? 27 : 29,
     },
     categoryLabel: {
       color: palette.cream,
       fontFamily: HOME_FONT.uiMedium,
-      fontSize: layout.isCompactHeight ? 12.5 : 14,
+      fontSize: layout.isCompactHeight ? 13 : 14,
       lineHeight: layout.isCompactHeight ? 18 : 20,
       textAlign: "center",
       width: "100%",
@@ -2035,8 +2056,8 @@ const createStyles = (
     heroGreeting: {
       color: palette.cream,
       fontFamily: HOME_FONT.kufiBold,
-      fontSize: layout.isCompactHeight ? 17 : 20,
-      lineHeight: layout.isCompactHeight ? 24 : 28,
+      fontSize: layout.isCompactHeight ? 20 : 21,
+      lineHeight: layout.isCompactHeight ? 27 : 29,
     },
     heroIdentity: {
       alignItems: "center",
@@ -2325,7 +2346,7 @@ const createStyles = (
       borderWidth: 1,
       flexDirection: "row",
       gap: 10,
-      height: layout.isCompactHeight ? 54 : 62,
+      height: layout.isCompactHeight ? 50 : 52,
       paddingLeft: 16,
       paddingRight: 6,
       shadowColor: "#000000",
@@ -2383,8 +2404,8 @@ const createStyles = (
       color: palette.cream,
       flexShrink: 1,
       fontFamily: HOME_FONT.kufiBold,
-      fontSize: 17,
-      lineHeight: 23,
+      fontSize: layout.typography.sectionTitle,
+      lineHeight: layout.typography.sectionTitle + 7,
       minWidth: 0,
     },
     skeletonButton: {

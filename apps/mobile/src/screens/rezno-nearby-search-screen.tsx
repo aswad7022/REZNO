@@ -6,18 +6,22 @@ import {
   Modal,
   Pressable,
   StyleSheet,
-  Text,
   View,
   type ImageSourcePropType,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { labels, type MobileLocale } from "../i18n/labels";
+import { LayoutText as Text } from "../components/layout-text";
 import {
   PremiumEntrance,
   PremiumPressable,
 } from "../components/premium-motion";
-import type { MobileResponsiveLayout } from "../layout/responsive-metrics";
+import {
+  DISPLAY_MAX_FONT_SIZE_MULTIPLIER,
+  LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER,
+  type MobileResponsiveLayout,
+} from "../layout/responsive-metrics";
 import { useMobileResponsiveLayout } from "../layout/use-mobile-responsive-layout";
 import type { MobileTheme } from "../theme/tokens";
 import type {
@@ -261,13 +265,13 @@ export function ReznoNearbySearchScreen({
   const previewFlowRef = useRef<ReznoNearbyPreviewFlowHandle>(null);
   const pagePadding = layout.pagePadding;
   const sheetPadding = layout.isNarrowWidth ? 14 : layout.pagePadding;
-  const searchHeight = layout.isCompactHeight ? 54 : 58;
+  const searchHeight = layout.isCompactHeight ? 50 : 52;
   const chipHeight = layout.touchTarget;
   const chipGap = layout.isNarrowWidth ? 6 : 8;
   const mapHeight = clamp(
-    Math.round(layout.usableHeight * (layout.isCompactHeight ? 0.24 : 0.265)),
-    layout.isCompactHeight ? 160 : NEARBY_LAYOUT.minMapHeight,
-    layout.isCompactHeight ? 190 : NEARBY_LAYOUT.maxMapHeight,
+    Math.round(layout.usableHeight * (layout.isCompactHeight ? 0.22 : 0.245)),
+    layout.isCompactHeight ? 150 : NEARBY_LAYOUT.minMapHeight,
+    layout.isCompactHeight ? 176 : NEARBY_LAYOUT.maxMapHeight,
   );
   const sheetOverlap = clamp(
     Math.round(layout.usableHeight * 0.035),
@@ -509,6 +513,7 @@ function NearbySearchField({
       />
       <Text
         adjustsFontSizeToFit
+        maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
         minimumFontScale={0.8}
         numberOfLines={1}
         style={[
@@ -573,6 +578,7 @@ function NearbyFilterRow({
         >
           <Text
             adjustsFontSizeToFit
+            maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
             minimumFontScale={0.78}
             numberOfLines={1}
             style={[
@@ -705,6 +711,7 @@ function NearbyResultsHeader({
         </View>
         <Text
           adjustsFontSizeToFit
+          maxFontSizeMultiplier={DISPLAY_MAX_FONT_SIZE_MULTIPLIER}
           minimumFontScale={0.86}
           numberOfLines={1}
           style={[

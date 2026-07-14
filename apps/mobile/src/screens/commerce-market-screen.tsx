@@ -16,8 +16,6 @@ import {
   Platform,
   Pressable,
   StyleSheet,
-  Text,
-  TextInput,
   View,
 } from "react-native";
 
@@ -33,6 +31,10 @@ import {
   StoreCard,
 } from "../components/commerce-ui";
 import { PremiumPressable } from "../components/premium-motion";
+import {
+  LayoutText as Text,
+  LayoutTextInput as TextInput,
+} from "../components/layout-text";
 import {
   beginKeyedMutation,
   canApplyCheckoutCompletion,
@@ -119,6 +121,24 @@ const EMPTY_ADDRESS: CommerceAddressInput = {
   street: "",
 };
 
+const VISUAL_QA_CHECKOUT_CART: CommerceCart = {
+  availability: true,
+  currency: "IQD",
+  id: "visual-qa-cart",
+  informationalDiscountTotal: "0",
+  informationalSubtotal: "25000",
+  items: [],
+  store: {
+    id: "visual-qa-store",
+    logoUrl: null,
+    name: "REZNO Commerce QA Store",
+    slug: "rezno-commerce-qa-store",
+  },
+  totalQuantity: 1,
+  updatedAt: "2026-07-14T00:00:00.000Z",
+  version: 1,
+};
+
 export function CommerceMarketScreen({
   entryPoint,
   initialOrderId,
@@ -127,6 +147,7 @@ export function CommerceMarketScreen({
   onOpenAccount,
   onExit,
   theme,
+  visualQaCheckout = false,
 }: {
   entryPoint: EntryPoint;
   initialOrderId?: string;
@@ -135,18 +156,26 @@ export function CommerceMarketScreen({
   onOpenAccount: () => void;
   onExit?: () => void;
   theme: MobileTheme;
+  visualQaCheckout?: boolean;
 }) {
+  const enableVisualQaCheckout = __DEV__ && visualQaCheckout;
   const copy = commerceCopy[locale];
   const styles = useCommerceStyles(theme);
   const initialRoute = useMemo<Route>(
-    () => entryPoint === "orders" ? { kind: "orders" } : entryPoint === "favorites" ? { kind: "favorites" } : { kind: "market" },
-    [entryPoint],
+    () => enableVisualQaCheckout ? { kind: "checkout" } : entryPoint === "orders" ? { kind: "orders" } : entryPoint === "favorites" ? { kind: "favorites" } : { kind: "market" },
+    [enableVisualQaCheckout, entryPoint],
   );
   const [route, setRoute] = useState<Route>(initialRoute);
   const [history, setHistory] = useState<Route[]>([]);
-  const [cart, setCartSnapshot] = useState<CommerceCart | null>(null);
-  const [cartLoadState, setCartLoadState] = useState<LoadState>("loading");
-  const [sessionAvailable, setSessionAvailable] = useState<boolean | null>(null);
+  const [cart, setCartSnapshot] = useState<CommerceCart | null>(
+    enableVisualQaCheckout ? VISUAL_QA_CHECKOUT_CART : null,
+  );
+  const [cartLoadState, setCartLoadState] = useState<LoadState>(
+    enableVisualQaCheckout ? "ready" : "loading",
+  );
+  const [sessionAvailable, setSessionAvailable] = useState<boolean | null>(
+    enableVisualQaCheckout ? true : null,
+  );
   const [favoriteStoreIds, setFavoriteStoreIds] = useState<Set<string>>(new Set());
   const [favoriteProductIds, setFavoriteProductIds] = useState<Set<string>>(new Set());
   const [favoriteStoreLoadState, setFavoriteStoreLoadState] = useState<LoadState>("loading");
@@ -313,6 +342,7 @@ export function CommerceMarketScreen({
   }, [handlePrivateError, updateFavoriteProductIds]);
 
   useEffect(() => {
+    if (enableVisualQaCheckout) return;
     const timer = setTimeout(() => {
       void refreshCart();
       if (entryPoint !== "favorites") {
@@ -321,7 +351,7 @@ export function CommerceMarketScreen({
       }
     }, 0);
     return () => clearTimeout(timer);
-  }, [entryPoint, loadFavoriteProducts, loadFavoriteStores, refreshCart]);
+  }, [enableVisualQaCheckout, entryPoint, loadFavoriteProducts, loadFavoriteStores, refreshCart]);
 
   useEffect(() => {
     if (!initialOrderId) return;
@@ -503,6 +533,7 @@ export function CommerceMarketScreen({
     theme,
     toggleProductFavorite,
     toggleStoreFavorite,
+    visualQaCheckout: enableVisualQaCheckout,
   };
 
   return (
@@ -568,6 +599,7 @@ type CommonProps = {
   theme: MobileTheme;
   toggleProductFavorite: (product: CommerceProduct) => Promise<boolean>;
   toggleStoreFavorite: (store: CommerceStore) => Promise<boolean>;
+  visualQaCheckout: boolean;
 };
 
 function MarketHome(props: CommonProps) {
@@ -782,7 +814,7 @@ function CartScreen(props: CommonProps) {
 }
 
 function CheckoutScreen(props: CommonProps) {
-  const { beginCartRequest, cart, checkoutDraft, checkoutSubmitting: submitting, copy, goBack, handlePrivateError, isLatestCartRequest, isRtl, locale, navigate, onOpenAccount, sessionAvailable, setCart, setCheckoutDraft, setCheckoutSubmitting, setNotice, theme } = props;
+  const { beginCartRequest, cart, checkoutDraft, checkoutSubmitting: submitting, copy, goBack, handlePrivateError, isLatestCartRequest, isRtl, locale, navigate, onOpenAccount, sessionAvailable, setCart, setCheckoutDraft, setCheckoutSubmitting, setNotice, theme, visualQaCheckout } = props;
   const styles = useCommerceStyles(theme);
   const [addresses, setAddresses] = useState<CommerceAddress[]>([]);
   const [storeDetails, setStoreDetails] = useState<CommerceStore | null>(null);
@@ -809,6 +841,7 @@ function CheckoutScreen(props: CommonProps) {
   }, [cart?.version, checkoutCartId]);
 
   useEffect(() => {
+    if (visualQaCheckout) return;
     if (!checkoutCartId || !checkoutStoreId || !checkoutStoreSlug) return;
     let active = true;
     const cartRequestSequence = beginCartRequest();
@@ -862,7 +895,7 @@ function CheckoutScreen(props: CommonProps) {
     };
     void load();
     return () => { active = false; };
-  }, [beginCartRequest, checkoutCartId, checkoutStoreId, checkoutStoreSlug, copy, handlePrivateError, isLatestCartRequest, setCart, setCheckoutDraft, setNotice]);
+  }, [beginCartRequest, checkoutCartId, checkoutStoreId, checkoutStoreSlug, copy, handlePrivateError, isLatestCartRequest, setCart, setCheckoutDraft, setNotice, visualQaCheckout]);
 
   if (sessionAvailable === false) return <View style={styles.stack}><CommerceHeader copy={copy} isRtl={isRtl} title={copy.checkout} theme={theme} /><CommerceState body={copy.sessionRequired} buttonLabel={copy.retry} onPress={onOpenAccount} theme={theme} title={copy.sessionRequired} /></View>;
   if (!cart) return <View style={styles.stack}><CommerceHeader copy={copy} isRtl={isRtl} onBack={goBack} title={copy.checkout} theme={theme} /><CommerceState body={copy.cartEmpty} theme={theme} title={copy.cartEmpty} /></View>;

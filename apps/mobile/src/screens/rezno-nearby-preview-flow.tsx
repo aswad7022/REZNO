@@ -17,14 +17,16 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
   useWindowDimensions,
   View,
   type ImageSourcePropType,
 } from "react-native";
 
 import { TOUCH_HIT_SLOP } from "../components/mobile-chrome";
+import {
+  LayoutText as Text,
+  LayoutTextInput as TextInput,
+} from "../components/layout-text";
 import {
   PremiumCheck,
   PremiumEntrance,

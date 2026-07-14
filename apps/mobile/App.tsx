@@ -53,8 +53,18 @@ import {
   type MobileLocale,
 } from "./src/i18n/labels";
 import { commerceCopy, formatCommerceDate } from "./src/i18n/commerce";
-import type { MobileResponsiveLayout } from "./src/layout/responsive-metrics";
-import { ACCOUNT_GUEST_AUTH_ACTIONS } from "./src/layout/screen-contracts";
+import {
+  DISPLAY_MAX_FONT_SIZE_MULTIPLIER,
+  LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER,
+  type MobileResponsiveLayout,
+} from "./src/layout/responsive-metrics";
+import {
+  ACCOUNT_ACTION_LAYOUT,
+  ACCOUNT_GUEST_AUTH_ACTIONS,
+  MESSAGE_PREVIEW_ROW_LAYOUT,
+  getTextWritingDirection,
+  resolveVisualQaInitialScreen,
+} from "./src/layout/screen-contracts";
 import { useMobileResponsiveLayout } from "./src/layout/use-mobile-responsive-layout";
 import {
   createMobileShadow,
@@ -668,8 +678,18 @@ function ReznoApp() {
   });
   /* eslint-enable @typescript-eslint/no-require-imports */
   const colorScheme = useColorScheme();
+  const visualQaInitialScreen = resolveVisualQaInitialScreen(
+    process.env.EXPO_PUBLIC_REZNO_VISUAL_QA_SCREEN,
+    __DEV__,
+  );
+  const visualQaInitialTab: MobileAppTabId | null =
+    visualQaInitialScreen === "checkout"
+      ? "marketplace"
+      : visualQaInitialScreen;
   const [locale, setLocale] = useState<MobileLocale>(DEFAULT_LOCALE);
-  const [activeTab, setActiveTab] = useState<MobileAppTabId>("customerHome");
+  const [activeTab, setActiveTab] = useState<MobileAppTabId>(
+    visualQaInitialTab ?? "customerHome",
+  );
   const [activityMenuOpen, setActivityMenuOpen] = useState(false);
   const [selectedBusiness, setSelectedBusiness] =
     useState<PremiumBusiness | null>(null);
@@ -688,7 +708,9 @@ function ReznoApp() {
   const [visualCancelledBookingIds, setVisualCancelledBookingIds] = useState<
     string[]
   >([]);
-  const [showOnboarding, setShowOnboarding] = useState(true);
+  const [showOnboarding, setShowOnboarding] = useState(
+    visualQaInitialTab === null,
+  );
   const [authMode, setAuthMode] = useState<MobileAuthMode | null>(null);
   const [authSession, setAuthSession] = useState<MobileAuthSessionState>({
     status: "loading",
@@ -915,6 +937,16 @@ function ReznoApp() {
         });
       });
   }, []);
+
+  useEffect(() => {
+    if (
+      visualQaInitialTab !== "customerHome" &&
+      visualQaInitialTab !== "serviceDiscovery"
+    ) return;
+
+    const timer = setTimeout(loadMarketplace, 0);
+    return () => clearTimeout(timer);
+  }, [loadMarketplace, visualQaInitialTab]);
 
   const handleTabPress = (tabId: MobileAppTabId) => {
     if (tabId === "activity") {
@@ -1276,6 +1308,7 @@ function ReznoApp() {
             locale={locale}
             onOpenAccount={() => handleTabPress("account")}
             theme={theme}
+            visualQaCheckout={visualQaInitialScreen === "checkout"}
           />
         ) : null}
 
@@ -1426,7 +1459,10 @@ function QuickBookingEntryScreen({
         <Text style={[styles.screenEyebrow, isRtl && styles.rtlText]}>
           إضافة حجز سريع
         </Text>
-        <Text style={[styles.quickBookingTitle, isRtl && styles.rtlText]}>
+        <Text
+          maxFontSizeMultiplier={DISPLAY_MAX_FONT_SIZE_MULTIPLIER}
+          style={[styles.quickBookingTitle, isRtl && styles.rtlText]}
+        >
           ابدأ من البحث أو اختر خدمة قريبة
         </Text>
         <Text style={[styles.quickBookingBody, isRtl && styles.rtlText]}>
@@ -1837,7 +1873,10 @@ function SalonDetailScreen({
 
           <View style={styles.salonIdentityBlock}>
             <View style={styles.salonVerifiedRow}>
-              <Text style={[styles.salonName, isRtl && styles.rtlText]}>
+              <Text
+                maxFontSizeMultiplier={DISPLAY_MAX_FONT_SIZE_MULTIPLIER}
+                style={[styles.salonName, isRtl && styles.rtlText]}
+              >
                 صالون فيجن
               </Text>
               <Image
@@ -1948,7 +1987,12 @@ function SalonDetailScreen({
               pressed && styles.primaryButtonPressed,
             ]}
           >
-            <Text style={styles.salonReferenceCtaText}>احجز الآن</Text>
+            <Text
+              maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+              style={styles.salonReferenceCtaText}
+            >
+              احجز الآن
+            </Text>
             <View style={styles.salonReferenceCtaArrowWrap}>
               <Text style={styles.salonReferenceCtaArrow}>→</Text>
             </View>
@@ -2353,7 +2397,10 @@ function StaffSelectionStep({
       </View>
 
       <View style={styles.staffReferenceHeroCopy}>
-        <Text style={[styles.staffReferenceTitle, isRtl && styles.rtlText]}>
+        <Text
+          maxFontSizeMultiplier={DISPLAY_MAX_FONT_SIZE_MULTIPLIER}
+          style={[styles.staffReferenceTitle, isRtl && styles.rtlText]}
+        >
           اختر طريقة الحجز
         </Text>
         <Text style={[styles.staffReferenceSubtitle, isRtl && styles.rtlText]}>
@@ -2602,7 +2649,12 @@ function StaffSelectionStep({
             pressed && styles.primaryButtonPressed,
           ]}
         >
-          <Text style={styles.staffReferenceCtaText}>التالي</Text>
+          <Text
+            maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+            style={styles.staffReferenceCtaText}
+          >
+            التالي
+          </Text>
           <Text style={styles.staffReferenceCtaArrow}>←</Text>
         </Pressable>
         <Text style={styles.staffReferenceTrustNote}>▧ بياناتك محمية وآمنة</Text>
@@ -2687,7 +2739,10 @@ function DateTimeSelectionStep({
       </View>
 
       <View style={styles.staffReferenceHeroCopy}>
-        <Text style={[styles.staffReferenceTitle, isRtl && styles.rtlText]}>
+        <Text
+          maxFontSizeMultiplier={DISPLAY_MAX_FONT_SIZE_MULTIPLIER}
+          style={[styles.staffReferenceTitle, isRtl && styles.rtlText]}
+        >
           اختر التاريخ والوقت
         </Text>
         <Text style={[styles.staffReferenceSubtitle, isRtl && styles.rtlText]}>
@@ -2915,7 +2970,12 @@ function DateTimeSelectionStep({
             pressed && styles.primaryButtonPressed,
           ]}
         >
-          <Text style={styles.staffReferenceCtaText}>التالي</Text>
+          <Text
+            maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+            style={styles.staffReferenceCtaText}
+          >
+            التالي
+          </Text>
           <Text style={styles.staffReferenceCtaArrow}>←</Text>
         </Pressable>
         <Text style={styles.staffReferenceTrustNote}>▧ بياناتك محمية وآمنة</Text>
@@ -3014,7 +3074,10 @@ function PaymentMethodStep({
       </View>
 
       <View style={styles.paymentReferenceHeroCopy}>
-        <Text style={[styles.paymentReferenceTitle, isRtl && styles.rtlText]}>
+        <Text
+          maxFontSizeMultiplier={DISPLAY_MAX_FONT_SIZE_MULTIPLIER}
+          style={[styles.paymentReferenceTitle, isRtl && styles.rtlText]}
+        >
           طريقة الدفع
         </Text>
         <Text style={[styles.paymentReferenceSubtitle, isRtl && styles.rtlText]}>
@@ -4073,13 +4136,22 @@ function MessagesNotificationsPreviewScreen({
           </View>
           <Text style={styles.messageSafetyBadge}>{heroCopy.badge}</Text>
         </View>
-        <Text style={[styles.screenEyebrow, isRtl && styles.rtlText]}>
+        <Text
+          maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+          style={[styles.screenEyebrow, isRtl && styles.rtlText]}
+        >
           {heroCopy.eyebrow}
         </Text>
-        <Text style={[styles.messageHeroTitle, isRtl && styles.rtlText]}>
+        <Text
+          maxFontSizeMultiplier={DISPLAY_MAX_FONT_SIZE_MULTIPLIER}
+          style={[styles.messageHeroTitle, isRtl && styles.rtlText]}
+        >
           {heroCopy.title}
         </Text>
-        <Text style={[styles.messageHeroBody, isRtl && styles.rtlText]}>
+        <Text
+          maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+          style={[styles.messageHeroBody, isRtl && styles.rtlText]}
+        >
           {heroCopy.body}
         </Text>
       </View>
@@ -4164,7 +4236,14 @@ function CommerceNotificationsCenter({
   return (
     <View style={styles.notificationPanel}>
       <SectionHeader isRtl={isRtl} styles={styles} title={copy.notifications} />
-      {state === "loading" && items.length === 0 ? <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>{copy.loading}</Text> : null}
+      {state === "loading" && items.length === 0 ? (
+        <Text
+          maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+          style={[styles.rowMeta, isRtl && styles.rtlText]}
+        >
+          {copy.loading}
+        </Text>
+      ) : null}
       {state === "error" ? (
         <Pressable
           accessibilityLabel={copy.retry}
@@ -4175,18 +4254,43 @@ function CommerceNotificationsCenter({
           )}
           style={styles.notificationCard}
         >
-          <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>{copy.errorGeneric}</Text>
-          <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>{copy.retry}</Text>
+          <Text
+            maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+            style={[styles.rowTitle, isRtl && styles.rtlText]}
+          >
+            {copy.errorGeneric}
+          </Text>
+          <Text
+            maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+            style={[styles.rowMeta, isRtl && styles.rtlText]}
+          >
+            {copy.retry}
+          </Text>
         </Pressable>
       ) : null}
       {state === "unauthenticated" ? (
         <Pressable accessibilityLabel={copy.retry} accessibilityRole="button" onPress={() => void load(null, false)} style={styles.notificationCard}>
-          <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>{copy.sessionRequired}</Text>
-          <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>{copy.retry}</Text>
+          <Text
+            maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+            style={[styles.rowTitle, isRtl && styles.rtlText]}
+          >
+            {copy.sessionRequired}
+          </Text>
+          <Text
+            maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+            style={[styles.rowMeta, isRtl && styles.rtlText]}
+          >
+            {copy.retry}
+          </Text>
         </Pressable>
       ) : null}
       {state === "ready" && items.length === 0 ? (
-        <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>{copy.noNotifications}</Text>
+        <Text
+          maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+          style={[styles.rowMeta, isRtl && styles.rtlText]}
+        >
+          {copy.noNotifications}
+        </Text>
       ) : null}
       {items.map((item) => {
         const orderId = commerceNotificationOrderDestination(item);
@@ -4197,10 +4301,26 @@ function CommerceNotificationsCenter({
             </View>
             <View style={styles.rowCopy}>
               <View style={styles.notificationTitleRow}>
-                <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>{item.title}</Text>
-                <Text style={styles.notificationTime}>{formatCommerceDate(item.createdAt, locale)}</Text>
+                <Text
+                  maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+                  numberOfLines={2}
+                  style={[styles.rowTitle, isRtl && styles.rtlText]}
+                >
+                  {item.title}
+                </Text>
+                <Text
+                  maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+                  style={styles.notificationTime}
+                >
+                  {formatCommerceDate(item.createdAt, locale)}
+                </Text>
               </View>
-              <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>{item.body}</Text>
+              <Text
+                maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+                style={[styles.rowMeta, isRtl && styles.rtlText]}
+              >
+                {item.body}
+              </Text>
             </View>
           </>
         );
@@ -4224,7 +4344,10 @@ function CommerceNotificationsCenter({
           onPress={() => void load(nextCursor, true)}
           style={styles.notificationCard}
         >
-          <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>
+          <Text
+            maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+            style={[styles.rowTitle, isRtl && styles.rtlText]}
+          >
             {state === "loading" ? copy.loading : copy.loadMore}
           </Text>
         </Pressable>
@@ -4272,15 +4395,32 @@ function NotificationsCenterPreview({
           </View>
           <View style={styles.rowCopy}>
             <View style={styles.notificationTitleRow}>
-              <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>
+              <Text
+                maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+                numberOfLines={2}
+                style={[styles.rowTitle, isRtl && styles.rtlText]}
+              >
                 {item.title}
               </Text>
-              <Text style={styles.notificationTime}>{item.time}</Text>
+              <Text
+                maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+                style={styles.notificationTime}
+              >
+                {item.time}
+              </Text>
             </View>
-            <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>
+            <Text
+              maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+              style={[styles.rowMeta, isRtl && styles.rtlText]}
+            >
               {item.body}
             </Text>
-            <Text style={styles.notificationStatusChip}>{item.status}</Text>
+            <Text
+              maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+              style={styles.notificationStatusChip}
+            >
+              {item.status}
+            </Text>
           </View>
         </View>
       ))}
@@ -4298,30 +4438,64 @@ function ConversationListPreview({
   return (
     <View style={styles.conversationPanel}>
       <SectionHeader isRtl={isRtl} styles={styles} title="المحادثات" />
-      {conversationPreviewItems.map((conversation) => (
-        <View key={conversation.name} style={styles.conversationRow}>
-          <View style={styles.conversationAvatar}>
-            <Text style={styles.conversationAvatarText}>
-              {conversation.initials}
-            </Text>
-          </View>
-          <View style={styles.rowCopy}>
-            <View style={styles.notificationTitleRow}>
-              <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>
+      {conversationPreviewItems.map((conversation) => {
+        const nameIsLtr = getTextWritingDirection(conversation.name) === "ltr";
+
+        return (
+          <View key={conversation.name} style={styles.conversationRow}>
+            <View style={styles.conversationAvatar}>
+              <Text
+                maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+                style={styles.conversationAvatarText}
+              >
+                {conversation.initials}
+              </Text>
+            </View>
+            <View style={styles.rowCopy}>
+              <Text
+                maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+                numberOfLines={1}
+                style={[
+                  styles.rowTitle,
+                  nameIsLtr ? styles.ltrText : isRtl && styles.rtlText,
+                ]}
+              >
                 {conversation.name}
               </Text>
-              <Text style={styles.notificationTime}>{conversation.time}</Text>
+              <Text
+                maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+                numberOfLines={2}
+                style={[styles.rowMeta, isRtl && styles.rtlText]}
+              >
+                {conversation.lastMessage}
+              </Text>
+              <Text
+                maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+                numberOfLines={1}
+                style={styles.conversationStatus}
+              >
+                {conversation.status}
+              </Text>
             </View>
-            <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>
-              {conversation.lastMessage}
-            </Text>
-            <Text style={styles.conversationStatus}>{conversation.status}</Text>
+            <View style={styles.conversationMeta}>
+              <Text
+                maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+                style={styles.notificationTime}
+              >
+                {conversation.time}
+              </Text>
+              {conversation.unread ? (
+                <Text
+                  maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+                  style={styles.unreadBadge}
+                >
+                  {conversation.unread}
+                </Text>
+              ) : null}
+            </View>
           </View>
-          {conversation.unread ? (
-            <Text style={styles.unreadBadge}>{conversation.unread}</Text>
-          ) : null}
-        </View>
-      ))}
+        );
+      })}
     </View>
   );
 }
@@ -4702,13 +4876,22 @@ function AccountScreen({
             </Text>
           </View>
         </View>
-        <Text style={[styles.screenEyebrow, isRtl && styles.rtlText]}>
+        <Text
+          maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+          style={[styles.screenEyebrow, isRtl && styles.rtlText]}
+        >
           الملف الشخصي
         </Text>
-        <Text style={[styles.screenTitle, isRtl && styles.rtlText]}>
+        <Text
+          maxFontSizeMultiplier={DISPLAY_MAX_FONT_SIZE_MULTIPLIER}
+          style={[styles.screenTitle, isRtl && styles.rtlText]}
+        >
           {accountTitle}
         </Text>
-        <Text style={[styles.screenDescription, isRtl && styles.rtlText]}>
+        <Text
+          maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+          style={[styles.screenDescription, isRtl && styles.rtlText]}
+        >
           {accountDescription}
         </Text>
         {authenticatedUser ? (
@@ -4753,7 +4936,13 @@ function AccountScreen({
                     pressed && !authSetupPending && styles.softButtonPressed,
                   ]}
                 >
-                  <Text style={styles.accountActionTextPrimary}>
+                  <Text
+                    maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+                    style={[
+                      styles.accountActionText,
+                      styles.accountActionTextPrimary,
+                    ]}
+                  >
                     {authSetupPending
                       ? copy.finishingSetup
                       : copy.finishSetup}
@@ -4775,11 +4964,11 @@ function AccountScreen({
                 ]}
               >
                 <Text
-                  style={
-                    authSetupUser
-                      ? styles.accountActionText
-                      : styles.accountActionTextPrimary
-                  }
+                  maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+                  style={[
+                    styles.accountActionText,
+                    !authSetupUser && styles.accountActionTextPrimary,
+                  ]}
                 >
                   {signOutPending ? copy.sessionLoading : copy.signOut}
                 </Text>
@@ -4804,11 +4993,11 @@ function AccountScreen({
                   ]}
                 >
                   <Text
-                    style={
-                      primary
-                        ? styles.accountActionTextPrimary
-                        : styles.accountActionText
-                    }
+                    maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+                    style={[
+                      styles.accountActionText,
+                      primary && styles.accountActionTextPrimary,
+                    ]}
                   >
                     {label}
                   </Text>
@@ -5069,13 +5258,12 @@ const createStyles = (
       borderColor: theme.colors.border,
       borderWidth: 1,
       borderRadius: theme.radii.control,
-      flex: 1,
       justifyContent: "center",
-      minHeight: 48,
-      minWidth: 126,
+      minHeight: ACCOUNT_ACTION_LAYOUT.buttonMinHeight,
       opacity: 0.92,
       paddingHorizontal: 12,
       paddingVertical: 14,
+      width: ACCOUNT_ACTION_LAYOUT.buttonWidth,
     },
     accountActionButtonPrimary: {
       backgroundColor: theme.colors.gold,
@@ -5092,16 +5280,15 @@ const createStyles = (
       opacity: 1,
     },
     accountActionRow: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: 10,
+      flexDirection: ACCOUNT_ACTION_LAYOUT.direction,
+      gap: ACCOUNT_ACTION_LAYOUT.gap,
       marginTop: layout.verticalSpacing,
     },
     accountActionText: {
       color: theme.colors.foreground,
       fontFamily: mobileTypography.uiSemiBold,
-      fontSize: 13,
-      lineHeight: 18,
+      fontSize: layout.typography.button,
+      lineHeight: 21,
       textAlign: "center",
     },
     accountActionTextPrimary: {
@@ -5126,7 +5313,6 @@ const createStyles = (
       borderColor: theme.colors.goldSoft,
       borderRadius: layout.borderRadius,
       borderWidth: 1,
-      overflow: "hidden",
       padding: layout.cardPadding,
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: 26, width: 0 },
@@ -6896,17 +7082,16 @@ const createStyles = (
       borderWidth: 0,
       borderRadius: 30,
       flex: 1,
-      height: layout.isCompactHeight ? 58 : 66,
+      height: layout.bottomNavigationHeight,
       marginHorizontal: 0,
       shadowColor: theme.colors.deepGold,
-      shadowOffset: { height: 8, width: 0 },
-      shadowOpacity: theme.isDark ? 0.4 : 0.12,
-      shadowRadius: 18,
-      transform: [{ translateY: -4 }],
+      shadowOffset: { height: 4, width: 0 },
+      shadowOpacity: theme.isDark ? 0.2 : 0.06,
+      shadowRadius: 10,
     },
     centerTabButtonActive: {
       backgroundColor: "transparent",
-      transform: [{ translateY: -5 }, { scale: 1.02 }],
+      transform: [{ scale: 1.01 }],
     },
     centerTabActiveIndicator: {
       backgroundColor: "transparent",
@@ -6915,9 +7100,9 @@ const createStyles = (
       width: 0,
     },
     centerTabIconImage: {
-      height: layout.iconSize,
+      height: layout.bottomNavigationIconSize,
       tintColor: theme.colors.foregroundInverse,
-      width: layout.iconSize,
+      width: layout.bottomNavigationIconSize,
     },
     centerTabHalo: {
       alignItems: "center",
@@ -6927,15 +7112,15 @@ const createStyles = (
       borderColor: theme.isDark
         ? "rgba(255, 246, 205, 0.7)"
         : "rgba(184, 117, 11, 0.28)",
-      borderRadius: 25,
-      borderWidth: 2,
-      height: layout.isCompactHeight ? 46 : 50,
+      borderRadius: layout.centerNavigationActionSize / 2,
+      borderWidth: 1,
+      height: layout.centerNavigationActionSize,
       justifyContent: "center",
       shadowColor: theme.colors.deepGold,
-      shadowOffset: { height: 10, width: 0 },
-      shadowOpacity: theme.isDark ? 0.44 : 0.14,
-      shadowRadius: 18,
-      width: layout.isCompactHeight ? 46 : 50,
+      shadowOffset: { height: 4, width: 0 },
+      shadowOpacity: theme.isDark ? 0.2 : 0.06,
+      shadowRadius: 9,
+      width: layout.centerNavigationActionSize,
     },
     centerTabInner: {
       alignItems: "center",
@@ -6943,18 +7128,17 @@ const createStyles = (
       borderColor: theme.isDark
         ? "rgba(255, 248, 220, 0.28)"
         : "rgba(255, 253, 248, 0.56)",
-      borderRadius: 21,
+      borderRadius: (layout.centerNavigationActionSize - 8) / 2,
       borderWidth: 1,
-      height: layout.isCompactHeight ? 38 : 42,
+      height: layout.centerNavigationActionSize - 8,
       justifyContent: "center",
-      width: layout.isCompactHeight ? 38 : 42,
+      width: layout.centerNavigationActionSize - 8,
     },
     centerTabLabel: {
       color: theme.colors.gold,
       fontFamily: mobileTypography.uiSemiBold,
-      fontSize: 9,
-      lineHeight: 11,
-      marginTop: 1,
+      fontSize: layout.typography.navigationLabel,
+      lineHeight: 10,
       maxWidth: 62,
       textAlign: "center",
     },
@@ -8104,8 +8288,14 @@ const createStyles = (
       borderColor: theme.colors.goldSoft,
       borderRadius: theme.radii.card,
       borderWidth: 1,
-      gap: 14,
-      padding: 20,
+      gap: layout.verticalSpacing,
+      padding: layout.cardPadding,
+    },
+    conversationMeta: {
+      alignItems: "flex-end",
+      flexShrink: 0,
+      gap: 8,
+      width: MESSAGE_PREVIEW_ROW_LAYOUT.metaColumnWidth,
     },
     conversationRow: {
       alignItems: "flex-start",
@@ -8114,8 +8304,8 @@ const createStyles = (
       borderRadius: 22,
       borderWidth: 1,
       flexDirection: "row",
-      gap: 12,
-      padding: 14,
+      gap: 10,
+      padding: layout.isCompactHeight ? 12 : 14,
     },
     conversationStatus: {
       color: theme.colors.gold,
@@ -8157,17 +8347,17 @@ const createStyles = (
     messageHeroBody: {
       color: theme.colors.mutedForeground,
       fontFamily: mobileTypography.uiRegular,
-      fontSize: 15,
-      lineHeight: 23,
-      marginTop: 10,
+      fontSize: layout.typography.body,
+      lineHeight: 22,
+      marginTop: 8,
     },
     messageHeroCard: {
       backgroundColor: theme.colors.hero,
       borderColor: theme.isDark ? theme.colors.goldSoft : theme.colors.gold,
-      borderRadius: theme.radii.xl,
+      borderRadius: layout.borderRadius,
       borderWidth: 1,
       overflow: "hidden",
-      padding: 24,
+      padding: layout.cardPadding,
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: 20, width: 0 },
       shadowOpacity: theme.isDark ? 0.36 : 0.13,
@@ -8176,20 +8366,20 @@ const createStyles = (
     messageHeroGlow: {
       backgroundColor: theme.colors.goldSoft,
       borderRadius: 999,
-      height: 150,
+      height: 96,
       opacity: 0.85,
       position: "absolute",
-      right: -48,
-      top: -52,
-      width: 150,
+      right: -32,
+      top: -38,
+      width: 96,
     },
     messageHeroIcon: {
       alignItems: "center",
       backgroundColor: theme.colors.gold,
-      borderRadius: 24,
-      height: 48,
+      borderRadius: 20,
+      height: 40,
       justifyContent: "center",
-      width: 48,
+      width: 40,
     },
     messageHeroIconText: {
       color: theme.colors.foregroundInverse,
@@ -8197,16 +8387,16 @@ const createStyles = (
       fontSize: 22,
     },
     messageHeroIconImage: {
-      height: 24,
+      height: 20,
       tintColor: theme.colors.foregroundInverse,
-      width: 24,
+      width: 20,
     },
     messageHeroTitle: {
       color: theme.colors.foreground,
       fontFamily: mobileTypography.kufiBold,
-      fontSize: 27,
-      lineHeight: 34,
-      marginTop: 20,
+      fontSize: layout.typography.pageTitle,
+      lineHeight: layout.typography.pageTitle + 8,
+      marginTop: 12,
     },
     messageHeroTopRow: {
       alignItems: "center",
@@ -8312,8 +8502,8 @@ const createStyles = (
       borderColor: theme.colors.goldSoft,
       borderRadius: theme.radii.card,
       borderWidth: 1,
-      gap: 16,
-      padding: 22,
+      gap: layout.verticalSpacing,
+      padding: layout.cardPadding,
     },
     notificationStatusChip: {
       alignSelf: "flex-start",
@@ -8332,15 +8522,17 @@ const createStyles = (
     },
     notificationTime: {
       color: theme.colors.mutedForeground,
+      flexShrink: 0,
       fontFamily: mobileTypography.uiMedium,
       fontSize: 11,
     },
     notificationTitleRow: {
       alignItems: "flex-start",
       flexDirection: "row",
-      flexWrap: "wrap",
       gap: 8,
       justifyContent: "space-between",
+      minWidth: 0,
+      width: "100%",
     },
     onboardingActions: {
       gap: layout.verticalSpacing,
@@ -8695,8 +8887,8 @@ const createStyles = (
     onboardingTitle: {
       color: theme.colors.foreground,
       fontFamily: mobileTypography.kufiBold,
-      fontSize: 30,
-      lineHeight: 37,
+      fontSize: layout.typography.pageTitle,
+      lineHeight: layout.typography.pageTitle + 8,
       marginTop: 24,
     },
     ownerActionText: {
@@ -9254,8 +9446,8 @@ const createStyles = (
     promoTitle: {
       color: theme.isDark ? theme.colors.gold : theme.colors.deepGold,
       fontFamily: mobileTypography.kufiBold,
-      fontSize: 30,
-      lineHeight: 36,
+      fontSize: layout.typography.pageTitle,
+      lineHeight: layout.typography.pageTitle + 8,
     },
     promoCopy: {
       alignItems: "flex-end",
@@ -9531,9 +9723,9 @@ const createStyles = (
     quickBookingTitle: {
       color: theme.colors.foreground,
       fontFamily: mobileTypography.kufiBold,
-      fontSize: 26,
+      fontSize: layout.typography.pageTitle,
       letterSpacing: -0.4,
-      lineHeight: 33,
+      lineHeight: layout.typography.pageTitle + 8,
       marginTop: 8,
     },
     ratingPill: {
@@ -9613,8 +9805,14 @@ const createStyles = (
       color: theme.colors.foreground,
       fontFamily: mobileTypography.uiRegular,
       fontSize: 15,
+      flex: 1,
       flexShrink: 1,
       lineHeight: 20,
+      minWidth: 0,
+    },
+    ltrText: {
+      textAlign: "left",
+      writingDirection: "ltr",
     },
     rtlText: {
       textAlign: "right",
@@ -9743,9 +9941,9 @@ const createStyles = (
       color: theme.colors.foreground,
       fontFamily: mobileTypography.kufiBold,
       flexShrink: 1,
-      fontSize: layout.titleSize,
+      fontSize: layout.typography.pageTitle,
       letterSpacing: -0.3,
-      lineHeight: layout.titleSize + 8,
+      lineHeight: layout.typography.pageTitle + 8,
       marginTop: layout.isCompactHeight ? 6 : 8,
     },
     iconButtonPressed: {
@@ -10216,9 +10414,9 @@ const createStyles = (
       color: theme.colors.foreground,
       fontFamily: mobileTypography.kufiBold,
       flexShrink: 1,
-      fontSize: 32,
+      fontSize: layout.typography.pageTitle,
       letterSpacing: -0.7,
-      lineHeight: 42,
+      lineHeight: layout.typography.pageTitle + 10,
       textAlign: "right",
     },
     salonIdentityBlock: {
@@ -10618,9 +10816,9 @@ const createStyles = (
     sectionTitle: {
       color: theme.colors.foreground,
       fontFamily: mobileTypography.kufiBold,
-      fontSize: 22,
+      fontSize: layout.typography.sectionTitle,
       letterSpacing: -0.2,
-      lineHeight: 30,
+      lineHeight: layout.typography.sectionTitle + 8,
     },
     selectText: {
       color: theme.colors.gold,
@@ -10893,9 +11091,9 @@ const createStyles = (
       height: layout.bottomNavigationHeight,
       marginBottom: layout.bottomNavigationBottomGap,
       marginHorizontal: layout.isNarrowWidth ? 12 : 16,
-      paddingBottom: layout.isCompactHeight ? 3 : 5,
+      paddingBottom: 0,
       paddingHorizontal: 6,
-      paddingTop: layout.isCompactHeight ? 3 : 5,
+      paddingTop: 0,
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: -10, width: 0 },
       shadowOpacity: theme.isDark ? 0.42 : 0.12,
@@ -10938,9 +11136,9 @@ const createStyles = (
       color: theme.colors.gold,
     },
     tabIconImage: {
-      height: layout.iconSize,
+      height: layout.bottomNavigationIconSize,
       tintColor: theme.colors.mutedForeground,
-      width: layout.iconSize,
+      width: layout.bottomNavigationIconSize,
     },
     tabIconImageActive: {
       tintColor: theme.colors.gold,
@@ -10948,8 +11146,8 @@ const createStyles = (
     tabLabel: {
       color: theme.colors.mutedForeground,
       fontFamily: mobileTypography.uiMedium,
-      fontSize: layout.isCompactHeight ? 10 : 11,
-      lineHeight: layout.isCompactHeight ? 14 : 15,
+      fontSize: layout.typography.navigationLabel,
+      lineHeight: layout.isCompactHeight ? 12 : 13,
       maxWidth: 60,
       minWidth: 42,
       textAlign: "center",
@@ -11361,9 +11559,9 @@ const createStyles = (
     staffReferenceTitle: {
       color: theme.colors.foreground,
       fontFamily: mobileTypography.kufiBold,
-      fontSize: 28,
+      fontSize: layout.typography.pageTitle,
       letterSpacing: -0.3,
-      lineHeight: 38,
+      lineHeight: layout.typography.pageTitle + 10,
       textAlign: "right",
     },
     staffReferenceSubtitle: {
@@ -12229,9 +12427,9 @@ const createStyles = (
     paymentReferenceTitle: {
       color: theme.colors.foreground,
       fontFamily: mobileTypography.kufiBold,
-      fontSize: 36,
+      fontSize: layout.typography.pageTitle,
       letterSpacing: -0.6,
-      lineHeight: 48,
+      lineHeight: layout.typography.pageTitle + 10,
       textAlign: "right",
     },
     paymentReferenceSubtitle: {

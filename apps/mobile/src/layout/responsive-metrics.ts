@@ -7,6 +7,7 @@ export type MobileLayoutPlatform =
 
 export type MobileLayoutInput = {
   bottomInset: number;
+  fontScale?: number;
   height: number;
   platform: MobileLayoutPlatform;
   statusBarHeight?: number;
@@ -14,15 +15,34 @@ export type MobileLayoutInput = {
   width: number;
 };
 
+export type MobileResponsiveTypography = {
+  body: number;
+  button: number;
+  cardTitle: number;
+  heroTitle: number;
+  metadata: number;
+  navigationLabel: number;
+  pageTitle: number;
+  secondary: number;
+  sectionTitle: number;
+};
+
+export const LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER = 1.15;
+export const DISPLAY_MAX_FONT_SIZE_MULTIPLIER = 1.1;
+
 export type MobileResponsiveLayout = {
   bodySize: number;
   borderRadius: number;
   bottomInset: number;
+  bottomNavigationIconSize: number;
   bottomNavigationBottomGap: number;
   bottomNavigationHeight: number;
   cardPadding: number;
   categoryTileHeight: number;
+  centerNavigationActionSize: number;
   contentBottomInset: number;
+  contentTrailingSpace: number;
+  fontScale: number;
   headerHeight: number;
   height: number;
   iconSize: number;
@@ -36,6 +56,7 @@ export type MobileResponsiveLayout = {
   titleSize: number;
   topInset: number;
   touchTarget: number;
+  typography: MobileResponsiveTypography;
   usableHeight: number;
   verticalSpacing: number;
   width: number;
@@ -43,8 +64,18 @@ export type MobileResponsiveLayout = {
 
 const clampInset = (value: number) => Math.max(0, Math.round(value));
 
+export function resolveScaledFontSize(
+  baseSize: number,
+  fontScale: number,
+  maxMultiplier = LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER,
+) {
+  const safeScale = Number.isFinite(fontScale) ? Math.max(1, fontScale) : 1;
+  return Number((baseSize * Math.min(safeScale, maxMultiplier)).toFixed(2));
+}
+
 export function createMobileResponsiveLayout({
   bottomInset,
+  fontScale = 1,
   height,
   platform,
   statusBarHeight = 0,
@@ -63,22 +94,38 @@ export function createMobileResponsiveLayout({
   const isNarrowWidth = width <= 360;
   const isCompactHeight = usableHeight <= 700;
   const isLargeWidth = width >= 430;
-  const bottomNavigationHeight = isCompactHeight ? 64 : 72;
-  const bottomNavigationBottomGap = isCompactHeight ? 4 : 8;
+  const bottomNavigationHeight = 64;
+  const bottomNavigationBottomGap = isCompactHeight ? 4 : 6;
+  const contentTrailingSpace = isCompactHeight ? 18 : 22;
+  const typography: MobileResponsiveTypography = {
+    body: 15,
+    button: 15,
+    cardTitle: 17,
+    heroTitle: isCompactHeight ? 23 : 24,
+    metadata: 12,
+    navigationLabel: isCompactHeight ? 10 : 11,
+    pageTitle: isCompactHeight ? 23 : 24,
+    secondary: 13,
+    sectionTitle: isCompactHeight ? 19 : 20,
+  };
 
   return {
-    bodySize: isCompactHeight ? 14 : 15,
+    bodySize: typography.body,
     borderRadius: isCompactHeight ? 22 : 28,
     bottomInset: safeBottomInset,
+    bottomNavigationIconSize: isCompactHeight ? 22 : 23,
     bottomNavigationBottomGap,
     bottomNavigationHeight,
     cardPadding: isCompactHeight ? 16 : isLargeWidth ? 22 : 20,
-    categoryTileHeight: isCompactHeight ? 68 : 76,
+    categoryTileHeight: isCompactHeight ? 82 : 88,
+    centerNavigationActionSize: 54,
     contentBottomInset:
       bottomNavigationHeight +
       bottomNavigationBottomGap +
       safeBottomInset +
-      (isCompactHeight ? 12 : 16),
+      contentTrailingSpace,
+    contentTrailingSpace,
+    fontScale: Math.max(1, fontScale),
     headerHeight: isCompactHeight ? 56 : 64,
     height: Math.round(height),
     iconSize: isCompactHeight ? 22 : 24,
@@ -86,12 +133,13 @@ export function createMobileResponsiveLayout({
     isLargeWidth,
     isNarrowWidth,
     pagePadding: isNarrowWidth ? 14 : isLargeWidth ? 22 : 18,
-    promoHeight: isCompactHeight ? 124 : 145,
+    promoHeight: isCompactHeight ? 116 : 120,
     screenTopPadding: isCompactHeight ? 10 : 18,
     sectionGap: isCompactHeight ? 12 : 18,
-    titleSize: isCompactHeight ? 24 : isLargeWidth ? 30 : 28,
+    titleSize: typography.pageTitle,
     topInset: safeTopInset,
     touchTarget: 44,
+    typography,
     usableHeight,
     verticalSpacing: isCompactHeight ? 10 : 14,
     width: Math.round(width),

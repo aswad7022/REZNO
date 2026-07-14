@@ -1,5 +1,4 @@
 import {
-  Text,
   View,
   type StyleProp,
   type TextStyle,
@@ -7,6 +6,11 @@ import {
 } from "react-native";
 
 import { PrimaryButton } from "./mobile-chrome";
+import { LayoutText as Text } from "./layout-text";
+import {
+  DISPLAY_MAX_FONT_SIZE_MULTIPLIER,
+  LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER,
+} from "../layout/responsive-metrics";
 
 type PrimaryButtonStyles = Parameters<typeof PrimaryButton>[0]["styles"];
 
@@ -42,10 +46,20 @@ export function SectionHeader({
 }) {
   return (
     <View style={styles.sectionHeader}>
-      <Text style={[styles.sectionTitle, isRtl && styles.rtlText]}>
+      <Text
+        maxFontSizeMultiplier={DISPLAY_MAX_FONT_SIZE_MULTIPLIER}
+        style={[styles.sectionTitle, isRtl && styles.rtlText]}
+      >
         {title}
       </Text>
-      {action ? <Text style={styles.sectionAction}>{action}</Text> : null}
+      {action ? (
+        <Text
+          maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+          style={styles.sectionAction}
+        >
+          {action}
+        </Text>
+      ) : null}
     </View>
   );
 }

@@ -1,6 +1,7 @@
-import { Image, StyleSheet, Text, View, type ImageSourcePropType } from "react-native";
+import { Image, StyleSheet, View, type ImageSourcePropType } from "react-native";
 
 import { PremiumEntrance, PremiumPressable } from "./premium-motion";
+import { LayoutText as Text } from "./layout-text";
 import { formatCommerceMoney, type CommerceCopy } from "../i18n/commerce";
 import type { MobileLocale } from "../i18n/labels";
 import type { CommerceProduct, CommerceStore } from "../types/commerce";

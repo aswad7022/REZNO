@@ -5,8 +5,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
   View,
 } from "react-native";
 
@@ -20,8 +18,16 @@ import {
 } from "../auth/form";
 import { TOUCH_HIT_SLOP } from "../components/mobile-chrome";
 import { PremiumEntrance } from "../components/premium-motion";
+import {
+  LayoutText as Text,
+  LayoutTextInput as TextInput,
+} from "../components/layout-text";
 import { getTextDirection, type MobileLocale } from "../i18n/labels";
-import type { MobileResponsiveLayout } from "../layout/responsive-metrics";
+import {
+  DISPLAY_MAX_FONT_SIZE_MULTIPLIER,
+  LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER,
+  type MobileResponsiveLayout,
+} from "../layout/responsive-metrics";
 import { useMobileResponsiveLayout } from "../layout/use-mobile-responsive-layout";
 import type { MobileTheme } from "../theme/tokens";
 
@@ -373,7 +379,12 @@ export function MobileAuthScreen({
           ]}
         >
           <Text style={styles.backArrow}>{isRtl ? "›" : "‹"}</Text>
-          <Text style={[styles.backText, isRtl && styles.rtl]}>{copy.back}</Text>
+          <Text
+            maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+            style={[styles.backText, isRtl && styles.rtl]}
+          >
+            {copy.back}
+          </Text>
         </Pressable>
 
         <PremiumEntrance distance={14} style={styles.card}>
@@ -381,14 +392,20 @@ export function MobileAuthScreen({
             <Text style={styles.brandMarkText}>R</Text>
           </View>
           <Text style={styles.brandName}>REZNO</Text>
-          <Text style={[styles.title, isRtl && styles.rtl]}>
+          <Text
+            maxFontSizeMultiplier={DISPLAY_MAX_FONT_SIZE_MULTIPLIER}
+            style={[styles.title, isRtl && styles.rtl]}
+          >
             {setupUser
               ? copy.finishSetup
               : mode === "signin"
                 ? copy.signIn
                 : copy.createAccount}
           </Text>
-          <Text style={[styles.description, isRtl && styles.rtl]}>
+          <Text
+            maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+            style={[styles.description, isRtl && styles.rtl]}
+          >
             {setupUser
               ? copy.setupDescription
               : mode === "signin"
@@ -519,7 +536,10 @@ export function MobileAuthScreen({
               pressed && !pending && styles.pressed,
             ]}
           >
-            <Text style={styles.submitText}>
+            <Text
+              maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+              style={styles.submitText}
+            >
               {setupUser
                 ? pending
                   ? copy.finishingSetup
@@ -572,7 +592,10 @@ function ModeButton({
       onPress={onPress}
       style={[styles.modeButton, active && styles.modeButtonActive]}
     >
-      <Text style={[styles.modeText, active && styles.modeTextActive]}>
+      <Text
+        maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+        style={[styles.modeText, active && styles.modeTextActive]}
+      >
         {label}
       </Text>
     </Pressable>
@@ -590,7 +613,12 @@ function AuthField({
 }) {
   return (
     <View style={styles.field}>
-      <Text style={styles.label}>{label}</Text>
+      <Text
+        maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+        style={styles.label}
+      >
+        {label}
+      </Text>
       {children}
     </View>
   );
@@ -789,8 +817,8 @@ function createStyles(
     title: {
       color: theme.colors.foreground,
       fontFamily: typography.kufiBold,
-      fontSize: layout.isCompactHeight ? 21 : 24,
-      lineHeight: layout.isCompactHeight ? 30 : 34,
+      fontSize: layout.typography.pageTitle,
+      lineHeight: layout.typography.pageTitle + 9,
       marginTop: layout.isCompactHeight ? 14 : 18,
       textAlign: "center",
     },

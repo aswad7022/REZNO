@@ -8,13 +8,14 @@ import {
 } from "./responsive-metrics";
 
 export function useMobileResponsiveLayout() {
-  const { height, width } = useWindowDimensions();
+  const { fontScale, height, width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
 
   return useMemo(
     () =>
       createMobileResponsiveLayout({
         bottomInset: insets.bottom,
+        fontScale,
         height,
         platform: Platform.OS as MobileLayoutPlatform,
         statusBarHeight:
@@ -22,6 +23,6 @@ export function useMobileResponsiveLayout() {
         topInset: insets.top,
         width,
       }),
-    [height, insets.bottom, insets.top, width],
+    [fontScale, height, insets.bottom, insets.top, width],
   );
 }

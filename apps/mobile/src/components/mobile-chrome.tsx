@@ -1,6 +1,5 @@
 import {
   Image,
-  Text,
   View,
   type ImageSourcePropType,
   type ImageStyle,
@@ -14,6 +13,11 @@ import {
   type MobileLocale,
 } from "../i18n/labels";
 import type { MobileTabId } from "../navigation/tabs";
+import {
+  DISPLAY_MAX_FONT_SIZE_MULTIPLIER,
+  LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER,
+} from "../layout/responsive-metrics";
+import { LayoutText as Text } from "./layout-text";
 import {
   PremiumEntrance,
   PremiumPressable,
@@ -173,12 +177,14 @@ export function ScreenHeader({
         </View>
         <View style={styles.brandCopy}>
           <Text
+            maxFontSizeMultiplier={DISPLAY_MAX_FONT_SIZE_MULTIPLIER}
             numberOfLines={1}
             style={[styles.brandName, isRtl && styles.rtlText]}
           >
             بغداد
           </Text>
           <Text
+            maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
             numberOfLines={2}
             style={[styles.brandTagline, isRtl && styles.rtlText]}
           >
@@ -225,6 +231,7 @@ export function PrimaryButton({
       ]}
     >
       <Text
+        maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
         style={[
           styles.primaryButtonText,
           disabled && styles.disabledButtonText,
@@ -312,7 +319,11 @@ export function BottomTabBar({
                       />
                     </View>
                   </View>
-                  <Text numberOfLines={1} style={styles.centerTabLabel}>
+                  <Text
+                    maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+                    numberOfLines={1}
+                    style={styles.centerTabLabel}
+                  >
                     {label}
                   </Text>
                 </>
@@ -330,6 +341,7 @@ export function BottomTabBar({
               )}
               {!isCenterAction ? (
                 <Text
+                  maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
                   numberOfLines={1}
                   style={[styles.tabLabel, active && styles.tabLabelActive]}
                 >
