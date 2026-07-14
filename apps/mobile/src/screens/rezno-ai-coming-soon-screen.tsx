@@ -1,8 +1,11 @@
 import { useMemo } from "react";
-import { Image, StyleSheet, Text, View, type ImageSourcePropType } from "react-native";
+import { Image, StyleSheet, View, type ImageSourcePropType } from "react-native";
 
 import { PremiumEntrance } from "../components/premium-motion";
+import { LayoutText as Text } from "../components/layout-text";
 import type { MobileLocale } from "../i18n/labels";
+import type { MobileResponsiveLayout } from "../layout/responsive-metrics";
+import { useMobileResponsiveLayout } from "../layout/use-mobile-responsive-layout";
 import type { MobileTheme } from "../theme/tokens";
 
 const FONT = {
@@ -44,7 +47,8 @@ export function ReznoAiComingSoonScreen({
   locale: MobileLocale;
   theme: MobileTheme;
 }) {
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const layout = useMobileResponsiveLayout();
+  const styles = useMemo(() => createStyles(theme, layout), [layout, theme]);
   const copy = COPY[locale];
 
   return (
@@ -79,7 +83,10 @@ export function ReznoAiComingSoonScreen({
     </View>
   );
 }
-function createStyles(theme: MobileTheme) {
+function createStyles(
+  theme: MobileTheme,
+  layout: MobileResponsiveLayout,
+) {
   return StyleSheet.create({
     body: {
       color: theme.colors.mutedForeground,
@@ -96,10 +103,10 @@ function createStyles(theme: MobileTheme) {
       borderColor: theme.colors.goldSoft,
       borderRadius: 30,
       borderWidth: 1,
-      minHeight: 360,
+      minHeight: layout.isCompactHeight ? 300 : 360,
       overflow: "hidden",
-      paddingHorizontal: 26,
-      paddingVertical: 42,
+      paddingHorizontal: layout.cardPadding,
+      paddingVertical: layout.isCompactHeight ? 30 : 42,
       position: "relative",
     },
     flagState: {
@@ -139,9 +146,9 @@ function createStyles(theme: MobileTheme) {
       writingDirection: "rtl",
     },
     screen: {
-      paddingBottom: 24,
-      paddingHorizontal: 16,
-      paddingTop: 24,
+      paddingBottom: layout.verticalSpacing,
+      paddingHorizontal: layout.pagePadding,
+      paddingTop: layout.screenTopPadding,
     },
     statusPill: {
       backgroundColor: theme.colors.goldSoft,
@@ -158,8 +165,8 @@ function createStyles(theme: MobileTheme) {
     title: {
       color: theme.colors.foreground,
       fontFamily: FONT.kufiBold,
-      fontSize: 30,
-      lineHeight: 40,
+      fontSize: layout.titleSize,
+      lineHeight: layout.titleSize + 10,
       marginTop: 14,
     },
   });

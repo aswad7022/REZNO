@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import test from "node:test";
 
-test("mobile onboarding route accepts no caller identity and keeps auth, rate-limit, and cache boundaries", () => {
+test("mobile onboarding accepts only a phone from the body and keeps auth, rate-limit, and cache boundaries", () => {
   const service = readFileSync(
     resolve(
       process.cwd(),
@@ -36,6 +36,10 @@ test("mobile onboarding route accepts no caller identity and keeps auth, rate-li
   );
 
   assert.match(service, /import "server-only"/);
+  assert.match(service, /completeMobileCustomerOnboardingProfile/);
+  assert.match(service, /validateCustomerPhone/);
+  assert.match(service, /submittedPhone === undefined \? person\.phone/);
+  assert.match(service, /phone: phone\.value/);
   assert.match(service, /updateMany\(\{/);
   assert.match(service, /where: \{ authUserId, deletedAt: null, status: "ACTIVE" \}/);
   assert.match(service, /data: \{ isOnboarded: true \}/);
@@ -43,9 +47,14 @@ test("mobile onboarding route accepts no caller identity and keeps auth, rate-li
   assert.match(route, /auth\.api\.getSession\(\{ headers: request\.headers \}\)/);
   assert.match(
     route,
-    /completeCustomerOnboardingProfile\(session\.user\.id\)/,
+    /completeMobileCustomerOnboardingProfile\(\s*session\.user\.id,\s*phone/,
   );
-  assert.doesNotMatch(route, /request\.(?:json|formData)\(/);
+  assert.match(route, /request\.json\(\)/);
+  assert.match(route, /isRecord\(body\) \? body\.phone : undefined/);
+  assert.doesNotMatch(route, /body\.(?:authUserId|personId|isOnboarded)/);
+  assert.match(route, /CustomerOnboardingPhoneError/);
+  assert.match(route, /"PHONE_REQUIRED"/);
+  assert.match(route, /"PHONE_INVALID"/);
   assert.match(route, /"mobile\.onboarding\.customer"/);
   assert.match(route, /limit:\s*10/);
   assert.match(route, /windowMs:\s*60_000/);
@@ -53,6 +62,7 @@ test("mobile onboarding route accepts no caller identity and keeps auth, rate-li
   assert.match(route, /"Cache-Control": "no-store, max-age=0"/);
   assert.match(webAction, /completeCustomerOnboardingProfile\(session\.user\.id\)/);
   assert.match(mobileClient, /authenticated:\s*true/);
+  assert.match(mobileClient, /body:\s*phone === undefined \? \{\} : \{ phone \}/);
   assert.match(mobileClient, /method:\s*"POST"/);
   assert.match(mobileClient, /AbortController/);
   assert.match(mobileClient, /signal:\s*controller\.signal/);

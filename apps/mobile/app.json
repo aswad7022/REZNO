@@ -10,7 +10,10 @@
     "userInterfaceStyle": "light",
     "ios": {
       "bundleIdentifier": "com.rezno.mobile",
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.rezno.mobile",
@@ -26,7 +29,6 @@
       "favicon": "./assets/favicon.png"
     },
     "extra": {
-      "apiBaseUrl": "http://localhost:3000",
       "eas": {
         "projectId": "ef209c9c-0d04-4731-a998-6241fef1b29d"
       }

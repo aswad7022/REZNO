@@ -13,6 +13,7 @@
     "test:http": "tsx --test --test-concurrency=1 tests/commerce/http/*.test.ts",
     "test:commerce": "npm run test:unit && npm run test:integration && npm run test:http",
     "commerce:expire-pending-orders": "tsx scripts/commerce/expire-pending-orders.ts",
+    "seed:staging:commerce-qa": "tsx scripts/staging/seed-commerce-qa.ts",
     "seed:staging:marketplace-demo": "tsx scripts/staging/seed-marketplace-demo.ts",
     "postinstall": "prisma generate"
   },

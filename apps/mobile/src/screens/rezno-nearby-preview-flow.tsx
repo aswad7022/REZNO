@@ -17,8 +17,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
   useWindowDimensions,
   View,
   type ImageSourcePropType,
@@ -26,10 +24,16 @@ import {
 
 import { TOUCH_HIT_SLOP } from "../components/mobile-chrome";
 import {
+  LayoutText as Text,
+  LayoutTextInput as TextInput,
+} from "../components/layout-text";
+import {
   PremiumCheck,
   PremiumEntrance,
   PremiumPressable,
 } from "../components/premium-motion";
+import type { MobileResponsiveLayout } from "../layout/responsive-metrics";
+import { useMobileResponsiveLayout } from "../layout/use-mobile-responsive-layout";
 import type { MobileTheme } from "../theme/tokens";
 import type {
   NearbyVisualQaFixture,
@@ -118,8 +122,8 @@ export const ReznoNearbyPreviewFlow = forwardRef<
   { business, isRtl, onExit, theme },
   ref,
 ) {
-  const { width } = useWindowDimensions();
-  const styles = useMemo(() => createStyles(theme, width), [theme, width]);
+  const layout = useMobileResponsiveLayout();
+  const styles = useMemo(() => createStyles(theme, layout), [layout, theme]);
   const [routeStack, setRouteStack] = useState<readonly PreviewRoute[]>([
     { name: "detail" },
   ]);
@@ -1935,10 +1939,16 @@ function getPreviewHeaderCopy(
   };
 }
 
-const createStyles = (theme: MobileTheme, width: number) => {
+const createStyles = (
+  theme: MobileTheme,
+  layout: MobileResponsiveLayout,
+) => {
+  const { width } = layout;
   const gold = theme.isDark ? theme.colors.gold : "#e9ae3e";
-  const horizontalPadding = width < 380 ? 18 : width >= 430 ? 22 : 20;
-  const heroHeight = Math.max(204, Math.min(232, Math.round(width * 0.54)));
+  const horizontalPadding = layout.pagePadding;
+  const heroHeight = layout.isCompactHeight
+    ? Math.max(184, Math.min(210, Math.round(width * 0.5)))
+    : Math.max(204, Math.min(232, Math.round(width * 0.54)));
 
   return StyleSheet.create({
     aboutText: {
@@ -2527,7 +2537,7 @@ const createStyles = (theme: MobileTheme, width: number) => {
       gap: 9,
     },
     flowStack: {
-      gap: 16,
+      gap: layout.sectionGap,
     },
     footer: {
       backgroundColor: "#080d10",
@@ -2535,7 +2545,7 @@ const createStyles = (theme: MobileTheme, width: number) => {
       borderTopWidth: 1,
       flexShrink: 0,
       gap: 8,
-      paddingBottom: 12,
+      paddingBottom: layout.verticalSpacing,
       paddingHorizontal: horizontalPadding,
       paddingTop: 10,
     },
@@ -2547,7 +2557,7 @@ const createStyles = (theme: MobileTheme, width: number) => {
       direction: "ltr",
       flexDirection: "row-reverse",
       gap: 12,
-      minHeight: 88,
+      minHeight: layout.isCompactHeight ? 76 : 88,
       paddingBottom: 9,
       paddingHorizontal: horizontalPadding,
       paddingTop: 9,
@@ -3125,9 +3135,9 @@ const createStyles = (theme: MobileTheme, width: number) => {
       minHeight: 0,
     },
     scrollContent: {
-      paddingBottom: 28,
+      paddingBottom: layout.isCompactHeight ? 20 : 28,
       paddingHorizontal: horizontalPadding,
-      paddingTop: 16,
+      paddingTop: layout.screenTopPadding,
     },
     secondaryCta: {
       alignItems: "center",

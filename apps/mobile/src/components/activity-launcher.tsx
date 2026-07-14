@@ -4,15 +4,20 @@ import {
   Image,
   Modal,
   Pressable,
-  SafeAreaView,
   StyleSheet,
-  Text,
-  useWindowDimensions,
   View,
   type ImageSourcePropType,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import type { MobileLocale } from "../i18n/labels";
+import { LayoutText as Text } from "./layout-text";
+import {
+  DISPLAY_MAX_FONT_SIZE_MULTIPLIER,
+  LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER,
+  type MobileResponsiveLayout,
+} from "../layout/responsive-metrics";
+import { useMobileResponsiveLayout } from "../layout/use-mobile-responsive-layout";
 import type { MobileAppTabId } from "./mobile-chrome";
 import { PremiumEntrance, PremiumPressable, useReducedMotionPreference } from "./premium-motion";
 import type { MobileTheme } from "../theme/tokens";
@@ -83,10 +88,10 @@ export function ActivityLauncher({
   theme: MobileTheme;
   visible: boolean;
 }) {
-  const { width } = useWindowDimensions();
+  const layout = useMobileResponsiveLayout();
   const reducedMotion = useReducedMotionPreference();
   const [screenReaderEnabled, setScreenReaderEnabled] = useState(false);
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const styles = useMemo(() => createStyles(theme, layout), [layout, theme]);
   const copy = COPY[locale];
 
   useEffect(() => {
@@ -105,7 +110,11 @@ export function ActivityLauncher({
     };
   }, []);
 
-  const useFallbackSheet = screenReaderEnabled || reducedMotion || width < 360;
+  const useFallbackSheet =
+    screenReaderEnabled ||
+    reducedMotion ||
+    layout.isNarrowWidth ||
+    layout.isCompactHeight;
   const destinations = locale === "en" ? DESTINATIONS : [...DESTINATIONS].reverse();
   const direction = isRtl ? styles.rtlText : styles.ltrText;
 
@@ -129,11 +138,25 @@ export function ActivityLauncher({
           onPress={onClose}
           style={StyleSheet.absoluteFill}
         />
-        <SafeAreaView pointerEvents="box-none" style={styles.safeArea}>
+        <SafeAreaView
+          edges={["bottom", "left", "right", "top"]}
+          pointerEvents="box-none"
+          style={styles.safeArea}
+        >
           {useFallbackSheet ? (
             <View accessibilityViewIsModal style={styles.sheet}>
-              <Text style={[styles.sheetTitle, direction]}>{copy.title}</Text>
-              <Text style={[styles.sheetHint, direction]}>{copy.hint}</Text>
+              <Text
+                maxFontSizeMultiplier={DISPLAY_MAX_FONT_SIZE_MULTIPLIER}
+                style={[styles.sheetTitle, direction]}
+              >
+                {copy.title}
+              </Text>
+              <Text
+                maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+                style={[styles.sheetHint, direction]}
+              >
+                {copy.hint}
+              </Text>
               <View style={styles.sheetList}>
                 {destinations.map((destination) => (
                   <ActivityButton
@@ -157,8 +180,18 @@ export function ActivityLauncher({
                 style={styles.arcPanel}
               >
                 <View style={styles.arcHeading}>
-                  <Text style={[styles.arcTitle, direction]}>{copy.title}</Text>
-                  <Text style={[styles.arcHint, direction]}>{copy.hint}</Text>
+                  <Text
+                    maxFontSizeMultiplier={DISPLAY_MAX_FONT_SIZE_MULTIPLIER}
+                    style={[styles.arcTitle, direction]}
+                  >
+                    {copy.title}
+                  </Text>
+                  <Text
+                    maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+                    style={[styles.arcHint, direction]}
+                  >
+                    {copy.hint}
+                  </Text>
                 </View>
                 <View style={styles.arcRow}>
                   {destinations.map((destination, index) => (
@@ -236,14 +269,21 @@ function ActivityButton({
           style={styles.activityIcon}
         />
       </View>
-      <Text numberOfLines={1} style={[styles.activityLabel, direction]}>
+      <Text
+        maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+        numberOfLines={1}
+        style={[styles.activityLabel, direction]}
+      >
         {label}
       </Text>
     </PremiumPressable>
   );
 }
 
-function createStyles(theme: MobileTheme) {
+function createStyles(
+  theme: MobileTheme,
+  layout: MobileResponsiveLayout,
+) {
   return StyleSheet.create({
     activityButton: {
       alignItems: "center",
@@ -289,7 +329,7 @@ function createStyles(theme: MobileTheme) {
       textAlign: "center",
     },
     activityTabCloseTarget: {
-      bottom: 14,
+      bottom: layout.bottomInset + 4,
       height: 78,
       position: "absolute",
       width: "20%",

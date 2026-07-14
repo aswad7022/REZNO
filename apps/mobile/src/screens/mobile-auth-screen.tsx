@@ -5,8 +5,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
   View,
 } from "react-native";
 
@@ -14,12 +12,24 @@ import { signInWithEmail, signUpWithEmail } from "../auth/client";
 import {
   MOBILE_AUTH_MIN_PASSWORD_LENGTH,
   validateMobileAuthForm,
+  validateMobilePhone,
   type MobileAuthMode,
   type MobileAuthValidationCode,
 } from "../auth/form";
 import { TOUCH_HIT_SLOP } from "../components/mobile-chrome";
 import { PremiumEntrance } from "../components/premium-motion";
+import {
+  LayoutText as Text,
+  LayoutTextInput as TextInput,
+} from "../components/layout-text";
 import { getTextDirection, type MobileLocale } from "../i18n/labels";
+import {
+  DISPLAY_MAX_FONT_SIZE_MULTIPLIER,
+  LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER,
+  type MobileResponsiveLayout,
+} from "../layout/responsive-metrics";
+import { KEYBOARD_SAFE_FORM_LAYOUT } from "../layout/screen-contracts";
+import { useMobileResponsiveLayout } from "../layout/use-mobile-responsive-layout";
 import type { MobileTheme } from "../theme/tokens";
 
 const typography = {
@@ -50,15 +60,21 @@ export type MobileAuthCopy = {
   emailRequired: string;
   finishSetup: string;
   finishingSetup: string;
+  hidePassword: string;
   name: string;
   nameRequired: string;
   password: string;
   passwordHint: string;
   passwordTooShort: string;
+  phone: string;
+  phoneHint: string;
+  phoneInvalid: string;
+  phoneRequired: string;
   sessionError: string;
   sessionLoading: string;
   setupDescription: string;
   setupFailure: string;
+  showPassword: string;
   signedIn: string;
   signedOut: string;
   signIn: string;
@@ -86,17 +102,23 @@ export const mobileAuthCopy: Record<MobileLocale, MobileAuthCopy> = {
     emailRequired: "البريد الإلكتروني مطلوب.",
     finishSetup: "إكمال إعداد العميل",
     finishingSetup: "جاري إكمال الإعداد...",
+    hidePassword: "إخفاء",
     name: "الاسم",
     nameRequired: "الاسم مطلوب لإنشاء الحساب.",
     password: "كلمة المرور",
     passwordHint: "ثمانية أحرف على الأقل.",
     passwordTooShort: `يجب ألا تقل كلمة المرور عن ${MOBILE_AUTH_MIN_PASSWORD_LENGTH} أحرف.`,
+    phone: "رقم الهاتف",
+    phoneHint: "أدخل رقماً يمكن للمتجر استخدامه لتنسيق استلام طلبك.",
+    phoneInvalid: "أدخل رقم هاتف صحيحاً من 7 إلى 15 رقماً.",
+    phoneRequired: "رقم الهاتف مطلوب لإكمال حساب العميل.",
     sessionError: "تعذر التحقق من الجلسة. يمكنك المحاولة عبر تسجيل الدخول.",
     sessionLoading: "جاري التحقق من الجلسة...",
     setupDescription:
-      "تم حفظ جلسة حسابك. أكمل إعداد ملف العميل لاستخدام السلة والطلبات والمفضلة.",
+      "تم حفظ جلسة حسابك. أضف رقم هاتف صحيحاً لإكمال ملف العميل واستخدام الدفع عند الاستلام.",
     setupFailure:
       "تم حفظ جلسة الحساب، لكن تعذر إكمال ملف العميل. أعد المحاولة دون إنشاء الحساب من جديد.",
+    showPassword: "إظهار",
     signedIn: "تم تسجيل الدخول",
     signedOut: "لم تسجّل الدخول بعد",
     signIn: "تسجيل الدخول",
@@ -122,17 +144,23 @@ export const mobileAuthCopy: Record<MobileLocale, MobileAuthCopy> = {
     emailRequired: "ئیمەیڵ پێویستە.",
     finishSetup: "تەواوکردنی ڕێکخستنی کڕیار",
     finishingSetup: "ڕێکخستن تەواو دەکرێت...",
+    hidePassword: "شاردنەوە",
     name: "ناو",
     nameRequired: "ناو بۆ دروستکردنی هەژمار پێویستە.",
     password: "وشەی نهێنی",
     passwordHint: "لانیکەم هەشت پیت.",
     passwordTooShort: `وشەی نهێنی دەبێت لانیکەم ${MOBILE_AUTH_MIN_PASSWORD_LENGTH} پیت بێت.`,
+    phone: "ژمارەی تەلەفۆن",
+    phoneHint: "ژمارەیەک بنووسە کە فرۆشگا بتوانێت بۆ وەرگرتنی داواکاری پەیوەندیت پێوە بکات.",
+    phoneInvalid: "ژمارەی تەلەفۆنێکی دروست لە 7 بۆ 15 ژمارە بنووسە.",
+    phoneRequired: "ژمارەی تەلەفۆن بۆ تەواوکردنی هەژماری کڕیار پێویستە.",
     sessionError: "پشکنینی دانیشتن سەرکەوتوو نەبوو. دووبارە بچۆ ژوورەوە.",
     sessionLoading: "دانیشتن پشکنین دەکرێت...",
     setupDescription:
-      "دانیشتنەکەت پارێزرا. ڕێکخستنی کڕیار تەواو بکە بۆ سەبەتە و داواکارییەکان.",
+      "دانیشتنەکەت پارێزرا. ژمارەی تەلەفۆنێکی دروست زیاد بکە بۆ تەواوکردنی پرۆفایلی کڕیار.",
     setupFailure:
       "دانیشتنەکەت پارێزرا، بەڵام پرۆفایلی کڕیار تەواو نەبوو. دووبارە هەوڵ بدە.",
+    showPassword: "پیشاندان",
     signedIn: "چوویتە ژوورەوە",
     signedOut: "هێشتا نەچوویتە ژوورەوە",
     signIn: "چوونە ژوورەوە",
@@ -158,17 +186,23 @@ export const mobileAuthCopy: Record<MobileLocale, MobileAuthCopy> = {
     emailRequired: "Email is required.",
     finishSetup: "Finish customer setup",
     finishingSetup: "Finishing setup...",
+    hidePassword: "Hide",
     name: "Name",
     nameRequired: "Name is required to create an account.",
     password: "Password",
     passwordHint: "At least eight characters.",
     passwordTooShort: `Password must be at least ${MOBILE_AUTH_MIN_PASSWORD_LENGTH} characters.`,
+    phone: "Phone number",
+    phoneHint: "Use a number the store can contact for pickup coordination.",
+    phoneInvalid: "Enter a valid phone number with 7 to 15 digits.",
+    phoneRequired: "A phone number is required to finish customer setup.",
     sessionError: "We could not verify your session. You can try signing in again.",
     sessionLoading: "Checking your session...",
     setupDescription:
-      "Your account session is saved. Finish the customer profile to use cart, orders, and favorites.",
+      "Your account session is saved. Add a valid phone number to finish the customer profile and use pickup checkout.",
     setupFailure:
       "Your session is saved, but the customer profile could not be completed. Retry without creating the account again.",
+    showPassword: "Show",
     signedIn: "Signed in",
     signedOut: "Not signed in yet",
     signIn: "Sign in",
@@ -188,17 +222,20 @@ export function MobileAuthScreen({
   onAuthenticated,
   onBack,
   theme,
+  visualQaAutoFocus = false,
 }: {
   initialMode: MobileAuthMode;
   initialSetupUser?: MobileAuthUser | null;
   locale: MobileLocale;
-  onAuthenticated: (user: MobileAuthUser) => Promise<boolean>;
+  onAuthenticated: (user: MobileAuthUser, phone?: string) => Promise<boolean>;
   onBack: () => void;
   theme: MobileTheme;
+  visualQaAutoFocus?: boolean;
 }) {
   const copy = mobileAuthCopy[locale];
   const isRtl = getTextDirection(locale) === "rtl";
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const layout = useMobileResponsiveLayout();
+  const styles = useMemo(() => createStyles(theme, layout), [layout, theme]);
   const [mode, setMode] = useState<MobileAuthMode>(initialMode);
   const [setupUser, setSetupUser] = useState<MobileAuthUser | null>(
     initialSetupUser,
@@ -206,6 +243,8 @@ export function MobileAuthScreen({
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  const [phone, setPhone] = useState("");
   const [pending, setPending] = useState(false);
   const [validationCode, setValidationCode] =
     useState<MobileAuthValidationCode | null>(null);
@@ -224,9 +263,19 @@ export function MobileAuthScreen({
   };
 
   const finishSetup = async (user: MobileAuthUser) => {
+    const phoneValidation = validateMobilePhone(phone);
+    if (!phoneValidation.ok) {
+      setValidationCode(phoneValidation.code);
+      setRequestError(null);
+      return;
+    }
+
     setPending(true);
+    setValidationCode(null);
     setRequestError(null);
-    const completed = await onAuthenticated(user).catch(() => false);
+    const completed = await onAuthenticated(user, phoneValidation.value).catch(
+      () => false,
+    );
     if (completed) return;
     setRequestError(copy.setupFailure);
     setPending(false);
@@ -239,7 +288,12 @@ export function MobileAuthScreen({
       return;
     }
 
-    const validation = validateMobileAuthForm(mode, { email, name, password });
+    const validation = validateMobileAuthForm(mode, {
+      email,
+      name,
+      password,
+      phone,
+    });
     if (!validation.ok) {
       setValidationCode(validation.code);
       setRequestError(null);
@@ -269,9 +323,10 @@ export function MobileAuthScreen({
         return;
       }
 
-      const completed = await onAuthenticated(result.data.user).catch(
-        () => false,
-      );
+      const completed = await onAuthenticated(
+        result.data.user,
+        mode === "signup" ? validation.values.phone : undefined,
+      ).catch(() => false);
       if (completed) return;
       setSetupUser(result.data.user);
       setRequestError(copy.setupFailure);
@@ -285,10 +340,36 @@ export function MobileAuthScreen({
   const errorMessage = validationCode
     ? validationMessage(validationCode, copy)
     : requestError;
+  const phoneField = (
+    <AuthField label={copy.phone} styles={styles}>
+      <TextInput
+        accessibilityHint={copy.phoneHint}
+        accessibilityLabel={copy.phone}
+        autoComplete="tel"
+        editable={!pending}
+        keyboardType="phone-pad"
+        maxLength={30}
+        onChangeText={(value) => {
+          setPhone(value);
+          clearError();
+        }}
+        onSubmitEditing={() => {
+          if (setupUser) void submit();
+        }}
+        placeholder="+964 750 000 0000"
+        placeholderTextColor={theme.colors.disabledText}
+        returnKeyType={setupUser ? "done" : "next"}
+        style={[styles.input, styles.inputLtr]}
+        textContentType="telephoneNumber"
+        value={phone}
+      />
+      <Text style={[styles.hint, isRtl && styles.rtl]}>{copy.phoneHint}</Text>
+    </AuthField>
+  );
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      behavior={Platform.OS === "ios" ? "padding" : KEYBOARD_SAFE_FORM_LAYOUT.androidBehavior}
       style={styles.keyboard}
     >
       <ScrollView
@@ -310,7 +391,12 @@ export function MobileAuthScreen({
           ]}
         >
           <Text style={styles.backArrow}>{isRtl ? "›" : "‹"}</Text>
-          <Text style={[styles.backText, isRtl && styles.rtl]}>{copy.back}</Text>
+          <Text
+            maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+            style={[styles.backText, isRtl && styles.rtl]}
+          >
+            {copy.back}
+          </Text>
         </Pressable>
 
         <PremiumEntrance distance={14} style={styles.card}>
@@ -318,14 +404,20 @@ export function MobileAuthScreen({
             <Text style={styles.brandMarkText}>R</Text>
           </View>
           <Text style={styles.brandName}>REZNO</Text>
-          <Text style={[styles.title, isRtl && styles.rtl]}>
+          <Text
+            maxFontSizeMultiplier={DISPLAY_MAX_FONT_SIZE_MULTIPLIER}
+            style={[styles.title, isRtl && styles.rtl]}
+          >
             {setupUser
               ? copy.finishSetup
               : mode === "signin"
                 ? copy.signIn
                 : copy.createAccount}
           </Text>
-          <Text style={[styles.description, isRtl && styles.rtl]}>
+          <Text
+            maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+            style={[styles.description, isRtl && styles.rtl]}
+          >
             {setupUser
               ? copy.setupDescription
               : mode === "signin"
@@ -375,6 +467,7 @@ export function MobileAuthScreen({
                     />
                   </AuthField>
                 ) : null}
+                {mode === "signup" ? phoneField : null}
                 <AuthField label={copy.email} styles={styles}>
                   <TextInput
                     accessibilityLabel={copy.email}
@@ -397,33 +490,48 @@ export function MobileAuthScreen({
                   />
                 </AuthField>
                 <AuthField label={copy.password} styles={styles}>
-                  <TextInput
-                    accessibilityHint={copy.passwordHint}
-                    accessibilityLabel={copy.password}
-                    autoCapitalize="none"
-                    autoComplete={
-                      mode === "signin" ? "current-password" : "new-password"
-                    }
-                    autoCorrect={false}
-                    editable={!pending}
-                    maxLength={128}
-                    onChangeText={(value) => {
-                      setPassword(value);
-                      clearError();
-                    }}
-                    onSubmitEditing={() => {
-                      void submit();
-                    }}
-                    placeholder={copy.password}
-                    placeholderTextColor={theme.colors.disabledText}
-                    returnKeyType="done"
-                    secureTextEntry
-                    style={[styles.input, styles.inputLtr]}
-                    textContentType={
-                      mode === "signin" ? "password" : "newPassword"
-                    }
-                    value={password}
-                  />
+                  <View style={styles.passwordInputRow}>
+                    <TextInput
+                      accessibilityHint={copy.passwordHint}
+                      accessibilityLabel={copy.password}
+                      autoCapitalize="none"
+                      autoComplete={
+                        mode === "signin" ? "current-password" : "new-password"
+                      }
+                      autoCorrect={false}
+                      autoFocus={visualQaAutoFocus}
+                      editable={!pending}
+                      maxLength={128}
+                      onChangeText={(value) => {
+                        setPassword(value);
+                        clearError();
+                      }}
+                      onSubmitEditing={() => {
+                        void submit();
+                      }}
+                      placeholder={copy.password}
+                      placeholderTextColor={theme.colors.disabledText}
+                      returnKeyType="done"
+                      secureTextEntry={!passwordVisible}
+                      style={[styles.input, styles.inputLtr, styles.passwordInput]}
+                      textContentType={
+                        mode === "signin" ? "password" : "newPassword"
+                      }
+                      value={password}
+                    />
+                    <Pressable
+                      accessibilityLabel={passwordVisible ? copy.hidePassword : copy.showPassword}
+                      accessibilityRole="button"
+                      disabled={pending}
+                      hitSlop={TOUCH_HIT_SLOP}
+                      onPress={() => setPasswordVisible((current) => !current)}
+                      style={styles.passwordVisibilityButton}
+                    >
+                      <Text style={styles.passwordVisibilityText}>
+                        {passwordVisible ? copy.hidePassword : copy.showPassword}
+                      </Text>
+                    </Pressable>
+                  </View>
                   <Text style={[styles.hint, isRtl && styles.rtl]}>
                     {copy.passwordHint}
                   </Text>
@@ -431,6 +539,8 @@ export function MobileAuthScreen({
               </View>
             </>
           ) : null}
+
+          {setupUser ? <View style={styles.fields}>{phoneField}</View> : null}
 
           {errorMessage ? (
             <View accessibilityLiveRegion="polite" style={styles.error}>
@@ -453,7 +563,10 @@ export function MobileAuthScreen({
               pressed && !pending && styles.pressed,
             ]}
           >
-            <Text style={styles.submitText}>
+            <Text
+              maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+              style={styles.submitText}
+            >
               {setupUser
                 ? pending
                   ? copy.finishingSetup
@@ -480,6 +593,8 @@ function validationMessage(
   if (code === "EMAIL_INVALID") return copy.emailInvalid;
   if (code === "EMAIL_REQUIRED") return copy.emailRequired;
   if (code === "NAME_REQUIRED") return copy.nameRequired;
+  if (code === "PHONE_INVALID") return copy.phoneInvalid;
+  if (code === "PHONE_REQUIRED") return copy.phoneRequired;
   return copy.passwordTooShort;
 }
 
@@ -504,7 +619,10 @@ function ModeButton({
       onPress={onPress}
       style={[styles.modeButton, active && styles.modeButtonActive]}
     >
-      <Text style={[styles.modeText, active && styles.modeTextActive]}>
+      <Text
+        maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+        style={[styles.modeText, active && styles.modeTextActive]}
+      >
         {label}
       </Text>
     </Pressable>
@@ -522,7 +640,12 @@ function AuthField({
 }) {
   return (
     <View style={styles.field}>
-      <Text style={styles.label}>{label}</Text>
+      <Text
+        maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+        style={styles.label}
+      >
+        {label}
+      </Text>
       {children}
     </View>
   );
@@ -530,7 +653,10 @@ function AuthField({
 
 type AuthStyles = ReturnType<typeof createStyles>;
 
-function createStyles(theme: MobileTheme) {
+function createStyles(
+  theme: MobileTheme,
+  layout: MobileResponsiveLayout,
+) {
   return StyleSheet.create({
     backArrow: {
       color: theme.colors.gold,
@@ -587,11 +713,11 @@ function createStyles(theme: MobileTheme) {
       alignSelf: "center",
       backgroundColor: theme.colors.card,
       borderColor: theme.colors.border,
-      borderRadius: theme.radii.card,
+      borderRadius: layout.borderRadius,
       borderWidth: 1,
-      marginTop: 18,
+      marginTop: layout.verticalSpacing,
       maxWidth: 520,
-      padding: 22,
+      padding: layout.cardPadding,
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: 18, width: 0 },
       shadowOpacity: theme.isDark ? 0.32 : 0.1,
@@ -601,9 +727,9 @@ function createStyles(theme: MobileTheme) {
     description: {
       color: theme.colors.mutedForeground,
       fontFamily: typography.uiRegular,
-      fontSize: 14,
-      lineHeight: 22,
-      marginTop: 8,
+      fontSize: layout.bodySize,
+      lineHeight: layout.isCompactHeight ? 20 : 22,
+      marginTop: layout.isCompactHeight ? 6 : 8,
       textAlign: "center",
     },
     error: {
@@ -622,7 +748,10 @@ function createStyles(theme: MobileTheme) {
       lineHeight: 20,
     },
     field: { gap: 7 },
-    fields: { gap: 15, marginTop: 22 },
+    fields: {
+      gap: layout.isCompactHeight ? 12 : 15,
+      marginTop: layout.isCompactHeight ? 16 : 22,
+    },
     hint: {
       color: theme.colors.mutedForeground,
       fontFamily: typography.uiRegular,
@@ -665,7 +794,7 @@ function createStyles(theme: MobileTheme) {
       borderWidth: 1,
       flexDirection: "row",
       gap: 4,
-      marginTop: 22,
+      marginTop: layout.isCompactHeight ? 16 : 22,
       padding: 4,
     },
     modeText: {
@@ -676,14 +805,45 @@ function createStyles(theme: MobileTheme) {
       textAlign: "center",
     },
     modeTextActive: { color: theme.colors.foregroundInverse },
+    passwordInput: {
+      backgroundColor: "transparent",
+      borderWidth: 0,
+      flex: 1,
+      minWidth: 0,
+    },
+    passwordInputRow: {
+      alignItems: "center",
+      backgroundColor: theme.colors.cardElevated,
+      borderColor: theme.colors.border,
+      borderRadius: theme.radii.control,
+      borderWidth: 1,
+      direction: "ltr",
+      flexDirection: "row",
+      minHeight: 52,
+      overflow: "hidden",
+    },
+    passwordVisibilityButton: {
+      alignItems: "center",
+      justifyContent: "center",
+      minHeight: 44,
+      minWidth: 58,
+      paddingHorizontal: 10,
+    },
+    passwordVisibilityText: {
+      color: theme.colors.gold,
+      fontFamily: typography.uiSemiBold,
+      fontSize: 12,
+      lineHeight: 18,
+      textAlign: "center",
+    },
     pressed: { opacity: 0.86, transform: [{ scale: 0.985 }] },
     rtl: { textAlign: "right", writingDirection: "rtl" },
     screen: {
       flexGrow: 1,
-      justifyContent: "center",
-      paddingBottom: 32,
-      paddingHorizontal: 20,
-      paddingTop: 12,
+      justifyContent: layout.isCompactHeight ? "flex-start" : "center",
+      paddingBottom: layout.isCompactHeight ? 20 : 32,
+      paddingHorizontal: layout.pagePadding,
+      paddingTop: layout.screenTopPadding,
     },
     submit: {
       alignItems: "center",
@@ -692,7 +852,7 @@ function createStyles(theme: MobileTheme) {
       borderRadius: theme.radii.control,
       borderWidth: 1,
       justifyContent: "center",
-      marginTop: 20,
+      marginTop: layout.isCompactHeight ? 16 : 20,
       minHeight: 54,
       paddingHorizontal: 18,
       shadowColor: theme.colors.deepGold,
@@ -715,9 +875,9 @@ function createStyles(theme: MobileTheme) {
     title: {
       color: theme.colors.foreground,
       fontFamily: typography.kufiBold,
-      fontSize: 24,
-      lineHeight: 34,
-      marginTop: 18,
+      fontSize: layout.typography.pageTitle,
+      lineHeight: layout.typography.pageTitle + 9,
+      marginTop: layout.isCompactHeight ? 14 : 18,
       textAlign: "center",
     },
   });

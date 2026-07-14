@@ -1,6 +1,5 @@
 import {
   Image,
-  Text,
   View,
   type ImageSourcePropType,
   type ImageStyle,
@@ -14,6 +13,12 @@ import {
   type MobileLocale,
 } from "../i18n/labels";
 import type { MobileTabId } from "../navigation/tabs";
+import {
+  DISPLAY_MAX_FONT_SIZE_MULTIPLIER,
+  LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER,
+} from "../layout/responsive-metrics";
+import { SHARED_TOP_HEADER_LAYOUT } from "../layout/screen-contracts";
+import { LayoutText as Text } from "./layout-text";
 import {
   PremiumEntrance,
   PremiumPressable,
@@ -71,6 +76,11 @@ const BOTTOM_NAV_TABS: BottomNavTab[] = [
     label: { ar: "الحساب", ckb: "هەژمار", en: "Account" },
   },
 ];
+
+const HEADER_BACK_ICONS = {
+  ltr: require("../../assets/icons/common/back-arrow-ltr.png") as ImageSourcePropType,
+  rtl: require("../../assets/icons/common/back-arrow-rtl.png") as ImageSourcePropType,
+};
 /* eslint-enable @typescript-eslint/no-require-imports */
 
 const BOTTOM_NAV_A11Y: Record<
@@ -125,6 +135,15 @@ type MobileChromeStyles = {
   exploreCompassNeedle: StyleProp<ViewStyle>;
   exploreCompassNeedleActive: StyleProp<ViewStyle>;
   header: StyleProp<ViewStyle>;
+  headerAction: StyleProp<ViewStyle>;
+  headerActionText: StyleProp<TextStyle>;
+  headerBackButton: StyleProp<ViewStyle>;
+  headerBackIcon: StyleProp<ImageStyle>;
+  headerPageCopy: StyleProp<ViewStyle>;
+  headerPageSubtitle: StyleProp<TextStyle>;
+  headerPageTitle: StyleProp<TextStyle>;
+  headerRtl: StyleProp<ViewStyle>;
+  headerSpacer: StyleProp<ViewStyle>;
   localeButton: StyleProp<ViewStyle>;
   localeButtonActive: StyleProp<ViewStyle>;
   localeButtonPressed: StyleProp<ViewStyle>;
@@ -155,16 +174,83 @@ type MobileChromeStyles = {
 type MobileText = (typeof labels)[MobileLocale];
 
 export function ScreenHeader({
+  backLabel = "Back",
   isRtl,
+  onBack,
+  pageAction,
+  pageSubtitle,
+  pageTitle,
   styles,
   text,
 }: {
+  backLabel?: string;
   isRtl: boolean;
   locale?: MobileLocale;
   onLocaleChange?: (locale: MobileLocale) => void;
+  onBack?: () => void;
+  pageAction?: string;
+  pageSubtitle?: string;
+  pageTitle?: string;
   styles: MobileChromeStyles;
   text: MobileText;
 }) {
+  if (pageTitle) {
+    return (
+      <View style={[styles.header, isRtl && styles.headerRtl]}>
+        {onBack ? (
+          <PremiumPressable
+            accessibilityLabel={backLabel}
+            accessibilityRole="button"
+            hitSlop={TOUCH_HIT_SLOP}
+            onPress={onBack}
+            style={styles.headerBackButton}
+          >
+            <Image
+              accessible={false}
+              alt=""
+              resizeMode="contain"
+              source={isRtl ? HEADER_BACK_ICONS.rtl : HEADER_BACK_ICONS.ltr}
+              style={styles.headerBackIcon}
+            />
+          </PremiumPressable>
+        ) : (
+          <View style={styles.headerSpacer} />
+        )}
+        <View style={styles.headerPageCopy}>
+          <Text
+            maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+            numberOfLines={SHARED_TOP_HEADER_LAYOUT.titleMaxLines}
+            style={[styles.headerPageTitle, isRtl && styles.rtlText]}
+          >
+            {pageTitle}
+          </Text>
+          {pageSubtitle ? (
+            <Text
+              maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+              numberOfLines={2}
+              style={[styles.headerPageSubtitle, isRtl && styles.rtlText]}
+            >
+              {pageSubtitle}
+            </Text>
+          ) : null}
+        </View>
+        {pageAction ? (
+          <View style={styles.headerAction}>
+            <Text
+              maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+              numberOfLines={1}
+              style={styles.headerActionText}
+            >
+              {pageAction}
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.headerSpacer} />
+        )}
+      </View>
+    );
+  }
+
   return (
     <View style={styles.header}>
       <View style={styles.brandRow}>
@@ -173,12 +259,14 @@ export function ScreenHeader({
         </View>
         <View style={styles.brandCopy}>
           <Text
+            maxFontSizeMultiplier={DISPLAY_MAX_FONT_SIZE_MULTIPLIER}
             numberOfLines={1}
             style={[styles.brandName, isRtl && styles.rtlText]}
           >
             بغداد
           </Text>
           <Text
+            maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
             numberOfLines={2}
             style={[styles.brandTagline, isRtl && styles.rtlText]}
           >
@@ -225,6 +313,7 @@ export function PrimaryButton({
       ]}
     >
       <Text
+        maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
         style={[
           styles.primaryButtonText,
           disabled && styles.disabledButtonText,
@@ -312,7 +401,11 @@ export function BottomTabBar({
                       />
                     </View>
                   </View>
-                  <Text numberOfLines={1} style={styles.centerTabLabel}>
+                  <Text
+                    maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+                    numberOfLines={1}
+                    style={styles.centerTabLabel}
+                  >
                     {label}
                   </Text>
                 </>
@@ -330,6 +423,7 @@ export function BottomTabBar({
               )}
               {!isCenterAction ? (
                 <Text
+                  maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
                   numberOfLines={1}
                   style={[styles.tabLabel, active && styles.tabLabelActive]}
                 >

@@ -10,6 +10,7 @@ const validValues: MobileAuthFormValues = {
   email: "customer@example.com",
   name: "REZNO Customer",
   password: "safe-password",
+  phone: "+964 750 000 0000",
 };
 
 test("mobile auth normalizes safe identity fields without changing the password", () => {
@@ -17,6 +18,7 @@ test("mobile auth normalizes safe identity fields without changing the password"
     email: "  CUSTOMER@Example.com ",
     name: "  REZNO Customer  ",
     password: "  safe-password  ",
+    phone: " +964 (750) 000-0000 ",
   });
 
   assert.deepEqual(result, {
@@ -25,6 +27,7 @@ test("mobile auth normalizes safe identity fields without changing the password"
       email: "customer@example.com",
       name: "REZNO Customer",
       password: "  safe-password  ",
+      phone: "+9647500000000",
     },
   });
 });
@@ -36,9 +39,31 @@ test("mobile sign-up requires a display name", () => {
   );
 });
 
-test("mobile sign-in does not require a display name", () => {
+test("mobile sign-up requires a valid pickup phone", () => {
+  assert.deepEqual(
+    validateMobileAuthForm("signup", { ...validValues, phone: "  " }),
+    { code: "PHONE_REQUIRED", field: "phone", ok: false },
+  );
+  assert.deepEqual(
+    validateMobileAuthForm("signup", {
+      ...validValues,
+      phone: "+964-call-me",
+    }),
+    { code: "PHONE_INVALID", field: "phone", ok: false },
+  );
+  assert.deepEqual(
+    validateMobileAuthForm("signup", { ...validValues, phone: "123456" }),
+    { code: "PHONE_INVALID", field: "phone", ok: false },
+  );
+});
+
+test("mobile sign-in does not require a display name or phone before session lookup", () => {
   assert.equal(
-    validateMobileAuthForm("signin", { ...validValues, name: "" }).ok,
+    validateMobileAuthForm("signin", {
+      ...validValues,
+      name: "",
+      phone: "",
+    }).ok,
     true,
   );
 });

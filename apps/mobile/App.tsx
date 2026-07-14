@@ -6,7 +6,6 @@ import {
   I18nManager,
   Image,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -15,6 +14,10 @@ import {
   View,
   type ImageSourcePropType,
 } from "react-native";
+import {
+  SafeAreaProvider,
+  SafeAreaView,
+} from "react-native-safe-area-context";
 
 import { fetchMobileMarketplace } from "./src/api/marketplace";
 import { completeMobileCustomerOnboarding } from "./src/api/onboarding";
@@ -51,6 +54,26 @@ import {
 } from "./src/i18n/labels";
 import { commerceCopy, formatCommerceDate } from "./src/i18n/commerce";
 import {
+  DISPLAY_MAX_FONT_SIZE_MULTIPLIER,
+  LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER,
+  type MobileResponsiveLayout,
+} from "./src/layout/responsive-metrics";
+import {
+  ACCOUNT_ACTION_LAYOUT,
+  ACCOUNT_GUEST_AUTH_ACTIONS,
+  ACCOUNT_NOTIFICATION_ROW_LAYOUT,
+  ACCOUNT_VISUAL_LAYOUT,
+  FULL_SCREEN_BACKGROUND_LAYOUT,
+  HELP_CENTER_ROW_LAYOUT,
+  MESSAGE_PREVIEW_ROW_LAYOUT,
+  NOTIFICATION_CARD_LAYOUT,
+  NOTIFICATIONS_LANDING_LAYOUT,
+  getTextWritingDirection,
+  resolveVisualQaInitialScreen,
+  resolveVisualQaLocale,
+} from "./src/layout/screen-contracts";
+import { useMobileResponsiveLayout } from "./src/layout/use-mobile-responsive-layout";
+import {
   createMobileShadow,
   createMobileSurface,
   mobileRadii,
@@ -60,7 +83,10 @@ import {
   lightMobileTheme,
   type MobileTheme,
 } from "./src/theme/tokens";
-import { ReznoHomeScreen } from "./src/screens/rezno-home-screen";
+import {
+  ReznoHomeScreen,
+  getReznoHomeScreenBackground,
+} from "./src/screens/rezno-home-screen";
 import { ReznoAiComingSoonScreen } from "./src/screens/rezno-ai-coming-soon-screen";
 import {
   MobileAuthScreen,
@@ -153,6 +179,15 @@ type BookingPaymentOption = {
 type BookingListFilter = "all" | "upcoming" | "completed" | "cancelled";
 
 type BookingManagementPanel = "cancel" | "edit" | null;
+
+type AccountSection = "help" | "notifications" | "overview";
+
+type MessagesPreviewSection =
+  | "conversation"
+  | "landing"
+  | "messages"
+  | "notificationCenter"
+  | "orderNotifications";
 
 type VisualBookingStatus = "cancelled" | "completed" | "confirmed" | "pending";
 
@@ -589,13 +624,6 @@ const quickReplyPreview = [
   "أرسل الموقع",
 ];
 
-const notificationPreferenceRows = [
-  { enabled: true, label: "تذكيرات الحجز" },
-  { enabled: true, label: "ردود الأعمال" },
-  { enabled: false, label: "العروض" },
-  { enabled: true, label: "تحديثات النظام" },
-];
-
 const profileOverviewStats = [
   { label: "الحجوزات", value: "12", meta: "عرض تجريبي" },
   { label: "الأعمال", value: "2", meta: "عضويات مرئية" },
@@ -632,17 +660,113 @@ const privacySecurityRows = [
 ];
 
 const helpFaqRows = [
-  "كيف أتابع حجزي؟",
-  "كيف أضيف عملي لاحقاً؟",
-  "كيف أسجّل الدخول أو أنشئ حساباً؟",
+  { answer: "افتح «نشاطي» ثم «حجوزاتي» لمراجعة الموعد وحالته.", question: "كيف أتابع حجزي؟" },
+  { answer: "إضافة الأعمال غير مفعلة في هذه النسخة. سيظهر المسار الموثق عند جاهزيته.", question: "كيف أضيف عملي لاحقاً؟" },
+  { answer: "ارجع إلى نظرة الحساب العامة واختر تسجيل الدخول أو إنشاء حساب.", question: "كيف أسجّل الدخول أو أنشئ حساباً؟" },
 ];
 
-const accountManagementActions = [
-  { label: "إدارة الحساب لاحقاً", tone: "secondary" },
-  { label: "مركز المساعدة", tone: "primary" },
-];
+const accountSectionCopy: Record<MobileLocale, {
+  helpSubtitle: string;
+  helpTitle: string;
+  notificationsSubtitle: string;
+  notificationsTitle: string;
+}> = {
+  ar: { helpSubtitle: "إجابات داخلية واضحة", helpTitle: "مركز المساعدة", notificationsSubtitle: "تحكم بصري بدون صلاحيات جهاز", notificationsTitle: "تفضيلات الإشعارات" },
+  ckb: { helpSubtitle: "وەڵامی ڕوونی ناوخۆی ئەپ", helpTitle: "ناوەندی یارمەتی", notificationsSubtitle: "کۆنترۆڵی بینراو بەبێ مۆڵەتی ئامێر", notificationsTitle: "هەڵبژاردەکانی ئاگادارکردنەوە" },
+  en: { helpSubtitle: "Clear answers inside the app", helpTitle: "Help center", notificationsSubtitle: "Visual controls without device permissions", notificationsTitle: "Notification preferences" },
+};
+
+const accountActivityRows: Record<MobileLocale, Array<{
+  destination: MobileAppTabId;
+  meta: string;
+  title: string;
+}>> = {
+  ar: [
+    { destination: "favorites", meta: "الأعمال والخدمات المحفوظة", title: "مفضلاتي" },
+    { destination: "orders", meta: "متابعة طلبات السوق", title: "طلباتي" },
+    { destination: "bookings", meta: "المواعيد القادمة والسابقة", title: "حجوزاتي" },
+  ],
+  ckb: [
+    { destination: "favorites", meta: "خزمەتگوزارییە پاشەکەوتکراوەکان", title: "دڵخوازەکانم" },
+    { destination: "orders", meta: "بەدواداچوونی داواکارییەکان", title: "داواکارییەکانم" },
+    { destination: "bookings", meta: "کاتە حجزکراوەکان", title: "حجزەکانم" },
+  ],
+  en: [
+    { destination: "favorites", meta: "Saved businesses and services", title: "Favorites" },
+    { destination: "orders", meta: "Track marketplace orders", title: "Orders" },
+    { destination: "bookings", meta: "Upcoming and past appointments", title: "Bookings" },
+  ],
+};
+
+const messagesNotificationsCopy: Record<MobileLocale, {
+  badge: string;
+  body: string;
+  infoTitle: string;
+  sectionDescriptions: Record<Exclude<MessagesPreviewSection, "conversation" | "landing">, string>;
+  sectionTitles: Record<MessagesPreviewSection, string>;
+}> = {
+  ar: {
+    badge: "معاينة آمنة",
+    body: "إشعارات الطلبات أدناه تأتي من واجهة القراءة الحقيقية. تبقى الرسائل معاينة فقط، ولا توجد إشعارات دفع أو WebSocket أو واجهة إرسال.",
+    infoTitle: "حدود واضحة لهذه المعاينة",
+    sectionDescriptions: {
+      messages: "محادثات معاينة فقط بدون واجهة إرسال.",
+      notificationCenter: "تنبيهات الحجز والخدمة في قائمة مدمجة.",
+      orderNotifications: "تحديثات طلب حقيقية للقراءة فقط.",
+    },
+    sectionTitles: {
+      conversation: "محادثة الحجز",
+      landing: "الرسائل والإشعارات",
+      messages: "الرسائل",
+      notificationCenter: "مركز الإشعارات",
+      orderNotifications: "إشعارات الطلبات",
+    },
+  },
+  ckb: {
+    badge: "پێشبینینی پارێزراو",
+    body: "ئاگادارکردنەوەکانی داواکاری لە API ـی ڕاستەقینەی تەنها خوێندنەوەوە دێن. پەیامەکان هێشتا پێشبینینن و Push و WebSocket و API ـی ناردن چالاک نین.",
+    infoTitle: "سنووری ڕوونی ئەم پێشبینینە",
+    sectionDescriptions: {
+      messages: "پەیامی پێشبینین بەبێ ناردن.",
+      notificationCenter: "ئاگادارکردنەوەی حجز و خزمەتگوزاری.",
+      orderNotifications: "نوێکاریی داواکاری تەنها بۆ خوێندنەوە.",
+    },
+    sectionTitles: {
+      conversation: "گفتوگۆی حجز",
+      landing: "پەیام و ئاگادارکردنەوەکان",
+      messages: "پەیامەکان",
+      notificationCenter: "ناوەندی ئاگادارکردنەوە",
+      orderNotifications: "ئاگادارکردنەوەی داواکاری",
+    },
+  },
+  en: {
+    badge: "Safe preview",
+    body: "Order notifications use the real read-only API. Messages remain preview-only; Push, device permissions, WebSocket, and send APIs are not enabled.",
+    infoTitle: "Clear preview boundaries",
+    sectionDescriptions: {
+      messages: "Preview conversations with no send interface.",
+      notificationCenter: "Booking and service alerts in one compact list.",
+      orderNotifications: "Real read-only order updates.",
+    },
+    sectionTitles: {
+      conversation: "Booking conversation",
+      landing: "Messages and notifications",
+      messages: "Messages",
+      notificationCenter: "Notification center",
+      orderNotifications: "Order notifications",
+    },
+  },
+};
 
 export default function App() {
+  return (
+    <SafeAreaProvider>
+      <ReznoApp />
+    </SafeAreaProvider>
+  );
+}
+
+function ReznoApp() {
   /* eslint-disable @typescript-eslint/no-require-imports -- Expo Font loads local TTF assets through static require(). */
   const [fontsLoaded] = useFonts({
     [mobileTypography.kufiBold]: require("./assets/fonts/NotoKufiArabic-Bold.ttf"),
@@ -654,8 +778,31 @@ export default function App() {
   });
   /* eslint-enable @typescript-eslint/no-require-imports */
   const colorScheme = useColorScheme();
-  const [locale, setLocale] = useState<MobileLocale>(DEFAULT_LOCALE);
-  const [activeTab, setActiveTab] = useState<MobileAppTabId>("customerHome");
+  const visualQaInitialScreen = resolveVisualQaInitialScreen(
+    process.env.EXPO_PUBLIC_REZNO_VISUAL_QA_SCREEN,
+    __DEV__,
+  );
+  const visualQaInitialTab: MobileAppTabId | null =
+    visualQaInitialScreen === "checkout" || visualQaInitialScreen === "product"
+      ? "marketplace"
+      : visualQaInitialScreen === "accountHelp" ||
+          visualQaInitialScreen === "accountNotifications" ||
+          visualQaInitialScreen === "signIn" ||
+          visualQaInitialScreen === "signUp"
+        ? "account"
+      : visualQaInitialScreen === "conversationPreview" ||
+          visualQaInitialScreen === "messages" ||
+          visualQaInitialScreen === "notificationCenter" ||
+          visualQaInitialScreen === "notificationsLanding"
+        ? "messages"
+        : visualQaInitialScreen;
+  const [locale, setLocale] = useState<MobileLocale>(
+    resolveVisualQaLocale(process.env.EXPO_PUBLIC_REZNO_VISUAL_QA_LOCALE) ??
+      DEFAULT_LOCALE,
+  );
+  const [activeTab, setActiveTab] = useState<MobileAppTabId>(
+    visualQaInitialTab ?? "customerHome",
+  );
   const [activityMenuOpen, setActivityMenuOpen] = useState(false);
   const [selectedBusiness, setSelectedBusiness] =
     useState<PremiumBusiness | null>(null);
@@ -674,8 +821,16 @@ export default function App() {
   const [visualCancelledBookingIds, setVisualCancelledBookingIds] = useState<
     string[]
   >([]);
-  const [showOnboarding, setShowOnboarding] = useState(true);
-  const [authMode, setAuthMode] = useState<MobileAuthMode | null>(null);
+  const [showOnboarding, setShowOnboarding] = useState(
+    visualQaInitialTab === null,
+  );
+  const [authMode, setAuthMode] = useState<MobileAuthMode | null>(
+    visualQaInitialScreen === "signIn"
+      ? "signin"
+      : visualQaInitialScreen === "signUp"
+        ? "signup"
+        : null,
+  );
   const [authSession, setAuthSession] = useState<MobileAuthSessionState>({
     status: "loading",
   });
@@ -687,6 +842,23 @@ export default function App() {
   const [authActionError, setAuthActionError] = useState<string | null>(null);
   const [signOutPending, setSignOutPending] = useState(false);
   const [themeMode, setThemeMode] = useState<MobileThemeMode>("dark");
+  const [accountSection, setAccountSection] = useState<AccountSection>(
+    visualQaInitialScreen === "accountHelp"
+      ? "help"
+      : visualQaInitialScreen === "accountNotifications"
+        ? "notifications"
+        : "overview",
+  );
+  const [messagesSection, setMessagesSection] = useState<MessagesPreviewSection>(
+    visualQaInitialScreen === "conversationPreview"
+      ? "conversation"
+      : visualQaInitialScreen === "notificationCenter"
+        ? "notificationCenter"
+        : visualQaInitialScreen === "messages"
+          ? "messages"
+          : "landing",
+  );
+  const appScrollRef = useRef<ScrollView>(null);
   const [notificationOrderId, setNotificationOrderId] = useState<string | null>(null);
   const [marketplaceState, setMarketplaceState] = useState<MarketplaceState>({
     status: "idle",
@@ -695,9 +867,16 @@ export default function App() {
     themeMode === "system" ? colorScheme ?? "dark" : themeMode;
   const theme =
     effectiveThemeMode === "light" ? lightMobileTheme : darkMobileTheme;
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const layout = useMobileResponsiveLayout();
+  const styles = useMemo(() => createStyles(theme, layout), [layout, theme]);
   const text = labels[locale];
+  const accountCopy = accountSectionCopy[locale];
+  const messagesCopy = messagesNotificationsCopy[locale];
   const isRtl = getTextDirection(locale) === "rtl";
+  const screenBackgroundColor =
+    activeTab === "customerHome" && !selectedBusiness
+      ? getReznoHomeScreenBackground(theme)
+      : theme.colors.background;
 
   useEffect(() => {
     let cancelled = false;
@@ -901,6 +1080,16 @@ export default function App() {
       });
   }, []);
 
+  useEffect(() => {
+    if (
+      visualQaInitialTab !== "customerHome" &&
+      visualQaInitialTab !== "serviceDiscovery"
+    ) return;
+
+    const timer = setTimeout(loadMarketplace, 0);
+    return () => clearTimeout(timer);
+  }, [loadMarketplace, visualQaInitialTab]);
+
   const handleTabPress = (tabId: MobileAppTabId) => {
     if (tabId === "activity") {
       setActivityMenuOpen((current) => !current);
@@ -914,11 +1103,30 @@ export default function App() {
     setBookingManagementPanel(null);
     setNotificationOrderId(null);
 
+    if (tabId === "account") setAccountSection("overview");
+    if (tabId === "messages") setMessagesSection("landing");
+
     if (tabId === "serviceDiscovery" && marketplaceState.status === "idle") {
       loadMarketplace();
     }
 
     setActiveTab(tabId);
+    requestAnimationFrame(() => appScrollRef.current?.scrollTo({ animated: false, y: 0 }));
+  };
+
+  const handleAccountSectionChange = (section: AccountSection) => {
+    setAccountSection(section);
+    requestAnimationFrame(() => appScrollRef.current?.scrollTo({ animated: false, y: 0 }));
+  };
+
+  const handleMessagesSectionChange = (section: MessagesPreviewSection) => {
+    setMessagesSection(section);
+    requestAnimationFrame(() => appScrollRef.current?.scrollTo({ animated: false, y: 0 }));
+  };
+
+  const handleOpenMessagesSection = (section: MessagesPreviewSection) => {
+    handleTabPress("messages");
+    setMessagesSection(section);
   };
 
   const handleEnterApp = () => {
@@ -934,7 +1142,7 @@ export default function App() {
     setAuthMode(mode);
   };
 
-  const handleAuthSuccess = async (user: MobileAuthUser) => {
+  const handleAuthSuccess = async (user: MobileAuthUser, phone?: string) => {
     const setupAttempt = ++authSetupAttempt.current;
     setAuthSession({ status: "authenticated", user });
     setAuthSetupUser(user);
@@ -942,7 +1150,7 @@ export default function App() {
     setAuthActionError(null);
 
     try {
-      await completeMobileCustomerOnboarding();
+      await completeMobileCustomerOnboarding(phone);
       if (authSetupAttempt.current !== setupAttempt) return false;
       setAuthSetupUser(null);
       setAuthMode(null);
@@ -1109,7 +1317,10 @@ export default function App() {
 
   if (!fontsLoaded) {
     return (
-      <SafeAreaView style={styles.shell}>
+      <SafeAreaView
+        edges={["bottom", "left", "right", "top"]}
+        style={styles.shell}
+      >
         <StatusBar style={theme.isDark ? "light" : "dark"} />
         <View style={styles.fontLoadingScreen} />
       </SafeAreaView>
@@ -1118,7 +1329,10 @@ export default function App() {
 
   if (authMode) {
     return (
-      <SafeAreaView style={styles.shell}>
+      <SafeAreaView
+        edges={["bottom", "left", "right", "top"]}
+        style={styles.shell}
+      >
         <StatusBar style={theme.isDark ? "light" : "dark"} />
         <MobileAuthScreen
           initialMode={authMode}
@@ -1127,6 +1341,7 @@ export default function App() {
           onAuthenticated={handleAuthSuccess}
           onBack={() => setAuthMode(null)}
           theme={theme}
+          visualQaAutoFocus={visualQaInitialScreen === "signIn" || visualQaInitialScreen === "signUp"}
         />
       </SafeAreaView>
     );
@@ -1134,7 +1349,10 @@ export default function App() {
 
   if (showOnboarding) {
     return (
-      <SafeAreaView style={[styles.shell, styles.onboardingSafeArea]}>
+      <SafeAreaView
+        edges={["bottom", "left", "right", "top"]}
+        style={[styles.shell, styles.onboardingSafeArea]}
+      >
         <StatusBar style="light" />
         <View style={styles.onboardingScreen}>
           <WelcomeOnboardingCard
@@ -1151,7 +1369,17 @@ export default function App() {
   }
 
   return (
-    <SafeAreaView style={styles.shell}>
+    <SafeAreaView
+      edges={["left", "right", "top"]}
+      style={[styles.shell, { backgroundColor: screenBackgroundColor }]}
+    >
+      <View
+        pointerEvents={FULL_SCREEN_BACKGROUND_LAYOUT.decorativeLayerPointerEvents}
+        style={[
+          StyleSheet.absoluteFill,
+          { backgroundColor: screenBackgroundColor },
+        ]}
+      />
       <StatusBar style={theme.isDark ? "light" : "dark"} />
       {!selectedBusiness &&
       activeTab !== "marketplace" &&
@@ -1162,9 +1390,36 @@ export default function App() {
       activeTab !== "favorites" &&
       activeTab !== "reznoAi" ? (
         <ScreenHeader
+          backLabel={mobileAuthCopy[locale].back}
           isRtl={isRtl}
           locale={locale}
+          onBack={
+            activeTab === "account" && accountSection !== "overview"
+              ? () => handleAccountSectionChange("overview")
+              : activeTab === "messages" && messagesSection !== "landing"
+                ? () => handleMessagesSectionChange("landing")
+                : undefined
+          }
           onLocaleChange={setLocale}
+          pageAction={
+            activeTab === "messages" && messagesSection === "notificationCenter"
+              ? locale === "en"
+                ? "Manage"
+                : locale === "ckb"
+                  ? "بەڕێوەبردن"
+                  : "إدارة"
+              : undefined
+          }
+          pageSubtitle={activeTab === "account" && accountSection === "notifications" ? accountCopy.notificationsSubtitle : activeTab === "account" && accountSection === "help" ? accountCopy.helpSubtitle : undefined}
+          pageTitle={
+            activeTab === "messages"
+              ? messagesCopy.sectionTitles[messagesSection]
+              : activeTab === "account" && accountSection === "notifications"
+                ? accountCopy.notificationsTitle
+                : activeTab === "account" && accountSection === "help"
+                  ? accountCopy.helpTitle
+                  : undefined
+          }
           styles={styles}
           text={text}
         />
@@ -1190,6 +1445,7 @@ export default function App() {
             selectedBusiness && styles.immersiveContent,
           ]}
           keyboardShouldPersistTaps="handled"
+          ref={appScrollRef}
           showsVerticalScrollIndicator={false}
           style={styles.appScroll}
         >
@@ -1237,8 +1493,8 @@ export default function App() {
             locale={locale}
             marketplaceState={marketplaceState}
             onOpenBusiness={setSelectedBusiness}
-            onOpenMessages={() => handleTabPress("messages")}
-            onOpenNotifications={() => handleTabPress("messages")}
+            onOpenMessages={() => handleOpenMessagesSection("messages")}
+            onOpenNotifications={() => handleOpenMessagesSection("notificationCenter")}
             onOpenServiceDiscovery={() => handleTabPress("serviceDiscovery")}
             onRetry={loadMarketplace}
             theme={theme}
@@ -1252,6 +1508,8 @@ export default function App() {
             locale={locale}
             onOpenAccount={() => handleTabPress("account")}
             theme={theme}
+            visualQaCheckout={visualQaInitialScreen === "checkout"}
+            visualQaProduct={visualQaInitialScreen === "product"}
           />
         ) : null}
 
@@ -1324,10 +1582,12 @@ export default function App() {
           <MessagesNotificationsPreviewScreen
             isRtl={isRtl}
             locale={locale}
+            onSectionChange={handleMessagesSectionChange}
             onOpenCommerceOrder={(orderId) => {
               setNotificationOrderId(orderId);
               setActiveTab("orders");
             }}
+            section={messagesSection}
             styles={styles}
           />
         ) : null}
@@ -1345,13 +1605,16 @@ export default function App() {
             isRtl={isRtl}
             locale={locale}
             onLocaleChange={setLocale}
+            onNavigate={handleTabPress}
             onOpenAuth={handleOpenAuth}
             onOpenSetup={() => setAuthMode("signin")}
+            onSectionChange={handleAccountSectionChange}
             onSignOut={() => {
               void handleSignOut();
             }}
             onThemeModeChange={setThemeMode}
             signOutPending={signOutPending}
+            section={accountSection}
             styles={styles}
             text={text}
             themeMode={themeMode}
@@ -1360,13 +1623,20 @@ export default function App() {
         </ScrollView>
       )}
 
-      <BottomTabBar
-        activeTab={activeTab}
-        activityMenuOpen={activityMenuOpen}
-        locale={locale}
-        onTabPress={handleTabPress}
-        styles={styles}
-      />
+      <View
+        style={[
+          styles.bottomNavSafeArea,
+          { paddingBottom: layout.bottomInset },
+        ]}
+      >
+        <BottomTabBar
+          activeTab={activeTab}
+          activityMenuOpen={activityMenuOpen}
+          locale={locale}
+          onTabPress={handleTabPress}
+          styles={styles}
+        />
+      </View>
       <ActivityLauncher
         isRtl={isRtl}
         locale={locale}
@@ -1395,7 +1665,10 @@ function QuickBookingEntryScreen({
         <Text style={[styles.screenEyebrow, isRtl && styles.rtlText]}>
           إضافة حجز سريع
         </Text>
-        <Text style={[styles.quickBookingTitle, isRtl && styles.rtlText]}>
+        <Text
+          maxFontSizeMultiplier={DISPLAY_MAX_FONT_SIZE_MULTIPLIER}
+          style={[styles.quickBookingTitle, isRtl && styles.rtlText]}
+        >
           ابدأ من البحث أو اختر خدمة قريبة
         </Text>
         <Text style={[styles.quickBookingBody, isRtl && styles.rtlText]}>
@@ -1458,8 +1731,9 @@ function WelcomeOnboardingCard({
   onStart: () => void;
   styles: MobileStyles;
 }) {
-  const { height, width } = useWindowDimensions();
-  const compact = height < 760 || width < 375;
+  const responsiveLayout = useMobileResponsiveLayout();
+  const compact =
+    responsiveLayout.isCompactHeight || responsiveLayout.isNarrowWidth;
 
   return (
     <ScrollView
@@ -1805,7 +2079,10 @@ function SalonDetailScreen({
 
           <View style={styles.salonIdentityBlock}>
             <View style={styles.salonVerifiedRow}>
-              <Text style={[styles.salonName, isRtl && styles.rtlText]}>
+              <Text
+                maxFontSizeMultiplier={DISPLAY_MAX_FONT_SIZE_MULTIPLIER}
+                style={[styles.salonName, isRtl && styles.rtlText]}
+              >
                 صالون فيجن
               </Text>
               <Image
@@ -1916,7 +2193,12 @@ function SalonDetailScreen({
               pressed && styles.primaryButtonPressed,
             ]}
           >
-            <Text style={styles.salonReferenceCtaText}>احجز الآن</Text>
+            <Text
+              maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+              style={styles.salonReferenceCtaText}
+            >
+              احجز الآن
+            </Text>
             <View style={styles.salonReferenceCtaArrowWrap}>
               <Text style={styles.salonReferenceCtaArrow}>→</Text>
             </View>
@@ -2321,7 +2603,10 @@ function StaffSelectionStep({
       </View>
 
       <View style={styles.staffReferenceHeroCopy}>
-        <Text style={[styles.staffReferenceTitle, isRtl && styles.rtlText]}>
+        <Text
+          maxFontSizeMultiplier={DISPLAY_MAX_FONT_SIZE_MULTIPLIER}
+          style={[styles.staffReferenceTitle, isRtl && styles.rtlText]}
+        >
           اختر طريقة الحجز
         </Text>
         <Text style={[styles.staffReferenceSubtitle, isRtl && styles.rtlText]}>
@@ -2570,7 +2855,12 @@ function StaffSelectionStep({
             pressed && styles.primaryButtonPressed,
           ]}
         >
-          <Text style={styles.staffReferenceCtaText}>التالي</Text>
+          <Text
+            maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+            style={styles.staffReferenceCtaText}
+          >
+            التالي
+          </Text>
           <Text style={styles.staffReferenceCtaArrow}>←</Text>
         </Pressable>
         <Text style={styles.staffReferenceTrustNote}>▧ بياناتك محمية وآمنة</Text>
@@ -2655,7 +2945,10 @@ function DateTimeSelectionStep({
       </View>
 
       <View style={styles.staffReferenceHeroCopy}>
-        <Text style={[styles.staffReferenceTitle, isRtl && styles.rtlText]}>
+        <Text
+          maxFontSizeMultiplier={DISPLAY_MAX_FONT_SIZE_MULTIPLIER}
+          style={[styles.staffReferenceTitle, isRtl && styles.rtlText]}
+        >
           اختر التاريخ والوقت
         </Text>
         <Text style={[styles.staffReferenceSubtitle, isRtl && styles.rtlText]}>
@@ -2883,7 +3176,12 @@ function DateTimeSelectionStep({
             pressed && styles.primaryButtonPressed,
           ]}
         >
-          <Text style={styles.staffReferenceCtaText}>التالي</Text>
+          <Text
+            maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+            style={styles.staffReferenceCtaText}
+          >
+            التالي
+          </Text>
           <Text style={styles.staffReferenceCtaArrow}>←</Text>
         </Pressable>
         <Text style={styles.staffReferenceTrustNote}>▧ بياناتك محمية وآمنة</Text>
@@ -2982,7 +3280,10 @@ function PaymentMethodStep({
       </View>
 
       <View style={styles.paymentReferenceHeroCopy}>
-        <Text style={[styles.paymentReferenceTitle, isRtl && styles.rtlText]}>
+        <Text
+          maxFontSizeMultiplier={DISPLAY_MAX_FONT_SIZE_MULTIPLIER}
+          style={[styles.paymentReferenceTitle, isRtl && styles.rtlText]}
+        >
           طريقة الدفع
         </Text>
         <Text style={[styles.paymentReferenceSubtitle, isRtl && styles.rtlText]}>
@@ -3998,75 +4299,136 @@ function MessagesNotificationsPreviewScreen({
   isRtl,
   locale,
   onOpenCommerceOrder,
+  onSectionChange,
+  section,
   styles,
 }: {
   isRtl: boolean;
   locale: MobileLocale;
   onOpenCommerceOrder: (orderId: string) => void;
+  onSectionChange: (section: MessagesPreviewSection) => void;
+  section: MessagesPreviewSection;
   styles: MobileStyles;
 }) {
-  const heroCopy = locale === "en"
-    ? {
-        badge: "Safe preview",
-        body: "Order notifications below use the real read-only API. Messages remain a preview; Push, device permissions, WebSocket, and send APIs are not enabled.",
-        eyebrow: "Messages and notifications",
-        title: "Clear order updates without enabling outbound messaging",
-      }
-    : locale === "ckb"
-      ? {
-          badge: "پێشبینینی پارێزراو",
-          body: "ئاگادارکردنەوەکانی داواکاری لە API ـی ڕاستەقینەی تەنها خوێندنەوەوە دێن. پەیامەکان هێشتا پێشبینینن؛ Push و WebSocket و API ـی ناردن چالاک نین.",
-          eyebrow: "پەیام و ئاگادارکردنەوەکان",
-          title: "نوێکارییە ڕوونەکانی داواکاری بەبێ ناردنی پەیام",
-        }
-      : {
-          badge: "معاينة آمنة",
-          body: "إشعارات الطلبات أدناه تأتي من واجهة القراءة الحقيقية. تبقى الرسائل معاينة فقط؛ ولا توجد إشعارات دفع أو WebSocket أو واجهة إرسال.",
-          eyebrow: "الرسائل والإشعارات",
-          title: "تحديثات طلب واضحة بدون تفعيل إرسال الرسائل",
-        };
+  const copy = messagesNotificationsCopy[locale];
 
-  return (
-    <>
-      <View style={styles.messageHeroCard}>
-        <View style={styles.messageHeroGlow} />
-        <View style={styles.messageHeroTopRow}>
-          <View style={styles.messageHeroIcon}>
-            <Image
-              alt=""
-              resizeMode="contain"
-              source={mobileIconAssets.common.message}
-              style={styles.messageHeroIconImage}
-            />
-          </View>
-          <Text style={styles.messageSafetyBadge}>{heroCopy.badge}</Text>
-        </View>
-        <Text style={[styles.screenEyebrow, isRtl && styles.rtlText]}>
-          {heroCopy.eyebrow}
-        </Text>
-        <Text style={[styles.messageHeroTitle, isRtl && styles.rtlText]}>
-          {heroCopy.title}
-        </Text>
-        <Text style={[styles.messageHeroBody, isRtl && styles.rtlText]}>
-          {heroCopy.body}
-        </Text>
-      </View>
-
+  if (section === "orderNotifications") {
+    return (
       <CommerceNotificationsCenter
         isRtl={isRtl}
         locale={locale}
         onOpenOrder={onOpenCommerceOrder}
         styles={styles}
       />
-      {locale === "ar" ? (
-        <>
-          <NotificationsCenterPreview isRtl={isRtl} styles={styles} />
-          <ConversationListPreview isRtl={isRtl} styles={styles} />
-          <MessageDetailPreview isRtl={isRtl} styles={styles} />
-          <NotificationPreferencesPreview isRtl={isRtl} styles={styles} />
-        </>
-      ) : null}
+    );
+  }
+
+  if (section === "notificationCenter") {
+    return <NotificationsCenterPreview isRtl={isRtl} styles={styles} />;
+  }
+
+  if (section === "messages") {
+    return (
+      <ConversationListPreview
+        isRtl={isRtl}
+        onOpenConversation={() => onSectionChange("conversation")}
+        styles={styles}
+      />
+    );
+  }
+
+  if (section === "conversation") {
+    return (
+      <>
+        <MessageDetailPreview isRtl={isRtl} styles={styles} />
+        <NotificationPreferencesPreview isRtl={isRtl} styles={styles} />
+      </>
+    );
+  }
+
+  return (
+    <>
+      <View style={styles.notificationLandingInfoCard}>
+        <View style={[styles.notificationLandingInfoHeader, isRtl && styles.flexRowRtl]}>
+          <View style={styles.notificationLandingIcon}>
+            <Image
+              alt=""
+              resizeMode="contain"
+              source={mobileIconAssets.common.message}
+              style={styles.notificationLandingIconImage}
+            />
+          </View>
+          <Text style={styles.messageSafetyBadge}>{copy.badge}</Text>
+        </View>
+        <Text
+          maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+          style={[styles.notificationLandingInfoTitle, isRtl && styles.rtlText]}
+        >
+          {copy.infoTitle}
+        </Text>
+        <Text
+          maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+          style={[styles.notificationLandingInfoBody, isRtl && styles.rtlText]}
+        >
+          {copy.body}
+        </Text>
+      </View>
+
+      <View style={styles.notificationLandingSections}>
+        {NOTIFICATIONS_LANDING_LAYOUT.sectionOrder.map((destination) => (
+          <NotificationLandingDestination
+            description={copy.sectionDescriptions[destination]}
+            isRtl={isRtl}
+            key={destination}
+            onPress={() => onSectionChange(destination)}
+            styles={styles}
+            title={copy.sectionTitles[destination]}
+          />
+        ))}
+      </View>
     </>
+  );
+}
+
+function NotificationLandingDestination({
+  description,
+  isRtl,
+  onPress,
+  styles,
+  title,
+}: {
+  description: string;
+  isRtl: boolean;
+  onPress: () => void;
+  styles: MobileStyles;
+  title: string;
+}) {
+  return (
+    <PremiumPressable
+      accessibilityHint={description}
+      accessibilityLabel={title}
+      accessibilityRole="button"
+      onPress={onPress}
+      style={[styles.notificationLandingRow, isRtl && styles.flexRowRtl]}
+    >
+      <View style={styles.notificationLandingRowIcon}>
+        <Image
+          alt=""
+          resizeMode="contain"
+          source={mobileIconAssets.common.notificationBell}
+          style={styles.notificationLandingRowIconImage}
+        />
+      </View>
+      <View style={styles.rowCopy}>
+        <Text style={[styles.notificationLandingRowTitle, isRtl && styles.rtlText]}>
+          {title}
+        </Text>
+        <Text style={[styles.notificationLandingRowBody, isRtl && styles.rtlText]}>
+          {description}
+        </Text>
+      </View>
+      <Text style={styles.preferenceChevron}>{isRtl ? "‹" : "›"}</Text>
+    </PremiumPressable>
   );
 }
 
@@ -4131,8 +4493,14 @@ function CommerceNotificationsCenter({
 
   return (
     <View style={styles.notificationPanel}>
-      <SectionHeader isRtl={isRtl} styles={styles} title={copy.notifications} />
-      {state === "loading" && items.length === 0 ? <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>{copy.loading}</Text> : null}
+      {state === "loading" && items.length === 0 ? (
+        <Text
+          maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+          style={[styles.rowMeta, isRtl && styles.rtlText]}
+        >
+          {copy.loading}
+        </Text>
+      ) : null}
       {state === "error" ? (
         <Pressable
           accessibilityLabel={copy.retry}
@@ -4141,20 +4509,45 @@ function CommerceNotificationsCenter({
             retryRequest?.cursor ?? null,
             retryRequest?.append ?? false,
           )}
-          style={styles.notificationCard}
+          style={[styles.notificationCard, isRtl && styles.flexRowRtl]}
         >
-          <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>{copy.errorGeneric}</Text>
-          <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>{copy.retry}</Text>
+          <Text
+            maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+            style={[styles.rowTitle, isRtl && styles.rtlText]}
+          >
+            {copy.errorGeneric}
+          </Text>
+          <Text
+            maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+            style={[styles.rowMeta, isRtl && styles.rtlText]}
+          >
+            {copy.retry}
+          </Text>
         </Pressable>
       ) : null}
       {state === "unauthenticated" ? (
-        <Pressable accessibilityLabel={copy.retry} accessibilityRole="button" onPress={() => void load(null, false)} style={styles.notificationCard}>
-          <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>{copy.sessionRequired}</Text>
-          <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>{copy.retry}</Text>
+        <Pressable accessibilityLabel={copy.retry} accessibilityRole="button" onPress={() => void load(null, false)} style={[styles.notificationCard, isRtl && styles.flexRowRtl]}>
+          <Text
+            maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+            style={[styles.rowTitle, isRtl && styles.rtlText]}
+          >
+            {copy.sessionRequired}
+          </Text>
+          <Text
+            maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+            style={[styles.rowMeta, isRtl && styles.rtlText]}
+          >
+            {copy.retry}
+          </Text>
         </Pressable>
       ) : null}
       {state === "ready" && items.length === 0 ? (
-        <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>{copy.noNotifications}</Text>
+        <Text
+          maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+          style={[styles.rowMeta, isRtl && styles.rtlText]}
+        >
+          {copy.noNotifications}
+        </Text>
       ) : null}
       {items.map((item) => {
         const orderId = commerceNotificationOrderDestination(item);
@@ -4164,11 +4557,27 @@ function CommerceNotificationsCenter({
               <Image alt="" resizeMode="contain" source={mobileIconAssets.common.notificationBell} style={styles.notificationIconImage} />
             </View>
             <View style={styles.rowCopy}>
-              <View style={styles.notificationTitleRow}>
-                <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>{item.title}</Text>
-                <Text style={styles.notificationTime}>{formatCommerceDate(item.createdAt, locale)}</Text>
+              <View style={[styles.notificationTitleRow, isRtl && styles.flexRowRtl]}>
+                <Text
+                  maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+                  numberOfLines={2}
+                  style={[styles.notificationTitle, isRtl && styles.rtlText]}
+                >
+                  {item.title}
+                </Text>
+                <Text
+                  maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+                  style={styles.notificationTime}
+                >
+                  {formatCommerceDate(item.createdAt, locale)}
+                </Text>
               </View>
-              <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>{item.body}</Text>
+              <Text
+                maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+                style={[styles.notificationBody, isRtl && styles.rtlText]}
+              >
+                {item.body}
+              </Text>
             </View>
           </>
         );
@@ -4178,11 +4587,11 @@ function CommerceNotificationsCenter({
             accessibilityRole="button"
             key={item.id}
             onPress={() => onOpenOrder(orderId)}
-            style={styles.notificationCard}
+            style={[styles.notificationCard, isRtl && styles.flexRowRtl]}
           >
             {content}
           </Pressable>
-        ) : <View key={item.id} style={styles.notificationCard}>{content}</View>;
+        ) : <View key={item.id} style={[styles.notificationCard, isRtl && styles.flexRowRtl]}>{content}</View>;
       })}
       {hasNextPage && nextCursor ? (
         <Pressable
@@ -4190,9 +4599,12 @@ function CommerceNotificationsCenter({
           accessibilityRole="button"
           disabled={state === "loading"}
           onPress={() => void load(nextCursor, true)}
-          style={styles.notificationCard}
+          style={[styles.notificationCard, isRtl && styles.flexRowRtl]}
         >
-          <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>
+          <Text
+            maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+            style={[styles.rowTitle, isRtl && styles.rtlText]}
+          >
             {state === "loading" ? copy.loading : copy.loadMore}
           </Text>
         </Pressable>
@@ -4210,17 +4622,14 @@ function NotificationsCenterPreview({
 }) {
   return (
     <View style={styles.notificationPanel}>
-      <SectionHeader
-        action="إدارة"
-        isRtl={isRtl}
-        styles={styles}
-        title="مركز الإشعارات"
-      />
       {notificationPreviewItems.map((item, index) => (
         <View
+          accessibilityLabel={`${item.title}. ${item.body}. ${item.time}`}
+          accessible
           key={item.title}
           style={[
             styles.notificationCard,
+            isRtl && styles.flexRowRtl,
             index === 0 && styles.notificationCardUnread,
           ]}
         >
@@ -4239,16 +4648,33 @@ function NotificationsCenterPreview({
             />
           </View>
           <View style={styles.rowCopy}>
-            <View style={styles.notificationTitleRow}>
-              <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>
+            <View style={[styles.notificationTitleRow, isRtl && styles.flexRowRtl]}>
+              <Text
+                maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+                numberOfLines={2}
+                style={[styles.notificationTitle, isRtl && styles.rtlText]}
+              >
                 {item.title}
               </Text>
-              <Text style={styles.notificationTime}>{item.time}</Text>
+              <Text
+                maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+                style={styles.notificationTime}
+              >
+                {item.time}
+              </Text>
             </View>
-            <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>
+            <Text
+              maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+              style={[styles.notificationBody, isRtl && styles.rtlText]}
+            >
               {item.body}
             </Text>
-            <Text style={styles.notificationStatusChip}>{item.status}</Text>
+            <Text
+              maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+              style={styles.notificationStatusChip}
+            >
+              {item.status}
+            </Text>
           </View>
         </View>
       ))}
@@ -4258,38 +4684,82 @@ function NotificationsCenterPreview({
 
 function ConversationListPreview({
   isRtl,
+  onOpenConversation,
   styles,
 }: {
   isRtl: boolean;
+  onOpenConversation: () => void;
   styles: MobileStyles;
 }) {
   return (
     <View style={styles.conversationPanel}>
-      <SectionHeader isRtl={isRtl} styles={styles} title="المحادثات" />
-      {conversationPreviewItems.map((conversation) => (
-        <View key={conversation.name} style={styles.conversationRow}>
-          <View style={styles.conversationAvatar}>
-            <Text style={styles.conversationAvatarText}>
-              {conversation.initials}
-            </Text>
-          </View>
-          <View style={styles.rowCopy}>
-            <View style={styles.notificationTitleRow}>
-              <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>
+      {conversationPreviewItems.map((conversation) => {
+        const nameIsLtr = getTextWritingDirection(conversation.name) === "ltr";
+
+        return (
+          <PremiumPressable
+            accessibilityHint="يفتح معاينة المحادثة بدون تفعيل الإرسال."
+            accessibilityLabel={conversation.name}
+            accessibilityRole="button"
+            key={conversation.name}
+            onPress={onOpenConversation}
+            style={[styles.conversationRow, isRtl && styles.flexRowRtl]}
+          >
+            <View style={styles.conversationAvatar}>
+              <Text
+                maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+                style={styles.conversationAvatarText}
+              >
+                {conversation.initials}
+              </Text>
+            </View>
+            <View style={styles.rowCopy}>
+              <Text
+                maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+                ellipsizeMode="tail"
+                numberOfLines={1}
+                style={[
+                  styles.conversationName,
+                  nameIsLtr ? styles.ltrText : isRtl && styles.rtlText,
+                ]}
+              >
                 {conversation.name}
               </Text>
-              <Text style={styles.notificationTime}>{conversation.time}</Text>
+              <Text
+                maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+                ellipsizeMode="tail"
+                numberOfLines={2}
+                style={[styles.conversationPreview, isRtl && styles.rtlText]}
+              >
+                {conversation.lastMessage}
+              </Text>
+              <Text
+                maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+                numberOfLines={1}
+                style={styles.conversationStatus}
+              >
+                {conversation.status}
+              </Text>
             </View>
-            <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>
-              {conversation.lastMessage}
-            </Text>
-            <Text style={styles.conversationStatus}>{conversation.status}</Text>
-          </View>
-          {conversation.unread ? (
-            <Text style={styles.unreadBadge}>{conversation.unread}</Text>
-          ) : null}
-        </View>
-      ))}
+            <View style={styles.conversationMeta}>
+              <Text
+                maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+                style={styles.notificationTime}
+              >
+                {conversation.time}
+              </Text>
+              {conversation.unread ? (
+                <Text
+                  maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+                  style={styles.unreadBadge}
+                >
+                  {conversation.unread}
+                </Text>
+              ) : null}
+            </View>
+          </PremiumPressable>
+        );
+      })}
     </View>
   );
 }
@@ -4304,15 +4774,25 @@ function MessageDetailPreview({
   return (
     <View style={styles.chatPanel}>
       <View style={styles.chatHeader}>
-        <View>
-          <Text style={[styles.screenEyebrow, isRtl && styles.rtlText]}>
+        <View style={[styles.chatMetaRow, isRtl && styles.flexRowRtl]}>
+          <Text
+            maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+            style={[styles.screenEyebrow, isRtl && styles.rtlText]}
+          >
             محادثة الحجز
           </Text>
-          <Text style={[styles.chatTitle, isRtl && styles.rtlText]}>
-            Noura Beauty Lounge
-          </Text>
+          <Text style={styles.messageSafetyBadge}>بدون إرسال</Text>
         </View>
-        <Text style={styles.messageSafetyBadge}>بدون إرسال</Text>
+        <Text
+          adjustsFontSizeToFit
+          ellipsizeMode="tail"
+          maxFontSizeMultiplier={DISPLAY_MAX_FONT_SIZE_MULTIPLIER}
+          minimumFontScale={0.88}
+          numberOfLines={1}
+          style={[styles.chatTitle, styles.ltrText]}
+        >
+          Noura Beauty Lounge
+        </Text>
       </View>
       {messageBubblePreview.map((message) => (
         <View
@@ -4323,6 +4803,7 @@ function MessageDetailPreview({
           ]}
         >
           <Text
+            maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
             style={[
               styles.chatBubbleText,
               message.from === "customer" && styles.chatBubbleTextCustomer,
@@ -4332,6 +4813,7 @@ function MessageDetailPreview({
             {message.body}
           </Text>
           <Text
+            maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
             style={[
               styles.chatBubbleTime,
               message.from === "customer" && styles.chatBubbleTimeCustomer,
@@ -4343,15 +4825,19 @@ function MessageDetailPreview({
       ))}
       <View style={styles.quickReplyRow}>
         {quickReplyPreview.map((reply) => (
-          <Text key={reply} style={styles.quickReplyChip}>
+          <Text
+            key={reply}
+            maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+            style={styles.quickReplyChip}
+          >
             {reply}
           </Text>
         ))}
       </View>
       <View style={styles.messagePlaceholderRow}>
-        <Text style={styles.messagePlaceholderChip}>مرفق</Text>
-        <Text style={styles.messagePlaceholderChip}>موقع</Text>
-        <Text style={styles.messagePlaceholderChip}>دفع بصري</Text>
+        <Text maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER} style={styles.messagePlaceholderChip}>مرفق</Text>
+        <Text maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER} style={styles.messagePlaceholderChip}>موقع</Text>
+        <Text maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER} style={styles.messagePlaceholderChip}>دفع بصري</Text>
       </View>
     </View>
   );
@@ -4367,11 +4853,23 @@ function NotificationPreferencesPreview({
   return (
     <View style={styles.preferencesPanel}>
       <SectionHeader isRtl={isRtl} styles={styles} title="تفضيلات الإشعارات" />
-      {notificationPreferenceRows.map((row) => (
-        <View key={row.label} style={styles.preferenceRow}>
-          <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>
-            {row.label}
-          </Text>
+      {accountNotificationRows.map((row) => (
+        <View
+          accessibilityLabel={`${row.label}. ${row.meta}`}
+          accessibilityRole="switch"
+          accessibilityState={{ checked: row.enabled, disabled: true }}
+          accessible
+          key={row.label}
+          style={[styles.preferenceRow, isRtl && styles.flexRowRtl]}
+        >
+          <View style={styles.preferenceCopy}>
+            <Text style={[styles.preferenceRowTitle, isRtl && styles.rtlText]}>
+              {row.label}
+            </Text>
+            <Text style={[styles.preferenceRowMeta, isRtl && styles.rtlText]}>
+              {row.meta}
+            </Text>
+          </View>
           <View
             style={[
               styles.preferenceToggle,
@@ -4387,9 +4885,11 @@ function NotificationPreferencesPreview({
           </View>
         </View>
       ))}
-      <Text style={[styles.preferenceNote, isRtl && styles.rtlText]}>
-        المفاتيح بصرية فقط ولا تحفظ أي إعدادات أو تطلب صلاحيات جهاز.
-      </Text>
+      <View style={styles.preferenceInfoCard}>
+        <Text style={[styles.preferenceNote, isRtl && styles.rtlText]}>
+          المفاتيح بصرية فقط ولا تحفظ أي إعدادات أو تطلب صلاحيات جهاز.
+        </Text>
+      </View>
     </View>
   );
 }
@@ -4605,10 +5105,13 @@ function AccountScreen({
   isRtl,
   locale,
   onLocaleChange,
+  onNavigate,
   onOpenAuth,
   onOpenSetup,
+  onSectionChange,
   onSignOut,
   onThemeModeChange,
+  section,
   signOutPending,
   styles,
   text,
@@ -4621,16 +5124,28 @@ function AccountScreen({
   isRtl: boolean;
   locale: MobileLocale;
   onLocaleChange: (locale: MobileLocale) => void;
+  onNavigate: (tabId: MobileAppTabId) => void;
   onOpenAuth: (mode: MobileAuthMode) => void;
   onOpenSetup: () => void;
+  onSectionChange: (section: AccountSection) => void;
   onSignOut: () => void;
   onThemeModeChange: (mode: MobileThemeMode) => void;
+  section: AccountSection;
   signOutPending: boolean;
   styles: MobileStyles;
   text: (typeof labels)[MobileLocale];
   themeMode: MobileThemeMode;
 }) {
   const copy = mobileAuthCopy[locale];
+
+  if (section === "notifications") {
+    return <AccountNotificationPreferencesScreen isRtl={isRtl} styles={styles} />;
+  }
+
+  if (section === "help") {
+    return <AccountHelpScreen isRtl={isRtl} styles={styles} />;
+  }
+
   const authenticatedUser =
     authSession.status === "authenticated" ? authSession.user : null;
   const accountTitle = authenticatedUser?.name || copy.accountGuestTitle;
@@ -4657,7 +5172,7 @@ function AccountScreen({
   return (
     <>
       <View style={styles.accountHeroCard}>
-        <View style={styles.profileHeroTopRow}>
+        <View style={[styles.profileHeroTopRow, isRtl && styles.flexRowRtl]}>
           <View style={styles.accountAvatar}>
             <Text style={styles.accountAvatarText}>{avatarLabel}</Text>
           </View>
@@ -4670,15 +5185,27 @@ function AccountScreen({
             </Text>
           </View>
         </View>
-        <Text style={[styles.screenEyebrow, isRtl && styles.rtlText]}>
-          الملف الشخصي
-        </Text>
-        <Text style={[styles.screenTitle, isRtl && styles.rtlText]}>
-          {accountTitle}
-        </Text>
-        <Text style={[styles.screenDescription, isRtl && styles.rtlText]}>
-          {accountDescription}
-        </Text>
+        <View style={styles.accountHeroCopy}>
+          <Text
+            maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+            style={[styles.accountEyebrow, isRtl && styles.rtlText]}
+          >
+            الملف الشخصي
+          </Text>
+          <Text
+            maxFontSizeMultiplier={DISPLAY_MAX_FONT_SIZE_MULTIPLIER}
+            numberOfLines={2}
+            style={[styles.accountTitle, isRtl && styles.rtlText]}
+          >
+            {accountTitle}
+          </Text>
+          <Text
+            maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+            style={[styles.accountDescription, isRtl && styles.rtlText]}
+          >
+            {accountDescription}
+          </Text>
+        </View>
         {authenticatedUser ? (
           <View style={styles.profileStatsGrid}>
             {profileOverviewStats.map((stat) => (
@@ -4721,7 +5248,13 @@ function AccountScreen({
                     pressed && !authSetupPending && styles.softButtonPressed,
                   ]}
                 >
-                  <Text style={styles.accountActionTextPrimary}>
+                  <Text
+                    maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+                    style={[
+                      styles.accountActionText,
+                      styles.accountActionTextPrimary,
+                    ]}
+                  >
                     {authSetupPending
                       ? copy.finishingSetup
                       : copy.finishSetup}
@@ -4743,52 +5276,52 @@ function AccountScreen({
                 ]}
               >
                 <Text
-                  style={
-                    authSetupUser
-                      ? styles.accountActionText
-                      : styles.accountActionTextPrimary
-                  }
+                  maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+                  style={[
+                    styles.accountActionText,
+                    !authSetupUser && styles.accountActionTextPrimary,
+                  ]}
                 >
                   {signOutPending ? copy.sessionLoading : copy.signOut}
                 </Text>
               </Pressable>
             </>
           ) : (
-            <>
-              <Pressable
-                accessibilityRole="button"
-                disabled={authSession.status === "loading"}
-                onPress={() => onOpenAuth("signin")}
-                style={({ pressed }) => [
-                  styles.accountActionButton,
-                  styles.accountActionButtonPrimary,
-                  pressed && styles.softButtonPressed,
-                ]}
-              >
-                <Text style={styles.accountActionTextPrimary}>
-                  {copy.signIn}
-                </Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                disabled={authSession.status === "loading"}
-                onPress={() => onOpenAuth("signup")}
-                style={({ pressed }) => [
-                  styles.accountActionButton,
-                  pressed && styles.softButtonPressed,
-                ]}
-              >
-                <Text style={styles.accountActionText}>
-                  {copy.createAccount}
-                </Text>
-              </Pressable>
-            </>
+            ACCOUNT_GUEST_AUTH_ACTIONS.map((mode) => {
+              const primary = mode === "signin";
+              const label = primary ? copy.signIn : copy.createAccount;
+
+              return (
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={authSession.status === "loading"}
+                  key={mode}
+                  onPress={() => onOpenAuth(mode)}
+                  style={({ pressed }) => [
+                    styles.accountActionButton,
+                    primary && styles.accountActionButtonPrimary,
+                    !primary && styles.accountActionButtonSecondary,
+                    pressed && styles.softButtonPressed,
+                  ]}
+                >
+                  <Text
+                    maxFontSizeMultiplier={LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER}
+                    style={[
+                      styles.accountActionText,
+                      primary && styles.accountActionTextPrimary,
+                    ]}
+                  >
+                    {label}
+                  </Text>
+                </Pressable>
+              );
+            })
           )}
         </View>
       </View>
 
       <View style={styles.settingsCard}>
-        <Text style={[styles.cardTitle, isRtl && styles.rtlText]}>
+        <Text style={[styles.accountSectionTitle, isRtl && styles.rtlText]}>
           اللغة والمظهر
         </Text>
         <Text style={[styles.cardBody, isRtl && styles.rtlText]}>
@@ -4813,6 +5346,7 @@ function AccountScreen({
                 onPress={() => onLocaleChange(row.locale)}
                 style={({ pressed }) => [
                   styles.accountPreferenceRow,
+                  isRtl && styles.flexRowRtl,
                   pressed && styles.softButtonPressed,
                 ]}
               >
@@ -4855,6 +5389,7 @@ function AccountScreen({
                 onPress={() => onThemeModeChange(row.mode)}
                 style={({ pressed }) => [
                   styles.accountPreferenceRow,
+                  isRtl && styles.flexRowRtl,
                   pressed && styles.softButtonPressed,
                 ]}
               >
@@ -4881,40 +5416,40 @@ function AccountScreen({
         </View>
       </View>
 
-      <View style={styles.preferencesPanel}>
-        <SectionHeader isRtl={isRtl} styles={styles} title="تفضيلات الإشعارات" />
-        {accountNotificationRows.map((row) => (
-          <View key={row.label} style={styles.preferenceRow}>
-            <View style={styles.preferenceCopy}>
-              <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>
-                {row.label}
-              </Text>
-              <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>
-                {row.meta}
-              </Text>
-            </View>
-            <View
-              style={[
-                styles.preferenceToggle,
-                row.enabled && styles.preferenceToggleActive,
-              ]}
-            >
-              <View
-                style={[
-                  styles.preferenceKnob,
-                  row.enabled && styles.preferenceKnobActive,
-                ]}
-              />
-            </View>
-          </View>
+      <View style={styles.accountDestinationsCard}>
+        <Text style={[styles.accountSectionTitle, isRtl && styles.rtlText]}>إعدادات الحساب</Text>
+        <AccountDestinationRow
+          isRtl={isRtl}
+          meta={accountSectionCopy[locale].notificationsSubtitle}
+          onPress={() => onSectionChange("notifications")}
+          styles={styles}
+          title={accountSectionCopy[locale].notificationsTitle}
+        />
+        <AccountDestinationRow
+          isRtl={isRtl}
+          meta={accountSectionCopy[locale].helpSubtitle}
+          onPress={() => onSectionChange("help")}
+          styles={styles}
+          title={accountSectionCopy[locale].helpTitle}
+        />
+      </View>
+
+      <View style={styles.accountDestinationsCard}>
+        <Text style={[styles.accountSectionTitle, isRtl && styles.rtlText]}>نشاطي</Text>
+        {accountActivityRows[locale].map((row) => (
+          <AccountDestinationRow
+            isRtl={isRtl}
+            key={row.destination}
+            meta={row.meta}
+            onPress={() => onNavigate(row.destination)}
+            styles={styles}
+            title={row.title}
+          />
         ))}
-        <Text style={[styles.preferenceNote, isRtl && styles.rtlText]}>
-          المفاتيح بصرية فقط ولا تطلب إذن إشعارات أو تحفظ تفضيلات.
-        </Text>
       </View>
 
       <View style={styles.privacyCard}>
-        <Text style={[styles.cardTitle, isRtl && styles.rtlText]}>
+        <Text style={[styles.accountSectionTitle, isRtl && styles.rtlText]}>
           الأمان والخصوصية
         </Text>
         <Text style={[styles.cardBody, isRtl && styles.rtlText]}>
@@ -4929,9 +5464,6 @@ function AccountScreen({
               <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>
                 {row.body}
               </Text>
-              <Text style={[styles.safeActionText, isRtl && styles.rtlText]}>
-                إدارة لاحقاً
-              </Text>
             </View>
           ))}
         </View>
@@ -4939,52 +5471,6 @@ function AccountScreen({
           سيبقى المستخدم مالكاً لبياناته، وإجراءات التصدير أو الحذف تحتاج
           سبرنت صلاحيات معتمد قبل أي تنفيذ حقيقي.
         </Text>
-      </View>
-
-      <View style={styles.supportCard}>
-        <View style={styles.supportHeaderRow}>
-          <View style={styles.supportHeaderCopy}>
-            <Text style={[styles.cardTitle, isRtl && styles.rtlText]}>
-              المساعدة والدعم
-            </Text>
-            <Text style={[styles.cardBody, isRtl && styles.rtlText]}>
-              مركز مساعدة بصري فقط، بدون رسائل أو تذاكر دعم حقيقية.
-            </Text>
-          </View>
-          <View style={styles.supportIconBubble}>
-            <Text style={styles.supportIconText}>?</Text>
-          </View>
-        </View>
-        {helpFaqRows.map((row) => (
-          <View key={row} style={styles.faqRow}>
-            <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>
-              {row}
-            </Text>
-            <Text style={styles.preferenceChevron}>›</Text>
-          </View>
-        ))}
-        <View style={styles.accountActionRow}>
-          {accountManagementActions.map((action) => (
-            <Pressable
-              accessibilityRole="button"
-              disabled
-              key={action.label}
-              style={[
-                styles.accountActionButton,
-                action.tone === "primary" && styles.accountActionButtonPrimary,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.accountActionText,
-                  action.tone === "primary" && styles.accountActionTextPrimary,
-                ]}
-              >
-                {action.label}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
       </View>
 
       <View style={styles.integrationCard}>
@@ -5002,15 +5488,117 @@ function AccountScreen({
   );
 }
 
+function AccountDestinationRow({ isRtl, meta, onPress, styles, title }: {
+  isRtl: boolean;
+  meta: string;
+  onPress: () => void;
+  styles: MobileStyles;
+  title: string;
+}) {
+  return (
+    <PremiumPressable
+      accessibilityHint={meta}
+      accessibilityLabel={title}
+      accessibilityRole="button"
+      hitSlop={TOUCH_HIT_SLOP}
+      onPress={onPress}
+      style={[styles.accountDestinationRow, isRtl && styles.flexRowRtl]}
+    >
+      <View style={styles.preferenceCopy}>
+        <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>{title}</Text>
+        <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>{meta}</Text>
+      </View>
+      <Text style={styles.preferenceChevron}>{isRtl ? "‹" : "›"}</Text>
+    </PremiumPressable>
+  );
+}
+
+function AccountNotificationPreferencesScreen({ isRtl, styles }: {
+  isRtl: boolean;
+  styles: MobileStyles;
+}) {
+  return (
+    <View style={styles.preferencesPanel}>
+      {accountNotificationRows.map((row) => (
+        <View
+          accessibilityLabel={`${row.label}. ${row.meta}`}
+          accessibilityRole="switch"
+          accessibilityState={{ checked: row.enabled, disabled: true }}
+          accessible
+          key={row.label}
+          style={[styles.preferenceRow, isRtl && styles.flexRowRtl]}
+        >
+          <View style={styles.preferenceCopy}>
+            <Text style={[styles.preferenceRowTitle, isRtl && styles.rtlText]}>{row.label}</Text>
+            <Text style={[styles.preferenceRowMeta, isRtl && styles.rtlText]}>{row.meta}</Text>
+          </View>
+          <View style={[styles.preferenceToggle, row.enabled && styles.preferenceToggleActive]}>
+            <View style={[styles.preferenceKnob, row.enabled && styles.preferenceKnobActive]} />
+          </View>
+        </View>
+      ))}
+      <View style={styles.preferenceInfoCard}>
+        <Text style={[styles.preferenceNote, isRtl && styles.rtlText]}>
+          المفاتيح بصرية فقط ولا تطلب إذن إشعارات أو تحفظ تفضيلات.
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+function AccountHelpScreen({ isRtl, styles }: {
+  isRtl: boolean;
+  styles: MobileStyles;
+}) {
+  const [expandedQuestion, setExpandedQuestion] = useState<string | null>(null);
+
+  return (
+    <View style={styles.supportCard}>
+      <View style={styles.supportHeaderRow}>
+        <View style={styles.supportHeaderCopy}>
+          <Text style={[styles.cardTitle, isRtl && styles.rtlText]}>الأسئلة الشائعة</Text>
+          <Text style={[styles.cardBody, isRtl && styles.rtlText]}>
+            إجابات قصيرة داخل التطبيق بدون فتح صفحة خارجية أو إنشاء تذكرة.
+          </Text>
+        </View>
+        <View style={styles.supportIconBubble}><Text style={styles.supportIconText}>?</Text></View>
+      </View>
+      {helpFaqRows.map((row) => {
+        const expanded = expandedQuestion === row.question;
+        return (
+          <PremiumPressable
+            accessibilityLabel={row.question}
+            accessibilityRole="button"
+            accessibilityState={{ expanded }}
+            key={row.question}
+            onPress={() => setExpandedQuestion((current) => current === row.question ? null : row.question)}
+            style={styles.faqRow}
+          >
+            <View style={styles.preferenceCopy}>
+              <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>{row.question}</Text>
+              {expanded ? <Text style={[styles.faqAnswer, isRtl && styles.rtlText]}>{row.answer}</Text> : null}
+            </View>
+            <Text style={styles.faqDisclosure}>{expanded ? "−" : "+"}</Text>
+          </PremiumPressable>
+        );
+      })}
+    </View>
+  );
+}
+
 type MobileStyles = ReturnType<typeof createStyles>;
 
-const createStyles = (theme: MobileTheme) =>
+const createStyles = (
+  theme: MobileTheme,
+  layout: MobileResponsiveLayout,
+) =>
   StyleSheet.create({
     actionStack: {
       gap: theme.spacing.sm,
       marginTop: 18,
     },
     appScroll: {
+      backgroundColor: FULL_SCREEN_BACKGROUND_LAYOUT.scrollBackground,
       flex: 1,
     },
     authError: {
@@ -5034,13 +5622,12 @@ const createStyles = (theme: MobileTheme) =>
       borderColor: theme.colors.border,
       borderWidth: 1,
       borderRadius: theme.radii.control,
-      flex: 1,
       justifyContent: "center",
-      minHeight: 48,
-      minWidth: 126,
+      minHeight: ACCOUNT_ACTION_LAYOUT.buttonMinHeight,
       opacity: 0.92,
       paddingHorizontal: 12,
       paddingVertical: 14,
+      width: ACCOUNT_ACTION_LAYOUT.buttonWidth,
     },
     accountActionButtonPrimary: {
       backgroundColor: theme.colors.gold,
@@ -5051,30 +5638,54 @@ const createStyles = (theme: MobileTheme) =>
       shadowOpacity: theme.isDark ? 0.22 : 0.1,
       shadowRadius: 14,
     },
+    accountActionButtonSecondary: {
+      backgroundColor: "transparent",
+      borderColor: theme.colors.gold,
+      opacity: 1,
+    },
     accountActionRow: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: 10,
-      marginTop: 18,
+      flexDirection: ACCOUNT_ACTION_LAYOUT.direction,
+      gap: ACCOUNT_ACTION_LAYOUT.gap,
+      marginTop: layout.verticalSpacing,
     },
     accountActionText: {
       color: theme.colors.foreground,
       fontFamily: mobileTypography.uiSemiBold,
-      fontSize: 13,
-      lineHeight: 18,
+      fontSize: layout.typography.button,
+      lineHeight: 21,
       textAlign: "center",
     },
     accountActionTextPrimary: {
       color: theme.colors.foregroundInverse,
     },
+    accountDestinationRow: {
+      alignItems: "center",
+      backgroundColor: theme.colors.cardElevated,
+      borderColor: theme.colors.goldSoft,
+      borderRadius: mobileRadii.compactCard,
+      borderWidth: 1,
+      flexDirection: "row",
+      gap: 12,
+      justifyContent: "space-between",
+      minHeight: layout.touchTarget,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+    },
+    accountDestinationsCard: {
+      backgroundColor: theme.colors.card,
+      borderColor: theme.colors.border,
+      borderRadius: 20,
+      borderWidth: 1,
+      gap: layout.verticalSpacing,
+      padding: layout.isCompactHeight ? 14 : 16,
+    },
     accountAvatar: {
       alignItems: "center",
       backgroundColor: theme.colors.gold,
-      borderRadius: 26,
-      height: 52,
+      borderRadius: ACCOUNT_VISUAL_LAYOUT.avatarSize / 2,
+      height: ACCOUNT_VISUAL_LAYOUT.avatarSize,
       justifyContent: "center",
-      marginBottom: 14,
-      width: 52,
+      width: ACCOUNT_VISUAL_LAYOUT.avatarSize,
     },
     accountAvatarText: {
       color: theme.colors.foregroundInverse,
@@ -5084,14 +5695,53 @@ const createStyles = (theme: MobileTheme) =>
     accountHeroCard: {
       backgroundColor: theme.colors.hero,
       borderColor: theme.colors.goldSoft,
-      borderRadius: theme.radii.xl,
+      borderRadius: 22,
       borderWidth: 1,
-      overflow: "hidden",
-      padding: 28,
+      padding: layout.isCompactHeight ? 14 : 16,
       shadowColor: theme.colors.shadow,
-      shadowOffset: { height: 26, width: 0 },
-      shadowOpacity: theme.isDark ? 0.38 : 0.13,
-      shadowRadius: 38,
+      shadowOffset: { height: 14, width: 0 },
+      shadowOpacity: theme.isDark ? 0.24 : 0.08,
+      shadowRadius: 24,
+    },
+    accountHeroCopy: {
+      gap: 4,
+      minWidth: 0,
+    },
+    accountEyebrow: {
+      color: theme.colors.gold,
+      fontFamily: mobileTypography.uiMedium,
+      fontSize: 14,
+      lineHeight: 19,
+    },
+    accountTitle: {
+      color: theme.colors.foreground,
+      flexShrink: 1,
+      fontFamily: mobileTypography.kufiBold,
+      fontSize: Math.min(
+        layout.typography.pageTitle,
+        ACCOUNT_VISUAL_LAYOUT.titleMaximum,
+      ),
+      letterSpacing: -0.2,
+      lineHeight: layout.typography.pageTitle + 8,
+    },
+    accountDescription: {
+      color: theme.colors.mutedForeground,
+      flexShrink: 1,
+      fontFamily: mobileTypography.uiRegular,
+      fontSize: Math.min(
+        layout.typography.body,
+        ACCOUNT_VISUAL_LAYOUT.bodyMaximum,
+      ),
+      lineHeight: 22,
+    },
+    accountSectionTitle: {
+      color: theme.colors.foreground,
+      fontFamily: mobileTypography.kufiBold,
+      fontSize: Math.min(
+        layout.typography.sectionTitle,
+        ACCOUNT_VISUAL_LAYOUT.sectionTitleMaximum,
+      ),
+      lineHeight: layout.typography.sectionTitle + 7,
     },
     accountPreferenceDot: {
       backgroundColor: theme.colors.muted,
@@ -5116,8 +5766,8 @@ const createStyles = (theme: MobileTheme) =>
       borderRadius: mobileRadii.compactCard,
       borderWidth: 1,
       flexDirection: "row",
-      gap: 12,
-      padding: 14,
+      gap: layout.verticalSpacing,
+      padding: layout.isCompactHeight ? 12 : 14,
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: 10, width: 0 },
       shadowOpacity: theme.isDark ? 0.16 : 0.05,
@@ -5193,7 +5843,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     bookingBottomAction: {
       marginTop: 10,
-      paddingBottom: 144,
+      paddingBottom: layout.verticalSpacing,
     },
     bookingDateRail: {
       flexDirection: "row",
@@ -5246,7 +5896,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     bookingReceiptActions: {
       gap: 12,
-      paddingBottom: 148,
+      paddingBottom: layout.verticalSpacing,
     },
     bookingSearchField: {
       alignItems: "center",
@@ -5290,10 +5940,10 @@ const createStyles = (theme: MobileTheme) =>
       shadowRadius: 22,
     },
     bookingStepScreen: {
-      gap: 16,
-      paddingBottom: 152,
-      paddingHorizontal: 20,
-      paddingTop: 30,
+      gap: layout.sectionGap,
+      paddingBottom: layout.verticalSpacing,
+      paddingHorizontal: layout.pagePadding,
+      paddingTop: layout.screenTopPadding,
     },
     bookingTimeGrid: {
       flexDirection: "row",
@@ -5506,7 +6156,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     bookingDetailActions: {
       gap: 12,
-      paddingBottom: 148,
+      paddingBottom: layout.verticalSpacing,
     },
     bookingDetailHero: {
       alignItems: "center",
@@ -5539,10 +6189,10 @@ const createStyles = (theme: MobileTheme) =>
       width: 116,
     },
     bookingDetailScreen: {
-      gap: 16,
-      paddingBottom: 152,
-      paddingHorizontal: 20,
-      paddingTop: 30,
+      gap: layout.sectionGap,
+      paddingBottom: layout.verticalSpacing,
+      paddingHorizontal: layout.pagePadding,
+      paddingTop: layout.screenTopPadding,
     },
     bookingDetailSummary: {
       backgroundColor: theme.isDark
@@ -5911,16 +6561,16 @@ const createStyles = (theme: MobileTheme) =>
     bookingsHeaderTitle: {
       color: "#f5f1e8",
       fontFamily: mobileTypography.kufiBold,
-      fontSize: 25,
-      lineHeight: 32,
+      fontSize: layout.isCompactHeight ? 21 : 25,
+      lineHeight: layout.isCompactHeight ? 28 : 32,
       paddingBottom: 1,
       paddingTop: 2,
       textAlign: "center",
       writingDirection: "rtl",
     },
     bookingsList: {
-      gap: 18,
-      paddingBottom: 170,
+      gap: layout.sectionGap,
+      paddingBottom: layout.verticalSpacing,
     },
     bookingsNotificationBadge: {
       alignItems: "center",
@@ -5943,9 +6593,9 @@ const createStyles = (theme: MobileTheme) =>
       lineHeight: 13,
     },
     bookingsScreen: {
-      gap: 15,
+      gap: layout.sectionGap,
       paddingBottom: 0,
-      paddingTop: 8,
+      paddingTop: layout.screenTopPadding,
       width: "100%",
     },
     bookingsSegment: {
@@ -6856,17 +7506,16 @@ const createStyles = (theme: MobileTheme) =>
       borderWidth: 0,
       borderRadius: 30,
       flex: 1,
-      height: 66,
+      height: layout.bottomNavigationHeight,
       marginHorizontal: 0,
       shadowColor: theme.colors.deepGold,
-      shadowOffset: { height: 8, width: 0 },
-      shadowOpacity: theme.isDark ? 0.4 : 0.12,
-      shadowRadius: 18,
-      transform: [{ translateY: -4 }],
+      shadowOffset: { height: 4, width: 0 },
+      shadowOpacity: theme.isDark ? 0.2 : 0.06,
+      shadowRadius: 10,
     },
     centerTabButtonActive: {
       backgroundColor: "transparent",
-      transform: [{ translateY: -5 }, { scale: 1.02 }],
+      transform: [{ scale: 1.01 }],
     },
     centerTabActiveIndicator: {
       backgroundColor: "transparent",
@@ -6875,9 +7524,9 @@ const createStyles = (theme: MobileTheme) =>
       width: 0,
     },
     centerTabIconImage: {
-      height: 26,
+      height: layout.bottomNavigationIconSize,
       tintColor: theme.colors.foregroundInverse,
-      width: 26,
+      width: layout.bottomNavigationIconSize,
     },
     centerTabHalo: {
       alignItems: "center",
@@ -6887,15 +7536,15 @@ const createStyles = (theme: MobileTheme) =>
       borderColor: theme.isDark
         ? "rgba(255, 246, 205, 0.7)"
         : "rgba(184, 117, 11, 0.28)",
-      borderRadius: 25,
-      borderWidth: 2,
-      height: 50,
+      borderRadius: layout.centerNavigationActionSize / 2,
+      borderWidth: 1,
+      height: layout.centerNavigationActionSize,
       justifyContent: "center",
       shadowColor: theme.colors.deepGold,
-      shadowOffset: { height: 10, width: 0 },
-      shadowOpacity: theme.isDark ? 0.44 : 0.14,
-      shadowRadius: 18,
-      width: 50,
+      shadowOffset: { height: 4, width: 0 },
+      shadowOpacity: theme.isDark ? 0.2 : 0.06,
+      shadowRadius: 9,
+      width: layout.centerNavigationActionSize,
     },
     centerTabInner: {
       alignItems: "center",
@@ -6903,18 +7552,17 @@ const createStyles = (theme: MobileTheme) =>
       borderColor: theme.isDark
         ? "rgba(255, 248, 220, 0.28)"
         : "rgba(255, 253, 248, 0.56)",
-      borderRadius: 21,
+      borderRadius: (layout.centerNavigationActionSize - 8) / 2,
       borderWidth: 1,
-      height: 42,
+      height: layout.centerNavigationActionSize - 8,
       justifyContent: "center",
-      width: 42,
+      width: layout.centerNavigationActionSize - 8,
     },
     centerTabLabel: {
       color: theme.colors.gold,
       fontFamily: mobileTypography.uiSemiBold,
-      fontSize: 9,
-      lineHeight: 11,
-      marginTop: 1,
+      fontSize: layout.typography.navigationLabel,
+      lineHeight: 10,
       maxWidth: 62,
       textAlign: "center",
     },
@@ -7006,13 +7654,13 @@ const createStyles = (theme: MobileTheme) =>
       textAlign: "center",
     },
     content: {
-      gap: 18,
-      paddingBottom: 24,
-      paddingHorizontal: 20,
+      gap: layout.sectionGap,
+      paddingBottom: layout.contentBottomInset,
+      paddingHorizontal: layout.pagePadding,
     },
     homeContent: {
       gap: 0,
-      paddingBottom: 0,
+      paddingBottom: layout.contentBottomInset,
       paddingHorizontal: 0,
     },
     immersiveContent: {
@@ -7310,14 +7958,31 @@ const createStyles = (theme: MobileTheme) =>
       width: 19,
     },
     faqRow: {
-      alignItems: "center",
+      alignItems: "flex-start",
       backgroundColor: theme.colors.cardElevated,
       borderColor: theme.colors.border,
       borderRadius: 18,
       borderWidth: 1,
       flexDirection: "row",
+      gap: 12,
       justifyContent: "space-between",
+      minHeight: HELP_CENTER_ROW_LAYOUT.minimumTouchHeight,
       padding: 14,
+    },
+    faqAnswer: {
+      color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiRegular,
+      fontSize: 13,
+      lineHeight: 21,
+      marginTop: 8,
+    },
+    faqDisclosure: {
+      color: theme.colors.gold,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: 22,
+      lineHeight: 24,
+      minWidth: 24,
+      textAlign: "center",
     },
     filterButton: {
       alignItems: "center",
@@ -7412,12 +8077,67 @@ const createStyles = (theme: MobileTheme) =>
     },
     header: {
       alignItems: "center",
-      backgroundColor: theme.colors.background,
+      backgroundColor: "transparent",
       flexDirection: "row",
       gap: 8,
-      paddingBottom: 10,
-      paddingHorizontal: 20,
-      paddingTop: 24,
+      minHeight: layout.headerHeight,
+      paddingHorizontal: layout.pagePadding,
+      paddingVertical: layout.isCompactHeight ? 8 : 10,
+    },
+    headerRtl: {
+      flexDirection: "row-reverse",
+    },
+    headerAction: {
+      alignItems: "center",
+      height: layout.touchTarget,
+      justifyContent: "center",
+      width: layout.touchTarget,
+    },
+    headerActionText: {
+      color: theme.colors.gold,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: 14,
+      lineHeight: 20,
+      textAlign: "center",
+    },
+    headerBackButton: {
+      alignItems: "center",
+      backgroundColor: theme.colors.cardElevated,
+      borderColor: theme.colors.border,
+      borderRadius: 16,
+      borderWidth: 1,
+      height: layout.touchTarget,
+      justifyContent: "center",
+      width: layout.touchTarget,
+    },
+    headerBackIcon: {
+      height: layout.iconSize,
+      tintColor: theme.colors.gold,
+      width: layout.iconSize,
+    },
+    headerPageCopy: {
+      alignItems: "center",
+      flex: 1,
+      minWidth: 0,
+    },
+    headerPageSubtitle: {
+      color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiRegular,
+      fontSize: 11,
+      lineHeight: 15,
+      marginTop: 1,
+      textAlign: "center",
+    },
+    headerPageTitle: {
+      color: theme.colors.foreground,
+      fontFamily: mobileTypography.kufiBold,
+      fontSize: layout.typography.pageTitle,
+      lineHeight: layout.typography.pageTitle + 7,
+      textAlign: "center",
+    },
+    headerSpacer: {
+      height: layout.touchTarget,
+      width: layout.touchTarget,
     },
     iconAction: {
       alignItems: "center",
@@ -7878,7 +8598,7 @@ const createStyles = (theme: MobileTheme) =>
       borderColor: theme.colors.warning,
       borderRadius: theme.radii.card,
       borderWidth: 1,
-      padding: 20,
+      padding: layout.cardPadding,
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: 12, width: 0 },
       shadowOpacity: theme.isDark ? 0.18 : 0.06,
@@ -8011,8 +8731,8 @@ const createStyles = (theme: MobileTheme) =>
     chatBubbleText: {
       color: theme.colors.foreground,
       fontFamily: mobileTypography.uiSemiBold,
-      fontSize: 14,
-      lineHeight: 21,
+      fontSize: 15,
+      lineHeight: 22,
     },
     chatBubbleTextCustomer: {
       color: theme.colors.foregroundInverse,
@@ -8020,7 +8740,7 @@ const createStyles = (theme: MobileTheme) =>
     chatBubbleTime: {
       color: theme.colors.mutedForeground,
       fontFamily: mobileTypography.uiRegular,
-      fontSize: 10,
+      fontSize: 12,
       marginTop: 6,
     },
     chatBubbleTimeCustomer: {
@@ -8028,6 +8748,10 @@ const createStyles = (theme: MobileTheme) =>
       opacity: 0.75,
     },
     chatHeader: {
+      gap: 6,
+      width: "100%",
+    },
+    chatMetaRow: {
       alignItems: "center",
       flexDirection: "row",
       justifyContent: "space-between",
@@ -8035,24 +8759,24 @@ const createStyles = (theme: MobileTheme) =>
     chatPanel: {
       backgroundColor: theme.colors.cardElevated,
       borderColor: theme.colors.goldSoft,
-      borderRadius: theme.radii.card,
+      borderRadius: 22,
       borderWidth: 1,
-      gap: 14,
-      padding: 20,
+      gap: 12,
+      padding: layout.isCompactHeight ? 14 : 16,
     },
     chatTitle: {
       color: theme.colors.foreground,
-      fontFamily: mobileTypography.kufiBold,
-      fontSize: 20,
-      marginTop: 4,
+      fontFamily: mobileTypography.uiBold,
+      fontSize: Math.min(layout.typography.pageTitle, 22),
+      lineHeight: 29,
     },
     conversationAvatar: {
       alignItems: "center",
       backgroundColor: theme.colors.goldSoft,
-      borderRadius: 22,
-      height: 44,
+      borderRadius: MESSAGE_PREVIEW_ROW_LAYOUT.avatarSize / 2,
+      height: MESSAGE_PREVIEW_ROW_LAYOUT.avatarSize,
       justifyContent: "center",
-      width: 44,
+      width: MESSAGE_PREVIEW_ROW_LAYOUT.avatarSize,
     },
     conversationAvatarText: {
       color: theme.colors.deepGold,
@@ -8060,29 +8784,54 @@ const createStyles = (theme: MobileTheme) =>
       fontSize: 16,
     },
     conversationPanel: {
-      backgroundColor: theme.colors.card,
-      borderColor: theme.colors.goldSoft,
-      borderRadius: theme.radii.card,
-      borderWidth: 1,
-      gap: 14,
-      padding: 20,
+      backgroundColor: "transparent",
+      gap: layout.verticalSpacing,
+    },
+    conversationMeta: {
+      alignItems: "flex-end",
+      flexShrink: 0,
+      gap: 8,
+      width: MESSAGE_PREVIEW_ROW_LAYOUT.metaColumnWidth,
     },
     conversationRow: {
-      alignItems: "flex-start",
+      alignItems: "center",
       backgroundColor: theme.colors.cardElevated,
       borderColor: theme.colors.border,
-      borderRadius: 22,
+      borderRadius: 18,
       borderWidth: 1,
       flexDirection: "row",
-      gap: 12,
-      padding: 14,
+      gap: 10,
+      padding: layout.isCompactHeight ? 12 : 14,
+    },
+    conversationName: {
+      color: theme.colors.foreground,
+      flexShrink: 1,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: Math.min(
+        layout.typography.cardTitle,
+        MESSAGE_PREVIEW_ROW_LAYOUT.businessNameMaximum,
+      ),
+      lineHeight: 23,
+      minWidth: 0,
+    },
+    conversationPreview: {
+      color: theme.colors.mutedForeground,
+      flexShrink: 1,
+      fontFamily: mobileTypography.uiRegular,
+      fontSize: Math.min(
+        layout.typography.body,
+        MESSAGE_PREVIEW_ROW_LAYOUT.previewMaximum,
+      ),
+      lineHeight: 20,
+      marginTop: 2,
+      minWidth: 0,
     },
     conversationStatus: {
       color: theme.colors.gold,
       fontFamily: mobileTypography.uiMedium,
-      fontSize: 11,
-      lineHeight: 15,
-      marginTop: 6,
+      fontSize: 12,
+      lineHeight: 16,
+      marginTop: 4,
     },
     marketplaceMode: {
       backgroundColor: theme.colors.cardElevated,
@@ -8114,65 +8863,6 @@ const createStyles = (theme: MobileTheme) =>
       justifyContent: "flex-start",
       marginBottom: 12,
     },
-    messageHeroBody: {
-      color: theme.colors.mutedForeground,
-      fontFamily: mobileTypography.uiRegular,
-      fontSize: 15,
-      lineHeight: 23,
-      marginTop: 10,
-    },
-    messageHeroCard: {
-      backgroundColor: theme.colors.hero,
-      borderColor: theme.isDark ? theme.colors.goldSoft : theme.colors.gold,
-      borderRadius: theme.radii.xl,
-      borderWidth: 1,
-      overflow: "hidden",
-      padding: 24,
-      shadowColor: theme.colors.shadow,
-      shadowOffset: { height: 20, width: 0 },
-      shadowOpacity: theme.isDark ? 0.36 : 0.13,
-      shadowRadius: 32,
-    },
-    messageHeroGlow: {
-      backgroundColor: theme.colors.goldSoft,
-      borderRadius: 999,
-      height: 150,
-      opacity: 0.85,
-      position: "absolute",
-      right: -48,
-      top: -52,
-      width: 150,
-    },
-    messageHeroIcon: {
-      alignItems: "center",
-      backgroundColor: theme.colors.gold,
-      borderRadius: 24,
-      height: 48,
-      justifyContent: "center",
-      width: 48,
-    },
-    messageHeroIconText: {
-      color: theme.colors.foregroundInverse,
-      fontFamily: mobileTypography.uiBold,
-      fontSize: 22,
-    },
-    messageHeroIconImage: {
-      height: 24,
-      tintColor: theme.colors.foregroundInverse,
-      width: 24,
-    },
-    messageHeroTitle: {
-      color: theme.colors.foreground,
-      fontFamily: mobileTypography.kufiBold,
-      fontSize: 27,
-      lineHeight: 34,
-      marginTop: 20,
-    },
-    messageHeroTopRow: {
-      alignItems: "center",
-      flexDirection: "row",
-      justifyContent: "space-between",
-    },
     messagePlaceholderChip: {
       backgroundColor: theme.colors.muted,
       borderRadius: theme.radii.pill,
@@ -8200,6 +8890,86 @@ const createStyles = (theme: MobileTheme) =>
       overflow: "hidden",
       paddingHorizontal: 10,
       paddingVertical: 7,
+    },
+    notificationLandingInfoCard: {
+      backgroundColor: theme.colors.card,
+      borderColor: theme.colors.goldSoft,
+      borderRadius: 20,
+      borderWidth: 1,
+      gap: 8,
+      padding: layout.isCompactHeight ? 14 : 16,
+    },
+    notificationLandingInfoHeader: {
+      alignItems: "center",
+      flexDirection: "row",
+      justifyContent: "space-between",
+    },
+    notificationLandingIcon: {
+      alignItems: "center",
+      backgroundColor: theme.colors.goldSoft,
+      borderRadius: 18,
+      height: 36,
+      justifyContent: "center",
+      width: 36,
+    },
+    notificationLandingIconImage: {
+      height: 18,
+      tintColor: theme.colors.gold,
+      width: 18,
+    },
+    notificationLandingInfoTitle: {
+      color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: layout.typography.cardTitle,
+      lineHeight: 23,
+    },
+    notificationLandingInfoBody: {
+      color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiRegular,
+      fontSize: layout.typography.body,
+      lineHeight: 22,
+    },
+    notificationLandingSections: {
+      gap: 12,
+    },
+    notificationLandingRow: {
+      alignItems: "center",
+      backgroundColor: theme.colors.cardElevated,
+      borderColor: theme.colors.border,
+      borderRadius: 18,
+      borderWidth: 1,
+      flexDirection: "row",
+      gap: 12,
+      minHeight: 72,
+      padding: 14,
+    },
+    notificationLandingRowIcon: {
+      alignItems: "center",
+      backgroundColor: theme.colors.goldSoft,
+      borderRadius: 18,
+      height: 36,
+      justifyContent: "center",
+      width: 36,
+    },
+    notificationLandingRowIconImage: {
+      height: 18,
+      tintColor: theme.colors.gold,
+      width: 18,
+    },
+    notificationLandingRowTitle: {
+      color: theme.colors.foreground,
+      flexShrink: 1,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: layout.typography.cardTitle,
+      lineHeight: 22,
+    },
+    notificationLandingRowBody: {
+      color: theme.colors.mutedForeground,
+      flexShrink: 1,
+      fontFamily: mobileTypography.uiRegular,
+      fontSize: layout.typography.secondary,
+      lineHeight: 19,
+      marginTop: 2,
     },
     myBookingCard: {
       backgroundColor: theme.colors.cardElevated,
@@ -8232,14 +9002,14 @@ const createStyles = (theme: MobileTheme) =>
       marginTop: 8,
     },
     notificationCard: {
-      alignItems: "flex-start",
+      alignItems: "center",
       backgroundColor: theme.colors.cardElevated,
       borderColor: theme.colors.border,
-      borderRadius: 22,
+      borderRadius: 18,
       borderWidth: 1,
       flexDirection: "row",
-      gap: 12,
-      padding: 14,
+      gap: NOTIFICATION_CARD_LAYOUT.gap,
+      padding: NOTIFICATION_CARD_LAYOUT.padding,
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: 8, width: 0 },
       shadowOpacity: theme.isDark ? 0.12 : 0.04,
@@ -8252,10 +9022,10 @@ const createStyles = (theme: MobileTheme) =>
     notificationIcon: {
       alignItems: "center",
       backgroundColor: theme.colors.gold,
-      borderRadius: 20,
-      height: 40,
+      borderRadius: NOTIFICATION_CARD_LAYOUT.iconSize / 2,
+      height: NOTIFICATION_CARD_LAYOUT.iconSize,
       justifyContent: "center",
-      width: 40,
+      width: NOTIFICATION_CARD_LAYOUT.iconSize,
     },
     notificationIconText: {
       color: theme.colors.foregroundInverse,
@@ -8268,12 +9038,32 @@ const createStyles = (theme: MobileTheme) =>
       width: 20,
     },
     notificationPanel: {
-      backgroundColor: theme.colors.cardElevated,
-      borderColor: theme.colors.goldSoft,
-      borderRadius: theme.radii.card,
-      borderWidth: 1,
-      gap: 16,
-      padding: 22,
+      backgroundColor: "transparent",
+      gap: layout.verticalSpacing,
+    },
+    notificationTitle: {
+      color: theme.colors.foreground,
+      flex: 1,
+      flexShrink: 1,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: Math.min(
+        layout.typography.cardTitle,
+        NOTIFICATION_CARD_LAYOUT.titleMaximum,
+      ),
+      lineHeight: 23,
+      minWidth: 0,
+    },
+    notificationBody: {
+      color: theme.colors.mutedForeground,
+      flexShrink: 1,
+      fontFamily: mobileTypography.uiRegular,
+      fontSize: Math.min(
+        layout.typography.body,
+        NOTIFICATION_CARD_LAYOUT.bodyMaximum,
+      ),
+      lineHeight: 21,
+      marginTop: 3,
+      minWidth: 0,
     },
     notificationStatusChip: {
       alignSelf: "flex-start",
@@ -8283,8 +9073,8 @@ const createStyles = (theme: MobileTheme) =>
       borderWidth: 1,
       color: theme.colors.deepGold,
       fontFamily: mobileTypography.uiMedium,
-      fontSize: 11,
-      lineHeight: 15,
+      fontSize: 12,
+      lineHeight: 16,
       marginTop: 8,
       overflow: "hidden",
       paddingHorizontal: 9,
@@ -8292,19 +9082,24 @@ const createStyles = (theme: MobileTheme) =>
     },
     notificationTime: {
       color: theme.colors.mutedForeground,
+      flexShrink: 0,
       fontFamily: mobileTypography.uiMedium,
-      fontSize: 11,
+      fontSize: Math.min(
+        layout.typography.metadata,
+        NOTIFICATION_CARD_LAYOUT.timestampMaximum,
+      ),
     },
     notificationTitleRow: {
       alignItems: "flex-start",
       flexDirection: "row",
-      flexWrap: "wrap",
       gap: 8,
       justifyContent: "space-between",
+      minWidth: 0,
+      width: "100%",
     },
     onboardingActions: {
-      gap: 12,
-      marginTop: 34,
+      gap: layout.verticalSpacing,
+      marginTop: layout.isCompactHeight ? 20 : 34,
     },
     categoryRailCardBlue: {
       borderColor: "#38a9d3",
@@ -8321,8 +9116,8 @@ const createStyles = (theme: MobileTheme) =>
     onboardingBody: {
       color: "#f4f0e8",
       fontFamily: mobileTypography.uiRegular,
-      fontSize: 20,
-      lineHeight: 31,
+      fontSize: layout.isCompactHeight ? 17 : 20,
+      lineHeight: layout.isCompactHeight ? 26 : 31,
       textAlign: "center",
       writingDirection: "rtl",
     },
@@ -8348,9 +9143,9 @@ const createStyles = (theme: MobileTheme) =>
       justifyContent: "space-between",
       minHeight: "100%",
       overflow: "hidden",
-      paddingBottom: 22,
-      paddingHorizontal: 28,
-      paddingTop: 44,
+      paddingBottom: layout.isCompactHeight ? 16 : 22,
+      paddingHorizontal: layout.isNarrowWidth ? 18 : 28,
+      paddingTop: layout.isCompactHeight ? 22 : 44,
     },
     onboardingCardCompact: {
       paddingBottom: 16,
@@ -8376,7 +9171,7 @@ const createStyles = (theme: MobileTheme) =>
       flex: 1,
       gap: 10,
       justifyContent: "center",
-      minHeight: 104,
+      minHeight: layout.isCompactHeight ? 88 : 104,
       paddingHorizontal: 8,
       paddingVertical: 12,
     },
@@ -8401,7 +9196,7 @@ const createStyles = (theme: MobileTheme) =>
       direction: "ltr",
       flexDirection: "row-reverse",
       gap: 10,
-      marginTop: 26,
+      marginTop: layout.isCompactHeight ? 18 : 26,
       width: "100%",
     },
     onboardingLogoGlow: {
@@ -8583,7 +9378,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     onboardingValueSection: {
       alignItems: "center",
-      marginTop: 34,
+      marginTop: layout.isCompactHeight ? 20 : 34,
       width: "100%",
     },
     onboardingPattern: {
@@ -8655,8 +9450,8 @@ const createStyles = (theme: MobileTheme) =>
     onboardingTitle: {
       color: theme.colors.foreground,
       fontFamily: mobileTypography.kufiBold,
-      fontSize: 30,
-      lineHeight: 37,
+      fontSize: layout.typography.pageTitle,
+      lineHeight: layout.typography.pageTitle + 8,
       marginTop: 24,
     },
     ownerActionText: {
@@ -8999,10 +9794,10 @@ const createStyles = (theme: MobileTheme) =>
     privacyCard: {
       backgroundColor: theme.colors.successSoft,
       borderColor: theme.colors.success,
-      borderRadius: 24,
+      borderRadius: 20,
       borderWidth: 1,
-      gap: 14,
-      padding: 18,
+      gap: layout.verticalSpacing,
+      padding: layout.isCompactHeight ? 14 : 16,
     },
     privacyGrid: {
       gap: 10,
@@ -9028,9 +9823,8 @@ const createStyles = (theme: MobileTheme) =>
     preferenceNote: {
       color: theme.colors.mutedForeground,
       fontFamily: mobileTypography.uiRegular,
-      fontSize: 12,
-      lineHeight: 19,
-      marginTop: 6,
+      fontSize: layout.typography.secondary,
+      lineHeight: 20,
     },
     preferenceChevron: {
       color: theme.colors.gold,
@@ -9038,9 +9832,9 @@ const createStyles = (theme: MobileTheme) =>
       fontSize: 20,
     },
     preferenceCopy: {
-      flex: 1,
+      flex: ACCOUNT_NOTIFICATION_ROW_LAYOUT.textColumnFlex,
       flexShrink: 1,
-      minWidth: 0,
+      minWidth: ACCOUNT_NOTIFICATION_ROW_LAYOUT.textColumnMinWidth,
     },
     preferenceGroupTitle: {
       color: theme.colors.deepGold,
@@ -9049,17 +9843,20 @@ const createStyles = (theme: MobileTheme) =>
     },
     preferencesGroup: {
       gap: 10,
-      marginTop: 16,
+      marginTop: layout.verticalSpacing,
     },
     preferenceRow: {
       alignItems: "center",
       backgroundColor: theme.colors.cardElevated,
       borderColor: theme.colors.goldSoft,
-      borderRadius: 20,
+      borderRadius: 18,
       borderWidth: 1,
       flexDirection: "row",
       gap: 12,
       justifyContent: "space-between",
+      minHeight: layout.isCompactHeight
+        ? ACCOUNT_NOTIFICATION_ROW_LAYOUT.compactMinHeight
+        : ACCOUNT_NOTIFICATION_ROW_LAYOUT.defaultMinHeight,
       padding: 14,
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: 7, width: 0 },
@@ -9067,19 +9864,45 @@ const createStyles = (theme: MobileTheme) =>
       shadowRadius: 12,
     },
     preferencesPanel: {
-      backgroundColor: theme.colors.cardElevated,
+      backgroundColor: theme.colors.card,
       borderColor: theme.colors.goldSoft,
-      borderRadius: theme.radii.card,
+      borderRadius: 20,
       borderWidth: 1,
-      gap: 16,
-      padding: 22,
+      gap: 12,
+      padding: layout.isCompactHeight ? 14 : 16,
+    },
+    preferenceInfoCard: {
+      backgroundColor: theme.colors.goldSoft,
+      borderColor: theme.colors.gold,
+      borderRadius: 16,
+      borderWidth: 1,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+    },
+    preferenceRowTitle: {
+      color: theme.colors.foreground,
+      flexShrink: 1,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: layout.typography.cardTitle,
+      lineHeight: 23,
+      minWidth: 0,
+    },
+    preferenceRowMeta: {
+      color: theme.colors.mutedForeground,
+      flexShrink: 1,
+      fontFamily: mobileTypography.uiRegular,
+      fontSize: layout.typography.secondary,
+      lineHeight: 19,
+      marginTop: 2,
+      minWidth: 0,
     },
     preferenceToggle: {
       backgroundColor: theme.colors.muted,
       borderRadius: 999,
+      flexShrink: 0,
       justifyContent: "center",
       padding: 3,
-      width: 44,
+      width: ACCOUNT_NOTIFICATION_ROW_LAYOUT.switchWidth,
     },
     preferenceToggleActive: {
       backgroundColor: theme.colors.gold,
@@ -9093,7 +9916,7 @@ const createStyles = (theme: MobileTheme) =>
       flexDirection: "row",
       gap: 12,
       justifyContent: "space-between",
-      marginBottom: 14,
+      marginBottom: layout.verticalSpacing,
     },
     profileMembershipText: {
       color: theme.colors.mutedForeground,
@@ -9123,8 +9946,9 @@ const createStyles = (theme: MobileTheme) =>
     },
     profileStatsGrid: {
       flexDirection: "row",
+      flexWrap: layout.isNarrowWidth ? "wrap" : "nowrap",
       gap: 8,
-      marginTop: 18,
+      marginTop: layout.verticalSpacing,
     },
     profileStatValue: {
       color: theme.colors.deepGold,
@@ -9213,8 +10037,8 @@ const createStyles = (theme: MobileTheme) =>
     promoTitle: {
       color: theme.isDark ? theme.colors.gold : theme.colors.deepGold,
       fontFamily: mobileTypography.kufiBold,
-      fontSize: 30,
-      lineHeight: 36,
+      fontSize: layout.typography.pageTitle,
+      lineHeight: layout.typography.pageTitle + 8,
     },
     promoCopy: {
       alignItems: "flex-end",
@@ -9490,9 +10314,9 @@ const createStyles = (theme: MobileTheme) =>
     quickBookingTitle: {
       color: theme.colors.foreground,
       fontFamily: mobileTypography.kufiBold,
-      fontSize: 26,
+      fontSize: layout.typography.pageTitle,
       letterSpacing: -0.4,
-      lineHeight: 33,
+      lineHeight: layout.typography.pageTitle + 8,
       marginTop: 8,
     },
     ratingPill: {
@@ -9572,8 +10396,17 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.foreground,
       fontFamily: mobileTypography.uiRegular,
       fontSize: 15,
+      flex: 1,
       flexShrink: 1,
       lineHeight: 20,
+      minWidth: 0,
+    },
+    ltrText: {
+      textAlign: "left",
+      writingDirection: "ltr",
+    },
+    flexRowRtl: {
+      flexDirection: "row-reverse",
     },
     rtlText: {
       textAlign: "right",
@@ -9686,9 +10519,9 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.mutedForeground,
       fontFamily: mobileTypography.uiRegular,
       flexShrink: 1,
-      fontSize: 15,
-      lineHeight: 23,
-      marginTop: 8,
+      fontSize: layout.bodySize,
+      lineHeight: layout.isCompactHeight ? 21 : 23,
+      marginTop: layout.isCompactHeight ? 6 : 8,
     },
     screenEyebrow: {
       color: theme.colors.gold,
@@ -9702,10 +10535,10 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.foreground,
       fontFamily: mobileTypography.kufiBold,
       flexShrink: 1,
-      fontSize: 29,
+      fontSize: layout.typography.pageTitle,
       letterSpacing: -0.3,
-      lineHeight: 37,
-      marginTop: 8,
+      lineHeight: layout.typography.pageTitle + 8,
+      marginTop: layout.isCompactHeight ? 6 : 8,
     },
     iconButtonPressed: {
       opacity: 0.86,
@@ -10175,9 +11008,9 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.foreground,
       fontFamily: mobileTypography.kufiBold,
       flexShrink: 1,
-      fontSize: 32,
+      fontSize: layout.typography.pageTitle,
       letterSpacing: -0.7,
-      lineHeight: 42,
+      lineHeight: layout.typography.pageTitle + 10,
       textAlign: "right",
     },
     salonIdentityBlock: {
@@ -10577,9 +11410,9 @@ const createStyles = (theme: MobileTheme) =>
     sectionTitle: {
       color: theme.colors.foreground,
       fontFamily: mobileTypography.kufiBold,
-      fontSize: 22,
+      fontSize: layout.typography.sectionTitle,
       letterSpacing: -0.2,
-      lineHeight: 30,
+      lineHeight: layout.typography.sectionTitle + 8,
     },
     selectText: {
       color: theme.colors.gold,
@@ -10594,17 +11427,17 @@ const createStyles = (theme: MobileTheme) =>
     settingsCard: {
       backgroundColor: theme.colors.card,
       borderColor: theme.colors.border,
-      borderRadius: 24,
+      borderRadius: 20,
       borderWidth: 1,
-      padding: 18,
+      padding: layout.isCompactHeight ? 14 : 16,
     },
     supportCard: {
       backgroundColor: theme.colors.card,
       borderColor: theme.colors.goldSoft,
       borderRadius: theme.radii.card,
       borderWidth: 1,
-      gap: 14,
-      padding: 20,
+      gap: layout.verticalSpacing,
+      padding: layout.cardPadding,
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: 12, width: 0 },
       shadowOpacity: theme.isDark ? 0.18 : 0.06,
@@ -10801,6 +11634,10 @@ const createStyles = (theme: MobileTheme) =>
       gap: 8,
       marginTop: 14,
     },
+    bottomNavSafeArea: {
+      backgroundColor: "transparent",
+      flexShrink: 0,
+    },
     stepBody: {
       color: theme.colors.mutedForeground,
       fontFamily: mobileTypography.uiRegular,
@@ -10839,18 +11676,18 @@ const createStyles = (theme: MobileTheme) =>
       borderColor: theme.isDark
         ? "rgba(255, 193, 58, 0.26)"
         : "rgba(184, 117, 11, 0.22)",
-      borderRadius: 20,
+      borderRadius: layout.isCompactHeight ? 18 : 20,
       borderWidth: 1,
       direction: "ltr",
       elevation: 18,
       flexDirection: "row",
       flexShrink: 0,
-      height: 72,
-      marginBottom: 8,
-      marginHorizontal: 16,
-      paddingBottom: 5,
+      height: layout.bottomNavigationHeight,
+      marginBottom: layout.bottomNavigationBottomGap,
+      marginHorizontal: layout.isNarrowWidth ? 12 : 16,
+      paddingBottom: 0,
       paddingHorizontal: 6,
-      paddingTop: 5,
+      paddingTop: 0,
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: -10, width: 0 },
       shadowOpacity: theme.isDark ? 0.42 : 0.12,
@@ -10874,7 +11711,7 @@ const createStyles = (theme: MobileTheme) =>
       flex: 1,
       gap: 3,
       justifyContent: "center",
-      minHeight: 52,
+      minHeight: layout.touchTarget,
       paddingHorizontal: 0,
     },
     tabButtonActive: {
@@ -10893,9 +11730,9 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.gold,
     },
     tabIconImage: {
-      height: 25,
+      height: layout.bottomNavigationIconSize,
       tintColor: theme.colors.mutedForeground,
-      width: 25,
+      width: layout.bottomNavigationIconSize,
     },
     tabIconImageActive: {
       tintColor: theme.colors.gold,
@@ -10903,8 +11740,8 @@ const createStyles = (theme: MobileTheme) =>
     tabLabel: {
       color: theme.colors.mutedForeground,
       fontFamily: mobileTypography.uiMedium,
-      fontSize: 11,
-      lineHeight: 15,
+      fontSize: layout.typography.navigationLabel,
+      lineHeight: layout.isCompactHeight ? 12 : 13,
       maxWidth: 60,
       minWidth: 42,
       textAlign: "center",
@@ -11021,10 +11858,13 @@ const createStyles = (theme: MobileTheme) =>
       borderRadius: 999,
       color: theme.colors.foregroundInverse,
       fontFamily: mobileTypography.uiMedium,
+      height: MESSAGE_PREVIEW_ROW_LAYOUT.unreadBadgeSize,
       fontSize: 11,
+      lineHeight: MESSAGE_PREVIEW_ROW_LAYOUT.unreadBadgeSize,
+      minWidth: MESSAGE_PREVIEW_ROW_LAYOUT.unreadBadgeSize,
       overflow: "hidden",
-      paddingHorizontal: 8,
-      paddingVertical: 5,
+      paddingHorizontal: 6,
+      textAlign: "center",
     },
     voiceButton: {
       alignItems: "center",
@@ -11225,12 +12065,12 @@ const createStyles = (theme: MobileTheme) =>
     },
     staffReferenceScreen: {
       backgroundColor: theme.isDark ? "#020805" : "#fff8ea",
-      gap: 16,
+      gap: layout.sectionGap,
       minHeight: "100%",
       overflow: "hidden",
-      paddingBottom: 232,
-      paddingHorizontal: 22,
-      paddingTop: 34,
+      paddingBottom: layout.verticalSpacing,
+      paddingHorizontal: layout.pagePadding,
+      paddingTop: layout.screenTopPadding,
       position: "relative",
     },
     staffReferenceGlow: {
@@ -11316,9 +12156,9 @@ const createStyles = (theme: MobileTheme) =>
     staffReferenceTitle: {
       color: theme.colors.foreground,
       fontFamily: mobileTypography.kufiBold,
-      fontSize: 28,
+      fontSize: layout.typography.pageTitle,
       letterSpacing: -0.3,
-      lineHeight: 38,
+      lineHeight: layout.typography.pageTitle + 10,
       textAlign: "right",
     },
     staffReferenceSubtitle: {
@@ -11759,7 +12599,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     staffReferenceBottomAction: {
       gap: 10,
-      paddingBottom: 42,
+      paddingBottom: layout.verticalSpacing,
     },
     staffReferenceCta: {
       alignItems: "center",
@@ -11799,12 +12639,12 @@ const createStyles = (theme: MobileTheme) =>
     },
     dateTimeReferenceScreen: {
       backgroundColor: theme.isDark ? "#020805" : "#fff8ea",
-      gap: 16,
+      gap: layout.sectionGap,
       minHeight: "100%",
       overflow: "hidden",
-      paddingBottom: 232,
-      paddingHorizontal: 22,
-      paddingTop: 34,
+      paddingBottom: layout.verticalSpacing,
+      paddingHorizontal: layout.pagePadding,
+      paddingTop: layout.screenTopPadding,
       position: "relative",
     },
     dateTimeSummaryCard: {
@@ -12120,16 +12960,16 @@ const createStyles = (theme: MobileTheme) =>
     },
     dateTimeBottomAction: {
       gap: 10,
-      paddingBottom: 42,
+      paddingBottom: layout.verticalSpacing,
     },
     paymentReferenceScreen: {
       backgroundColor: theme.isDark ? "#020805" : "#fff8ea",
-      gap: 16,
+      gap: layout.sectionGap,
       minHeight: "100%",
       overflow: "hidden",
-      paddingBottom: 228,
-      paddingHorizontal: 20,
-      paddingTop: 34,
+      paddingBottom: layout.verticalSpacing,
+      paddingHorizontal: layout.pagePadding,
+      paddingTop: layout.screenTopPadding,
       position: "relative",
     },
     paymentReferenceHeader: {
@@ -12184,9 +13024,9 @@ const createStyles = (theme: MobileTheme) =>
     paymentReferenceTitle: {
       color: theme.colors.foreground,
       fontFamily: mobileTypography.kufiBold,
-      fontSize: 36,
+      fontSize: layout.typography.pageTitle,
       letterSpacing: -0.6,
-      lineHeight: 48,
+      lineHeight: layout.typography.pageTitle + 10,
       textAlign: "right",
     },
     paymentReferenceSubtitle: {
@@ -12409,7 +13249,7 @@ const createStyles = (theme: MobileTheme) =>
       textAlign: "right",
     },
     paymentReferenceBottomAction: {
-      paddingBottom: 42,
+      paddingBottom: layout.verticalSpacing,
     },
     paymentReferenceCta: {
       alignItems: "center",
