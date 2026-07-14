@@ -4,6 +4,7 @@ import {
   validateCustomerPhone,
   type CustomerPhoneValidationCode,
 } from "@/features/onboarding/services/customer-phone";
+import { isMobileCustomerOnboardingComplete } from "@/features/onboarding/services/customer-onboarding-status";
 import { prisma } from "@/lib/db/prisma";
 
 type CustomerOnboardingPersonDatabase = {
@@ -31,6 +32,19 @@ type MobileCustomerOnboardingDatabase = {
         status: "ACTIVE";
       };
     }): Promise<{ phone: string | null } | null>;
+  };
+};
+
+type MobileCustomerOnboardingStatusDatabase = {
+  person: {
+    findFirst(args: {
+      select: { isOnboarded: true; phone: true };
+      where: {
+        authUserId: string;
+        deletedAt: null;
+        status: "ACTIVE";
+      };
+    }): Promise<{ isOnboarded: boolean; phone: string | null } | null>;
   };
 };
 
@@ -99,4 +113,19 @@ export async function completeMobileCustomerOnboardingProfile(
   }
 
   return { isOnboarded: true as const };
+}
+
+export async function getMobileCustomerOnboardingStatus(
+  authUserId: string,
+  database: MobileCustomerOnboardingStatusDatabase = prisma,
+) {
+  const person = await database.person.findFirst({
+    where: { authUserId, deletedAt: null, status: "ACTIVE" },
+    select: { isOnboarded: true, phone: true },
+  });
+  if (!person) throw new CustomerOnboardingUnavailableError();
+
+  return {
+    isComplete: isMobileCustomerOnboardingComplete(person),
+  };
 }

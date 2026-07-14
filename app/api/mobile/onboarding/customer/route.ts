@@ -4,6 +4,7 @@ import {
   completeMobileCustomerOnboardingProfile,
   CustomerOnboardingPhoneError,
   CustomerOnboardingUnavailableError,
+  getMobileCustomerOnboardingStatus,
 } from "@/features/onboarding/services/customer-onboarding";
 import { auth } from "@/lib/auth/auth";
 import { logServerError } from "@/lib/logging/server";
@@ -12,6 +13,51 @@ import { consumeRateLimit } from "@/lib/security/rate-limit-core";
 const NO_STORE_HEADERS = { "Cache-Control": "no-store, max-age=0" } as const;
 
 export const dynamic = "force-dynamic";
+
+export async function GET(request: Request) {
+  try {
+    const session = await auth.api.getSession({ headers: request.headers });
+    if (!session) {
+      return onboardingError(
+        "UNAUTHENTICATED",
+        "Authentication is required.",
+        401,
+      );
+    }
+
+    const rateLimit = consumeRateLimit(
+      "mobile.onboarding.customer.status",
+      `user:${session.user.id}`,
+      { limit: 30, windowMs: 60_000 },
+    );
+    if (!rateLimit.success) {
+      return onboardingError("RATE_LIMITED", "Too many requests.", 429, {
+        "Retry-After": String(rateLimit.retryAfterSeconds),
+      });
+    }
+
+    const data = await getMobileCustomerOnboardingStatus(session.user.id);
+    return NextResponse.json(
+      { data },
+      { headers: NO_STORE_HEADERS, status: 200 },
+    );
+  } catch (error) {
+    if (error instanceof CustomerOnboardingUnavailableError) {
+      return onboardingError(
+        "PROFILE_UNAVAILABLE",
+        "An active customer profile is required.",
+        403,
+      );
+    }
+
+    logServerError("mobile-customer-onboarding-status", error);
+    return onboardingError(
+      "INTERNAL_ERROR",
+      "Customer setup status could not be loaded.",
+      500,
+    );
+  }
+}
 
 export async function POST(request: Request) {
   try {
