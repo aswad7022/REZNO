@@ -3,11 +3,20 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
-      "environment": "development"
+      "environment": "development",
+      "env": {
+        "EXPO_PUBLIC_REZNO_API_BASE_URL": "https://rezno-staging.vercel.app"
+      }
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "environment": "preview",
+      "env": {
+        "EXPO_PUBLIC_REZNO_API_BASE_URL": "https://rezno-staging.vercel.app"
+      }
     },
-    "production": {}
+    "production": {
+      "environment": "production"
+    }
   }
 }
