@@ -1,21 +1,22 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
+import { forbidden, redirect } from "next/navigation";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
 
-import {
-  getAdminEmails,
-  requireAdminPermission,
-} from "@/features/admin/services/admin-auth";
+import { requireAdminPermission } from "@/features/admin/services/admin-auth";
 import { logAdminAuditEvent } from "@/features/admin/services/admin-audit";
 import {
-  getBusinessContextState,
   requireBusinessIdentity,
   requireCustomerIdentity,
-  requireActiveIdentity,
 } from "@/features/identity/server";
+import { canAccessOrganizationConversations } from "@/features/identity/policies/authorization";
+import {
+  canAccessConversation,
+  type ConversationActor,
+} from "@/features/messages/policies/conversation-access";
+import { markConversationReadForActor } from "@/features/messages/services/conversation-read";
 import { prisma } from "@/lib/db/prisma";
 import { logServerError } from "@/lib/logging/server";
 import { consumeRateLimit } from "@/lib/security/rate-limit";
@@ -97,6 +98,9 @@ export async function openBookingConversation(
   }
 
   const { membership } = await requireBusinessIdentity();
+  if (!canAccessOrganizationConversations(membership.role.systemRole)) {
+    forbidden();
+  }
   const booking = await prisma.booking.findFirst({
     where: {
       id: bookingId,
@@ -226,23 +230,29 @@ export async function sendConversationMessage(
   if (!conversation) return { status: "error", message: "المحادثة غير موجودة." };
 
   let senderUserId: string;
-  let allowed = false;
+  let actor: ConversationActor;
 
   if (role === "business") {
     const identity = await requireBusinessIdentity();
     senderUserId = identity.session.user.id;
-    allowed = conversation.businessId === identity.membership.organizationId;
+    actor = {
+      kind: "business",
+      organizationId: identity.membership.organizationId,
+      systemRole: identity.membership.role.systemRole,
+    };
   } else if (role === "customer") {
     const identity = await requireCustomerIdentity();
     senderUserId = identity.session.user.id;
-    allowed = conversation.customerId === identity.person.id;
+    actor = { kind: "customer", personId: identity.person.id };
   } else {
     const { identity } = await requireAdminPermission("MESSAGES_SEND");
     senderUserId = identity.session.user.id;
-    allowed = true;
+    actor = { kind: "admin", userId: senderUserId };
   }
 
-  if (!allowed) return { status: "error", message: "لا تملك صلاحية الرد." };
+  if (!canAccessConversation(conversation, actor)) {
+    return { status: "error", message: "لا تملك صلاحية الرد." };
+  }
   const rateLimit = consumeRateLimit("message:send", senderUserId, {
     limit: 20,
     windowMs: 60_000,
@@ -360,11 +370,20 @@ export async function startAdminConversation(
   const targetExists =
     parsed.data.targetType === "USER"
       ? await prisma.person.findFirst({
-          where: { id: parsed.data.personId, deletedAt: null },
+          where: {
+            id: parsed.data.personId,
+            deletedAt: null,
+            status: "ACTIVE",
+          },
           select: { id: true },
         })
       : await prisma.organization.findFirst({
-          where: { id: parsed.data.businessId, deletedAt: null },
+          where: {
+            id: parsed.data.businessId,
+            deletedAt: null,
+            isActive: true,
+            status: "ACTIVE",
+          },
           select: { id: true },
         });
   if (!targetExists) {
@@ -417,39 +436,34 @@ export async function startAdminConversation(
   return { status: "success", message: "تم إرسال الرسالة." };
 }
 
-export async function markConversationRead(conversationId: string) {
-  const identity = await requireActiveIdentity();
-  const sessionEmail = identity.session.user.email?.trim().toLowerCase();
-  const isAdmin =
-    Boolean(sessionEmail) && getAdminEmails().has(sessionEmail as string);
-  const businessContext = isAdmin ? null : await getBusinessContextState();
-  const activeBusinessId =
-    businessContext?.status === "ready"
-      ? businessContext.membership.organizationId
-      : null;
-  const allowedConversation = await prisma.conversation.findFirst({
-    where: {
-      id: conversationId,
-      ...(isAdmin
-        ? {}
-        : {
-            OR: [
-              { customerId: identity.person.id },
-              ...(activeBusinessId ? [{ businessId: activeBusinessId }] : []),
-              { adminUserId: identity.session.user.id },
-            ],
-          }),
-    },
-    select: { id: true },
-  });
-  if (!allowedConversation) return;
+export async function markConversationRead(
+  role: DashboardRole | "admin",
+  conversationId: string,
+) {
+  let actor: ConversationActor;
+  let currentUserId: string;
 
-  await prisma.message.updateMany({
-    where: {
-      conversationId,
-      senderUserId: { not: identity.session.user.id },
-      readAt: null,
-    },
-    data: { readAt: new Date() },
+  if (role === "admin") {
+    const { identity } = await requireAdminPermission("MESSAGES_VIEW");
+    currentUserId = identity.session.user.id;
+    actor = { kind: "admin", userId: currentUserId };
+  } else if (role === "business") {
+    const identity = await requireBusinessIdentity();
+    currentUserId = identity.session.user.id;
+    actor = {
+      kind: "business",
+      organizationId: identity.membership.organizationId,
+      systemRole: identity.membership.role.systemRole,
+    };
+  } else {
+    const identity = await requireCustomerIdentity();
+    currentUserId = identity.session.user.id;
+    actor = { kind: "customer", personId: identity.person.id };
+  }
+
+  await markConversationReadForActor({
+    actor,
+    conversationId,
+    currentUserId,
   });
 }

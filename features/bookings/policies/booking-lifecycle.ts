@@ -1,5 +1,6 @@
 import type { BookingStatus, SystemRole } from "@prisma/client";
 
+import { canOperateBookings as canOperateBookingsFromIdentityPolicy } from "@/features/identity/policies/authorization";
 import type { BookingLifecycleStatus } from "@/features/bookings/types";
 
 const transitions: Readonly<
@@ -13,11 +14,7 @@ const transitions: Readonly<
 };
 
 export function canOperateBookings(systemRole: SystemRole | null): boolean {
-  return (
-    systemRole === "OWNER" ||
-    systemRole === "MANAGER" ||
-    systemRole === "RECEPTIONIST"
-  );
+  return canOperateBookingsFromIdentityPolicy(systemRole);
 }
 
 export function canTransitionBooking(

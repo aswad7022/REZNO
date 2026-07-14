@@ -59,6 +59,8 @@ async function notifyEligibleMerchants(
   const members = await transaction.organizationMember.findMany({
     where: {
       organizationId: order.store.organizationId,
+      deletedAt: null,
+      status: "ACTIVE",
       organization: { deletedAt: null, isActive: true, status: "ACTIVE" },
       person: { deletedAt: null, isOnboarded: true, status: "ACTIVE" },
       role: {

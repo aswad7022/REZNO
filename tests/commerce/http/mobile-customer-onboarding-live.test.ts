@@ -87,6 +87,10 @@ test(
       (unauthenticated.body.error as { code: string }).code,
       "UNAUTHENTICATED",
     );
+    const unauthenticatedStatus = await request(
+      "/api/mobile/onboarding/customer",
+    );
+    assert.equal(unauthenticatedStatus.response.status, 401);
 
     const cartBeforeOnboarding = await request(
       "/api/commerce/customer/cart",
@@ -102,6 +106,13 @@ test(
     assert.equal(caller.isOnboarded, false);
     assert.equal(caller.phone, null);
     assert.equal(untouched.isOnboarded, false);
+
+    const incompleteStatus = await request(
+      "/api/mobile/onboarding/customer",
+      { cookie: callerCookie },
+    );
+    assert.equal(incompleteStatus.response.status, 200);
+    assert.deepEqual(incompleteStatus.body.data, { isComplete: false });
 
     const missingPhone = await request("/api/mobile/onboarding/customer", {
       cookie: callerCookie,
@@ -149,6 +160,20 @@ test(
       "a forged identity body must not onboard another Person",
     );
 
+    const completeStatus = await request(
+      "/api/mobile/onboarding/customer",
+      { cookie: callerCookie },
+    );
+    assert.equal(completeStatus.response.status, 200);
+    assert.deepEqual(completeStatus.body.data, { isComplete: true });
+
+    const untouchedStatus = await request(
+      "/api/mobile/onboarding/customer",
+      { cookie: untouchedCookie },
+    );
+    assert.equal(untouchedStatus.response.status, 200);
+    assert.deepEqual(untouchedStatus.body.data, { isComplete: false });
+
     const replay = await request("/api/mobile/onboarding/customer", {
       cookie: callerCookie,
       method: "POST",
@@ -191,5 +216,10 @@ test(
       ).isOnboarded,
       false,
     );
+    const inactiveStatus = await request(
+      "/api/mobile/onboarding/customer",
+      { cookie: inactiveCookie },
+    );
+    assert.equal(inactiveStatus.response.status, 403);
   },
 );

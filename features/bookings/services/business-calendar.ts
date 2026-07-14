@@ -193,6 +193,8 @@ export async function getBusinessCalendarData(
     prisma.organizationMember.findMany({
       where: {
         organizationId,
+        deletedAt: null,
+        status: "ACTIVE",
         ...(membership.role.systemRole === "STAFF"
           ? { id: membership.id }
           : {}),

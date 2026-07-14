@@ -109,6 +109,8 @@ async function getActiveBusinessMemberships(personId: string) {
   const memberships = await prisma.organizationMember.findMany({
     where: {
       personId,
+      deletedAt: null,
+      status: "ACTIVE",
       organization: {
         deletedAt: null,
         isActive: true,

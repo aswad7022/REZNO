@@ -1,11 +1,15 @@
 import "server-only";
 
+import { forbidden } from "next/navigation";
+
 import { requireAdminPermission } from "@/features/admin/services/admin-auth";
+import { canAccessOrganizationConversations } from "@/features/identity/policies/authorization";
 import {
   requireBusinessIdentity,
   requireCustomerIdentity,
 } from "@/features/identity/server";
 import { prisma } from "@/lib/db/prisma";
+import { adminConversationWhere } from "@/features/messages/policies/conversation-access";
 import type { DashboardRole } from "@/types/dashboard";
 
 export interface DashboardMessagePreview {
@@ -46,6 +50,10 @@ const previewInclude = {
     take: 1,
   },
 };
+
+function requireBusinessMessagingRole(systemRole: import("@prisma/client").SystemRole | null) {
+  if (!canAccessOrganizationConversations(systemRole)) forbidden();
+}
 
 function toPreview({
   conversation,
@@ -100,7 +108,10 @@ export async function getDashboardMessagePreviews(
   if (role === "customer") {
     const { person, session } = await requireCustomerIdentity();
     const conversations = await prisma.conversation.findMany({
-      where: { customerId: person.id, type: "CUSTOMER_BUSINESS" },
+      where: {
+        customerId: person.id,
+        type: { in: ["CUSTOMER_BUSINESS", "ADMIN_USER"] },
+      },
       include: previewInclude,
       orderBy: { updatedAt: "desc" },
       take: limit,
@@ -118,10 +129,11 @@ export async function getDashboardMessagePreviews(
 
   if (role === "business") {
     const { membership, session } = await requireBusinessIdentity();
+    requireBusinessMessagingRole(membership.role.systemRole);
     const conversations = await prisma.conversation.findMany({
       where: {
         businessId: membership.organizationId,
-        type: "CUSTOMER_BUSINESS",
+        type: { in: ["CUSTOMER_BUSINESS", "ADMIN_BUSINESS"] },
       },
       include: previewInclude,
       orderBy: { updatedAt: "desc" },
@@ -140,13 +152,7 @@ export async function getDashboardMessagePreviews(
 
   const { identity } = await requireAdminPermission("MESSAGES_VIEW");
   const conversations = await prisma.conversation.findMany({
-    where: {
-      OR: [
-        { type: "ADMIN_USER" },
-        { type: "ADMIN_BUSINESS" },
-        { adminUserId: identity.session.user.id },
-      ],
-    },
+    where: adminConversationWhere(identity.session.user.id),
     include: previewInclude,
     orderBy: { updatedAt: "desc" },
     take: limit,
@@ -167,7 +173,10 @@ export async function getMessagesPageData(role: DashboardRole | "admin") {
     const { person } = await requireCustomerIdentity();
     const [conversations, businesses] = await Promise.all([
       prisma.conversation.findMany({
-        where: { customerId: person.id },
+        where: {
+          customerId: person.id,
+          type: { in: ["CUSTOMER_BUSINESS", "ADMIN_USER"] },
+        },
         include: conversationInclude,
         orderBy: { updatedAt: "desc" },
         take: 30,
@@ -189,8 +198,12 @@ export async function getMessagesPageData(role: DashboardRole | "admin") {
 
   if (role === "business") {
     const { membership } = await requireBusinessIdentity();
+    requireBusinessMessagingRole(membership.role.systemRole);
     const conversations = await prisma.conversation.findMany({
-      where: { businessId: membership.organizationId },
+      where: {
+        businessId: membership.organizationId,
+        type: { in: ["CUSTOMER_BUSINESS", "ADMIN_BUSINESS"] },
+      },
       include: conversationInclude,
       orderBy: { updatedAt: "desc" },
       take: 30,
@@ -198,9 +211,10 @@ export async function getMessagesPageData(role: DashboardRole | "admin") {
     return { conversations, businesses: [], users: [] };
   }
 
-  await requireAdminPermission("MESSAGES_VIEW");
+  const { identity } = await requireAdminPermission("MESSAGES_VIEW");
   const [conversations, businesses, users] = await Promise.all([
     prisma.conversation.findMany({
+      where: adminConversationWhere(identity.session.user.id),
       include: conversationInclude,
       orderBy: { updatedAt: "desc" },
       take: 100,
@@ -236,20 +250,24 @@ export async function getUnreadMessageCount(role: DashboardRole | "admin") {
       where: {
         readAt: null,
         senderUserId: { not: session.user.id },
-        conversation: { customerId: person.id, type: "CUSTOMER_BUSINESS" },
+        conversation: {
+          customerId: person.id,
+          type: { in: ["CUSTOMER_BUSINESS", "ADMIN_USER"] },
+        },
       },
     });
   }
 
   if (role === "business") {
     const { membership, session } = await requireBusinessIdentity();
+    requireBusinessMessagingRole(membership.role.systemRole);
     return prisma.message.count({
       where: {
         readAt: null,
         senderUserId: { not: session.user.id },
         conversation: {
           businessId: membership.organizationId,
-          type: "CUSTOMER_BUSINESS",
+          type: { in: ["CUSTOMER_BUSINESS", "ADMIN_BUSINESS"] },
         },
       },
     });
@@ -261,13 +279,7 @@ export async function getUnreadMessageCount(role: DashboardRole | "admin") {
     where: {
       readAt: null,
       senderUserId: { not: session.user.id },
-      conversation: {
-        OR: [
-          { type: "ADMIN_USER" },
-          { type: "ADMIN_BUSINESS" },
-          { adminUserId: session.user.id },
-        ],
-      },
+      conversation: adminConversationWhere(session.user.id),
     },
   });
 }

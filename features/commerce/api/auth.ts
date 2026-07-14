@@ -46,6 +46,8 @@ export async function resolveMerchantApiContext(
   const memberships = await prisma.organizationMember.findMany({
     where: {
       personId: identity.personId,
+      deletedAt: null,
+      status: "ACTIVE",
       organization: { deletedAt: null, isActive: true, status: "ACTIVE" },
     },
     select: { organizationId: true, role: { select: { organizationId: true } } },

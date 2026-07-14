@@ -37,6 +37,7 @@ test("mobile onboarding accepts only a phone from the body and keeps auth, rate-
 
   assert.match(service, /import "server-only"/);
   assert.match(service, /completeMobileCustomerOnboardingProfile/);
+  assert.match(service, /getMobileCustomerOnboardingStatus/);
   assert.match(service, /validateCustomerPhone/);
   assert.match(service, /submittedPhone === undefined \? person\.phone/);
   assert.match(service, /phone: phone\.value/);
@@ -45,6 +46,8 @@ test("mobile onboarding accepts only a phone from the body and keeps auth, rate-
   assert.match(service, /data: \{ isOnboarded: true \}/);
   assert.match(service, /result\.count !== 1/);
   assert.match(route, /auth\.api\.getSession\(\{ headers: request\.headers \}\)/);
+  assert.match(route, /export async function GET/);
+  assert.match(route, /getMobileCustomerOnboardingStatus\(session\.user\.id\)/);
   assert.match(
     route,
     /completeMobileCustomerOnboardingProfile\(\s*session\.user\.id,\s*phone/,
@@ -62,6 +65,7 @@ test("mobile onboarding accepts only a phone from the body and keeps auth, rate-
   assert.match(route, /"Cache-Control": "no-store, max-age=0"/);
   assert.match(webAction, /completeCustomerOnboardingProfile\(session\.user\.id\)/);
   assert.match(mobileClient, /authenticated:\s*true/);
+  assert.match(mobileClient, /getMobileCustomerOnboardingStatus/);
   assert.match(mobileClient, /body:\s*phone === undefined \? \{\} : \{ phone \}/);
   assert.match(mobileClient, /method:\s*"POST"/);
   assert.match(mobileClient, /AbortController/);

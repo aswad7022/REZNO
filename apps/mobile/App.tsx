@@ -17,7 +17,10 @@ import {
 } from "react-native";
 
 import { fetchMobileMarketplace } from "./src/api/marketplace";
-import { completeMobileCustomerOnboarding } from "./src/api/onboarding";
+import {
+  completeMobileCustomerOnboarding,
+  getMobileCustomerOnboardingStatus,
+} from "./src/api/onboarding";
 import { commerceApi } from "./src/api/commerce";
 import { MobileApiRequestError } from "./src/api/client";
 import {
@@ -25,6 +28,21 @@ import {
   signOutMobile,
 } from "./src/auth/client";
 import type { MobileAuthMode } from "./src/auth/form";
+import {
+  completeInformationalWelcome,
+  resolveAuthenticatedStartup,
+  resolveGuestStartup,
+  resolveStartupError,
+  signedOutStartup,
+  startupWelcomeCompleted,
+  toMobileAuthSession,
+  type MobileStartupAuthSession,
+  type MobileStartupState,
+} from "./src/onboarding/startup-state";
+import {
+  persistWelcomeCompleted,
+  readWelcomeCompleted,
+} from "./src/onboarding/welcome-preference";
 import { commerceNotificationOrderDestination } from "./src/commerce/notification-navigation";
 import {
   BottomTabBar,
@@ -172,12 +190,6 @@ type VisualBooking = {
 };
 
 type MobileThemeMode = "system" | "light" | "dark";
-
-type MobileAuthSessionState =
-  | { status: "authenticated"; user: MobileAuthUser }
-  | { status: "error" }
-  | { status: "loading" }
-  | { status: "unauthenticated" };
 
 type DevMenuPreferencesModule = {
   getPreferencesAsync(): Promise<{ showFloatingActionButton?: boolean }>;
@@ -674,14 +686,10 @@ export default function App() {
   const [visualCancelledBookingIds, setVisualCancelledBookingIds] = useState<
     string[]
   >([]);
-  const [showOnboarding, setShowOnboarding] = useState(true);
-  const [authMode, setAuthMode] = useState<MobileAuthMode | null>(null);
-  const [authSession, setAuthSession] = useState<MobileAuthSessionState>({
-    status: "loading",
+  const [startupState, setStartupState] = useState<MobileStartupState>({
+    kind: "BOOTSTRAPPING",
   });
-  const [authSetupUser, setAuthSetupUser] = useState<MobileAuthUser | null>(
-    null,
-  );
+  const [authMode, setAuthMode] = useState<MobileAuthMode | null>(null);
   const [authSetupPending, setAuthSetupPending] = useState(false);
   const authSetupAttempt = useRef(0);
   const [authActionError, setAuthActionError] = useState<string | null>(null);
@@ -698,54 +706,68 @@ export default function App() {
   const styles = useMemo(() => createStyles(theme), [theme]);
   const text = labels[locale];
   const isRtl = getTextDirection(locale) === "rtl";
+  const authSession = toMobileAuthSession(startupState);
+  const authSetupUser =
+    startupState.kind === "AUTHENTICATED_PROFILE_INCOMPLETE"
+      ? startupState.user
+      : null;
+  const showOnboarding =
+    startupState.kind === "GUEST_WELCOME_NOT_COMPLETED";
+
+  const restoreStartup = useCallback(async () => {
+    // Keep the effect as an external-session synchronization boundary. State
+    // updates begin after the async boundary rather than during effect setup.
+    await Promise.resolve();
+    const sessionAttempt = ++authSetupAttempt.current;
+    let welcomeCompleted = false;
+    let restoredUser: MobileAuthUser | undefined;
+
+    setStartupState({ kind: "BOOTSTRAPPING" });
+    setAuthActionError(null);
+    setAuthSetupPending(false);
+
+    try {
+      welcomeCompleted = await readWelcomeCompleted();
+      const result = await getMobileSession();
+      if (authSetupAttempt.current !== sessionAttempt) return;
+
+      if (result.error) {
+        setStartupState(resolveStartupError(welcomeCompleted));
+        return;
+      }
+
+      if (!result.data?.user) {
+        setStartupState(resolveGuestStartup(welcomeCompleted));
+        return;
+      }
+
+      restoredUser = result.data.user;
+      const profile = await getMobileCustomerOnboardingStatus();
+      if (authSetupAttempt.current !== sessionAttempt) return;
+      setStartupState(
+        resolveAuthenticatedStartup(
+          restoredUser,
+          profile.isComplete,
+          welcomeCompleted,
+        ),
+      );
+    } catch {
+      if (authSetupAttempt.current === sessionAttempt) {
+        setStartupState(resolveStartupError(welcomeCompleted, restoredUser));
+      }
+    }
+  }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    const sessionAttempt = ++authSetupAttempt.current;
-
-    void getMobileSession()
-      .then(async (result) => {
-        if (cancelled || authSetupAttempt.current !== sessionAttempt) return;
-
-        if (result.error) {
-          setAuthSession({ status: "error" });
-          return;
-        }
-
-        if (!result.data?.user) {
-          setAuthSession({ status: "unauthenticated" });
-          return;
-        }
-
-        const user = result.data.user;
-        setAuthSession({ status: "authenticated", user });
-        setAuthSetupUser(user);
-        setAuthSetupPending(true);
-        try {
-          await completeMobileCustomerOnboarding();
-          if (!cancelled && authSetupAttempt.current === sessionAttempt) {
-            setAuthSetupUser(null);
-          }
-        } catch {
-          if (!cancelled && authSetupAttempt.current === sessionAttempt) {
-            setAuthSetupUser(user);
-          }
-        } finally {
-          if (!cancelled && authSetupAttempt.current === sessionAttempt) {
-            setAuthSetupPending(false);
-          }
-        }
-      })
-      .catch(() => {
-        if (!cancelled && authSetupAttempt.current === sessionAttempt) {
-          setAuthSession({ status: "error" });
-        }
-      });
+    const bootstrapTimer = setTimeout(() => {
+      void restoreStartup();
+    }, 0);
 
     return () => {
-      cancelled = true;
+      clearTimeout(bootstrapTimer);
+      authSetupAttempt.current += 1;
     };
-  }, []);
+  }, [restoreStartup]);
 
   useEffect(() => {
     if ((!showOnboarding && activeTab !== "bookings") || !DEV_MENU_PREFERENCES) {
@@ -921,35 +943,61 @@ export default function App() {
     setActiveTab(tabId);
   };
 
+  const completeWelcome = async () => {
+    await persistWelcomeCompleted();
+    setStartupState((current) => completeInformationalWelcome(current));
+  };
+
   const handleEnterApp = () => {
     if (marketplaceState.status === "idle") {
       loadMarketplace();
     }
 
-    setShowOnboarding(false);
+    void completeWelcome().catch(() => {
+      setStartupState((current) =>
+        resolveStartupError(startupWelcomeCompleted(current)),
+      );
+    });
   };
 
   const handleOpenAuth = (mode: MobileAuthMode) => {
     setAuthActionError(null);
-    setAuthMode(mode);
+    const open = async () => {
+      if (startupState.kind === "GUEST_WELCOME_NOT_COMPLETED") {
+        await completeWelcome();
+      }
+      setAuthMode(mode);
+    };
+    void open().catch(() => {
+      setStartupState((current) =>
+        resolveStartupError(startupWelcomeCompleted(current)),
+      );
+    });
   };
 
   const handleAuthSuccess = async (user: MobileAuthUser, phone?: string) => {
     const setupAttempt = ++authSetupAttempt.current;
-    setAuthSession({ status: "authenticated", user });
-    setAuthSetupUser(user);
+    const welcomeCompleted = startupWelcomeCompleted(startupState);
+    setStartupState(
+      resolveAuthenticatedStartup(user, false, welcomeCompleted),
+    );
     setAuthSetupPending(true);
     setAuthActionError(null);
 
     try {
       await completeMobileCustomerOnboarding(phone);
       if (authSetupAttempt.current !== setupAttempt) return false;
-      setAuthSetupUser(null);
+      setStartupState(
+        resolveAuthenticatedStartup(user, true, welcomeCompleted),
+      );
       setAuthMode(null);
-      setShowOnboarding(false);
       return true;
     } catch {
-      if (authSetupAttempt.current === setupAttempt) setAuthSetupUser(user);
+      if (authSetupAttempt.current === setupAttempt) {
+        setStartupState(
+          resolveAuthenticatedStartup(user, false, welcomeCompleted),
+        );
+      }
       return false;
     } finally {
       if (authSetupAttempt.current === setupAttempt) {
@@ -973,8 +1021,8 @@ export default function App() {
         return;
       }
 
-      setAuthSession({ status: "unauthenticated" });
-      setAuthSetupUser(null);
+      setStartupState((current) => signedOutStartup(current));
+      setAuthMode(null);
       setAuthSetupPending(false);
     } catch {
       setAuthActionError(mobileAuthCopy[locale].authFailure);
@@ -1116,16 +1164,51 @@ export default function App() {
     );
   }
 
-  if (authMode) {
+  if (startupState.kind === "BOOTSTRAPPING") {
+    return (
+      <SafeAreaView style={styles.shell}>
+        <StatusBar style={theme.isDark ? "light" : "dark"} />
+        <View style={styles.fontLoadingScreen} />
+      </SafeAreaView>
+    );
+  }
+
+  if (startupState.kind === "AUTH_ERROR_RETRYABLE") {
+    return (
+      <SafeAreaView style={styles.shell}>
+        <StatusBar style={theme.isDark ? "light" : "dark"} />
+        <View style={styles.startupErrorScreen}>
+          <Text style={styles.startupErrorText}>
+            {mobileAuthCopy[locale].sessionError}
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => void restoreStartup()}
+            style={styles.startupRetryButton}
+          >
+            <Text style={styles.startupRetryText}>إعادة المحاولة</Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (authMode || authSetupUser) {
     return (
       <SafeAreaView style={styles.shell}>
         <StatusBar style={theme.isDark ? "light" : "dark"} />
         <MobileAuthScreen
-          initialMode={authMode}
+          initialMode={authMode ?? "signin"}
           initialSetupUser={authSetupUser}
           locale={locale}
           onAuthenticated={handleAuthSuccess}
-          onBack={() => setAuthMode(null)}
+          onBack={() => {
+            if (authSetupUser) {
+              void handleSignOut();
+            } else {
+              setAuthMode(null);
+            }
+          }}
           theme={theme}
         />
       </SafeAreaView>
@@ -4615,7 +4698,7 @@ function AccountScreen({
   themeMode,
 }: {
   authActionError: string | null;
-  authSession: MobileAuthSessionState;
+  authSession: MobileStartupAuthSession;
   authSetupPending: boolean;
   authSetupUser: MobileAuthUser | null;
   isRtl: boolean;
@@ -10643,6 +10726,30 @@ const createStyles = (theme: MobileTheme) =>
     fontLoadingScreen: {
       backgroundColor: theme.colors.background,
       flex: 1,
+    },
+    startupErrorScreen: {
+      alignItems: "center",
+      flex: 1,
+      gap: 16,
+      justifyContent: "center",
+      padding: 24,
+    },
+    startupErrorText: {
+      color: theme.colors.foreground,
+      fontFamily: mobileTypography.uiRegular,
+      fontSize: 16,
+      textAlign: "center",
+    },
+    startupRetryButton: {
+      backgroundColor: theme.colors.accent,
+      borderRadius: theme.radii.pill,
+      paddingHorizontal: 22,
+      paddingVertical: 12,
+    },
+    startupRetryText: {
+      color: theme.colors.foregroundInverse,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: 14,
     },
     statusBadge: {
       alignSelf: "flex-start",

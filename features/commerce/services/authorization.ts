@@ -1,5 +1,6 @@
 import type { AdminPermission } from "@/features/admin/config/permissions";
 import { commerceError } from "@/features/commerce/domain/errors";
+import { hasCommercePermission } from "@/features/identity/policies/authorization";
 import { prisma } from "@/lib/db/prisma";
 import type { CommercePermission, Prisma } from "@prisma/client";
 
@@ -30,20 +31,28 @@ export async function resolveMerchantCommerceContext(
     where: {
       organizationId: identity.organizationId,
       personId: identity.personId,
+      deletedAt: null,
+      status: "ACTIVE",
       organization: { deletedAt: null, isActive: true, status: "ACTIVE" },
       role: { organizationId: identity.organizationId },
     },
     select: {
       organizationId: true,
       personId: true,
-      role: { select: { commercePermissions: true } },
+      role: { select: { commercePermissions: true, systemRole: true } },
     },
   });
 
   if (!membership) {
     return commerceError("FORBIDDEN", "No active Organization membership was found.");
   }
-  if (!membership.role.commercePermissions.includes(permission)) {
+  if (
+    !hasCommercePermission({
+      commercePermissions: membership.role.commercePermissions,
+      permission,
+      systemRole: membership.role.systemRole,
+    })
+  ) {
     return commerceError("FORBIDDEN", `Missing commerce permission ${permission}.`);
   }
 

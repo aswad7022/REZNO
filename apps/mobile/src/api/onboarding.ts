@@ -5,6 +5,19 @@ type CustomerOnboardingResponse = {
   data: { isOnboarded: true };
 };
 
+type CustomerOnboardingStatusResponse = {
+  data: { isComplete: boolean };
+};
+
+export async function getMobileCustomerOnboardingStatus() {
+  return (
+    await mobileApiRequest<CustomerOnboardingStatusResponse>(
+      "/api/mobile/onboarding/customer",
+      { authenticated: true, method: "GET" },
+    )
+  ).data;
+}
+
 export async function completeMobileCustomerOnboarding(phone?: string) {
   const controller = new AbortController();
   const timeout = setTimeout(

@@ -1,5 +1,6 @@
 import type { SystemRole } from "@prisma/client";
 
-export function canManageOrganization(systemRole: SystemRole | null): boolean {
-  return systemRole === "OWNER" || systemRole === "MANAGER";
-}
+export { canManageOrganization } from "@/features/identity/policies/authorization";
+
+// Preserve this type import for downstream declaration output.
+export type OrganizationSystemRole = SystemRole;
