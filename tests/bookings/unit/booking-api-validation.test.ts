@@ -5,6 +5,9 @@ import { BookingApiError, mapBookingApiError } from "../../../features/bookings/
 import {
   parseAvailabilityQuery,
   parseBookingIdempotencyKey,
+  parseCancelBookingRequest,
+  parseChangeBookingRequest,
+  parseCustomerBookingListQuery,
   parseCreateBookingRequest,
 } from "../../../features/bookings/api/validation";
 import { BookingDomainError } from "../../../features/bookings/domain/errors";
@@ -50,6 +53,58 @@ test("booking API validates exact create DTOs and canonical timestamps", async (
       }),
     ),
     (error) => error instanceof BookingApiError && error.code === "INVALID_REQUEST",
+  );
+});
+
+test("management list, cancellation, and change DTOs are strict and bounded", async () => {
+  assert.deepEqual(
+    parseCustomerBookingListQuery(
+      new URLSearchParams({ tab: "upcoming", limit: "20" }),
+    ),
+    { tab: "upcoming", cursor: null, limit: 20 },
+  );
+  assert.throws(
+    () => parseCustomerBookingListQuery(new URLSearchParams("tab=all&tab=completed")),
+    (error) => error instanceof BookingApiError && error.code === "INVALID_REQUEST",
+  );
+  assert.throws(
+    () => parseCustomerBookingListQuery(new URLSearchParams({ tab: "history" })),
+    (error) => error instanceof BookingApiError && error.code === "INVALID_REQUEST",
+  );
+  assert.deepEqual(
+    await parseCancelBookingRequest(
+      new Request("https://rezno.invalid/cancel", {
+        body: JSON.stringify({ reason: "  schedule changed  " }),
+        method: "POST",
+      }),
+    ),
+    { reason: "schedule changed" },
+  );
+  await assert.rejects(
+    parseCancelBookingRequest(
+      new Request("https://rezno.invalid/cancel", {
+        body: JSON.stringify({ reason: "x", status: "CANCELLED" }),
+        method: "POST",
+      }),
+    ),
+    (error) => error instanceof BookingApiError && error.code === "INVALID_REQUEST",
+  );
+  assert.deepEqual(
+    await parseChangeBookingRequest(
+      new Request("https://rezno.invalid/change", {
+        body: JSON.stringify({
+          date: "2026-07-20",
+          memberId,
+          startsAt: "2026-07-20T07:00:00.000Z",
+        }),
+        method: "POST",
+      }),
+    ),
+    {
+      date: "2026-07-20",
+      memberId,
+      startsAt: "2026-07-20T07:00:00.000Z",
+    },
   );
 });
 
