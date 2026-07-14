@@ -6,6 +6,8 @@ import {
   createMobileBookingSubmissionGate,
   EMPTY_BOOKING_SELECTION,
   mobileBookingFailureRecovery,
+  mergeMobileBookingPage,
+  mobileBookingManagementFailure,
   nextBookingDates,
   selectMobileBookingBranch,
   selectMobileBookingDate,
@@ -99,4 +101,42 @@ test("mobile submission recovery distinguishes conflicts, authentication, and ne
     requiresAuthentication: false,
     returnToSlots: false,
   });
+});
+
+test("mobile management pagination de-duplicates and classifies recovery", () => {
+  const booking = {
+    id: "booking",
+    reference: "RZ-BOOKING",
+    businessName: "Business",
+    branchName: "Branch",
+    serviceName: "Service",
+    memberName: null,
+    startsAt: "2026-07-20T08:00:00.000Z",
+    endsAt: "2026-07-20T08:30:00.000Z",
+    timezone: "Asia/Baghdad",
+    price: "25000",
+    status: "CONFIRMED" as const,
+    createdAt: "2026-07-14T08:00:00.000Z",
+    cancellation: {
+      eligible: true,
+      deadline: "2026-07-19T08:00:00.000Z",
+      cancelledAt: null,
+    },
+    changeRequest: null,
+  };
+  const merged = mergeMobileBookingPage([booking], {
+    items: [{ ...booking, status: "CANCELLED", cancellation: { ...booking.cancellation, eligible: false } }],
+    nextCursor: null,
+    counts: { all: 1, upcoming: 0, completed: 0, cancelled: 1 },
+  }, true);
+  assert.equal(merged.length, 1);
+  assert.equal(merged[0]?.status, "CANCELLED");
+  assert.deepEqual(mobileBookingManagementFailure("UNAUTHENTICATED"), {
+    sessionExpired: true,
+    conflict: false,
+  });
+  assert.equal(
+    mobileBookingManagementFailure("BOOKING_STATE_CONFLICT").conflict,
+    true,
+  );
 });

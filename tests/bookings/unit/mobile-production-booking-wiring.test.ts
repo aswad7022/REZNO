@@ -8,11 +8,28 @@ test("production mobile booking routes to the API screen and never falls back to
     "utf8",
   );
   assert.match(source, /<CustomerBookingCreationScreen/);
-  assert.match(source, /if \(!__DEV__\) return \[\];/);
+  assert.match(source, /<CustomerBookingManagementScreen/);
+  assert.doesNotMatch(source, /bookingVisualQaFixtures/);
+  assert.doesNotMatch(source, /managedBookings/);
   assert.doesNotMatch(
     source,
     /selectedBusiness && !bookingFlowStep \? \(\s*<SalonDetailScreen/,
   );
+});
+
+test("mobile booking management exposes persisted list, detail, mutations, refresh, and recovery", async () => {
+  const source = await readFile(
+    new URL("../../../apps/mobile/src/screens/customer-booking-management-screen.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(source, /fetchMobileManagedBookings/);
+  assert.match(source, /fetchMobileBookingDetail/);
+  assert.match(source, /cancelMobileBooking/);
+  assert.match(source, /requestMobileBookingChange/);
+  assert.match(source, /refreshAuthoritative/);
+  assert.match(source, /mobileBookingManagementFailure/);
+  assert.match(source, /mergeMobileBookingPage/);
+  assert.doesNotMatch(source, /VisualBooking/);
 });
 
 test("mobile booking screen exposes loading, retry, persisted success, and recovery wiring", async () => {

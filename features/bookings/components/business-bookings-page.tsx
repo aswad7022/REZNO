@@ -110,6 +110,20 @@ async function BusinessBookingCard({
         timeStyle: "short",
         hour12: true,
       })}
+      formattedPendingChange={
+        booking.pendingChange
+          ? format.dateTimeRange(
+              booking.pendingChange.startsAt,
+              booking.pendingChange.endsAt,
+              {
+                timeZone: booking.timezone,
+                dateStyle: "medium",
+                timeStyle: "short",
+                hour12: true,
+              },
+            )
+          : undefined
+      }
       labels={{
         status: t(`statuses.${booking.status}`),
         customer: t("customer"),
@@ -133,6 +147,7 @@ async function BusinessBookingCard({
       rejectChange: t("changeRequest.reject"),
       pendingChangeStaff: t("staff"),
       waitingForCustomer: t("changeRequest.waiting"),
+      waitingForBusiness: t("changeRequest.waitingForBusiness"),
         transitions: {
           CONFIRMED: t("actions.CONFIRMED"),
           CANCELLED: t("actions.CANCELLED"),

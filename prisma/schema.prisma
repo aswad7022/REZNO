@@ -403,42 +403,45 @@ model BlockedTime {
 }
 
 model Booking {
-  id                    String                        @id @default(uuid()) @db.Uuid
-  organizationId        String                        @db.Uuid
-  branchId              String                        @db.Uuid
-  customerId            String                        @db.Uuid
-  branchServiceId       String                        @db.Uuid
-  memberId              String?                       @db.Uuid
-  status                BookingStatus                 @default(CONFIRMED)
-  startsAt              DateTime                      @db.Timestamptz(6)
-  endsAt                DateTime                      @db.Timestamptz(6)
-  serviceNameSnapshot   String
-  customerNameSnapshot  String
-  priceSnapshot         Decimal                       @db.Decimal(10, 2)
-  notes                 String?
-  cancellationReason    String?
-  cancelledAt           DateTime?                     @db.Timestamptz(6)
-  creationIdempotencyKey String?                       @db.Uuid
-  creationRequestHash   String?                        @db.VarChar(64)
-  createdAt             DateTime                      @default(now()) @db.Timestamptz(6)
-  updatedAt             DateTime                      @updatedAt @db.Timestamptz(6)
-  organization          Organization                  @relation(fields: [organizationId], references: [id])
-  branch                Branch                        @relation(fields: [branchId], references: [id])
-  customer              Person                        @relation("BookingCustomer", fields: [customerId], references: [id])
-  branchService         BranchService                 @relation(fields: [branchServiceId], references: [id])
-  member                OrganizationMember?           @relation(fields: [memberId], references: [id])
-  statusHistory         BookingStatusHistory[]
-  changeRequests        BookingChangeRequest[]
-  review                Review?
-  restaurantReservation RestaurantReservationDetails?
-  conversations         Conversation[]
+  id                                 String                        @id @default(uuid()) @db.Uuid
+  organizationId                     String                        @db.Uuid
+  branchId                           String                        @db.Uuid
+  customerId                         String                        @db.Uuid
+  branchServiceId                    String                        @db.Uuid
+  memberId                           String?                       @db.Uuid
+  status                             BookingStatus                 @default(CONFIRMED)
+  startsAt                           DateTime                      @db.Timestamptz(6)
+  endsAt                             DateTime                      @db.Timestamptz(6)
+  serviceNameSnapshot                String
+  customerNameSnapshot               String
+  priceSnapshot                      Decimal                       @db.Decimal(10, 2)
+  notes                              String?
+  cancellationReason                 String?
+  cancelledAt                        DateTime?                     @db.Timestamptz(6)
+  creationIdempotencyKey             String?                       @db.Uuid
+  creationRequestHash                String?                       @db.VarChar(64)
+  customerCancellationIdempotencyKey String?                       @db.Uuid
+  customerCancellationRequestHash    String?                       @db.VarChar(64)
+  createdAt                          DateTime                      @default(now()) @db.Timestamptz(6)
+  updatedAt                          DateTime                      @updatedAt @db.Timestamptz(6)
+  organization                       Organization                  @relation(fields: [organizationId], references: [id])
+  branch                             Branch                        @relation(fields: [branchId], references: [id])
+  customer                           Person                        @relation("BookingCustomer", fields: [customerId], references: [id])
+  branchService                      BranchService                 @relation(fields: [branchServiceId], references: [id])
+  member                             OrganizationMember?           @relation(fields: [memberId], references: [id])
+  statusHistory                      BookingStatusHistory[]
+  changeRequests                     BookingChangeRequest[]
+  review                             Review?
+  restaurantReservation              RestaurantReservationDetails?
+  conversations                      Conversation[]
 
+  @@unique([customerId, creationIdempotencyKey])
+  @@unique([customerId, customerCancellationIdempotencyKey])
   @@index([organizationId, startsAt])
   @@index([branchId, startsAt, endsAt])
   @@index([customerId, startsAt])
   @@index([memberId, startsAt, endsAt])
   @@index([status, startsAt])
-  @@unique([customerId, creationIdempotencyKey])
 }
 
 model BookingStatusHistory {
@@ -468,19 +471,23 @@ model ServiceStaffAssignment {
 }
 
 model BookingChangeRequest {
-  id                  String                     @id @default(uuid()) @db.Uuid
-  bookingId           String                     @db.Uuid
-  requestedByPersonId String                     @db.Uuid
-  proposedMemberId    String?                    @db.Uuid
-  proposedStartsAt    DateTime                   @db.Timestamptz(6)
-  proposedEndsAt      DateTime                   @db.Timestamptz(6)
-  status              BookingChangeRequestStatus @default(PENDING)
-  createdAt           DateTime                   @default(now()) @db.Timestamptz(6)
-  respondedAt         DateTime?                  @db.Timestamptz(6)
-  booking             Booking                    @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  requestedBy         Person                     @relation("BookingChangeRequester", fields: [requestedByPersonId], references: [id])
-  proposedMember      OrganizationMember?        @relation(fields: [proposedMemberId], references: [id])
+  id                       String                     @id @default(uuid()) @db.Uuid
+  bookingId                String                     @db.Uuid
+  requestedByPersonId      String                     @db.Uuid
+  proposedMemberId         String?                    @db.Uuid
+  proposedStartsAt         DateTime                   @db.Timestamptz(6)
+  proposedEndsAt           DateTime                   @db.Timestamptz(6)
+  status                   BookingChangeRequestStatus @default(PENDING)
+  createdAt                DateTime                   @default(now()) @db.Timestamptz(6)
+  respondedAt              DateTime?                  @db.Timestamptz(6)
+  creationIdempotencyKey   String?                    @db.Uuid
+  creationRequestHash      String?                    @db.VarChar(64)
+  bookingUpdatedAtSnapshot DateTime?                  @db.Timestamptz(6)
+  booking                  Booking                    @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  requestedBy              Person                     @relation("BookingChangeRequester", fields: [requestedByPersonId], references: [id])
+  proposedMember           OrganizationMember?        @relation(fields: [proposedMemberId], references: [id])
 
+  @@unique([requestedByPersonId, creationIdempotencyKey], map: "BookingChangeRequest_requester_creationKey_key")
   @@index([bookingId, status])
   @@index([requestedByPersonId])
 }

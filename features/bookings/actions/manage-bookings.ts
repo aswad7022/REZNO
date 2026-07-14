@@ -10,6 +10,7 @@ import { requireBusinessIdentity, requireCustomerIdentity } from "@/features/ide
 import {
   canOperateBookings,
   canTransitionBooking,
+  canCustomerRequestBookingChange,
 } from "@/features/bookings/policies/booking-lifecycle";
 import {
   bookingStatusSchema,
@@ -17,6 +18,10 @@ import {
 } from "@/features/bookings/schemas/booking";
 import { BookingDomainError } from "@/features/bookings/domain/errors";
 import { createCustomerBooking } from "@/features/bookings/services/booking-creation";
+import {
+  cancelCustomerBookingPersisted,
+  respondToCustomerBookingChange as respondToCustomerBookingChangePersisted,
+} from "@/features/bookings/services/booking-management";
 import { generateBookingSlots } from "@/features/bookings/services/slots";
 import { prisma } from "@/lib/db/prisma";
 import { logServerError } from "@/lib/logging/server";
@@ -106,50 +111,22 @@ export async function cancelCustomerBooking(
   const reason =
     typeof reasonValue === "string" ? reasonValue.trim().slice(0, 500) : "";
 
-  const booking = await prisma.booking.findFirst({
-    where: {
-      id: bookingId,
+  try {
+    await cancelCustomerBookingPersisted({
+      bookingId,
       customerId: identity.person.id,
-      status: { in: [...ACTIVE_STATUSES] },
-    },
-    include: {
-      organization: { include: { settings: true } },
-    },
-  });
-  if (!booking) return;
-
-  const cancellationWindowHours =
-    booking.organization.settings?.cancellationWindowHours ?? 24;
-  const cancellationDeadline = new Date(
-    booking.startsAt.getTime() - cancellationWindowHours * 3_600_000,
-  );
-  if (new Date() >= cancellationDeadline) return;
-
-  await prisma.$transaction(async (transaction) => {
-    const result = await transaction.booking.updateMany({
-      where: {
-        id: booking.id,
+      idempotencyKey: randomUUID(),
+      reason: reason || null,
+    });
+  } catch (error) {
+    if (!(error instanceof BookingDomainError)) {
+      logServerError("booking.cancelCustomer", error, {
+        bookingId,
         customerId: identity.person.id,
-        status: booking.status,
-      },
-      data: {
-        status: "CANCELLED",
-        cancelledAt: new Date(),
-        cancellationReason: reason || null,
-      },
-    });
-    if (result.count === 0) return;
-
-    await transaction.bookingStatusHistory.create({
-      data: {
-        bookingId: booking.id,
-        fromStatus: booking.status,
-        toStatus: "CANCELLED",
-        changedByPersonId: identity.person.id,
-        note: reason || null,
-      },
-    });
-  });
+      });
+    }
+    return;
+  }
 
   revalidatePath("/customer/bookings");
   revalidatePath("/business/bookings");
@@ -181,9 +158,14 @@ export async function rescheduleCustomerBooking(
   });
   if (!booking) redirect(`${baseUrl}?error=unavailable`);
 
-  const windowHours =
-    booking.organization.settings?.cancellationWindowHours ?? 24;
-  if (Date.now() >= booking.startsAt.getTime() - windowHours * 3_600_000) {
+  if (
+    !canCustomerRequestBookingChange({
+      status: booking.status,
+      startsAt: booking.startsAt,
+      cancellationWindowHours:
+        booking.organization.settings?.cancellationWindowHours,
+    })
+  ) {
     redirect(`${baseUrl}?error=notAllowed`);
   }
 
@@ -305,6 +287,17 @@ export async function transitionBusinessBooking(
     });
     if (result.count === 0) return;
 
+    if (
+      parsed.data === "CANCELLED" ||
+      parsed.data === "COMPLETED" ||
+      parsed.data === "NO_SHOW"
+    ) {
+      await transaction.bookingChangeRequest.updateMany({
+        where: { bookingId: booking.id, status: "PENDING" },
+        data: { status: "CANCELLED", respondedAt: new Date() },
+      });
+    }
+
     await transaction.bookingStatusHistory.create({
       data: {
         bookingId: booking.id,
@@ -392,6 +385,11 @@ export async function proposeBookingChange(
         ]);
         if (conflict || blocked) return;
 
+        const pending = await transaction.bookingChangeRequest.findFirst({
+          where: { bookingId: booking.id, status: "PENDING" },
+          select: { requestedByPersonId: true },
+        });
+        if (pending?.requestedByPersonId === booking.customerId) return;
         await transaction.bookingChangeRequest.updateMany({
           where: { bookingId: booking.id, status: "PENDING" },
           data: { status: "CANCELLED", respondedAt: new Date() },
@@ -440,6 +438,7 @@ export async function respondToBookingChange(
         customerId: identity.person.id,
         status: { in: [...ACTIVE_STATUSES] },
       },
+      requestedByPersonId: { not: identity.person.id },
     },
     include: {
       booking: { include: { branch: true } },
@@ -492,14 +491,24 @@ export async function respondToBookingChange(
           });
           if (changed.count === 0) return;
 
-          await transaction.booking.update({
-            where: { id: request.bookingId },
+          const bookingChanged = await transaction.booking.updateMany({
+            where: {
+              id: request.bookingId,
+              customerId: identity.person.id,
+              status: request.booking.status,
+            },
             data: {
               startsAt: request.proposedStartsAt,
               endsAt: request.proposedEndsAt,
               memberId: request.proposedMemberId,
             },
           });
+          if (bookingChanged.count !== 1) {
+            throw new BookingDomainError(
+              "BOOKING_STATE_CONFLICT",
+              "Booking changed while the proposal was being accepted.",
+            );
+          }
           await transaction.bookingStatusHistory.create({
             data: {
               bookingId: request.bookingId,
@@ -530,4 +539,32 @@ export async function respondToBookingChange(
   revalidatePath("/business/bookings");
   revalidatePath("/business/calendar");
   revalidatePath("/customer/notifications");
+}
+
+export async function respondToCustomerBookingChange(
+  requestId: string,
+  formData: FormData,
+): Promise<void> {
+  const identity = await requireBusinessIdentity();
+  if (!canOperateBookings(identity.membership.role.systemRole)) return;
+  const decision = formData.get("decision");
+  if (decision !== "accept" && decision !== "reject") return;
+  try {
+    await respondToCustomerBookingChangePersisted({
+      requestId,
+      organizationId: identity.membership.organizationId,
+      responderPersonId: identity.person.id,
+      decision,
+    });
+  } catch (error) {
+    if (!(error instanceof BookingDomainError)) {
+      logServerError("booking.respondToCustomerChange", error, {
+        requestId,
+        organizationId: identity.membership.organizationId,
+      });
+    }
+  }
+  revalidatePath("/customer/bookings");
+  revalidatePath("/business/bookings");
+  revalidatePath("/business/calendar");
 }

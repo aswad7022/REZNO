@@ -1,4 +1,5 @@
 import type {
+  BookingChangeRequestStatus,
   BookingStatus,
   StaffSelectionMode,
 } from "@prisma/client";
@@ -100,6 +101,67 @@ export interface PersistedBookingDetail {
   createdAt: string;
 }
 
+export interface CustomerBookingChangeRequest {
+  id: string;
+  direction: "BUSINESS_TO_CUSTOMER" | "CUSTOMER_TO_BUSINESS";
+  status: BookingChangeRequestStatus;
+  proposedStartsAt: string;
+  proposedEndsAt: string;
+  proposedMemberName: string | null;
+  createdAt: string;
+  respondedAt: string | null;
+}
+
+export interface CustomerBookingManagementItem {
+  id: string;
+  reference: string;
+  businessName: string;
+  branchName: string;
+  serviceName: string;
+  memberName: string | null;
+  startsAt: string;
+  endsAt: string;
+  timezone: string;
+  price: string;
+  status: BookingStatus;
+  createdAt: string;
+  cancellation: {
+    eligible: boolean;
+    deadline: string;
+    cancelledAt: string | null;
+  };
+  changeRequest: CustomerBookingChangeRequest | null;
+}
+
+export interface CustomerBookingManagementDetail
+  extends CustomerBookingManagementItem {
+  branchServiceId: string;
+  memberId: string | null;
+  cancellation: CustomerBookingManagementItem["cancellation"] & {
+    reason: string | null;
+  };
+  reschedule: {
+    eligible: boolean;
+  };
+  statusHistory: Array<{
+    id: string;
+    fromStatus: BookingStatus | null;
+    toStatus: BookingStatus;
+    createdAt: string;
+  }>;
+}
+
+export interface CustomerBookingPage {
+  items: CustomerBookingManagementItem[];
+  nextCursor: string | null;
+  counts: {
+    all: number;
+    upcoming: number;
+    completed: number;
+    cancelled: number;
+  };
+}
+
 export interface BookingListItem {
   id: string;
   serviceName: string;
@@ -131,6 +193,7 @@ export interface BookingListItem {
     startsAt: Date;
     endsAt: Date;
     memberName: string | null;
+    requestedByCustomer: boolean;
   } | null;
 }
 

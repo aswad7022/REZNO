@@ -531,7 +531,8 @@
       "customerTitle": "A new time was proposed for your booking",
       "accept": "Accept new time",
       "reject": "Reject change",
-      "waiting": "Waiting for customer approval"
+      "waiting": "Waiting for customer approval",
+      "waitingForBusiness": "Waiting for business approval"
     },
     "customer": "Customer",
     "staff": "Staff",

@@ -1,6 +1,10 @@
 import "server-only";
 
-import { canOperateBookings } from "@/features/bookings/policies/booking-lifecycle";
+import {
+  canCustomerCancelBooking,
+  canCustomerRequestBookingChange,
+  canOperateBookings,
+} from "@/features/bookings/policies/booking-lifecycle";
 import {
   requireBusinessIdentity,
   requireCustomerIdentity,
@@ -52,6 +56,7 @@ export async function getPublicOfferings(): Promise<PublicOffering[]> {
 
 function toListItem(booking: {
   id: string;
+  customerId: string;
   serviceNameSnapshot: string;
   customerNameSnapshot: string;
   startsAt: Date;
@@ -76,6 +81,7 @@ function toListItem(booking: {
   } | null;
   changeRequests?: Array<{
     id: string;
+    requestedByPersonId: string;
     proposedStartsAt: Date;
     proposedEndsAt: Date;
     proposedMember: {
@@ -118,6 +124,8 @@ function toListItem(booking: {
             booking.changeRequests[0].proposedMember?.person.displayName ??
             booking.changeRequests[0].proposedMember?.person.firstName ??
             null,
+          requestedByCustomer:
+            booking.changeRequests[0].requestedByPersonId === booking.customerId,
         }
       : null,
   };
@@ -134,17 +142,21 @@ function withCustomerPermissions(
     review?: { rating: number; comment: string | null } | null;
   },
 ): BookingListItem {
-  const windowHours =
-    booking.organization.settings?.cancellationWindowHours ?? 24;
-  const isActive =
-    booking.status === "PENDING" || booking.status === "CONFIRMED";
-  const canChange =
-    isActive && Date.now() < booking.startsAt.getTime() - windowHours * 3_600_000;
+  const cancellationWindowHours =
+    booking.organization.settings?.cancellationWindowHours;
 
   return {
     ...item,
-    canCustomerCancel: canChange,
-    canCustomerReschedule: canChange,
+    canCustomerCancel: canCustomerCancelBooking({
+      status: booking.status,
+      startsAt: booking.startsAt,
+      cancellationWindowHours,
+    }),
+    canCustomerReschedule: canCustomerRequestBookingChange({
+      status: booking.status,
+      startsAt: booking.startsAt,
+      cancellationWindowHours,
+    }),
     canCustomerReview: booking.status === "COMPLETED" && !booking.review,
   };
 }
@@ -293,11 +305,12 @@ export async function getCustomerBookingForReschedule(bookingId: string) {
   });
   if (!booking) return null;
 
-  const windowHours =
-    booking.organization.settings?.cancellationWindowHours ?? 24;
-  const canReschedule =
-    (booking.status === "PENDING" || booking.status === "CONFIRMED") &&
-    Date.now() < booking.startsAt.getTime() - windowHours * 3_600_000;
+  const canReschedule = canCustomerRequestBookingChange({
+    status: booking.status,
+    startsAt: booking.startsAt,
+    cancellationWindowHours:
+      booking.organization.settings?.cancellationWindowHours,
+  });
 
   return {
     id: booking.id,

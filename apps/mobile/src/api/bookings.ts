@@ -6,6 +6,9 @@ import type {
   MobileBookingService,
   MobileBookingStaff,
   MobilePersistedBooking,
+  MobileBookingManagementPage,
+  MobileBookingManagementTab,
+  MobileManagedBookingDetail,
   MobileStaffSelectionMode,
 } from "../types/bookings";
 
@@ -76,8 +79,73 @@ export function createMobileBooking(
 }
 
 export function fetchMobileBookingDetail(bookingId: string) {
-  return mobileApiRequest<DataResponse<MobilePersistedBooking>>(
+  return mobileApiRequest<DataResponse<MobileManagedBookingDetail>>(
     `/api/mobile/bookings/${encodeURIComponent(bookingId)}`,
     { authenticated: true },
   );
+}
+
+export function fetchMobileManagedBookings(input: {
+  tab: MobileBookingManagementTab;
+  cursor?: string | null;
+  limit?: number;
+}) {
+  return mobileApiRequest<DataResponse<MobileBookingManagementPage>>(
+    "/api/mobile/bookings",
+    {
+      authenticated: true,
+      params: {
+        tab: input.tab,
+        cursor: input.cursor ?? undefined,
+        limit: input.limit,
+      },
+    },
+  );
+}
+
+export function cancelMobileBooking(
+  bookingId: string,
+  reason: string,
+  idempotencyKey: string,
+) {
+  return mobileApiRequest<
+    DataResponse<{ booking: MobileManagedBookingDetail; replayed: boolean }>
+  >(`/api/mobile/bookings/${encodeURIComponent(bookingId)}/cancel`, {
+    authenticated: true,
+    body: { reason },
+    headers: { "Idempotency-Key": idempotencyKey },
+    method: "POST",
+  });
+}
+
+export function fetchMobileBookingRescheduleOptions(input: {
+  bookingId: string;
+  date: string;
+  memberId: string | null;
+}) {
+  return mobileApiRequest<DataResponse<MobileBookingAvailability>>(
+    `/api/mobile/bookings/${encodeURIComponent(input.bookingId)}/reschedule-options`,
+    {
+      authenticated: true,
+      params: {
+        date: input.date,
+        memberId: input.memberId ?? undefined,
+      },
+    },
+  );
+}
+
+export function requestMobileBookingChange(
+  bookingId: string,
+  input: { date: string; memberId: string | null; startsAt: string },
+  idempotencyKey: string,
+) {
+  return mobileApiRequest<
+    DataResponse<{ booking: MobileManagedBookingDetail; replayed: boolean }>
+  >(`/api/mobile/bookings/${encodeURIComponent(bookingId)}/change-request`, {
+    authenticated: true,
+    body: input,
+    headers: { "Idempotency-Key": idempotencyKey },
+    method: "POST",
+  });
 }
