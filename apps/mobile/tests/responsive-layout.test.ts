@@ -10,12 +10,18 @@ import {
 import {
   ACCOUNT_GUEST_AUTH_ACTIONS,
   ACCOUNT_ACTION_LAYOUT,
+  ACCOUNT_NOTIFICATION_ROW_LAYOUT,
+  HELP_CENTER_ROW_LAYOUT,
   HOME_HERO_TITLE_MAX_LINES,
   HOME_HEADER_ACTION_MODE,
+  KEYBOARD_SAFE_FORM_LAYOUT,
   MESSAGE_PREVIEW_ROW_LAYOUT,
+  PRODUCT_NO_MEDIA_LAYOUT,
+  SHARED_TOP_HEADER_LAYOUT,
   getTextWritingDirection,
   homeHeaderActionLabelsAreVisible,
   resolveVisualQaInitialScreen,
+  resolveVisualQaLocale,
 } from "../src/layout/screen-contracts";
 
 const dimensions = [
@@ -39,11 +45,19 @@ const dimensions = [
   },
   {
     bottomInset: 34,
-    height: 812,
-    label: "narrow iPhone class",
+    height: 667,
+    label: "compact 375 class",
+    platform: "ios" as const,
+    topInset: 20,
+    width: 375,
+  },
+  {
+    bottomInset: 34,
+    height: 844,
+    label: "390 class",
     platform: "ios" as const,
     topInset: 47,
-    width: 375,
+    width: 390,
   },
   {
     bottomInset: 34,
@@ -75,7 +89,7 @@ test("detects compact-height and narrow-width device classes", () => {
   assert.equal(narrowIphone.isNarrowWidth, false);
 });
 
-test("keeps system insets and navigation clearance in bottom padding", () => {
+test("keeps exactly one system inset and a final 20-24dp gap in bottom padding", () => {
   const layout = createMobileResponsiveLayout(dimensions[0]);
 
   assert.equal(layout.topInset, 24);
@@ -83,12 +97,13 @@ test("keeps system insets and navigation clearance in bottom padding", () => {
   assert.equal(
     layout.contentBottomInset,
       layout.bottomNavigationHeight +
-      layout.bottomNavigationBottomGap +
       layout.bottomInset +
-      layout.contentTrailingSpace,
+      layout.finalContentGap,
   );
-  assert.ok(layout.contentTrailingSpace >= 16);
-  assert.ok(layout.contentTrailingSpace <= 24);
+  assert.equal(layout.contentBottomInset - layout.bottomInset, layout.bottomNavigationHeight + layout.finalContentGap);
+  assert.equal(layout.contentTrailingSpace, layout.finalContentGap);
+  assert.ok(layout.finalContentGap >= 20);
+  assert.ok(layout.finalContentGap <= 24);
 });
 
 test("produces readable, tappable metrics across the QA dimension matrix", () => {
@@ -180,9 +195,41 @@ test("keeps message previews in deterministic flex rows", () => {
   assert.equal(MESSAGE_PREVIEW_ROW_LAYOUT.metaColumnWidth, 48);
 });
 
+test("keeps the shared compact header centered and in normal flex flow", () => {
+  const layout = createMobileResponsiveLayout(dimensions[0]);
+  assert.equal(layout.headerHeight, 56);
+  assert.equal(layout.touchTarget, 44);
+  assert.equal(SHARED_TOP_HEADER_LAYOUT.centeredTitle, true);
+  assert.equal(SHARED_TOP_HEADER_LAYOUT.titleMaxLines, 2);
+  assert.equal(SHARED_TOP_HEADER_LAYOUT.usesAbsolutePositioning, false);
+});
+
+test("keeps final-polish rows and media placeholders compact but reachable", () => {
+  assert.equal(ACCOUNT_NOTIFICATION_ROW_LAYOUT.compactMinHeight, 68);
+  assert.equal(ACCOUNT_NOTIFICATION_ROW_LAYOUT.usesAbsolutePositioning, false);
+  assert.equal(HELP_CENTER_ROW_LAYOUT.inlineExpansion, true);
+  assert.equal(HELP_CENTER_ROW_LAYOUT.usesFixedHeight, false);
+  assert.ok(HELP_CENTER_ROW_LAYOUT.minimumTouchHeight >= 44);
+  assert.equal(PRODUCT_NO_MEDIA_LAYOUT.compactHeight, 136);
+  assert.ok(PRODUCT_NO_MEDIA_LAYOUT.compactHeight < 180);
+  assert.equal(PRODUCT_NO_MEDIA_LAYOUT.isStructuredCard, true);
+});
+
+test("keeps auth and checkout CTAs in scrollable Android keyboard-safe flow", () => {
+  assert.equal(KEYBOARD_SAFE_FORM_LAYOUT.androidBehavior, "height");
+  assert.equal(KEYBOARD_SAFE_FORM_LAYOUT.ctaInNormalFlow, true);
+  assert.equal(KEYBOARD_SAFE_FORM_LAYOUT.usesScrollableContent, true);
+});
+
 test("keeps visual QA screen selection development-only and deterministic", () => {
   assert.equal(resolveVisualQaInitialScreen("checkout", true), "checkout");
+  assert.equal(resolveVisualQaInitialScreen("accountHelp", true), "accountHelp");
+  assert.equal(resolveVisualQaInitialScreen("product", true), "product");
+  assert.equal(resolveVisualQaInitialScreen("signUp", true), "signUp");
   assert.equal(resolveVisualQaInitialScreen("messages", true), "messages");
   assert.equal(resolveVisualQaInitialScreen("unknown", true), null);
   assert.equal(resolveVisualQaInitialScreen("checkout", false), null);
+  assert.equal(resolveVisualQaLocale("en"), "en");
+  assert.equal(resolveVisualQaLocale("ar"), "ar");
+  assert.equal(resolveVisualQaLocale("unknown"), null);
 });
