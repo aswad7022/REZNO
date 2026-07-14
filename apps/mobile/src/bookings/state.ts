@@ -2,6 +2,8 @@ import type {
   MobileBookingBranch,
   MobileBookingService,
   MobileBookingSlot,
+  MobileBookingManagementPage,
+  MobileManagedBooking,
 } from "../types/bookings";
 
 export type MobileBookingStep =
@@ -58,6 +60,34 @@ export function createMobileBookingSubmissionGate() {
       inFlight = true;
       return true;
     },
+  };
+}
+
+export function mergeMobileBookingPage(
+  current: readonly MobileManagedBooking[],
+  page: MobileBookingManagementPage,
+  append: boolean,
+): MobileManagedBooking[] {
+  if (!append) return page.items;
+  const byId = new Map(current.map((booking) => [booking.id, booking]));
+  for (const booking of page.items) byId.set(booking.id, booking);
+  return [...byId.values()];
+}
+
+export function mobileBookingManagementFailure(code: string | undefined) {
+  return {
+    sessionExpired:
+      code === "UNAUTHENTICATED" ||
+      code === "PROFILE_INCOMPLETE" ||
+      code === "PROFILE_UNAVAILABLE",
+    conflict:
+      code === "BOOKING_STATE_CONFLICT" ||
+      code === "BOOKING_NOT_CANCELLABLE" ||
+      code === "BOOKING_NOT_RESCHEDULABLE" ||
+      code === "CANCELLATION_DEADLINE_PASSED" ||
+      code === "ACTIVE_CHANGE_REQUEST_EXISTS" ||
+      code === "SLOT_CONFLICT" ||
+      code === "SLOT_UNAVAILABLE",
   };
 }
 

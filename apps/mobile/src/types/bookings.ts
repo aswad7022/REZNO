@@ -74,3 +74,51 @@ export type MobilePersistedBooking = {
   status: "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED" | "NO_SHOW";
   createdAt: string;
 };
+
+export type MobileBookingStatus = MobilePersistedBooking["status"];
+export type MobileBookingManagementTab =
+  | "all"
+  | "upcoming"
+  | "completed"
+  | "cancelled";
+
+export type MobileBookingChangeRequest = {
+  id: string;
+  direction: "BUSINESS_TO_CUSTOMER" | "CUSTOMER_TO_BUSINESS";
+  status: "PENDING" | "ACCEPTED" | "REJECTED" | "CANCELLED";
+  proposedStartsAt: string;
+  proposedEndsAt: string;
+  proposedMemberName: string | null;
+  createdAt: string;
+  respondedAt: string | null;
+};
+
+export type MobileManagedBooking = MobilePersistedBooking & {
+  cancellation: {
+    eligible: boolean;
+    deadline: string;
+    cancelledAt: string | null;
+  };
+  changeRequest: MobileBookingChangeRequest | null;
+};
+
+export type MobileManagedBookingDetail = MobileManagedBooking & {
+  branchServiceId: string;
+  memberId: string | null;
+  cancellation: MobileManagedBooking["cancellation"] & {
+    reason: string | null;
+  };
+  reschedule: { eligible: boolean };
+  statusHistory: Array<{
+    id: string;
+    fromStatus: MobileBookingStatus | null;
+    toStatus: MobileBookingStatus;
+    createdAt: string;
+  }>;
+};
+
+export type MobileBookingManagementPage = {
+  items: MobileManagedBooking[];
+  nextCursor: string | null;
+  counts: Record<MobileBookingManagementTab, number>;
+};
