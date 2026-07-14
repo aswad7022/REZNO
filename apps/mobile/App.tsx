@@ -88,6 +88,7 @@ import {
 } from "./src/screens/mobile-auth-screen";
 import { CommerceMarketScreen } from "./src/screens/commerce-market-screen";
 import { ReznoNearbySearchScreen } from "./src/screens/rezno-nearby-search-screen";
+import { CustomerBookingCreationScreen } from "./src/screens/customer-booking-creation-screen";
 import type { MobileMarketplaceBusiness } from "./src/types/marketplace";
 import type { CommerceNotification } from "./src/types/commerce";
 
@@ -107,6 +108,7 @@ type PremiumBusiness = {
   price: string;
   rating: string;
   reviewCount: string;
+  slug: string;
   status: string;
   tag: string;
 };
@@ -654,6 +656,7 @@ const accountManagementActions = [
   { label: "مركز المساعدة", tone: "primary" },
 ];
 
+/* eslint-disable @typescript-eslint/no-unused-vars -- The previous visual-only booking composition remains as a development design reference while production routing uses CustomerBookingCreationScreen. */
 export default function App() {
   /* eslint-disable @typescript-eslint/no-require-imports -- Expo Font loads local TTF assets through static require(). */
   const [fontsLoaded] = useFonts({
@@ -847,6 +850,7 @@ export default function App() {
   );
   const managedBookings = useMemo<VisualBooking[]>(
     () => {
+      if (!__DEV__) return [];
       const initialDraft = createInitialBookingDraft();
       const bookingDraftIsUnchanged =
         bookingDraft.businessName === initialDraft.businessName &&
@@ -1276,41 +1280,18 @@ export default function App() {
           showsVerticalScrollIndicator={false}
           style={styles.appScroll}
         >
-        {selectedBusiness && !bookingFlowStep ? (
-          <SalonDetailScreen
-            business={selectedBusiness}
+        {selectedBusiness ? (
+          <CustomerBookingCreationScreen
+            businessSlug={selectedBusiness.slug}
+            isAuthenticated={Boolean(authSession)}
             isRtl={isRtl}
             onBack={() => {
               setBookingFlowStep(null);
               setSelectedBusiness(null);
             }}
-            onStartBooking={handleStartBookingFlow}
-            styles={styles}
-          />
-        ) : null}
-
-        {selectedBusiness && bookingFlowStep ? (
-          <BookingStepScreen
-            date={selectedDate}
-            draft={bookingDraft}
-            isRtl={isRtl}
-            onBack={handleBookingBack}
-            onBookingMethodSelect={handleBookingMethodSelect}
-            onConfirm={() => setBookingFlowStep("confirmation")}
-            onDateSelect={handleDateSelect}
-            onPaymentSelect={handlePaymentSelect}
-            onReturnHome={handleReturnHome}
-            onStaffSelect={handleStaffSelect}
-            onStepChange={setBookingFlowStep}
-            onSuggestedTimeSelect={handleSuggestedTimeSelect}
-            onTimeSelect={handleTimeSelect}
-            onViewBookings={handleViewBookings}
-            payment={selectedPayment}
-            service={selectedBookingService}
-            staff={selectedStaff}
-            step={bookingFlowStep}
-            styles={styles}
-            time={selectedTime}
+            onSignIn={() => handleOpenAuth("signin")}
+            locale={locale}
+            theme={theme}
           />
         ) : null}
 
@@ -3252,6 +3233,7 @@ function BookingConfirmationStep({
   );
 }
 
+/* eslint-enable @typescript-eslint/no-unused-vars */
 function MyBookingsScreen({
   bookings,
   filter,
