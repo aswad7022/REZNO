@@ -60,6 +60,8 @@ import {
   type CommerceCopy,
 } from "../i18n/commerce";
 import type { MobileLocale } from "../i18n/labels";
+import type { MobileResponsiveLayout } from "../layout/responsive-metrics";
+import { useMobileResponsiveLayout } from "../layout/use-mobile-responsive-layout";
 import type {
   CommerceAddress,
   CommerceAddressInput,
@@ -135,7 +137,7 @@ export function CommerceMarketScreen({
   theme: MobileTheme;
 }) {
   const copy = commerceCopy[locale];
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const styles = useCommerceStyles(theme);
   const initialRoute = useMemo<Route>(
     () => entryPoint === "orders" ? { kind: "orders" } : entryPoint === "favorites" ? { kind: "favorites" } : { kind: "market" },
     [entryPoint],
@@ -570,7 +572,7 @@ type CommonProps = {
 
 function MarketHome(props: CommonProps) {
   const { cart, copy, favoriteProductIds, favoriteResources, favoriteStoreIds, isRtl, locale, navigate, openProduct, openStore, sessionAvailable, theme, toggleProductFavorite, toggleStoreFavorite } = props;
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const styles = useCommerceStyles(theme);
   const [mode, setMode] = useState<CatalogMode>("products");
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<string | undefined>();
@@ -680,7 +682,7 @@ function MarketHome(props: CommonProps) {
 
 function StoreDetail(props: CommonProps & { store: CommerceStore }) {
   const { cart, copy, favoriteProductIds, favoriteResources, favoriteStoreIds, goBack, isRtl, locale, navigate, openProduct, sessionAvailable, store, theme, toggleProductFavorite, toggleStoreFavorite } = props;
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const styles = useCommerceStyles(theme);
   const [products, setProducts] = useState<CommerceProduct[]>([]);
   const [state, setState] = useState<LoadState>("loading");
   const [cursor, setCursor] = useState<string | null>(null);
@@ -721,7 +723,7 @@ function StoreDetail(props: CommonProps & { store: CommerceStore }) {
 
 function ProductDetail(props: CommonProps & { addToCart: (variant: CommerceVariant, quantity: number, incomingStore?: string) => Promise<void>; product: CommerceProductDetail }) {
   const { addToCart, cart, copy, favoriteProductIds, favoriteResources, goBack, isRtl, locale, navigate, product, sessionAvailable, theme, toggleProductFavorite } = props;
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const styles = useCommerceStyles(theme);
   const selectable = product.variants.filter((variant) => variant.inStock);
   const automatic = product.variants.length === 1 || (selectable.length === 1 && selectable[0]?.isDefault);
   const [variantId, setVariantId] = useState<string | null>(automatic ? selectable[0]?.id ?? null : null);
@@ -748,7 +750,7 @@ function ProductDetail(props: CommonProps & { addToCart: (variant: CommerceVaria
 
 function CartScreen(props: CommonProps) {
   const { beginCartRequest, cart, cartLoadState, copy, goBack, handlePrivateError, isLatestCartRequest, isRtl, locale, navigate, onOpenAccount, refreshCart, sessionAvailable, setCart, setNotice, theme } = props;
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const styles = useCommerceStyles(theme);
   const mutate = async (operation: () => Promise<CommerceCart | null>) => {
     const sequence = beginCartRequest();
     setNotice(null);
@@ -781,7 +783,7 @@ function CartScreen(props: CommonProps) {
 
 function CheckoutScreen(props: CommonProps) {
   const { beginCartRequest, cart, checkoutDraft, checkoutSubmitting: submitting, copy, goBack, handlePrivateError, isLatestCartRequest, isRtl, locale, navigate, onOpenAccount, sessionAvailable, setCart, setCheckoutDraft, setCheckoutSubmitting, setNotice, theme } = props;
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const styles = useCommerceStyles(theme);
   const [addresses, setAddresses] = useState<CommerceAddress[]>([]);
   const [storeDetails, setStoreDetails] = useState<CommerceStore | null>(null);
   const mountedRef = useRef(false);
@@ -916,7 +918,7 @@ function CheckoutScreen(props: CommonProps) {
 
 function ReceiptScreen(props: CommonProps & { receipt: CommerceReceipt }) {
   const { copy, handlePrivateError, isRtl, locale, navigate, onOpenAccount, receipt, sessionAvailable, theme } = props;
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const styles = useCommerceStyles(theme);
   const openOrder = async () => {
     try { navigate({ kind: "order", order: await commerceApi.getOrder(receipt.id) }); }
     catch (error) { handlePrivateError(error); }
@@ -936,7 +938,7 @@ function ReceiptScreen(props: CommonProps & { receipt: CommerceReceipt }) {
 
 function OrdersScreen(props: CommonProps) {
   const { canGoBack, copy, goBack, handlePrivateError, isRtl, locale, navigate, onOpenAccount, sessionAvailable, theme } = props;
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const styles = useCommerceStyles(theme);
   const [orders, setOrders] = useState<CommerceOrderSummary[]>([]);
   const [state, setState] = useState<LoadState>("loading");
   const [cursor, setCursor] = useState<string | null>(null);
@@ -957,7 +959,7 @@ function OrdersScreen(props: CommonProps) {
 
 function OrderDetail(props: CommonProps & { order: CommerceOrderDetail }) {
   const { copy, goBack, handlePrivateError, isRtl, locale, onOpenAccount, order: initialOrder, sessionAvailable, setNotice, theme } = props;
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const styles = useCommerceStyles(theme);
   const [order, setOrder] = useState(initialOrder);
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -979,7 +981,7 @@ function OrderDetail(props: CommonProps & { order: CommerceOrderDetail }) {
 
 function FavoritesScreen(props: CommonProps) {
   const { canGoBack, copy, favoriteProductIds, favoriteResources, favoriteStoreIds, goBack, isRtl, locale, openProduct, openStore, onOpenAccount, sessionAvailable, theme, toggleProductFavorite, toggleStoreFavorite } = props;
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const styles = useCommerceStyles(theme);
   const [stores, setStores] = useState<FavoriteStore[]>([]);
   const [products, setProducts] = useState<FavoriteProduct[]>([]);
   const [mode, setMode] = useState<"products" | "stores">("stores");
@@ -1043,7 +1045,7 @@ function FavoritesScreen(props: CommonProps) {
 
 function AddressesScreen(props: CommonProps & { returnToCheckout: boolean }) {
   const { cart, copy, goBack, handlePrivateError, isRtl, onOpenAccount, returnToCheckout, sessionAvailable, setCheckoutDraft, theme } = props;
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const styles = useCommerceStyles(theme);
   const [addresses, setAddresses] = useState<CommerceAddress[]>([]);
   const [form, setForm] = useState<CommerceAddressInput>(EMPTY_ADDRESS);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -1092,12 +1094,12 @@ function AddressField({ form, isRtl, keyboardType, label, multiline, name, setFo
 }
 
 function QuantityControl({ copy, quantity, setQuantity, theme }: { copy: CommerceCopy; quantity: number; setQuantity: (quantity: number) => void; theme: MobileTheme }) {
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const styles = useCommerceStyles(theme);
   return <View style={styles.quantityControl}><PremiumPressable accessibilityLabel={copy.decreaseQuantity} accessibilityRole="button" disabled={quantity <= 1} onPress={() => setQuantity(Math.max(1, quantity - 1))} style={styles.quantityButton}><Text style={styles.quantityText}>−</Text></PremiumPressable><Text style={styles.quantityValue}>{quantity}</Text><PremiumPressable accessibilityLabel={copy.increaseQuantity} accessibilityRole="button" disabled={quantity >= 99} onPress={() => setQuantity(Math.min(99, quantity + 1))} style={styles.quantityButton}><Text style={styles.quantityText}>+</Text></PremiumPressable></View>;
 }
 
 function Chip({ disabled = false, label, onPress, selected, theme }: { disabled?: boolean; label: string; onPress: () => void; selected: boolean; theme: MobileTheme }) {
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const styles = useCommerceStyles(theme);
   return <PremiumPressable accessibilityRole="button" accessibilityState={{ disabled, selected }} disabled={disabled} onPress={onPress} style={[styles.chip, selected && styles.chipSelected, disabled && styles.disabled]}><Text style={[styles.chipText, selected && styles.chipTextSelected]}>{label}</Text></PremiumPressable>;
 }
 
@@ -1139,7 +1141,15 @@ function createUuid() {
   });
 }
 
-function createStyles(theme: MobileTheme) {
+function useCommerceStyles(theme: MobileTheme) {
+  const layout = useMobileResponsiveLayout();
+  return useMemo(() => createStyles(theme, layout), [layout, theme]);
+}
+
+function createStyles(
+  theme: MobileTheme,
+  layout: MobileResponsiveLayout,
+) {
   return StyleSheet.create({
     addressChoice: { backgroundColor: theme.colors.card, borderColor: theme.colors.border, borderRadius: 20, borderWidth: 1, gap: 7, padding: 15 },
     between: { alignItems: "center", flexDirection: "row", gap: 12, justifyContent: "space-between" },
@@ -1149,13 +1159,13 @@ function createStyles(theme: MobileTheme) {
     chipText: { color: theme.colors.mutedForeground, fontFamily: FONT.uiRegular, fontSize: 12 },
     chipTextSelected: { color: theme.colors.gold, fontFamily: FONT.uiSemiBold },
     danger: { color: theme.colors.danger, fontFamily: FONT.uiSemiBold, fontSize: 13 },
-    detailImage: { borderRadius: 24, height: 280, width: "100%" },
+    detailImage: { borderRadius: 24, height: layout.isCompactHeight ? 220 : 280, width: "100%" },
     dialog: { backgroundColor: theme.colors.cardElevated, borderColor: theme.colors.goldSoft, borderRadius: 26, borderWidth: 1, gap: 14, marginHorizontal: 24, padding: 22, width: "88%" },
     dialogTitle: { color: theme.colors.foreground, fontFamily: FONT.kufiBold, fontSize: 20 },
     disabled: { opacity: 0.42 },
     flex: { flex: 1 },
     goldText: { color: theme.colors.gold, fontFamily: FONT.uiSemiBold, fontSize: 14 },
-    heroImage: { borderRadius: 24, height: 190, width: "100%" },
+    heroImage: { borderRadius: 24, height: layout.isCompactHeight ? 160 : 190, width: "100%" },
     input: { color: theme.colors.foreground, flex: 1, fontFamily: FONT.uiRegular, fontSize: 15, minHeight: 52 },
     inputBox: { backgroundColor: theme.colors.cardElevated, borderColor: theme.colors.border, borderRadius: 16, borderWidth: 1, color: theme.colors.foreground, fontFamily: FONT.uiRegular, fontSize: 14, minHeight: 52, paddingHorizontal: 14 },
     label: { color: theme.colors.mutedForeground, fontFamily: FONT.uiRegular, fontSize: 14 },
@@ -1169,7 +1179,7 @@ function createStyles(theme: MobileTheme) {
     muted: { color: theme.colors.mutedForeground, fontFamily: FONT.uiRegular, fontSize: 13, lineHeight: 20 },
     notice: { backgroundColor: theme.colors.warningSoft, borderColor: theme.colors.warning, borderRadius: 16, borderWidth: 1, marginTop: 4, padding: 12 },
     noticeText: { color: theme.colors.warning, fontFamily: FONT.uiSemiBold, fontSize: 13, textAlign: "center" },
-    panel: { backgroundColor: theme.colors.card, borderColor: theme.colors.border, borderRadius: 24, borderWidth: 1, gap: 13, padding: 17 },
+    panel: { backgroundColor: theme.colors.card, borderColor: theme.colors.border, borderRadius: layout.borderRadius, borderWidth: 1, gap: layout.verticalSpacing, padding: layout.cardPadding },
     quantityButton: { alignItems: "center", height: 42, justifyContent: "center", width: 42 },
     quantityControl: { alignItems: "center", backgroundColor: theme.colors.cardElevated, borderColor: theme.colors.border, borderRadius: 16, borderWidth: 1, flexDirection: "row", minHeight: 44 },
     quantityRow: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
@@ -1177,13 +1187,13 @@ function createStyles(theme: MobileTheme) {
     quantityValue: { color: theme.colors.foreground, fontFamily: FONT.uiSemiBold, fontSize: 15, minWidth: 34, textAlign: "center" },
     rowRtl: { flexDirection: "row-reverse" },
     rtl: { textAlign: "right", writingDirection: "rtl" },
-    screen: { paddingBottom: 26, paddingHorizontal: 16, paddingTop: 12 },
+    screen: { paddingBottom: layout.verticalSpacing, paddingHorizontal: 0, paddingTop: layout.screenTopPadding },
     search: { alignItems: "center", backgroundColor: theme.colors.cardElevated, borderColor: theme.colors.border, borderRadius: 22, borderWidth: 1, flexDirection: "row", gap: 10, minHeight: 58, paddingHorizontal: 15 },
     searchIcon: { height: 22, tintColor: theme.colors.gold, width: 22 },
     sectionTitle: { color: theme.colors.foreground, fontFamily: FONT.uiSemiBold, fontSize: 18, lineHeight: 28 },
     segment: { flexDirection: "row", gap: 9 },
     selected: { borderColor: theme.colors.gold },
-    stack: { gap: 15 },
+    stack: { gap: layout.sectionGap },
     summaryValue: { color: theme.colors.foreground, flex: 1, fontFamily: FONT.uiSemiBold, fontSize: 14 },
     textArea: { backgroundColor: theme.colors.cardElevated, borderColor: theme.colors.border, borderRadius: 18, borderWidth: 1, color: theme.colors.foreground, fontFamily: FONT.uiRegular, fontSize: 14, minHeight: 100, padding: 14, textAlignVertical: "top" },
     thumbnail: { borderRadius: 14, height: 80, width: 80 },

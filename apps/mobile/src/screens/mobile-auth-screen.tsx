@@ -21,6 +21,8 @@ import {
 import { TOUCH_HIT_SLOP } from "../components/mobile-chrome";
 import { PremiumEntrance } from "../components/premium-motion";
 import { getTextDirection, type MobileLocale } from "../i18n/labels";
+import type { MobileResponsiveLayout } from "../layout/responsive-metrics";
+import { useMobileResponsiveLayout } from "../layout/use-mobile-responsive-layout";
 import type { MobileTheme } from "../theme/tokens";
 
 const typography = {
@@ -215,7 +217,8 @@ export function MobileAuthScreen({
 }) {
   const copy = mobileAuthCopy[locale];
   const isRtl = getTextDirection(locale) === "rtl";
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const layout = useMobileResponsiveLayout();
+  const styles = useMemo(() => createStyles(theme, layout), [layout, theme]);
   const [mode, setMode] = useState<MobileAuthMode>(initialMode);
   const [setupUser, setSetupUser] = useState<MobileAuthUser | null>(
     initialSetupUser,
@@ -595,7 +598,10 @@ function AuthField({
 
 type AuthStyles = ReturnType<typeof createStyles>;
 
-function createStyles(theme: MobileTheme) {
+function createStyles(
+  theme: MobileTheme,
+  layout: MobileResponsiveLayout,
+) {
   return StyleSheet.create({
     backArrow: {
       color: theme.colors.gold,
@@ -652,11 +658,11 @@ function createStyles(theme: MobileTheme) {
       alignSelf: "center",
       backgroundColor: theme.colors.card,
       borderColor: theme.colors.border,
-      borderRadius: theme.radii.card,
+      borderRadius: layout.borderRadius,
       borderWidth: 1,
-      marginTop: 18,
+      marginTop: layout.verticalSpacing,
       maxWidth: 520,
-      padding: 22,
+      padding: layout.cardPadding,
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: 18, width: 0 },
       shadowOpacity: theme.isDark ? 0.32 : 0.1,
@@ -666,9 +672,9 @@ function createStyles(theme: MobileTheme) {
     description: {
       color: theme.colors.mutedForeground,
       fontFamily: typography.uiRegular,
-      fontSize: 14,
-      lineHeight: 22,
-      marginTop: 8,
+      fontSize: layout.bodySize,
+      lineHeight: layout.isCompactHeight ? 20 : 22,
+      marginTop: layout.isCompactHeight ? 6 : 8,
       textAlign: "center",
     },
     error: {
@@ -687,7 +693,10 @@ function createStyles(theme: MobileTheme) {
       lineHeight: 20,
     },
     field: { gap: 7 },
-    fields: { gap: 15, marginTop: 22 },
+    fields: {
+      gap: layout.isCompactHeight ? 12 : 15,
+      marginTop: layout.isCompactHeight ? 16 : 22,
+    },
     hint: {
       color: theme.colors.mutedForeground,
       fontFamily: typography.uiRegular,
@@ -730,7 +739,7 @@ function createStyles(theme: MobileTheme) {
       borderWidth: 1,
       flexDirection: "row",
       gap: 4,
-      marginTop: 22,
+      marginTop: layout.isCompactHeight ? 16 : 22,
       padding: 4,
     },
     modeText: {
@@ -745,10 +754,10 @@ function createStyles(theme: MobileTheme) {
     rtl: { textAlign: "right", writingDirection: "rtl" },
     screen: {
       flexGrow: 1,
-      justifyContent: "center",
-      paddingBottom: 32,
-      paddingHorizontal: 20,
-      paddingTop: 12,
+      justifyContent: layout.isCompactHeight ? "flex-start" : "center",
+      paddingBottom: layout.isCompactHeight ? 20 : 32,
+      paddingHorizontal: layout.pagePadding,
+      paddingTop: layout.screenTopPadding,
     },
     submit: {
       alignItems: "center",
@@ -757,7 +766,7 @@ function createStyles(theme: MobileTheme) {
       borderRadius: theme.radii.control,
       borderWidth: 1,
       justifyContent: "center",
-      marginTop: 20,
+      marginTop: layout.isCompactHeight ? 16 : 20,
       minHeight: 54,
       paddingHorizontal: 18,
       shadowColor: theme.colors.deepGold,
@@ -780,9 +789,9 @@ function createStyles(theme: MobileTheme) {
     title: {
       color: theme.colors.foreground,
       fontFamily: typography.kufiBold,
-      fontSize: 24,
-      lineHeight: 34,
-      marginTop: 18,
+      fontSize: layout.isCompactHeight ? 21 : 24,
+      lineHeight: layout.isCompactHeight ? 30 : 34,
+      marginTop: layout.isCompactHeight ? 14 : 18,
       textAlign: "center",
     },
   });

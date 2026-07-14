@@ -6,7 +6,6 @@ import {
   I18nManager,
   Image,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -15,6 +14,10 @@ import {
   View,
   type ImageSourcePropType,
 } from "react-native";
+import {
+  SafeAreaProvider,
+  SafeAreaView,
+} from "react-native-safe-area-context";
 
 import { fetchMobileMarketplace } from "./src/api/marketplace";
 import { completeMobileCustomerOnboarding } from "./src/api/onboarding";
@@ -50,6 +53,9 @@ import {
   type MobileLocale,
 } from "./src/i18n/labels";
 import { commerceCopy, formatCommerceDate } from "./src/i18n/commerce";
+import type { MobileResponsiveLayout } from "./src/layout/responsive-metrics";
+import { ACCOUNT_GUEST_AUTH_ACTIONS } from "./src/layout/screen-contracts";
+import { useMobileResponsiveLayout } from "./src/layout/use-mobile-responsive-layout";
 import {
   createMobileShadow,
   createMobileSurface,
@@ -643,6 +649,14 @@ const accountManagementActions = [
 ];
 
 export default function App() {
+  return (
+    <SafeAreaProvider>
+      <ReznoApp />
+    </SafeAreaProvider>
+  );
+}
+
+function ReznoApp() {
   /* eslint-disable @typescript-eslint/no-require-imports -- Expo Font loads local TTF assets through static require(). */
   const [fontsLoaded] = useFonts({
     [mobileTypography.kufiBold]: require("./assets/fonts/NotoKufiArabic-Bold.ttf"),
@@ -695,7 +709,8 @@ export default function App() {
     themeMode === "system" ? colorScheme ?? "dark" : themeMode;
   const theme =
     effectiveThemeMode === "light" ? lightMobileTheme : darkMobileTheme;
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const layout = useMobileResponsiveLayout();
+  const styles = useMemo(() => createStyles(theme, layout), [layout, theme]);
   const text = labels[locale];
   const isRtl = getTextDirection(locale) === "rtl";
 
@@ -1109,7 +1124,10 @@ export default function App() {
 
   if (!fontsLoaded) {
     return (
-      <SafeAreaView style={styles.shell}>
+      <SafeAreaView
+        edges={["bottom", "left", "right", "top"]}
+        style={styles.shell}
+      >
         <StatusBar style={theme.isDark ? "light" : "dark"} />
         <View style={styles.fontLoadingScreen} />
       </SafeAreaView>
@@ -1118,7 +1136,10 @@ export default function App() {
 
   if (authMode) {
     return (
-      <SafeAreaView style={styles.shell}>
+      <SafeAreaView
+        edges={["bottom", "left", "right", "top"]}
+        style={styles.shell}
+      >
         <StatusBar style={theme.isDark ? "light" : "dark"} />
         <MobileAuthScreen
           initialMode={authMode}
@@ -1134,7 +1155,10 @@ export default function App() {
 
   if (showOnboarding) {
     return (
-      <SafeAreaView style={[styles.shell, styles.onboardingSafeArea]}>
+      <SafeAreaView
+        edges={["bottom", "left", "right", "top"]}
+        style={[styles.shell, styles.onboardingSafeArea]}
+      >
         <StatusBar style="light" />
         <View style={styles.onboardingScreen}>
           <WelcomeOnboardingCard
@@ -1151,7 +1175,7 @@ export default function App() {
   }
 
   return (
-    <SafeAreaView style={styles.shell}>
+    <SafeAreaView edges={["left", "right", "top"]} style={styles.shell}>
       <StatusBar style={theme.isDark ? "light" : "dark"} />
       {!selectedBusiness &&
       activeTab !== "marketplace" &&
@@ -1360,13 +1384,20 @@ export default function App() {
         </ScrollView>
       )}
 
-      <BottomTabBar
-        activeTab={activeTab}
-        activityMenuOpen={activityMenuOpen}
-        locale={locale}
-        onTabPress={handleTabPress}
-        styles={styles}
-      />
+      <View
+        style={[
+          styles.bottomNavSafeArea,
+          { paddingBottom: layout.bottomInset },
+        ]}
+      >
+        <BottomTabBar
+          activeTab={activeTab}
+          activityMenuOpen={activityMenuOpen}
+          locale={locale}
+          onTabPress={handleTabPress}
+          styles={styles}
+        />
+      </View>
       <ActivityLauncher
         isRtl={isRtl}
         locale={locale}
@@ -1458,8 +1489,9 @@ function WelcomeOnboardingCard({
   onStart: () => void;
   styles: MobileStyles;
 }) {
-  const { height, width } = useWindowDimensions();
-  const compact = height < 760 || width < 375;
+  const responsiveLayout = useMobileResponsiveLayout();
+  const compact =
+    responsiveLayout.isCompactHeight || responsiveLayout.isNarrowWidth;
 
   return (
     <ScrollView
@@ -4754,35 +4786,35 @@ function AccountScreen({
               </Pressable>
             </>
           ) : (
-            <>
-              <Pressable
-                accessibilityRole="button"
-                disabled={authSession.status === "loading"}
-                onPress={() => onOpenAuth("signin")}
-                style={({ pressed }) => [
-                  styles.accountActionButton,
-                  styles.accountActionButtonPrimary,
-                  pressed && styles.softButtonPressed,
-                ]}
-              >
-                <Text style={styles.accountActionTextPrimary}>
-                  {copy.signIn}
-                </Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                disabled={authSession.status === "loading"}
-                onPress={() => onOpenAuth("signup")}
-                style={({ pressed }) => [
-                  styles.accountActionButton,
-                  pressed && styles.softButtonPressed,
-                ]}
-              >
-                <Text style={styles.accountActionText}>
-                  {copy.createAccount}
-                </Text>
-              </Pressable>
-            </>
+            ACCOUNT_GUEST_AUTH_ACTIONS.map((mode) => {
+              const primary = mode === "signin";
+              const label = primary ? copy.signIn : copy.createAccount;
+
+              return (
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={authSession.status === "loading"}
+                  key={mode}
+                  onPress={() => onOpenAuth(mode)}
+                  style={({ pressed }) => [
+                    styles.accountActionButton,
+                    primary && styles.accountActionButtonPrimary,
+                    !primary && styles.accountActionButtonSecondary,
+                    pressed && styles.softButtonPressed,
+                  ]}
+                >
+                  <Text
+                    style={
+                      primary
+                        ? styles.accountActionTextPrimary
+                        : styles.accountActionText
+                    }
+                  >
+                    {label}
+                  </Text>
+                </Pressable>
+              );
+            })
           )}
         </View>
       </View>
@@ -5004,7 +5036,10 @@ function AccountScreen({
 
 type MobileStyles = ReturnType<typeof createStyles>;
 
-const createStyles = (theme: MobileTheme) =>
+const createStyles = (
+  theme: MobileTheme,
+  layout: MobileResponsiveLayout,
+) =>
   StyleSheet.create({
     actionStack: {
       gap: theme.spacing.sm,
@@ -5051,11 +5086,16 @@ const createStyles = (theme: MobileTheme) =>
       shadowOpacity: theme.isDark ? 0.22 : 0.1,
       shadowRadius: 14,
     },
+    accountActionButtonSecondary: {
+      backgroundColor: "transparent",
+      borderColor: theme.colors.gold,
+      opacity: 1,
+    },
     accountActionRow: {
       flexDirection: "row",
       flexWrap: "wrap",
       gap: 10,
-      marginTop: 18,
+      marginTop: layout.verticalSpacing,
     },
     accountActionText: {
       color: theme.colors.foreground,
@@ -5073,7 +5113,7 @@ const createStyles = (theme: MobileTheme) =>
       borderRadius: 26,
       height: 52,
       justifyContent: "center",
-      marginBottom: 14,
+      marginBottom: layout.verticalSpacing,
       width: 52,
     },
     accountAvatarText: {
@@ -5084,10 +5124,10 @@ const createStyles = (theme: MobileTheme) =>
     accountHeroCard: {
       backgroundColor: theme.colors.hero,
       borderColor: theme.colors.goldSoft,
-      borderRadius: theme.radii.xl,
+      borderRadius: layout.borderRadius,
       borderWidth: 1,
       overflow: "hidden",
-      padding: 28,
+      padding: layout.cardPadding,
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: 26, width: 0 },
       shadowOpacity: theme.isDark ? 0.38 : 0.13,
@@ -5116,8 +5156,8 @@ const createStyles = (theme: MobileTheme) =>
       borderRadius: mobileRadii.compactCard,
       borderWidth: 1,
       flexDirection: "row",
-      gap: 12,
-      padding: 14,
+      gap: layout.verticalSpacing,
+      padding: layout.isCompactHeight ? 12 : 14,
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: 10, width: 0 },
       shadowOpacity: theme.isDark ? 0.16 : 0.05,
@@ -5193,7 +5233,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     bookingBottomAction: {
       marginTop: 10,
-      paddingBottom: 144,
+      paddingBottom: layout.verticalSpacing,
     },
     bookingDateRail: {
       flexDirection: "row",
@@ -5246,7 +5286,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     bookingReceiptActions: {
       gap: 12,
-      paddingBottom: 148,
+      paddingBottom: layout.verticalSpacing,
     },
     bookingSearchField: {
       alignItems: "center",
@@ -5290,10 +5330,10 @@ const createStyles = (theme: MobileTheme) =>
       shadowRadius: 22,
     },
     bookingStepScreen: {
-      gap: 16,
-      paddingBottom: 152,
-      paddingHorizontal: 20,
-      paddingTop: 30,
+      gap: layout.sectionGap,
+      paddingBottom: layout.verticalSpacing,
+      paddingHorizontal: layout.pagePadding,
+      paddingTop: layout.screenTopPadding,
     },
     bookingTimeGrid: {
       flexDirection: "row",
@@ -5506,7 +5546,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     bookingDetailActions: {
       gap: 12,
-      paddingBottom: 148,
+      paddingBottom: layout.verticalSpacing,
     },
     bookingDetailHero: {
       alignItems: "center",
@@ -5539,10 +5579,10 @@ const createStyles = (theme: MobileTheme) =>
       width: 116,
     },
     bookingDetailScreen: {
-      gap: 16,
-      paddingBottom: 152,
-      paddingHorizontal: 20,
-      paddingTop: 30,
+      gap: layout.sectionGap,
+      paddingBottom: layout.verticalSpacing,
+      paddingHorizontal: layout.pagePadding,
+      paddingTop: layout.screenTopPadding,
     },
     bookingDetailSummary: {
       backgroundColor: theme.isDark
@@ -5911,16 +5951,16 @@ const createStyles = (theme: MobileTheme) =>
     bookingsHeaderTitle: {
       color: "#f5f1e8",
       fontFamily: mobileTypography.kufiBold,
-      fontSize: 25,
-      lineHeight: 32,
+      fontSize: layout.isCompactHeight ? 21 : 25,
+      lineHeight: layout.isCompactHeight ? 28 : 32,
       paddingBottom: 1,
       paddingTop: 2,
       textAlign: "center",
       writingDirection: "rtl",
     },
     bookingsList: {
-      gap: 18,
-      paddingBottom: 170,
+      gap: layout.sectionGap,
+      paddingBottom: layout.verticalSpacing,
     },
     bookingsNotificationBadge: {
       alignItems: "center",
@@ -5943,9 +5983,9 @@ const createStyles = (theme: MobileTheme) =>
       lineHeight: 13,
     },
     bookingsScreen: {
-      gap: 15,
+      gap: layout.sectionGap,
       paddingBottom: 0,
-      paddingTop: 8,
+      paddingTop: layout.screenTopPadding,
       width: "100%",
     },
     bookingsSegment: {
@@ -6856,7 +6896,7 @@ const createStyles = (theme: MobileTheme) =>
       borderWidth: 0,
       borderRadius: 30,
       flex: 1,
-      height: 66,
+      height: layout.isCompactHeight ? 58 : 66,
       marginHorizontal: 0,
       shadowColor: theme.colors.deepGold,
       shadowOffset: { height: 8, width: 0 },
@@ -6875,9 +6915,9 @@ const createStyles = (theme: MobileTheme) =>
       width: 0,
     },
     centerTabIconImage: {
-      height: 26,
+      height: layout.iconSize,
       tintColor: theme.colors.foregroundInverse,
-      width: 26,
+      width: layout.iconSize,
     },
     centerTabHalo: {
       alignItems: "center",
@@ -6889,13 +6929,13 @@ const createStyles = (theme: MobileTheme) =>
         : "rgba(184, 117, 11, 0.28)",
       borderRadius: 25,
       borderWidth: 2,
-      height: 50,
+      height: layout.isCompactHeight ? 46 : 50,
       justifyContent: "center",
       shadowColor: theme.colors.deepGold,
       shadowOffset: { height: 10, width: 0 },
       shadowOpacity: theme.isDark ? 0.44 : 0.14,
       shadowRadius: 18,
-      width: 50,
+      width: layout.isCompactHeight ? 46 : 50,
     },
     centerTabInner: {
       alignItems: "center",
@@ -6905,9 +6945,9 @@ const createStyles = (theme: MobileTheme) =>
         : "rgba(255, 253, 248, 0.56)",
       borderRadius: 21,
       borderWidth: 1,
-      height: 42,
+      height: layout.isCompactHeight ? 38 : 42,
       justifyContent: "center",
-      width: 42,
+      width: layout.isCompactHeight ? 38 : 42,
     },
     centerTabLabel: {
       color: theme.colors.gold,
@@ -7006,13 +7046,13 @@ const createStyles = (theme: MobileTheme) =>
       textAlign: "center",
     },
     content: {
-      gap: 18,
-      paddingBottom: 24,
-      paddingHorizontal: 20,
+      gap: layout.sectionGap,
+      paddingBottom: layout.contentBottomInset,
+      paddingHorizontal: layout.pagePadding,
     },
     homeContent: {
       gap: 0,
-      paddingBottom: 0,
+      paddingBottom: layout.contentBottomInset,
       paddingHorizontal: 0,
     },
     immersiveContent: {
@@ -7415,9 +7455,9 @@ const createStyles = (theme: MobileTheme) =>
       backgroundColor: theme.colors.background,
       flexDirection: "row",
       gap: 8,
-      paddingBottom: 10,
-      paddingHorizontal: 20,
-      paddingTop: 24,
+      minHeight: layout.headerHeight,
+      paddingHorizontal: layout.pagePadding,
+      paddingVertical: layout.isCompactHeight ? 8 : 10,
     },
     iconAction: {
       alignItems: "center",
@@ -7878,7 +7918,7 @@ const createStyles = (theme: MobileTheme) =>
       borderColor: theme.colors.warning,
       borderRadius: theme.radii.card,
       borderWidth: 1,
-      padding: 20,
+      padding: layout.cardPadding,
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: 12, width: 0 },
       shadowOpacity: theme.isDark ? 0.18 : 0.06,
@@ -8303,8 +8343,8 @@ const createStyles = (theme: MobileTheme) =>
       justifyContent: "space-between",
     },
     onboardingActions: {
-      gap: 12,
-      marginTop: 34,
+      gap: layout.verticalSpacing,
+      marginTop: layout.isCompactHeight ? 20 : 34,
     },
     categoryRailCardBlue: {
       borderColor: "#38a9d3",
@@ -8321,8 +8361,8 @@ const createStyles = (theme: MobileTheme) =>
     onboardingBody: {
       color: "#f4f0e8",
       fontFamily: mobileTypography.uiRegular,
-      fontSize: 20,
-      lineHeight: 31,
+      fontSize: layout.isCompactHeight ? 17 : 20,
+      lineHeight: layout.isCompactHeight ? 26 : 31,
       textAlign: "center",
       writingDirection: "rtl",
     },
@@ -8348,9 +8388,9 @@ const createStyles = (theme: MobileTheme) =>
       justifyContent: "space-between",
       minHeight: "100%",
       overflow: "hidden",
-      paddingBottom: 22,
-      paddingHorizontal: 28,
-      paddingTop: 44,
+      paddingBottom: layout.isCompactHeight ? 16 : 22,
+      paddingHorizontal: layout.isNarrowWidth ? 18 : 28,
+      paddingTop: layout.isCompactHeight ? 22 : 44,
     },
     onboardingCardCompact: {
       paddingBottom: 16,
@@ -8376,7 +8416,7 @@ const createStyles = (theme: MobileTheme) =>
       flex: 1,
       gap: 10,
       justifyContent: "center",
-      minHeight: 104,
+      minHeight: layout.isCompactHeight ? 88 : 104,
       paddingHorizontal: 8,
       paddingVertical: 12,
     },
@@ -8401,7 +8441,7 @@ const createStyles = (theme: MobileTheme) =>
       direction: "ltr",
       flexDirection: "row-reverse",
       gap: 10,
-      marginTop: 26,
+      marginTop: layout.isCompactHeight ? 18 : 26,
       width: "100%",
     },
     onboardingLogoGlow: {
@@ -8583,7 +8623,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     onboardingValueSection: {
       alignItems: "center",
-      marginTop: 34,
+      marginTop: layout.isCompactHeight ? 20 : 34,
       width: "100%",
     },
     onboardingPattern: {
@@ -9001,8 +9041,8 @@ const createStyles = (theme: MobileTheme) =>
       borderColor: theme.colors.success,
       borderRadius: 24,
       borderWidth: 1,
-      gap: 14,
-      padding: 18,
+      gap: layout.verticalSpacing,
+      padding: layout.cardPadding,
     },
     privacyGrid: {
       gap: 10,
@@ -9049,7 +9089,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     preferencesGroup: {
       gap: 10,
-      marginTop: 16,
+      marginTop: layout.verticalSpacing,
     },
     preferenceRow: {
       alignItems: "center",
@@ -9071,8 +9111,8 @@ const createStyles = (theme: MobileTheme) =>
       borderColor: theme.colors.goldSoft,
       borderRadius: theme.radii.card,
       borderWidth: 1,
-      gap: 16,
-      padding: 22,
+      gap: layout.sectionGap,
+      padding: layout.cardPadding,
     },
     preferenceToggle: {
       backgroundColor: theme.colors.muted,
@@ -9093,7 +9133,7 @@ const createStyles = (theme: MobileTheme) =>
       flexDirection: "row",
       gap: 12,
       justifyContent: "space-between",
-      marginBottom: 14,
+      marginBottom: layout.verticalSpacing,
     },
     profileMembershipText: {
       color: theme.colors.mutedForeground,
@@ -9123,8 +9163,9 @@ const createStyles = (theme: MobileTheme) =>
     },
     profileStatsGrid: {
       flexDirection: "row",
+      flexWrap: layout.isNarrowWidth ? "wrap" : "nowrap",
       gap: 8,
-      marginTop: 18,
+      marginTop: layout.verticalSpacing,
     },
     profileStatValue: {
       color: theme.colors.deepGold,
@@ -9686,9 +9727,9 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.mutedForeground,
       fontFamily: mobileTypography.uiRegular,
       flexShrink: 1,
-      fontSize: 15,
-      lineHeight: 23,
-      marginTop: 8,
+      fontSize: layout.bodySize,
+      lineHeight: layout.isCompactHeight ? 21 : 23,
+      marginTop: layout.isCompactHeight ? 6 : 8,
     },
     screenEyebrow: {
       color: theme.colors.gold,
@@ -9702,10 +9743,10 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.foreground,
       fontFamily: mobileTypography.kufiBold,
       flexShrink: 1,
-      fontSize: 29,
+      fontSize: layout.titleSize,
       letterSpacing: -0.3,
-      lineHeight: 37,
-      marginTop: 8,
+      lineHeight: layout.titleSize + 8,
+      marginTop: layout.isCompactHeight ? 6 : 8,
     },
     iconButtonPressed: {
       opacity: 0.86,
@@ -10596,15 +10637,15 @@ const createStyles = (theme: MobileTheme) =>
       borderColor: theme.colors.border,
       borderRadius: 24,
       borderWidth: 1,
-      padding: 18,
+      padding: layout.cardPadding,
     },
     supportCard: {
       backgroundColor: theme.colors.card,
       borderColor: theme.colors.goldSoft,
       borderRadius: theme.radii.card,
       borderWidth: 1,
-      gap: 14,
-      padding: 20,
+      gap: layout.verticalSpacing,
+      padding: layout.cardPadding,
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: 12, width: 0 },
       shadowOpacity: theme.isDark ? 0.18 : 0.06,
@@ -10801,6 +10842,10 @@ const createStyles = (theme: MobileTheme) =>
       gap: 8,
       marginTop: 14,
     },
+    bottomNavSafeArea: {
+      backgroundColor: theme.colors.background,
+      flexShrink: 0,
+    },
     stepBody: {
       color: theme.colors.mutedForeground,
       fontFamily: mobileTypography.uiRegular,
@@ -10839,18 +10884,18 @@ const createStyles = (theme: MobileTheme) =>
       borderColor: theme.isDark
         ? "rgba(255, 193, 58, 0.26)"
         : "rgba(184, 117, 11, 0.22)",
-      borderRadius: 20,
+      borderRadius: layout.isCompactHeight ? 18 : 20,
       borderWidth: 1,
       direction: "ltr",
       elevation: 18,
       flexDirection: "row",
       flexShrink: 0,
-      height: 72,
-      marginBottom: 8,
-      marginHorizontal: 16,
-      paddingBottom: 5,
+      height: layout.bottomNavigationHeight,
+      marginBottom: layout.bottomNavigationBottomGap,
+      marginHorizontal: layout.isNarrowWidth ? 12 : 16,
+      paddingBottom: layout.isCompactHeight ? 3 : 5,
       paddingHorizontal: 6,
-      paddingTop: 5,
+      paddingTop: layout.isCompactHeight ? 3 : 5,
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: -10, width: 0 },
       shadowOpacity: theme.isDark ? 0.42 : 0.12,
@@ -10874,7 +10919,7 @@ const createStyles = (theme: MobileTheme) =>
       flex: 1,
       gap: 3,
       justifyContent: "center",
-      minHeight: 52,
+      minHeight: layout.touchTarget,
       paddingHorizontal: 0,
     },
     tabButtonActive: {
@@ -10893,9 +10938,9 @@ const createStyles = (theme: MobileTheme) =>
       color: theme.colors.gold,
     },
     tabIconImage: {
-      height: 25,
+      height: layout.iconSize,
       tintColor: theme.colors.mutedForeground,
-      width: 25,
+      width: layout.iconSize,
     },
     tabIconImageActive: {
       tintColor: theme.colors.gold,
@@ -10903,8 +10948,8 @@ const createStyles = (theme: MobileTheme) =>
     tabLabel: {
       color: theme.colors.mutedForeground,
       fontFamily: mobileTypography.uiMedium,
-      fontSize: 11,
-      lineHeight: 15,
+      fontSize: layout.isCompactHeight ? 10 : 11,
+      lineHeight: layout.isCompactHeight ? 14 : 15,
       maxWidth: 60,
       minWidth: 42,
       textAlign: "center",
@@ -11225,12 +11270,12 @@ const createStyles = (theme: MobileTheme) =>
     },
     staffReferenceScreen: {
       backgroundColor: theme.isDark ? "#020805" : "#fff8ea",
-      gap: 16,
+      gap: layout.sectionGap,
       minHeight: "100%",
       overflow: "hidden",
-      paddingBottom: 232,
-      paddingHorizontal: 22,
-      paddingTop: 34,
+      paddingBottom: layout.verticalSpacing,
+      paddingHorizontal: layout.pagePadding,
+      paddingTop: layout.screenTopPadding,
       position: "relative",
     },
     staffReferenceGlow: {
@@ -11759,7 +11804,7 @@ const createStyles = (theme: MobileTheme) =>
     },
     staffReferenceBottomAction: {
       gap: 10,
-      paddingBottom: 42,
+      paddingBottom: layout.verticalSpacing,
     },
     staffReferenceCta: {
       alignItems: "center",
@@ -11799,12 +11844,12 @@ const createStyles = (theme: MobileTheme) =>
     },
     dateTimeReferenceScreen: {
       backgroundColor: theme.isDark ? "#020805" : "#fff8ea",
-      gap: 16,
+      gap: layout.sectionGap,
       minHeight: "100%",
       overflow: "hidden",
-      paddingBottom: 232,
-      paddingHorizontal: 22,
-      paddingTop: 34,
+      paddingBottom: layout.verticalSpacing,
+      paddingHorizontal: layout.pagePadding,
+      paddingTop: layout.screenTopPadding,
       position: "relative",
     },
     dateTimeSummaryCard: {
@@ -12120,16 +12165,16 @@ const createStyles = (theme: MobileTheme) =>
     },
     dateTimeBottomAction: {
       gap: 10,
-      paddingBottom: 42,
+      paddingBottom: layout.verticalSpacing,
     },
     paymentReferenceScreen: {
       backgroundColor: theme.isDark ? "#020805" : "#fff8ea",
-      gap: 16,
+      gap: layout.sectionGap,
       minHeight: "100%",
       overflow: "hidden",
-      paddingBottom: 228,
-      paddingHorizontal: 20,
-      paddingTop: 34,
+      paddingBottom: layout.verticalSpacing,
+      paddingHorizontal: layout.pagePadding,
+      paddingTop: layout.screenTopPadding,
       position: "relative",
     },
     paymentReferenceHeader: {
@@ -12409,7 +12454,7 @@ const createStyles = (theme: MobileTheme) =>
       textAlign: "right",
     },
     paymentReferenceBottomAction: {
-      paddingBottom: 42,
+      paddingBottom: layout.verticalSpacing,
     },
     paymentReferenceCta: {
       alignItems: "center",

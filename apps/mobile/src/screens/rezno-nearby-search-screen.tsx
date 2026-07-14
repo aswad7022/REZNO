@@ -5,19 +5,20 @@ import {
   Image,
   Modal,
   Pressable,
-  SafeAreaView,
   StyleSheet,
   Text,
-  useWindowDimensions,
   View,
   type ImageSourcePropType,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { labels, type MobileLocale } from "../i18n/labels";
 import {
   PremiumEntrance,
   PremiumPressable,
 } from "../components/premium-motion";
+import type { MobileResponsiveLayout } from "../layout/responsive-metrics";
+import { useMobileResponsiveLayout } from "../layout/use-mobile-responsive-layout";
 import type { MobileTheme } from "../theme/tokens";
 import type {
   MobileBusinessVertical,
@@ -250,24 +251,29 @@ export function ReznoNearbySearchScreen({
   state: NearbyMarketplaceState;
   theme: MobileTheme;
 }) {
-  const { height, width } = useWindowDimensions();
+  const layout = useMobileResponsiveLayout();
+  const { width } = layout;
   const copy = NEARBY_COPY[locale];
   const stateCopy = labels[locale];
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const styles = useMemo(() => createStyles(theme, layout), [layout, theme]);
   const [previewSession, setPreviewSession] =
     useState<NearbyPreviewSession | null>(null);
   const previewFlowRef = useRef<ReznoNearbyPreviewFlowHandle>(null);
-  const pagePadding = width < 380 ? 18 : width >= 430 ? 22 : 20;
-  const sheetPadding = width < 390 ? 16 : width >= 430 ? 20 : 18;
-  const searchHeight = width < 380 ? 56 : width >= 430 ? 60 : 58;
-  const chipHeight = width < 380 ? 42 : width >= 430 ? 46 : 44;
-  const chipGap = width < 380 ? 6 : width >= 430 ? 10 : 8;
+  const pagePadding = layout.pagePadding;
+  const sheetPadding = layout.isNarrowWidth ? 14 : layout.pagePadding;
+  const searchHeight = layout.isCompactHeight ? 54 : 58;
+  const chipHeight = layout.touchTarget;
+  const chipGap = layout.isNarrowWidth ? 6 : 8;
   const mapHeight = clamp(
-    Math.round(height * 0.265),
-    NEARBY_LAYOUT.minMapHeight,
-    NEARBY_LAYOUT.maxMapHeight,
+    Math.round(layout.usableHeight * (layout.isCompactHeight ? 0.24 : 0.265)),
+    layout.isCompactHeight ? 160 : NEARBY_LAYOUT.minMapHeight,
+    layout.isCompactHeight ? 190 : NEARBY_LAYOUT.maxMapHeight,
   );
-  const sheetOverlap = clamp(Math.round(height * 0.035), 26, 34);
+  const sheetOverlap = clamp(
+    Math.round(layout.usableHeight * 0.035),
+    layout.isCompactHeight ? 22 : 26,
+    layout.isCompactHeight ? 28 : 34,
+  );
   const cardHeight = clamp(Math.round(width * 0.345), 132, 144);
   const mediaWidth = clamp(Math.round(width * 0.3), 108, 128);
   const realResults = useMemo(
@@ -455,6 +461,7 @@ export function ReznoNearbySearchScreen({
       >
         <SafeAreaView
           accessibilityViewIsModal
+          edges={["bottom", "left", "right", "top"]}
           style={styles.previewModalSafeArea}
         >
           {selectedPreviewBusiness ? (
@@ -1371,7 +1378,10 @@ function clamp(value: number, minimum: number, maximum: number) {
   return Math.max(minimum, Math.min(maximum, value));
 }
 
-const createStyles = (theme: MobileTheme) => {
+const createStyles = (
+  theme: MobileTheme,
+  layout: MobileResponsiveLayout,
+) => {
   const gold = theme.isDark ? theme.colors.gold : "#e9ae3e";
 
   return StyleSheet.create({
@@ -1737,7 +1747,7 @@ const createStyles = (theme: MobileTheme) => {
       minHeight: 0,
     },
     resultsListContent: {
-      paddingBottom: 18,
+      paddingBottom: layout.contentBottomInset,
       paddingTop: 4,
     },
     resultsListContentEmpty: {
@@ -1951,9 +1961,9 @@ const createStyles = (theme: MobileTheme) => {
     },
     topControls: {
       backgroundColor: "#05090b",
-      gap: 12,
-      paddingBottom: 12,
-      paddingTop: 8,
+      gap: layout.verticalSpacing,
+      paddingBottom: layout.verticalSpacing,
+      paddingTop: layout.isCompactHeight ? 4 : 8,
     },
     venueArch: {
       borderColor: "rgba(233, 174, 62, 0.42)",

@@ -5,7 +5,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  useWindowDimensions,
   View,
   type ImageSourcePropType,
 } from "react-native";
@@ -15,6 +14,12 @@ import {
   PremiumEntrance,
   PremiumPressable,
 } from "../components/premium-motion";
+import type { MobileResponsiveLayout } from "../layout/responsive-metrics";
+import {
+  HOME_HEADER_ACTION_MODE,
+  homeHeaderActionLabelsAreVisible,
+} from "../layout/screen-contracts";
+import { useMobileResponsiveLayout } from "../layout/use-mobile-responsive-layout";
 import type { MobileTheme } from "../theme/tokens";
 import type {
   MobileBusinessVertical,
@@ -33,7 +38,6 @@ const HOME_FONT = {
 const HOME_LAYOUT = {
   businessSectionLimit: 6,
   categoryGap: 9,
-  compactBreakpoint: 380,
   maxBusinessCardWidth: 181,
   minBusinessCardWidth: 154,
   standardBreakpoint: 430,
@@ -113,7 +117,7 @@ const HOME_COPY: Record<MobileLocale, HomeCopy> = {
     couponAccessibility: "Discount code REZNO15",
     distanceUnavailable: "Distance unavailable",
     greeting: "Welcome Ali",
-    heroTitle: "What service\ndo you need today?",
+    heroTitle: "What service do you need today?",
     heroTitleLines: 2,
     messages: "Messages",
     nearYou: "Near you",
@@ -265,30 +269,31 @@ export function ReznoHomeScreen({
   onRetry,
   theme,
 }: ReznoHomeScreenProps) {
-  const { width } = useWindowDimensions();
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const layout = useMobileResponsiveLayout();
+  const { width } = layout;
+  const styles = useMemo(() => createStyles(theme, layout), [layout, theme]);
   const copy = HOME_COPY[locale];
   const stateCopy = labels[locale];
-  const pagePadding =
-    width < HOME_LAYOUT.compactBreakpoint
-      ? 14
-      : width >= HOME_LAYOUT.standardBreakpoint
-        ? 20
-        : 16;
+  const pagePadding = layout.pagePadding;
   const categoryWidth = Math.max(
     66,
     (width - pagePadding * 2 - HOME_LAYOUT.categoryGap * 3) / 4,
   );
-  const categoryHeight = Math.max(
-    68,
-    Math.min(78, categoryWidth * 0.9),
+  const categoryHeight = Math.min(
+    layout.categoryTileHeight,
+    Math.max(68, categoryWidth * 0.9),
   );
   const businessCardWidth = Math.min(
     HOME_LAYOUT.maxBusinessCardWidth,
     Math.max(HOME_LAYOUT.minBusinessCardWidth, Math.round(width * 0.42)),
   );
-  const heroTitleSize =
-    width < 380 ? 20 : width >= 430 ? 24 : width >= 400 ? 23 : 22;
+  const heroTitleSize = layout.isCompactHeight
+    ? layout.isNarrowWidth
+      ? 19
+      : 21
+    : width >= HOME_LAYOUT.standardBreakpoint
+      ? 24
+      : 22;
   const businessSections = useMemo(
     () => deriveHomeBusinessSections(marketplaceState, locale, copy),
     [copy, locale, marketplaceState],
@@ -543,14 +548,16 @@ function HeroQuickAction({
         />
         <View style={styles.heroActionDot} />
       </View>
-      <Text
-        adjustsFontSizeToFit
-        minimumFontScale={0.8}
-        numberOfLines={1}
-        style={styles.heroActionLabel}
-      >
-        {label}
-      </Text>
+      {homeHeaderActionLabelsAreVisible(HOME_HEADER_ACTION_MODE) ? (
+        <Text
+          adjustsFontSizeToFit
+          minimumFontScale={0.8}
+          numberOfLines={1}
+          style={styles.heroActionLabel}
+        >
+          {label}
+        </Text>
+      ) : null}
     </PremiumPressable>
   );
 }
@@ -1433,7 +1440,10 @@ function localizeVertical(
   return categories[locale][vertical] ?? categories[locale].OTHER ?? "Services";
 }
 
-const createStyles = (theme: MobileTheme) => {
+const createStyles = (
+  theme: MobileTheme,
+  layout: MobileResponsiveLayout,
+) => {
   const palette = theme.isDark
     ? {
         background: "#060f0e",
@@ -1592,7 +1602,7 @@ const createStyles = (theme: MobileTheme) => {
       borderRadius: 17,
       borderWidth: 1,
       flexShrink: 0,
-      minHeight: 240,
+      minHeight: layout.isCompactHeight ? 224 : 240,
       overflow: "hidden",
       shadowColor: "#000000",
       shadowOffset: { height: 7, width: 0 },
@@ -1702,12 +1712,12 @@ const createStyles = (theme: MobileTheme) => {
       alignItems: "center",
       backgroundColor: palette.card,
       borderColor: palette.border,
-      borderRadius: 16,
+      borderRadius: layout.isCompactHeight ? 14 : 16,
       borderWidth: 1,
       flexShrink: 0,
       justifyContent: "center",
-      paddingHorizontal: 5,
-      paddingVertical: 6,
+      paddingHorizontal: layout.isCompactHeight ? 4 : 5,
+      paddingVertical: layout.isCompactHeight ? 4 : 6,
       shadowColor: "#000000",
       shadowOffset: { height: 5, width: 0 },
       shadowOpacity: theme.isDark ? 0.18 : 0.05,
@@ -1724,16 +1734,16 @@ const createStyles = (theme: MobileTheme) => {
       flexWrap: "wrap",
     },
     categoryIcon: {
-      height: 29,
-      marginBottom: 4,
+      height: layout.isCompactHeight ? 25 : 29,
+      marginBottom: layout.isCompactHeight ? 2 : 4,
       tintColor: palette.goldBright,
-      width: 29,
+      width: layout.isCompactHeight ? 25 : 29,
     },
     categoryLabel: {
       color: palette.cream,
       fontFamily: HOME_FONT.uiMedium,
-      fontSize: 14,
-      lineHeight: 20,
+      fontSize: layout.isCompactHeight ? 12.5 : 14,
+      lineHeight: layout.isCompactHeight ? 18 : 20,
       textAlign: "center",
       width: "100%",
     },
@@ -1961,13 +1971,13 @@ const createStyles = (theme: MobileTheme) => {
       borderColor: "rgba(255, 237, 194, 0.58)",
       borderRadius: 23,
       borderWidth: 1,
-      height: 46,
+      height: layout.touchTarget,
       justifyContent: "center",
       shadowColor: palette.gold,
       shadowOffset: { height: 3, width: 0 },
       shadowOpacity: 0.28,
       shadowRadius: 7,
-      width: 46,
+      width: layout.touchTarget,
     },
     filterIcon: {
       height: 21,
@@ -1999,7 +2009,7 @@ const createStyles = (theme: MobileTheme) => {
     heroActionGroup: {
       alignItems: "flex-start",
       flexDirection: "row",
-      gap: 11,
+      gap: layout.isNarrowWidth ? 7 : 10,
     },
     heroActionIcon: {
       height: 22,
@@ -2009,8 +2019,9 @@ const createStyles = (theme: MobileTheme) => {
     heroActionItem: {
       alignItems: "center",
       justifyContent: "flex-start",
-      minWidth: 48,
-      width: 52,
+      minHeight: layout.touchTarget,
+      minWidth: layout.touchTarget,
+      width: layout.touchTarget,
     },
     heroActionLabel: {
       color: palette.cream,
@@ -2024,14 +2035,14 @@ const createStyles = (theme: MobileTheme) => {
     heroGreeting: {
       color: palette.cream,
       fontFamily: HOME_FONT.kufiBold,
-      fontSize: 20,
-      lineHeight: 28,
+      fontSize: layout.isCompactHeight ? 17 : 20,
+      lineHeight: layout.isCompactHeight ? 24 : 28,
     },
     heroIdentity: {
       alignItems: "center",
       flexDirection: "row",
       flexShrink: 1,
-      gap: 10,
+      gap: layout.isNarrowWidth ? 7 : 10,
       marginTop: 3,
     },
     heroLowerRow: {
@@ -2041,7 +2052,7 @@ const createStyles = (theme: MobileTheme) => {
       justifyContent: "space-between",
     },
     heroSection: {
-      gap: 16,
+      gap: layout.isCompactHeight ? 10 : 16,
       width: "100%",
     },
     heroTitle: {
@@ -2069,7 +2080,7 @@ const createStyles = (theme: MobileTheme) => {
       flexDirection: "row",
       flexShrink: 0,
       gap: 5,
-      height: 46,
+      height: layout.touchTarget,
       maxWidth: 98,
       minWidth: 88,
       paddingHorizontal: 7,
@@ -2105,7 +2116,7 @@ const createStyles = (theme: MobileTheme) => {
       writingDirection: "ltr",
     },
     marketplaceSectionBlock: {
-      gap: 7,
+      gap: layout.isCompactHeight ? 5 : 7,
       width: "100%",
     },
     marketplacePlaceholder: {
@@ -2151,21 +2162,21 @@ const createStyles = (theme: MobileTheme) => {
       alignItems: "center",
       backgroundColor: "rgba(10, 16, 14, 0.8)",
       borderColor: palette.goldBright,
-      borderRadius: 27,
+      borderRadius: layout.isCompactHeight ? 23 : 27,
       borderWidth: 1.5,
-      height: 54,
+      height: layout.isCompactHeight ? 46 : 54,
       justifyContent: "center",
-      width: 54,
+      width: layout.isCompactHeight ? 46 : 54,
     },
     profileIcon: {
-      height: 38,
+      height: layout.isCompactHeight ? 32 : 38,
       tintColor: palette.goldBright,
-      width: 38,
+      width: layout.isCompactHeight ? 32 : 38,
     },
     promoArtwork: {
       alignItems: "center",
       flexBasis: "44%",
-      height: 115,
+      height: layout.isCompactHeight ? 96 : 115,
       justifyContent: "center",
       maxWidth: 150,
       minWidth: 112,
@@ -2184,15 +2195,15 @@ const createStyles = (theme: MobileTheme) => {
       alignItems: "center",
       backgroundColor: theme.isDark ? "#0b241b" : theme.colors.card,
       borderColor: palette.border,
-      borderRadius: 22,
+      borderRadius: layout.borderRadius,
       borderWidth: 1,
       flexDirection: "row",
       justifyContent: "space-between",
-      minHeight: 145,
+      minHeight: layout.promoHeight,
       overflow: "hidden",
-      paddingBottom: 18,
-      paddingHorizontal: 14,
-      paddingTop: 12,
+      paddingBottom: layout.isCompactHeight ? 12 : 18,
+      paddingHorizontal: layout.isCompactHeight ? 11 : 14,
+      paddingTop: layout.isCompactHeight ? 9 : 12,
       shadowColor: "#000000",
       shadowOffset: { height: 8, width: 0 },
       shadowOpacity: theme.isDark ? 0.22 : 0.07,
@@ -2201,8 +2212,8 @@ const createStyles = (theme: MobileTheme) => {
     promoBody: {
       color: palette.cream,
       fontFamily: HOME_FONT.uiRegular,
-      fontSize: 14,
-      lineHeight: 21,
+      fontSize: layout.isCompactHeight ? 12.5 : 14,
+      lineHeight: layout.isCompactHeight ? 18 : 21,
       marginTop: 1,
       width: "100%",
     },
@@ -2216,8 +2227,8 @@ const createStyles = (theme: MobileTheme) => {
     promoHeadline: {
       color: palette.goldBright,
       fontFamily: HOME_FONT.kufiBold,
-      fontSize: 24,
-      lineHeight: 33,
+      fontSize: layout.isCompactHeight ? 21 : 24,
+      lineHeight: layout.isCompactHeight ? 29 : 33,
       width: "100%",
     },
     promoPagination: {
@@ -2301,9 +2312,9 @@ const createStyles = (theme: MobileTheme) => {
     screen: {
       backgroundColor: palette.background,
       direction: "ltr",
-      gap: 13,
-      paddingBottom: 10,
-      paddingTop: 4,
+      gap: layout.verticalSpacing,
+      paddingBottom: layout.verticalSpacing,
+      paddingTop: layout.isCompactHeight ? 2 : 4,
       width: "100%",
     },
     searchControl: {
@@ -2314,7 +2325,7 @@ const createStyles = (theme: MobileTheme) => {
       borderWidth: 1,
       flexDirection: "row",
       gap: 10,
-      height: 62,
+      height: layout.isCompactHeight ? 54 : 62,
       paddingLeft: 16,
       paddingRight: 6,
       shadowColor: "#000000",
