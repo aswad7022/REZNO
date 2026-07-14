@@ -12,6 +12,7 @@ import {
 } from "../../../features/bookings/services/booking-catalog";
 import { createCustomerBooking } from "../../../features/bookings/services/booking-creation";
 import { getBookingDetailForCustomer } from "../../../features/bookings/services/booking-detail";
+import { getBookingSlotResult } from "../../../features/bookings/services/slots";
 import { prisma } from "../../../lib/db/prisma";
 import {
   BOOKING_QA_FIXTURE,
@@ -45,6 +46,55 @@ async function availableSelection(
     memberId: slot.memberId,
     startsAt: slot.startsAt,
   };
+}
+
+type BookingFixture = Awaited<ReturnType<typeof createBookingFixture>>;
+
+async function createAdditionalStaff(
+  fixture: BookingFixture,
+  options: {
+    assignToService?: boolean;
+    memberDeletedAt?: Date | null;
+    memberStatus?: "ACTIVE" | "INACTIVE";
+    personDeletedAt?: Date | null;
+    personStatus?: "ACTIVE" | "INACTIVE";
+  } = {},
+) {
+  assert.ok(fixture.member, "Additional staff require a staffed fixture");
+  const person = await prisma.person.create({
+    data: {
+      authUserId: `assignment-policy-${randomUUID()}`,
+      deletedAt: options.personDeletedAt ?? null,
+      firstName: `Policy ${randomUUID().slice(0, 6)}`,
+      isOnboarded: true,
+      status: options.personStatus ?? "ACTIVE",
+      timezone: fixture.branch.timezone,
+    },
+  });
+  const dayOfWeek = new Date(`${fixture.date}T12:00:00.000Z`).getUTCDay();
+  const member = await prisma.organizationMember.create({
+    data: {
+      assignments: { create: { branchId: fixture.branch.id } },
+      availabilities: {
+        create: {
+          branchId: fixture.branch.id,
+          dayOfWeek,
+          endTime: "17:00",
+          isActive: true,
+          startTime: "09:00",
+        },
+      },
+      deletedAt: options.memberDeletedAt ?? null,
+      organizationId: fixture.organization.id,
+      personId: person.id,
+      roleId: fixture.member.roleId,
+      serviceAssignments: options.assignToService
+        ? { create: { serviceId: fixture.service.id } }
+        : undefined,
+      status: options.memberStatus ?? "ACTIVE",
+    },
+  });
+  return { member, person };
 }
 
 test("Gate 2A mobile booking creation is tenant-safe, transactional, and idempotent", { concurrency: false }, async (t) => {
@@ -372,6 +422,188 @@ test("Gate 2A mobile booking creation is tenant-safe, transactional, and idempot
     assert.equal(
       await prisma.booking.count({ where: { creationIdempotencyKey: key } }),
       0,
+    );
+  });
+
+  await t.test("inactive stale assignment falls back consistently and the displayed slot creates", async () => {
+    await resetBookingTestData();
+    const fixture = await createBookingFixture({ mode: "REQUIRED" });
+    await prisma.organizationMember.update({
+      where: { id: fixture.member!.id },
+      data: { status: "INACTIVE" },
+    });
+    const fallback = await createAdditionalStaff(fixture);
+    const staff = await getPublicOfferingStaff(fixture.offering.id);
+    assert.deepEqual(staff.staff.map((item) => item.id), [fallback.member.id]);
+    const selection = await availableSelection(fixture, fallback.member.id);
+    const created = await createCustomerBooking({
+      ...selection,
+      customerId: fixture.customer.id,
+      idempotencyKey: randomUUID(),
+    });
+    assert.equal(
+      (await prisma.booking.findUnique({ where: { id: created.booking.id } }))
+        ?.memberId,
+      fallback.member.id,
+    );
+  });
+
+  await t.test("deleted membership assignment is ignored", async () => {
+    await resetBookingTestData();
+    const fixture = await createBookingFixture({ mode: "REQUIRED" });
+    await prisma.organizationMember.update({
+      where: { id: fixture.member!.id },
+      data: { deletedAt: new Date() },
+    });
+    const fallback = await createAdditionalStaff(fixture);
+    const staff = await getPublicOfferingStaff(fixture.offering.id);
+    assert.deepEqual(staff.staff.map((item) => item.id), [fallback.member.id]);
+    assert.ok((await availableSelection(fixture, fallback.member.id)).startsAt);
+  });
+
+  await t.test("inactive and deleted Person assignments are ignored", async () => {
+    await resetBookingTestData();
+    const fixture = await createBookingFixture({ mode: "REQUIRED" });
+    await prisma.person.update({
+      where: { id: fixture.member!.personId },
+      data: { status: "INACTIVE" },
+    });
+    const deletedPersonAssignment = await createAdditionalStaff(fixture, {
+      assignToService: true,
+      personDeletedAt: new Date(),
+    });
+    const fallback = await createAdditionalStaff(fixture);
+    const staff = await getPublicOfferingStaff(fixture.offering.id);
+    assert.deepEqual(staff.staff.map((item) => item.id), [fallback.member.id]);
+    assert.equal(
+      staff.staff.some((item) => item.id === deletedPersonAssignment.member.id),
+      false,
+    );
+  });
+
+  await t.test("valid active explicit assignment restricts slots to the assigned employee", async () => {
+    await resetBookingTestData();
+    const fixture = await createBookingFixture({ mode: "REQUIRED" });
+    const unassigned = await createAdditionalStaff(fixture);
+    const staff = await getPublicOfferingStaff(fixture.offering.id);
+    assert.deepEqual(staff.staff.map((item) => item.id), [fixture.member!.id]);
+    const slots = await getBookingSlotResult(fixture.offering.id, fixture.date);
+    assert.ok(slots.slots.length > 0);
+    assert.deepEqual(
+      new Set(slots.slots.map((slot) => slot.memberId)),
+      new Set([fixture.member!.id]),
+    );
+    assert.equal(
+      slots.slots.some((slot) => slot.memberId === unassigned.member.id),
+      false,
+    );
+  });
+
+  await t.test("unassigned active branch employee is rejected while a valid explicit assignment exists", async () => {
+    await resetBookingTestData();
+    const fixture = await createBookingFixture({ mode: "REQUIRED" });
+    const unassigned = await createAdditionalStaff(fixture);
+    await assert.rejects(
+      getPublicBookingAvailability({
+        branchServiceId: fixture.offering.id,
+        date: fixture.date,
+        memberId: unassigned.member.id,
+      }),
+      expectBookingCode("STAFF_UNAVAILABLE"),
+    );
+    const assignedSelection = await availableSelection(fixture);
+    await assert.rejects(
+      createCustomerBooking({
+        ...assignedSelection,
+        customerId: fixture.customer.id,
+        idempotencyKey: randomUUID(),
+        memberId: unassigned.member.id,
+      }),
+      expectBookingCode("STAFF_UNAVAILABLE"),
+    );
+    assert.equal(await prisma.booking.count(), 0);
+  });
+
+  await t.test("cross-organization Service assignment cannot grant eligibility or disable fallback", async () => {
+    await resetBookingTestData();
+    const fixture = await createBookingFixture({
+      label: "gate2a-policy-owner",
+      mode: "REQUIRED",
+    });
+    await prisma.organizationMember.update({
+      where: { id: fixture.member!.id },
+      data: { status: "INACTIVE" },
+    });
+    const fallback = await createAdditionalStaff(fixture);
+    const foreign = await createBookingFixture({
+      date: fixture.date,
+      label: "gate2a-policy-foreign",
+      mode: "REQUIRED",
+    });
+    await prisma.serviceStaffAssignment.create({
+      data: { memberId: foreign.member!.id, serviceId: fixture.service.id },
+    });
+    const staff = await getPublicOfferingStaff(fixture.offering.id);
+    assert.deepEqual(staff.staff.map((item) => item.id), [fallback.member.id]);
+    await assert.rejects(
+      getPublicBookingAvailability({
+        branchServiceId: fixture.offering.id,
+        date: fixture.date,
+        memberId: foreign.member!.id,
+      }),
+      expectBookingCode("STAFF_UNAVAILABLE"),
+    );
+    assert.ok((await availableSelection(fixture, fallback.member.id)).startsAt);
+  });
+
+  await t.test("employee becoming inactive after availability fails without partial persistence", async () => {
+    await resetBookingTestData();
+    const fixture = await createBookingFixture({ mode: "REQUIRED" });
+    const selection = await availableSelection(fixture);
+    await prisma.organizationMember.update({
+      where: { id: fixture.member!.id },
+      data: { status: "INACTIVE" },
+    });
+    await assert.rejects(
+      createCustomerBooking({
+        ...selection,
+        customerId: fixture.customer.id,
+        idempotencyKey: randomUUID(),
+      }),
+      expectBookingCode("STAFF_UNAVAILABLE"),
+    );
+    assert.equal(await prisma.booking.count(), 0);
+    assert.equal(await prisma.bookingStatusHistory.count(), 0);
+  });
+
+  await t.test("catalog, slot generation, availability, and transaction share one eligibility result", async () => {
+    await resetBookingTestData();
+    const fixture = await createBookingFixture({ mode: "REQUIRED" });
+    await prisma.organizationMember.update({
+      where: { id: fixture.member!.id },
+      data: { deletedAt: new Date() },
+    });
+    const fallback = await createAdditionalStaff(fixture);
+    const staff = await getPublicOfferingStaff(fixture.offering.id);
+    const slotResult = await getBookingSlotResult(
+      fixture.offering.id,
+      fixture.date,
+    );
+    assert.deepEqual(staff.staff.map((item) => item.id), [fallback.member.id]);
+    assert.deepEqual(
+      new Set(slotResult.slots.map((slot) => slot.memberId)),
+      new Set([fallback.member.id]),
+    );
+    const selection = await availableSelection(fixture, fallback.member.id);
+    const created = await createCustomerBooking({
+      ...selection,
+      customerId: fixture.customer.id,
+      idempotencyKey: randomUUID(),
+    });
+    assert.equal(
+      (await prisma.booking.findUnique({ where: { id: created.booking.id } }))
+        ?.memberId,
+      fallback.member.id,
     );
   });
 

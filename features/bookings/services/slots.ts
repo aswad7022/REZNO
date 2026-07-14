@@ -3,6 +3,12 @@ import "server-only";
 import { TZDate } from "@date-fns/tz";
 
 import { parseBookingDate } from "@/features/bookings/domain/date";
+import {
+  activeServiceStaffAssignmentMemberIds,
+  activeServiceStaffAssignmentWhere,
+  serviceStaffAssignmentPolicySelect,
+  serviceStaffPolicyAllowsMember,
+} from "@/features/bookings/domain/staff-assignment-policy";
 import { prisma } from "@/lib/db/prisma";
 import type {
   BookingSlot,
@@ -52,13 +58,8 @@ export async function getBookingSlotResult(
       service: {
         include: {
           staffAssignments: {
-            where: {
-              member: {
-                deletedAt: null,
-                status: "ACTIVE",
-                person: { deletedAt: null, status: "ACTIVE" },
-              },
-            },
+            where: activeServiceStaffAssignmentWhere,
+            select: serviceStaffAssignmentPolicySelect,
           },
         },
       },
@@ -152,18 +153,22 @@ export async function getBookingSlotResult(
   );
   const slotsByKey = new Map<string, BookingSlot>();
 
-  const assignedMemberIds = new Set(
-    offering.service.staffAssignments.map((assignment) => assignment.memberId),
-  );
+  const assignedMemberIds = activeServiceStaffAssignmentMemberIds({
+    assignments: offering.service.staffAssignments,
+    organizationId: offering.service.organizationId,
+    serviceId: offering.service.id,
+  });
   const branchMembers = offering.branch.assignments
     .map((assignment) => assignment.member)
-    .filter((member) =>
-      member.availabilities.some(
-        (availability) =>
-          availability.branchId === offering.branchId &&
-          availability.dayOfWeek === dayOfWeek &&
-          availability.isActive,
-      ),
+    .filter(
+      (member) =>
+        member.organizationId === offering.service.organizationId &&
+        member.availabilities.some(
+          (availability) =>
+            availability.branchId === offering.branchId &&
+            availability.dayOfWeek === dayOfWeek &&
+            availability.isActive,
+        ),
     );
   const unassignedCandidate = {
     id: null,
@@ -173,7 +178,9 @@ export async function getBookingSlotResult(
   const staffMode = offering.service.staffSelectionMode;
   const configuredMembers =
     assignedMemberIds.size > 0
-      ? branchMembers.filter((member) => assignedMemberIds.has(member.id))
+      ? branchMembers.filter((member) =>
+          serviceStaffPolicyAllowsMember(assignedMemberIds, member.id),
+        )
       : branchMembers;
   const candidates =
     staffMode === "NONE"
@@ -187,6 +194,8 @@ export async function getBookingSlotResult(
   if (staffMode === "REQUIRED" && candidates.length === 0) {
     const hasConfiguredStaff = offering.branch.assignments.some(
       (assignment) =>
+        assignment.member.organizationId ===
+          offering.service.organizationId &&
         assignment.member.availabilities.some(
           (availability) =>
             availability.branchId === offering.branchId &&

@@ -1,6 +1,12 @@
 import "server-only";
 
 import { bookingDomainError } from "@/features/bookings/domain/errors";
+import {
+  activeServiceStaffAssignmentMemberIds,
+  activeServiceStaffAssignmentWhere,
+  serviceStaffAssignmentPolicySelect,
+  serviceStaffPolicyAllowsMember,
+} from "@/features/bookings/domain/staff-assignment-policy";
 import type {
   PublicBookingBranch,
   PublicBookingBusiness,
@@ -166,7 +172,14 @@ export async function getPublicOfferingStaff(
       },
     },
     include: {
-      service: { include: { staffAssignments: true } },
+      service: {
+        include: {
+          staffAssignments: {
+            where: activeServiceStaffAssignmentWhere,
+            select: serviceStaffAssignmentPolicySelect,
+          },
+        },
+      },
       branch: {
         include: {
           assignments: {
@@ -194,15 +207,17 @@ export async function getPublicOfferingStaff(
     );
   }
 
-  const assignedIds = new Set(
-    offering.service.staffAssignments.map((assignment) => assignment.memberId),
-  );
+  const assignedIds = activeServiceStaffAssignmentMemberIds({
+    assignments: offering.service.staffAssignments,
+    organizationId: offering.service.organizationId,
+    serviceId: offering.service.id,
+  });
   const candidates = offering.branch.assignments
     .map((assignment) => assignment.member)
     .filter(
       (member) =>
         member.organizationId === offering.service.organizationId &&
-        (assignedIds.size === 0 || assignedIds.has(member.id)),
+        serviceStaffPolicyAllowsMember(assignedIds, member.id),
     );
 
   return {

@@ -13,6 +13,12 @@ import {
   BookingDomainError,
   bookingDomainError,
 } from "@/features/bookings/domain/errors";
+import {
+  activeServiceStaffAssignmentMemberIds,
+  activeServiceStaffAssignmentWhere,
+  serviceStaffAssignmentPolicySelect,
+  serviceStaffPolicyAllowsMember,
+} from "@/features/bookings/domain/staff-assignment-policy";
 import { getPublicBookingAvailability } from "@/features/bookings/services/booking-availability";
 import {
   serializePersistedBookingDetail,
@@ -197,7 +203,14 @@ export async function createCustomerBooking(
               },
             },
             include: {
-              service: { include: { staffAssignments: true } },
+              service: {
+                include: {
+                  staffAssignments: {
+                    where: activeServiceStaffAssignmentWhere,
+                    select: serviceStaffAssignmentPolicySelect,
+                  },
+                },
+              },
               branch: {
                 include: {
                   businessHours: true,
@@ -299,10 +312,15 @@ export async function createCustomerBooking(
                 },
               },
             });
-            const hasExplicitAssignments =
-              offering.service.staffAssignments.length > 0;
-            const assignedToService = offering.service.staffAssignments.some(
-              (assignment) => assignment.memberId === input.memberId,
+            const activeAssignmentMemberIds =
+              activeServiceStaffAssignmentMemberIds({
+                assignments: offering.service.staffAssignments,
+                organizationId: offering.service.organizationId,
+                serviceId: offering.service.id,
+              });
+            const assignedToService = serviceStaffPolicyAllowsMember(
+              activeAssignmentMemberIds,
+              input.memberId,
             );
             const insideAvailability = member?.availabilities.some(
               (window) =>
@@ -321,7 +339,7 @@ export async function createCustomerBooking(
             );
             if (
               !member ||
-              (hasExplicitAssignments && !assignedToService) ||
+              !assignedToService ||
               !insideAvailability
             ) {
               bookingDomainError(
