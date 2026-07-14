@@ -11,11 +11,15 @@ import {
   ACCOUNT_GUEST_AUTH_ACTIONS,
   ACCOUNT_ACTION_LAYOUT,
   ACCOUNT_NOTIFICATION_ROW_LAYOUT,
+  ACCOUNT_VISUAL_LAYOUT,
+  FULL_SCREEN_BACKGROUND_LAYOUT,
   HELP_CENTER_ROW_LAYOUT,
   HOME_HERO_TITLE_MAX_LINES,
   HOME_HEADER_ACTION_MODE,
   KEYBOARD_SAFE_FORM_LAYOUT,
   MESSAGE_PREVIEW_ROW_LAYOUT,
+  NOTIFICATION_CARD_LAYOUT,
+  NOTIFICATIONS_LANDING_LAYOUT,
   PRODUCT_NO_MEDIA_LAYOUT,
   SHARED_TOP_HEADER_LAYOUT,
   getTextWritingDirection,
@@ -76,6 +80,14 @@ const dimensions = [
     topInset: 24,
     width: 412,
   },
+  {
+    bottomInset: 34,
+    height: 932,
+    label: "large iPhone class",
+    platform: "ios" as const,
+    topInset: 59,
+    width: 430,
+  },
 ];
 
 test("detects compact-height and narrow-width device classes", () => {
@@ -90,20 +102,25 @@ test("detects compact-height and narrow-width device classes", () => {
 });
 
 test("keeps exactly one system inset and a final 20-24dp gap in bottom padding", () => {
-  const layout = createMobileResponsiveLayout(dimensions[0]);
+  for (const target of dimensions) {
+    const layout = createMobileResponsiveLayout(target);
 
-  assert.equal(layout.topInset, 24);
-  assert.equal(layout.bottomInset, 48);
-  assert.equal(
-    layout.contentBottomInset,
+    assert.equal(
+      layout.contentBottomInset,
       layout.bottomNavigationHeight +
-      layout.bottomInset +
-      layout.finalContentGap,
-  );
-  assert.equal(layout.contentBottomInset - layout.bottomInset, layout.bottomNavigationHeight + layout.finalContentGap);
-  assert.equal(layout.contentTrailingSpace, layout.finalContentGap);
-  assert.ok(layout.finalContentGap >= 20);
-  assert.ok(layout.finalContentGap <= 24);
+        layout.bottomInset +
+        layout.finalContentGap,
+      target.label,
+    );
+    assert.equal(
+      layout.contentBottomInset - layout.bottomInset,
+      layout.bottomNavigationHeight + layout.finalContentGap,
+      target.label,
+    );
+    assert.equal(layout.contentTrailingSpace, layout.finalContentGap, target.label);
+    assert.ok(layout.finalContentGap >= 20, target.label);
+    assert.ok(layout.finalContentGap <= 24, target.label);
+  }
 });
 
 test("produces readable, tappable metrics across the QA dimension matrix", () => {
@@ -149,7 +166,7 @@ test("keeps the compact typography hierarchy inside the physical QA limits", () 
   assert.ok(layout.typography.navigationLabel <= 12);
 });
 
-test("bounds layout-critical text at Android font scales 1.0, 1.15, and 1.3", () => {
+test("bounds layout-critical text at font scales 1.0, 1.15, and 1.3", () => {
   const scales = [1, 1.15, 1.3];
 
   assert.deepEqual(
@@ -169,6 +186,20 @@ test("bounds layout-critical text at Android font scales 1.0, 1.15, and 1.3", ()
   assert.equal(LAYOUT_CRITICAL_MAX_FONT_SIZE_MULTIPLIER, 1.15);
 });
 
+test("keeps the full-screen background independent from scrolling", () => {
+  assert.equal(FULL_SCREEN_BACKGROUND_LAYOUT.rootFillsViewport, true);
+  assert.equal(FULL_SCREEN_BACKGROUND_LAYOUT.scrollBackground, "transparent");
+  assert.equal(FULL_SCREEN_BACKGROUND_LAYOUT.overscrollMatchesRoot, true);
+  assert.equal(
+    FULL_SCREEN_BACKGROUND_LAYOUT.decorativeLayerPointerEvents,
+    "none",
+  );
+  assert.equal(
+    FULL_SCREEN_BACKGROUND_LAYOUT.bottomNavigationOutsideScroll,
+    true,
+  );
+});
+
 test("keeps both guest Account auth actions with a primary sign-in", () => {
   assert.deepEqual(ACCOUNT_GUEST_AUTH_ACTIONS, ["signin", "signup"]);
   assert.equal(ACCOUNT_GUEST_AUTH_ACTIONS[0], "signin");
@@ -177,6 +208,10 @@ test("keeps both guest Account auth actions with a primary sign-in", () => {
   assert.ok(ACCOUNT_ACTION_LAYOUT.buttonMinHeight >= 50);
   assert.ok(ACCOUNT_ACTION_LAYOUT.buttonMinHeight <= 54);
   assert.equal(ACCOUNT_ACTION_LAYOUT.gap, 12);
+  assert.equal(ACCOUNT_VISUAL_LAYOUT.avatarSize, 52);
+  assert.ok(ACCOUNT_VISUAL_LAYOUT.titleMaximum <= 28);
+  assert.ok(ACCOUNT_VISUAL_LAYOUT.bodyMaximum <= 17);
+  assert.ok(ACCOUNT_VISUAL_LAYOUT.sectionTitleMaximum <= 22);
 });
 
 test("uses icon-only Home header actions", () => {
@@ -193,6 +228,11 @@ test("keeps Home hero copy to two lines and preserves mixed-script direction", (
 test("keeps message previews in deterministic flex rows", () => {
   assert.equal(MESSAGE_PREVIEW_ROW_LAYOUT.usesAbsolutePositioning, false);
   assert.equal(MESSAGE_PREVIEW_ROW_LAYOUT.metaColumnWidth, 48);
+  assert.ok(MESSAGE_PREVIEW_ROW_LAYOUT.avatarSize >= 42);
+  assert.ok(MESSAGE_PREVIEW_ROW_LAYOUT.avatarSize <= 48);
+  assert.ok(MESSAGE_PREVIEW_ROW_LAYOUT.businessNameMaximum <= 18);
+  assert.ok(MESSAGE_PREVIEW_ROW_LAYOUT.previewMaximum <= 16);
+  assert.equal(MESSAGE_PREVIEW_ROW_LAYOUT.preservesLatinWritingDirection, true);
 });
 
 test("keeps the shared compact header centered and in normal flex flow", () => {
@@ -206,6 +246,14 @@ test("keeps the shared compact header centered and in normal flex flow", () => {
 
 test("keeps final-polish rows and media placeholders compact but reachable", () => {
   assert.equal(ACCOUNT_NOTIFICATION_ROW_LAYOUT.compactMinHeight, 68);
+  assert.equal(ACCOUNT_NOTIFICATION_ROW_LAYOUT.expectedMaxHeight, 84);
+  assert.equal(ACCOUNT_NOTIFICATION_ROW_LAYOUT.switchWidth, 44);
+  assert.equal(ACCOUNT_NOTIFICATION_ROW_LAYOUT.textColumnFlex, 1);
+  assert.equal(ACCOUNT_NOTIFICATION_ROW_LAYOUT.textColumnMinWidth, 0);
+  assert.equal(
+    ACCOUNT_NOTIFICATION_ROW_LAYOUT.footerUsesInformationCard,
+    true,
+  );
   assert.equal(ACCOUNT_NOTIFICATION_ROW_LAYOUT.usesAbsolutePositioning, false);
   assert.equal(HELP_CENTER_ROW_LAYOUT.inlineExpansion, true);
   assert.equal(HELP_CENTER_ROW_LAYOUT.usesFixedHeight, false);
@@ -213,6 +261,22 @@ test("keeps final-polish rows and media placeholders compact but reachable", () 
   assert.equal(PRODUCT_NO_MEDIA_LAYOUT.compactHeight, 136);
   assert.ok(PRODUCT_NO_MEDIA_LAYOUT.compactHeight < 180);
   assert.equal(PRODUCT_NO_MEDIA_LAYOUT.isStructuredCard, true);
+});
+
+test("keeps notification landing and list cards compact", () => {
+  assert.equal(NOTIFICATIONS_LANDING_LAYOUT.usesMarketingHero, false);
+  assert.ok(NOTIFICATIONS_LANDING_LAYOUT.pageTitleMaximum <= 26);
+  assert.deepEqual(NOTIFICATIONS_LANDING_LAYOUT.sectionOrder, [
+    "orderNotifications",
+    "notificationCenter",
+    "messages",
+  ]);
+  assert.ok(NOTIFICATION_CARD_LAYOUT.iconSize >= 38);
+  assert.ok(NOTIFICATION_CARD_LAYOUT.iconSize <= 44);
+  assert.ok(NOTIFICATION_CARD_LAYOUT.titleMaximum <= 18);
+  assert.ok(NOTIFICATION_CARD_LAYOUT.bodyMaximum <= 16);
+  assert.ok(NOTIFICATION_CARD_LAYOUT.timestampMaximum <= 14);
+  assert.equal(NOTIFICATION_CARD_LAYOUT.usesAbsolutePositioning, false);
 });
 
 test("keeps auth and checkout CTAs in scrollable Android keyboard-safe flow", () => {
@@ -227,6 +291,18 @@ test("keeps visual QA screen selection development-only and deterministic", () =
   assert.equal(resolveVisualQaInitialScreen("product", true), "product");
   assert.equal(resolveVisualQaInitialScreen("signUp", true), "signUp");
   assert.equal(resolveVisualQaInitialScreen("messages", true), "messages");
+  assert.equal(
+    resolveVisualQaInitialScreen("notificationsLanding", true),
+    "notificationsLanding",
+  );
+  assert.equal(
+    resolveVisualQaInitialScreen("notificationCenter", true),
+    "notificationCenter",
+  );
+  assert.equal(
+    resolveVisualQaInitialScreen("conversationPreview", true),
+    "conversationPreview",
+  );
   assert.equal(resolveVisualQaInitialScreen("unknown", true), null);
   assert.equal(resolveVisualQaInitialScreen("checkout", false), null);
   assert.equal(resolveVisualQaLocale("en"), "en");
