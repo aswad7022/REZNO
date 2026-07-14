@@ -5,6 +5,9 @@ import { LayoutText as Text } from "./layout-text";
 import { formatCommerceMoney, type CommerceCopy } from "../i18n/commerce";
 import type { MobileLocale } from "../i18n/labels";
 import type { CommerceProduct, CommerceStore } from "../types/commerce";
+import type { MobileResponsiveLayout } from "../layout/responsive-metrics";
+import { SHARED_TOP_HEADER_LAYOUT } from "../layout/screen-contracts";
+import { useMobileResponsiveLayout } from "../layout/use-mobile-responsive-layout";
 import type { MobileTheme } from "../theme/tokens";
 
 const FONT = {
@@ -42,7 +45,8 @@ export function CommerceHeader({
   title: string;
   theme: MobileTheme;
 }) {
-  const styles = createStyles(theme);
+  const layout = useMobileResponsiveLayout();
+  const styles = createStyles(theme, layout);
   return (
     <View style={[styles.header, isRtl && styles.rowRtl]}>
       {onBack ? (
@@ -53,7 +57,7 @@ export function CommerceHeader({
           theme={theme}
         />
       ) : <View style={styles.headerSpacer} />}
-      <Text numberOfLines={2} style={[styles.headerTitle, isRtl ? styles.rtl : styles.ltr]}>{title}</Text>
+      <Text numberOfLines={SHARED_TOP_HEADER_LAYOUT.titleMaxLines} style={[styles.headerTitle, isRtl ? styles.rtl : styles.ltr]}>{title}</Text>
       {onCart ? (
         <View>
           <IconButton icon={COMMERCE_ICONS.cart} label={copy.cart} onPress={onCart} theme={theme} />
@@ -79,7 +83,8 @@ export function IconButton({
   onPress: () => void;
   theme: MobileTheme;
 }) {
-  const styles = createStyles(theme);
+  const layout = useMobileResponsiveLayout();
+  const styles = createStyles(theme, layout);
   return (
     <PremiumPressable
       accessibilityLabel={label}
@@ -251,7 +256,9 @@ export function createCommerceStyles(theme: MobileTheme) {
   return createStyles(theme);
 }
 
-function createStyles(theme: MobileTheme) {
+function createStyles(theme: MobileTheme, layout?: MobileResponsiveLayout) {
+  const headerActionSize = layout?.touchTarget ?? 44;
+
   return StyleSheet.create({
     available: { color: theme.colors.success, fontFamily: FONT.uiSemiBold, fontSize: 13 },
     badge: { alignItems: "center", backgroundColor: theme.colors.gold, borderRadius: 10, height: 20, justifyContent: "center", position: "absolute", right: -5, top: -5, width: 20 },
@@ -272,12 +279,12 @@ function createStyles(theme: MobileTheme) {
     coverFallback: { alignItems: "center", backgroundColor: theme.colors.heroMuted, height: 110, justifyContent: "center" },
     coverIcon: { height: 36, tintColor: theme.colors.gold, width: 36 },
     disabled: { opacity: 0.45 },
-    header: { alignItems: "center", flexDirection: "row", gap: 12, justifyContent: "space-between", minHeight: 58 },
-    headerSpacer: { height: 48, width: 48 },
-    headerTitle: { color: theme.colors.foreground, flex: 1, fontFamily: FONT.kufiBold, fontSize: 23, lineHeight: 34, textAlign: "center" },
+    header: { alignItems: "center", flexDirection: "row", gap: 10, justifyContent: "space-between", minHeight: layout?.headerHeight ?? 56 },
+    headerSpacer: { height: headerActionSize, width: headerActionSize },
+    headerTitle: { color: theme.colors.foreground, flex: 1, fontFamily: FONT.kufiBold, fontSize: layout?.isCompactHeight ? 18 : 20, lineHeight: layout?.isCompactHeight ? 25 : 28, textAlign: "center" },
     icon: { height: 22, tintColor: theme.colors.mutedForeground, width: 22 },
     iconActive: { tintColor: theme.colors.gold },
-    iconButton: { alignItems: "center", backgroundColor: theme.colors.cardElevated, borderColor: theme.colors.border, borderRadius: 16, borderWidth: 1, height: 48, justifyContent: "center", width: 48 },
+    iconButton: { alignItems: "center", backgroundColor: theme.colors.cardElevated, borderColor: theme.colors.border, borderRadius: 16, borderWidth: 1, height: headerActionSize, justifyContent: "center", width: headerActionSize },
     iconButtonActive: { borderColor: theme.colors.gold },
     ltr: { textAlign: "left", writingDirection: "ltr" },
     metaRow: { flexDirection: "row", flexWrap: "wrap", gap: 7 },

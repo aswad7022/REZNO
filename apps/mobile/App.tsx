@@ -61,9 +61,12 @@ import {
 import {
   ACCOUNT_ACTION_LAYOUT,
   ACCOUNT_GUEST_AUTH_ACTIONS,
+  ACCOUNT_NOTIFICATION_ROW_LAYOUT,
+  HELP_CENTER_ROW_LAYOUT,
   MESSAGE_PREVIEW_ROW_LAYOUT,
   getTextWritingDirection,
   resolveVisualQaInitialScreen,
+  resolveVisualQaLocale,
 } from "./src/layout/screen-contracts";
 import { useMobileResponsiveLayout } from "./src/layout/use-mobile-responsive-layout";
 import {
@@ -169,6 +172,8 @@ type BookingPaymentOption = {
 type BookingListFilter = "all" | "upcoming" | "completed" | "cancelled";
 
 type BookingManagementPanel = "cancel" | "edit" | null;
+
+type AccountSection = "help" | "notifications" | "overview";
 
 type VisualBookingStatus = "cancelled" | "completed" | "confirmed" | "pending";
 
@@ -648,15 +653,21 @@ const privacySecurityRows = [
 ];
 
 const helpFaqRows = [
-  "كيف أتابع حجزي؟",
-  "كيف أضيف عملي لاحقاً؟",
-  "كيف أسجّل الدخول أو أنشئ حساباً؟",
+  { answer: "افتح «نشاطي» ثم «حجوزاتي» لمراجعة الموعد وحالته.", question: "كيف أتابع حجزي؟" },
+  { answer: "إضافة الأعمال غير مفعلة في هذه النسخة. سيظهر المسار الموثق عند جاهزيته.", question: "كيف أضيف عملي لاحقاً؟" },
+  { answer: "ارجع إلى نظرة الحساب العامة واختر تسجيل الدخول أو إنشاء حساب.", question: "كيف أسجّل الدخول أو أنشئ حساباً؟" },
 ];
 
-const accountManagementActions = [
-  { label: "إدارة الحساب لاحقاً", tone: "secondary" },
-  { label: "مركز المساعدة", tone: "primary" },
-];
+const accountSectionCopy: Record<MobileLocale, {
+  helpSubtitle: string;
+  helpTitle: string;
+  notificationsSubtitle: string;
+  notificationsTitle: string;
+}> = {
+  ar: { helpSubtitle: "إجابات داخلية واضحة", helpTitle: "مركز المساعدة", notificationsSubtitle: "تحكم بصري بدون صلاحيات جهاز", notificationsTitle: "تفضيلات الإشعارات" },
+  ckb: { helpSubtitle: "وەڵامی ڕوونی ناوخۆی ئەپ", helpTitle: "ناوەندی یارمەتی", notificationsSubtitle: "کۆنترۆڵی بینراو بەبێ مۆڵەتی ئامێر", notificationsTitle: "هەڵبژاردەکانی ئاگادارکردنەوە" },
+  en: { helpSubtitle: "Clear answers inside the app", helpTitle: "Help center", notificationsSubtitle: "Visual controls without device permissions", notificationsTitle: "Notification preferences" },
+};
 
 export default function App() {
   return (
@@ -683,10 +694,18 @@ function ReznoApp() {
     __DEV__,
   );
   const visualQaInitialTab: MobileAppTabId | null =
-    visualQaInitialScreen === "checkout"
+    visualQaInitialScreen === "checkout" || visualQaInitialScreen === "product"
       ? "marketplace"
+      : visualQaInitialScreen === "accountHelp" ||
+          visualQaInitialScreen === "accountNotifications" ||
+          visualQaInitialScreen === "signIn" ||
+          visualQaInitialScreen === "signUp"
+        ? "account"
       : visualQaInitialScreen;
-  const [locale, setLocale] = useState<MobileLocale>(DEFAULT_LOCALE);
+  const [locale, setLocale] = useState<MobileLocale>(
+    resolveVisualQaLocale(process.env.EXPO_PUBLIC_REZNO_VISUAL_QA_LOCALE) ??
+      DEFAULT_LOCALE,
+  );
   const [activeTab, setActiveTab] = useState<MobileAppTabId>(
     visualQaInitialTab ?? "customerHome",
   );
@@ -711,7 +730,13 @@ function ReznoApp() {
   const [showOnboarding, setShowOnboarding] = useState(
     visualQaInitialTab === null,
   );
-  const [authMode, setAuthMode] = useState<MobileAuthMode | null>(null);
+  const [authMode, setAuthMode] = useState<MobileAuthMode | null>(
+    visualQaInitialScreen === "signIn"
+      ? "signin"
+      : visualQaInitialScreen === "signUp"
+        ? "signup"
+        : null,
+  );
   const [authSession, setAuthSession] = useState<MobileAuthSessionState>({
     status: "loading",
   });
@@ -723,6 +748,14 @@ function ReznoApp() {
   const [authActionError, setAuthActionError] = useState<string | null>(null);
   const [signOutPending, setSignOutPending] = useState(false);
   const [themeMode, setThemeMode] = useState<MobileThemeMode>("dark");
+  const [accountSection, setAccountSection] = useState<AccountSection>(
+    visualQaInitialScreen === "accountHelp"
+      ? "help"
+      : visualQaInitialScreen === "accountNotifications"
+        ? "notifications"
+        : "overview",
+  );
+  const appScrollRef = useRef<ScrollView>(null);
   const [notificationOrderId, setNotificationOrderId] = useState<string | null>(null);
   const [marketplaceState, setMarketplaceState] = useState<MarketplaceState>({
     status: "idle",
@@ -734,6 +767,7 @@ function ReznoApp() {
   const layout = useMobileResponsiveLayout();
   const styles = useMemo(() => createStyles(theme, layout), [layout, theme]);
   const text = labels[locale];
+  const accountCopy = accountSectionCopy[locale];
   const isRtl = getTextDirection(locale) === "rtl";
 
   useEffect(() => {
@@ -961,11 +995,19 @@ function ReznoApp() {
     setBookingManagementPanel(null);
     setNotificationOrderId(null);
 
+    if (tabId === "account") setAccountSection("overview");
+
     if (tabId === "serviceDiscovery" && marketplaceState.status === "idle") {
       loadMarketplace();
     }
 
     setActiveTab(tabId);
+    requestAnimationFrame(() => appScrollRef.current?.scrollTo({ animated: false, y: 0 }));
+  };
+
+  const handleAccountSectionChange = (section: AccountSection) => {
+    setAccountSection(section);
+    requestAnimationFrame(() => appScrollRef.current?.scrollTo({ animated: false, y: 0 }));
   };
 
   const handleEnterApp = () => {
@@ -1180,6 +1222,7 @@ function ReznoApp() {
           onAuthenticated={handleAuthSuccess}
           onBack={() => setAuthMode(null)}
           theme={theme}
+          visualQaAutoFocus={visualQaInitialScreen === "signIn" || visualQaInitialScreen === "signUp"}
         />
       </SafeAreaView>
     );
@@ -1218,9 +1261,13 @@ function ReznoApp() {
       activeTab !== "favorites" &&
       activeTab !== "reznoAi" ? (
         <ScreenHeader
+          backLabel={mobileAuthCopy[locale].back}
           isRtl={isRtl}
           locale={locale}
+          onBack={activeTab === "account" && accountSection !== "overview" ? () => handleAccountSectionChange("overview") : undefined}
           onLocaleChange={setLocale}
+          pageSubtitle={activeTab === "account" && accountSection === "notifications" ? accountCopy.notificationsSubtitle : activeTab === "account" && accountSection === "help" ? accountCopy.helpSubtitle : undefined}
+          pageTitle={activeTab === "account" && accountSection === "notifications" ? accountCopy.notificationsTitle : activeTab === "account" && accountSection === "help" ? accountCopy.helpTitle : undefined}
           styles={styles}
           text={text}
         />
@@ -1246,6 +1293,7 @@ function ReznoApp() {
             selectedBusiness && styles.immersiveContent,
           ]}
           keyboardShouldPersistTaps="handled"
+          ref={appScrollRef}
           showsVerticalScrollIndicator={false}
           style={styles.appScroll}
         >
@@ -1309,6 +1357,7 @@ function ReznoApp() {
             onOpenAccount={() => handleTabPress("account")}
             theme={theme}
             visualQaCheckout={visualQaInitialScreen === "checkout"}
+            visualQaProduct={visualQaInitialScreen === "product"}
           />
         ) : null}
 
@@ -1404,11 +1453,13 @@ function ReznoApp() {
             onLocaleChange={setLocale}
             onOpenAuth={handleOpenAuth}
             onOpenSetup={() => setAuthMode("signin")}
+            onSectionChange={handleAccountSectionChange}
             onSignOut={() => {
               void handleSignOut();
             }}
             onThemeModeChange={setThemeMode}
             signOutPending={signOutPending}
+            section={accountSection}
             styles={styles}
             text={text}
             themeMode={themeMode}
@@ -4813,8 +4864,10 @@ function AccountScreen({
   onLocaleChange,
   onOpenAuth,
   onOpenSetup,
+  onSectionChange,
   onSignOut,
   onThemeModeChange,
+  section,
   signOutPending,
   styles,
   text,
@@ -4829,14 +4882,25 @@ function AccountScreen({
   onLocaleChange: (locale: MobileLocale) => void;
   onOpenAuth: (mode: MobileAuthMode) => void;
   onOpenSetup: () => void;
+  onSectionChange: (section: AccountSection) => void;
   onSignOut: () => void;
   onThemeModeChange: (mode: MobileThemeMode) => void;
+  section: AccountSection;
   signOutPending: boolean;
   styles: MobileStyles;
   text: (typeof labels)[MobileLocale];
   themeMode: MobileThemeMode;
 }) {
   const copy = mobileAuthCopy[locale];
+
+  if (section === "notifications") {
+    return <AccountNotificationPreferencesScreen isRtl={isRtl} styles={styles} />;
+  }
+
+  if (section === "help") {
+    return <AccountHelpScreen isRtl={isRtl} styles={styles} />;
+  }
+
   const authenticatedUser =
     authSession.status === "authenticated" ? authSession.user : null;
   const accountTitle = authenticatedUser?.name || copy.accountGuestTitle;
@@ -5102,36 +5166,22 @@ function AccountScreen({
         </View>
       </View>
 
-      <View style={styles.preferencesPanel}>
-        <SectionHeader isRtl={isRtl} styles={styles} title="تفضيلات الإشعارات" />
-        {accountNotificationRows.map((row) => (
-          <View key={row.label} style={styles.preferenceRow}>
-            <View style={styles.preferenceCopy}>
-              <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>
-                {row.label}
-              </Text>
-              <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>
-                {row.meta}
-              </Text>
-            </View>
-            <View
-              style={[
-                styles.preferenceToggle,
-                row.enabled && styles.preferenceToggleActive,
-              ]}
-            >
-              <View
-                style={[
-                  styles.preferenceKnob,
-                  row.enabled && styles.preferenceKnobActive,
-                ]}
-              />
-            </View>
-          </View>
-        ))}
-        <Text style={[styles.preferenceNote, isRtl && styles.rtlText]}>
-          المفاتيح بصرية فقط ولا تطلب إذن إشعارات أو تحفظ تفضيلات.
-        </Text>
+      <View style={styles.accountDestinationsCard}>
+        <Text style={[styles.cardTitle, isRtl && styles.rtlText]}>إعدادات الحساب</Text>
+        <AccountDestinationRow
+          isRtl={isRtl}
+          meta={accountSectionCopy[locale].notificationsSubtitle}
+          onPress={() => onSectionChange("notifications")}
+          styles={styles}
+          title={accountSectionCopy[locale].notificationsTitle}
+        />
+        <AccountDestinationRow
+          isRtl={isRtl}
+          meta={accountSectionCopy[locale].helpSubtitle}
+          onPress={() => onSectionChange("help")}
+          styles={styles}
+          title={accountSectionCopy[locale].helpTitle}
+        />
       </View>
 
       <View style={styles.privacyCard}>
@@ -5150,9 +5200,6 @@ function AccountScreen({
               <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>
                 {row.body}
               </Text>
-              <Text style={[styles.safeActionText, isRtl && styles.rtlText]}>
-                إدارة لاحقاً
-              </Text>
             </View>
           ))}
         </View>
@@ -5160,52 +5207,6 @@ function AccountScreen({
           سيبقى المستخدم مالكاً لبياناته، وإجراءات التصدير أو الحذف تحتاج
           سبرنت صلاحيات معتمد قبل أي تنفيذ حقيقي.
         </Text>
-      </View>
-
-      <View style={styles.supportCard}>
-        <View style={styles.supportHeaderRow}>
-          <View style={styles.supportHeaderCopy}>
-            <Text style={[styles.cardTitle, isRtl && styles.rtlText]}>
-              المساعدة والدعم
-            </Text>
-            <Text style={[styles.cardBody, isRtl && styles.rtlText]}>
-              مركز مساعدة بصري فقط، بدون رسائل أو تذاكر دعم حقيقية.
-            </Text>
-          </View>
-          <View style={styles.supportIconBubble}>
-            <Text style={styles.supportIconText}>?</Text>
-          </View>
-        </View>
-        {helpFaqRows.map((row) => (
-          <View key={row} style={styles.faqRow}>
-            <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>
-              {row}
-            </Text>
-            <Text style={styles.preferenceChevron}>›</Text>
-          </View>
-        ))}
-        <View style={styles.accountActionRow}>
-          {accountManagementActions.map((action) => (
-            <Pressable
-              accessibilityRole="button"
-              disabled
-              key={action.label}
-              style={[
-                styles.accountActionButton,
-                action.tone === "primary" && styles.accountActionButtonPrimary,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.accountActionText,
-                  action.tone === "primary" && styles.accountActionTextPrimary,
-                ]}
-              >
-                {action.label}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
       </View>
 
       <View style={styles.integrationCard}>
@@ -5220,6 +5221,102 @@ function AccountScreen({
         </Text>
       </View>
     </>
+  );
+}
+
+function AccountDestinationRow({ isRtl, meta, onPress, styles, title }: {
+  isRtl: boolean;
+  meta: string;
+  onPress: () => void;
+  styles: MobileStyles;
+  title: string;
+}) {
+  return (
+    <PremiumPressable
+      accessibilityHint={meta}
+      accessibilityLabel={title}
+      accessibilityRole="button"
+      hitSlop={TOUCH_HIT_SLOP}
+      onPress={onPress}
+      style={styles.accountDestinationRow}
+    >
+      <View style={styles.preferenceCopy}>
+        <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>{title}</Text>
+        <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>{meta}</Text>
+      </View>
+      <Text style={styles.preferenceChevron}>{isRtl ? "‹" : "›"}</Text>
+    </PremiumPressable>
+  );
+}
+
+function AccountNotificationPreferencesScreen({ isRtl, styles }: {
+  isRtl: boolean;
+  styles: MobileStyles;
+}) {
+  return (
+    <View style={styles.preferencesPanel}>
+      {accountNotificationRows.map((row) => (
+        <View
+          accessibilityLabel={`${row.label}. ${row.meta}`}
+          accessibilityRole="switch"
+          accessibilityState={{ checked: row.enabled, disabled: true }}
+          accessible
+          key={row.label}
+          style={styles.preferenceRow}
+        >
+          <View style={styles.preferenceCopy}>
+            <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>{row.label}</Text>
+            <Text style={[styles.rowMeta, isRtl && styles.rtlText]}>{row.meta}</Text>
+          </View>
+          <View style={[styles.preferenceToggle, row.enabled && styles.preferenceToggleActive]}>
+            <View style={[styles.preferenceKnob, row.enabled && styles.preferenceKnobActive]} />
+          </View>
+        </View>
+      ))}
+      <Text style={[styles.preferenceNote, isRtl && styles.rtlText]}>
+        المفاتيح بصرية فقط ولا تطلب إذن إشعارات أو تحفظ تفضيلات.
+      </Text>
+    </View>
+  );
+}
+
+function AccountHelpScreen({ isRtl, styles }: {
+  isRtl: boolean;
+  styles: MobileStyles;
+}) {
+  const [expandedQuestion, setExpandedQuestion] = useState<string | null>(null);
+
+  return (
+    <View style={styles.supportCard}>
+      <View style={styles.supportHeaderRow}>
+        <View style={styles.supportHeaderCopy}>
+          <Text style={[styles.cardTitle, isRtl && styles.rtlText]}>الأسئلة الشائعة</Text>
+          <Text style={[styles.cardBody, isRtl && styles.rtlText]}>
+            إجابات قصيرة داخل التطبيق بدون فتح صفحة خارجية أو إنشاء تذكرة.
+          </Text>
+        </View>
+        <View style={styles.supportIconBubble}><Text style={styles.supportIconText}>?</Text></View>
+      </View>
+      {helpFaqRows.map((row) => {
+        const expanded = expandedQuestion === row.question;
+        return (
+          <PremiumPressable
+            accessibilityLabel={row.question}
+            accessibilityRole="button"
+            accessibilityState={{ expanded }}
+            key={row.question}
+            onPress={() => setExpandedQuestion((current) => current === row.question ? null : row.question)}
+            style={styles.faqRow}
+          >
+            <View style={styles.preferenceCopy}>
+              <Text style={[styles.rowTitle, isRtl && styles.rtlText]}>{row.question}</Text>
+              {expanded ? <Text style={[styles.faqAnswer, isRtl && styles.rtlText]}>{row.answer}</Text> : null}
+            </View>
+            <Text style={styles.faqDisclosure}>{expanded ? "−" : "+"}</Text>
+          </PremiumPressable>
+        );
+      })}
+    </View>
   );
 }
 
@@ -5294,13 +5391,33 @@ const createStyles = (
     accountActionTextPrimary: {
       color: theme.colors.foregroundInverse,
     },
+    accountDestinationRow: {
+      alignItems: "center",
+      backgroundColor: theme.colors.cardElevated,
+      borderColor: theme.colors.goldSoft,
+      borderRadius: mobileRadii.compactCard,
+      borderWidth: 1,
+      flexDirection: "row",
+      gap: 12,
+      justifyContent: "space-between",
+      minHeight: layout.touchTarget,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+    },
+    accountDestinationsCard: {
+      backgroundColor: theme.colors.card,
+      borderColor: theme.colors.border,
+      borderRadius: 24,
+      borderWidth: 1,
+      gap: layout.verticalSpacing,
+      padding: layout.cardPadding,
+    },
     accountAvatar: {
       alignItems: "center",
       backgroundColor: theme.colors.gold,
       borderRadius: 26,
       height: 52,
       justifyContent: "center",
-      marginBottom: layout.verticalSpacing,
       width: 52,
     },
     accountAvatarText: {
@@ -7534,14 +7651,31 @@ const createStyles = (
       width: 19,
     },
     faqRow: {
-      alignItems: "center",
+      alignItems: "flex-start",
       backgroundColor: theme.colors.cardElevated,
       borderColor: theme.colors.border,
       borderRadius: 18,
       borderWidth: 1,
       flexDirection: "row",
+      gap: 12,
       justifyContent: "space-between",
+      minHeight: HELP_CENTER_ROW_LAYOUT.minimumTouchHeight,
       padding: 14,
+    },
+    faqAnswer: {
+      color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiRegular,
+      fontSize: 13,
+      lineHeight: 21,
+      marginTop: 8,
+    },
+    faqDisclosure: {
+      color: theme.colors.gold,
+      fontFamily: mobileTypography.uiSemiBold,
+      fontSize: 22,
+      lineHeight: 24,
+      minWidth: 24,
+      textAlign: "center",
     },
     filterButton: {
       alignItems: "center",
@@ -7642,6 +7776,45 @@ const createStyles = (
       minHeight: layout.headerHeight,
       paddingHorizontal: layout.pagePadding,
       paddingVertical: layout.isCompactHeight ? 8 : 10,
+    },
+    headerBackButton: {
+      alignItems: "center",
+      backgroundColor: theme.colors.cardElevated,
+      borderColor: theme.colors.border,
+      borderRadius: 16,
+      borderWidth: 1,
+      height: layout.touchTarget,
+      justifyContent: "center",
+      width: layout.touchTarget,
+    },
+    headerBackIcon: {
+      height: layout.iconSize,
+      tintColor: theme.colors.gold,
+      width: layout.iconSize,
+    },
+    headerPageCopy: {
+      alignItems: "center",
+      flex: 1,
+      minWidth: 0,
+    },
+    headerPageSubtitle: {
+      color: theme.colors.mutedForeground,
+      fontFamily: mobileTypography.uiRegular,
+      fontSize: 11,
+      lineHeight: 15,
+      marginTop: 1,
+      textAlign: "center",
+    },
+    headerPageTitle: {
+      color: theme.colors.foreground,
+      fontFamily: mobileTypography.kufiBold,
+      fontSize: layout.isCompactHeight ? 17 : 18,
+      lineHeight: layout.isCompactHeight ? 23 : 25,
+      textAlign: "center",
+    },
+    headerSpacer: {
+      height: layout.touchTarget,
+      width: layout.touchTarget,
     },
     iconAction: {
       alignItems: "center",
@@ -9292,7 +9465,10 @@ const createStyles = (
       flexDirection: "row",
       gap: 12,
       justifyContent: "space-between",
-      padding: 14,
+      minHeight: layout.isCompactHeight
+        ? ACCOUNT_NOTIFICATION_ROW_LAYOUT.compactMinHeight
+        : ACCOUNT_NOTIFICATION_ROW_LAYOUT.defaultMinHeight,
+      padding: layout.isCompactHeight ? 12 : 14,
       shadowColor: theme.colors.shadow,
       shadowOffset: { height: 7, width: 0 },
       shadowOpacity: theme.isDark ? 0.12 : 0.04,
@@ -9309,6 +9485,7 @@ const createStyles = (
     preferenceToggle: {
       backgroundColor: theme.colors.muted,
       borderRadius: 999,
+      flexShrink: 0,
       justifyContent: "center",
       padding: 3,
       width: 44,

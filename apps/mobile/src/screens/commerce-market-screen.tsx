@@ -63,6 +63,10 @@ import {
 } from "../i18n/commerce";
 import type { MobileLocale } from "../i18n/labels";
 import type { MobileResponsiveLayout } from "../layout/responsive-metrics";
+import {
+  KEYBOARD_SAFE_FORM_LAYOUT,
+  PRODUCT_NO_MEDIA_LAYOUT,
+} from "../layout/screen-contracts";
 import { useMobileResponsiveLayout } from "../layout/use-mobile-responsive-layout";
 import type {
   CommerceAddress,
@@ -139,6 +143,36 @@ const VISUAL_QA_CHECKOUT_CART: CommerceCart = {
   version: 1,
 };
 
+const VISUAL_QA_PRODUCT: CommerceProductDetail = {
+  category: { displayOrder: 1, id: "visual-qa-category", name: "العناية", slug: "care" },
+  currency: "IQD",
+  description: "منتج QA حقيقي البنية بدون وسائط لاختبار التسلسل البصري على الأجهزة المدمجة.",
+  highestPrice: null,
+  id: "visual-qa-product",
+  inStock: true,
+  lowestPrice: "25000",
+  media: [],
+  name: "REZNO Commerce QA Product",
+  primaryMediaUrl: null,
+  productSlug: "rezno-commerce-qa-product",
+  slug: "rezno-commerce-qa-product",
+  store: {
+    coverImageUrl: null,
+    currency: "IQD",
+    delivery: { area: null, city: null, enabled: false, estimateMinutes: null, fee: "0" },
+    description: null,
+    id: "visual-qa-store",
+    logoUrl: null,
+    minimumOrderValue: "0",
+    name: "REZNO Commerce QA Store",
+    pickup: { area: "الكرادة", city: "بغداد", enabled: true, instructions: null },
+    preparationEstimateMinutes: null,
+    slug: "rezno-commerce-qa-store",
+  },
+  storeSlug: "rezno-commerce-qa-store",
+  variants: [{ compareAtPrice: null, currency: "IQD", id: "visual-qa-variant", inStock: true, isDefault: true, optionValues: {}, price: "25000", title: "الافتراضي" }],
+};
+
 export function CommerceMarketScreen({
   entryPoint,
   initialOrderId,
@@ -148,6 +182,7 @@ export function CommerceMarketScreen({
   onExit,
   theme,
   visualQaCheckout = false,
+  visualQaProduct = false,
 }: {
   entryPoint: EntryPoint;
   initialOrderId?: string;
@@ -157,13 +192,15 @@ export function CommerceMarketScreen({
   onExit?: () => void;
   theme: MobileTheme;
   visualQaCheckout?: boolean;
+  visualQaProduct?: boolean;
 }) {
   const enableVisualQaCheckout = __DEV__ && visualQaCheckout;
+  const enableVisualQaProduct = __DEV__ && visualQaProduct;
   const copy = commerceCopy[locale];
   const styles = useCommerceStyles(theme);
   const initialRoute = useMemo<Route>(
-    () => enableVisualQaCheckout ? { kind: "checkout" } : entryPoint === "orders" ? { kind: "orders" } : entryPoint === "favorites" ? { kind: "favorites" } : { kind: "market" },
-    [enableVisualQaCheckout, entryPoint],
+    () => enableVisualQaCheckout ? { kind: "checkout" } : enableVisualQaProduct ? { kind: "product", product: VISUAL_QA_PRODUCT } : entryPoint === "orders" ? { kind: "orders" } : entryPoint === "favorites" ? { kind: "favorites" } : { kind: "market" },
+    [enableVisualQaCheckout, enableVisualQaProduct, entryPoint],
   );
   const [route, setRoute] = useState<Route>(initialRoute);
   const [history, setHistory] = useState<Route[]>([]);
@@ -174,7 +211,7 @@ export function CommerceMarketScreen({
     enableVisualQaCheckout ? "ready" : "loading",
   );
   const [sessionAvailable, setSessionAvailable] = useState<boolean | null>(
-    enableVisualQaCheckout ? true : null,
+    enableVisualQaCheckout ? true : enableVisualQaProduct ? false : null,
   );
   const [favoriteStoreIds, setFavoriteStoreIds] = useState<Set<string>>(new Set());
   const [favoriteProductIds, setFavoriteProductIds] = useState<Set<string>>(new Set());
@@ -342,7 +379,7 @@ export function CommerceMarketScreen({
   }, [handlePrivateError, updateFavoriteProductIds]);
 
   useEffect(() => {
-    if (enableVisualQaCheckout) return;
+    if (enableVisualQaCheckout || enableVisualQaProduct) return;
     const timer = setTimeout(() => {
       void refreshCart();
       if (entryPoint !== "favorites") {
@@ -351,7 +388,7 @@ export function CommerceMarketScreen({
       }
     }, 0);
     return () => clearTimeout(timer);
-  }, [enableVisualQaCheckout, entryPoint, loadFavoriteProducts, loadFavoriteStores, refreshCart]);
+  }, [enableVisualQaCheckout, enableVisualQaProduct, entryPoint, loadFavoriteProducts, loadFavoriteStores, refreshCart]);
 
   useEffect(() => {
     if (!initialOrderId) return;
@@ -754,27 +791,25 @@ function StoreDetail(props: CommonProps & { store: CommerceStore }) {
 }
 
 function ProductDetail(props: CommonProps & { addToCart: (variant: CommerceVariant, quantity: number, incomingStore?: string) => Promise<void>; product: CommerceProductDetail }) {
-  const { addToCart, cart, copy, favoriteProductIds, favoriteResources, goBack, isRtl, locale, navigate, product, sessionAvailable, theme, toggleProductFavorite } = props;
+  const { addToCart, cart, copy, favoriteProductIds, favoriteResources, goBack, isRtl, locale, navigate, onOpenAccount, product, sessionAvailable, theme, toggleProductFavorite } = props;
   const styles = useCommerceStyles(theme);
   const selectable = product.variants.filter((variant) => variant.inStock);
   const automatic = product.variants.length === 1 || (selectable.length === 1 && selectable[0]?.isDefault);
   const [variantId, setVariantId] = useState<string | null>(automatic ? selectable[0]?.id ?? null : null);
   const [quantity, setQuantity] = useState(1);
   const selected = product.variants.find((variant) => variant.id === variantId) ?? null;
+  const summaryVariant = selected ?? selectable[0] ?? product.variants[0] ?? null;
   const favorite = sessionAvailable === true
     ? resolvedSetMembership(favoriteProductIds, product.id, favoriteResources.productState)
     : undefined;
   return <View style={styles.stack}>
     <CommerceHeader cartQuantity={sessionAvailable !== false ? cart?.totalQuantity : undefined} copy={copy} isRtl={isRtl} onBack={goBack} onCart={() => navigate({ kind: "cart" })} title={product.name} theme={theme} />
-    {product.media[0]?.url ? <Image alt={product.media[0].altText ?? product.name} source={{ uri: product.media[0].url }} style={styles.detailImage} /> : <View style={styles.mediaFallback}><Image alt="" source={COMMERCE_ICONS.catalog} style={styles.mediaIcon} /></View>}
+    {product.media[0]?.url ? <Image alt={product.media[0].altText ?? product.name} source={{ uri: product.media[0].url }} style={styles.detailImage} /> : <View style={styles.mediaFallback}><View style={styles.mediaIconBubble}><Image alt="" source={COMMERCE_ICONS.catalog} style={styles.mediaIcon} /></View><Text style={[styles.mediaFallbackText, isRtl ? styles.rtl : styles.ltr]}>{copy.product}</Text></View>}
     <View style={styles.panel}>
       <View style={[styles.between, isRtl && styles.rowRtl]}><View style={styles.flex}><Text style={[styles.title, isRtl ? styles.rtl : styles.ltr]}>{product.name}</Text><Text style={[styles.muted, isRtl ? styles.rtl : styles.ltr]}>{product.store.name} · {product.category.name}</Text></View>{favorite === undefined ? null : <IconButton active={favorite} icon={COMMERCE_ICONS.favorite} label={copy.favorites} onPress={() => void toggleProductFavorite(product)} theme={theme} />}</View>
+      {summaryVariant ? <View style={[styles.productStatusRow, isRtl && styles.rowRtl]}><Text style={[styles.goldText, isRtl ? styles.rtl : styles.ltr]}>{formatCommerceMoney(summaryVariant.price, summaryVariant.currency, locale)}</Text><Text style={selectable.length ? styles.available : styles.danger}>{selectable.length ? copy.inStock : copy.outOfStock}</Text></View> : null}
       {product.description ? <Text style={[styles.body, isRtl ? styles.rtl : styles.ltr]}>{product.description}</Text> : null}
-      <Text style={[styles.sectionTitle, isRtl ? styles.rtl : styles.ltr]}>{copy.selectVariant}</Text>
-      <View style={[styles.wrap, isRtl && styles.rowRtl]}>{product.variants.map((variant) => <Chip disabled={!variant.inStock} key={variant.id} label={`${variant.title} · ${formatCommerceMoney(variant.price, variant.currency, locale)}`} onPress={() => setVariantId(variant.id)} selected={variantId === variant.id} theme={theme} />)}</View>
-      {selected?.compareAtPrice ? <Text style={styles.muted}>{formatCommerceMoney(selected.compareAtPrice, selected.currency, locale)}</Text> : null}
-      <View style={[styles.quantityRow, isRtl && styles.rowRtl]}><Text style={styles.label}>{copy.quantity}</Text><QuantityControl copy={copy} quantity={quantity} setQuantity={setQuantity} theme={theme} /></View>
-      <CommerceButton disabled={!selected?.inStock} label={selected ? copy.addToCart : copy.selectVariant} onPress={() => selected ? void addToCart(selected, quantity, product.store.name) : undefined} theme={theme} />
+      {sessionAvailable === false ? <View style={styles.sessionActionCard}><Text style={[styles.muted, isRtl ? styles.rtl : styles.ltr]}>{copy.sessionRequired}</Text><CommerceButton label={copy.signIn} onPress={onOpenAccount} secondary theme={theme} /></View> : <><Text style={[styles.sectionTitle, isRtl ? styles.rtl : styles.ltr]}>{copy.selectVariant}</Text><View style={[styles.wrap, isRtl && styles.rowRtl]}>{product.variants.map((variant) => <Chip disabled={!variant.inStock} key={variant.id} label={`${variant.title} · ${formatCommerceMoney(variant.price, variant.currency, locale)}`} onPress={() => setVariantId(variant.id)} selected={variantId === variant.id} theme={theme} />)}</View>{selected?.compareAtPrice ? <Text style={styles.muted}>{formatCommerceMoney(selected.compareAtPrice, selected.currency, locale)}</Text> : null}<View style={[styles.quantityRow, isRtl && styles.rowRtl]}><Text style={styles.label}>{copy.quantity}</Text><QuantityControl copy={copy} quantity={quantity} setQuantity={setQuantity} theme={theme} /></View><CommerceButton disabled={!selected?.inStock} label={selected ? copy.addToCart : copy.selectVariant} onPress={() => selected ? void addToCart(selected, quantity, product.store.name) : undefined} theme={theme} /></>}
     </View>
     {sessionAvailable !== false && favoriteResources.productState === "error" ? <CommerceState buttonLabel={copy.retry} onPress={() => void favoriteResources.loadProducts()} theme={theme} title={copy.favorites} /> : null}
   </View>;
@@ -937,13 +972,13 @@ function CheckoutScreen(props: CommonProps) {
       }
     }
   };
-  return <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.stack}>
+  return <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : KEYBOARD_SAFE_FORM_LAYOUT.androidBehavior} style={styles.stack}>
     <CommerceHeader copy={copy} isRtl={isRtl} onBack={submitting ? undefined : goBack} title={copy.checkout} theme={theme} />
     <View style={styles.panel}><Text style={[styles.title, isRtl ? styles.rtl : styles.ltr]}>{cart.store.name}</Text><Text style={[styles.goldText, isRtl ? styles.rtl : styles.ltr]}>{copy.subtotal}: {formatCommerceMoney(cart.informationalSubtotal, cart.currency, locale)}</Text><Text style={[styles.muted, isRtl ? styles.rtl : styles.ltr]}>{copy.checkoutHint}</Text></View>
     <Text style={[styles.sectionTitle, isRtl ? styles.rtl : styles.ltr]}>{copy.fulfillment}</Text>
     <View style={[styles.segment, isRtl && styles.rowRtl]}><Chip disabled={submitting || (storeDetails ? !storeDetails.pickup.enabled : false)} label={copy.pickup} onPress={() => updateDraft({ fulfillmentMethod: "CUSTOMER_PICKUP" })} selected={fulfillment === "CUSTOMER_PICKUP"} theme={theme} /><Chip disabled={submitting || (storeDetails ? !storeDetails.delivery.enabled : false)} label={copy.delivery} onPress={() => updateDraft({ fulfillmentMethod: "STORE_DELIVERY" })} selected={fulfillment === "STORE_DELIVERY"} theme={theme} /></View>
     {fulfillment === "STORE_DELIVERY" ? <><Text style={[styles.sectionTitle, isRtl ? styles.rtl : styles.ltr]}>{copy.selectAddress}</Text>{addresses.map((address) => <PremiumPressable accessibilityRole="radio" accessibilityState={{ checked: address.id === addressId, disabled: submitting }} disabled={submitting} key={address.id} onPress={() => updateDraft({ addressId: address.id })} style={[styles.addressChoice, address.id === addressId && styles.selected]}><Text style={[styles.lineTitle, isRtl ? styles.rtl : styles.ltr]}>{address.recipientName}</Text><Text style={[styles.muted, isRtl ? styles.rtl : styles.ltr]}>{address.city} · {address.area} · {address.street}</Text></PremiumPressable>)}<CommerceButton disabled={submitting} label={copy.addAddress} onPress={() => navigate({ kind: "addresses", returnToCheckout: true })} secondary theme={theme} /></> : null}
-    <TextInput accessibilityLabel={copy.customerInstructions} editable={!submitting} multiline maxLength={1000} onChangeText={(value) => updateDraft({ customerInstructions: value })} placeholder={copy.customerInstructions} placeholderTextColor={theme.colors.mutedForeground} style={[styles.textArea, isRtl ? styles.rtl : styles.ltr]} value={instructions} />
+    <TextInput accessibilityLabel={copy.customerInstructions} autoFocus={visualQaCheckout} editable={!submitting} multiline maxLength={1000} onChangeText={(value) => updateDraft({ customerInstructions: value })} placeholder={copy.customerInstructions} placeholderTextColor={theme.colors.mutedForeground} style={[styles.textArea, isRtl ? styles.rtl : styles.ltr]} value={instructions} />
     <Text style={[styles.muted, isRtl ? styles.rtl : styles.ltr]}>{copy.payment}: {fulfillment === "STORE_DELIVERY" ? copy.cashOnDelivery : copy.payAtPickup}</Text>
     <CommerceButton disabled={submitting || !cart.availability || (fulfillment === "STORE_DELIVERY" && !addressId)} label={submitting ? copy.loading : copy.confirm} onPress={() => void submit()} theme={theme} />
   </KeyboardAvoidingView>;
@@ -1113,7 +1148,7 @@ function AddressesScreen(props: CommonProps & { returnToCheckout: boolean }) {
   };
   const edit = (address: CommerceAddress) => { setEditingId(address.id); setForm({ additionalDetails: address.additionalDetails, area: address.area, city: address.city, landmark: address.landmark, phone: address.phone, recipientName: address.recipientName, street: address.street }); };
   if (sessionAvailable === false) return <View style={styles.stack}><CommerceHeader copy={copy} isRtl={isRtl} title={copy.addresses} theme={theme} /><CommerceState body={copy.sessionRequired} buttonLabel={copy.retry} onPress={onOpenAccount} theme={theme} title={copy.sessionRequired} /></View>;
-  return <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.stack}>
+  return <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : KEYBOARD_SAFE_FORM_LAYOUT.androidBehavior} style={styles.stack}>
     <CommerceHeader copy={copy} isRtl={isRtl} onBack={goBack} title={copy.addresses} theme={theme} />
     {state === "loading" && !addresses.length ? <CommerceState title={copy.loading} theme={theme} /> : null}
     {state === "error" ? <CommerceState buttonLabel={copy.retry} onPress={() => void load()} theme={theme} title={copy.errorGeneric} /> : null}
@@ -1185,6 +1220,7 @@ function createStyles(
 ) {
   return StyleSheet.create({
     addressChoice: { backgroundColor: theme.colors.card, borderColor: theme.colors.border, borderRadius: 20, borderWidth: 1, gap: 7, padding: 15 },
+    available: { color: theme.colors.success, fontFamily: FONT.uiSemiBold, fontSize: 13 },
     between: { alignItems: "center", flexDirection: "row", gap: 12, justifyContent: "space-between" },
     body: { color: theme.colors.mutedForeground, fontFamily: FONT.uiRegular, fontSize: 14, lineHeight: 23 },
     chip: { backgroundColor: theme.colors.card, borderColor: theme.colors.border, borderRadius: 999, borderWidth: 1, minHeight: 42, justifyContent: "center", paddingHorizontal: 14, paddingVertical: 8 },
@@ -1206,13 +1242,16 @@ function createStyles(
     lineTitle: { color: theme.colors.foreground, fontFamily: FONT.uiSemiBold, fontSize: 16, lineHeight: 24 },
     lineTop: { alignItems: "flex-start", flexDirection: "row", gap: 12 },
     ltr: { textAlign: "left", writingDirection: "ltr" },
-    mediaFallback: { alignItems: "center", backgroundColor: theme.colors.heroMuted, borderRadius: 24, height: 220, justifyContent: "center" },
-    mediaIcon: { height: 48, tintColor: theme.colors.gold, width: 48 },
+    mediaFallback: { alignItems: "center", backgroundColor: theme.colors.heroMuted, borderColor: theme.colors.goldSoft, borderRadius: 24, borderWidth: 1, gap: 10, height: layout.isCompactHeight ? PRODUCT_NO_MEDIA_LAYOUT.compactHeight : PRODUCT_NO_MEDIA_LAYOUT.defaultHeight, justifyContent: "center" },
+    mediaFallbackText: { color: theme.colors.mutedForeground, fontFamily: FONT.uiSemiBold, fontSize: 13 },
+    mediaIcon: { height: 30, tintColor: theme.colors.gold, width: 30 },
+    mediaIconBubble: { alignItems: "center", backgroundColor: theme.colors.cardElevated, borderColor: theme.colors.goldSoft, borderRadius: 25, borderWidth: 1, height: 50, justifyContent: "center", width: 50 },
     modalRoot: { alignItems: "center", backgroundColor: theme.colors.overlay, flex: 1, justifyContent: "center" },
     muted: { color: theme.colors.mutedForeground, fontFamily: FONT.uiRegular, fontSize: 13, lineHeight: 20 },
     notice: { backgroundColor: theme.colors.warningSoft, borderColor: theme.colors.warning, borderRadius: 16, borderWidth: 1, marginTop: 4, padding: 12 },
     noticeText: { color: theme.colors.warning, fontFamily: FONT.uiSemiBold, fontSize: 13, textAlign: "center" },
     panel: { backgroundColor: theme.colors.card, borderColor: theme.colors.border, borderRadius: layout.borderRadius, borderWidth: 1, gap: layout.verticalSpacing, padding: layout.cardPadding },
+    productStatusRow: { alignItems: "center", flexDirection: "row", gap: 12, justifyContent: "space-between" },
     quantityButton: { alignItems: "center", height: 42, justifyContent: "center", width: 42 },
     quantityControl: { alignItems: "center", backgroundColor: theme.colors.cardElevated, borderColor: theme.colors.border, borderRadius: 16, borderWidth: 1, flexDirection: "row", minHeight: 44 },
     quantityRow: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
@@ -1225,6 +1264,7 @@ function createStyles(
     searchIcon: { height: 22, tintColor: theme.colors.gold, width: 22 },
     sectionTitle: { color: theme.colors.foreground, fontFamily: FONT.uiSemiBold, fontSize: 18, lineHeight: 28 },
     segment: { flexDirection: "row", gap: 9 },
+    sessionActionCard: { backgroundColor: theme.colors.cardElevated, borderColor: theme.colors.goldSoft, borderRadius: 18, borderWidth: 1, gap: 10, padding: 13 },
     selected: { borderColor: theme.colors.gold },
     stack: { gap: layout.sectionGap },
     summaryValue: { color: theme.colors.foreground, flex: 1, fontFamily: FONT.uiSemiBold, fontSize: 14 },

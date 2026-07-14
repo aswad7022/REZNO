@@ -378,7 +378,7 @@ export function ReznoHomeScreen({
       </View>
 
       {dataSections.map((section, index) => (
-        <View key={section.key} style={styles.marketplaceSectionBlock}>
+        <View key={section.key} style={[styles.marketplaceSectionBlock, index === 0 && styles.marketplaceSectionPrimary]}>
           <SectionHeader
             action={copy.viewAll}
             isRtl={isRtl}
@@ -2073,7 +2073,7 @@ const createStyles = (
       justifyContent: "space-between",
     },
     heroSection: {
-      gap: layout.isCompactHeight ? 10 : 16,
+      gap: layout.sectionGap,
       width: "100%",
     },
     heroTitle: {
@@ -2139,6 +2139,9 @@ const createStyles = (
     marketplaceSectionBlock: {
       gap: layout.isCompactHeight ? 5 : 7,
       width: "100%",
+    },
+    marketplaceSectionPrimary: {
+      marginTop: layout.verticalSpacing / 2,
     },
     marketplacePlaceholder: {
       backgroundColor: palette.cardDeep,

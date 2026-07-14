@@ -23,14 +23,49 @@ export const MESSAGE_PREVIEW_ROW_LAYOUT = {
   usesAbsolutePositioning: false,
 } as const;
 
+export const KEYBOARD_SAFE_FORM_LAYOUT = {
+  androidBehavior: "height" as const,
+  ctaInNormalFlow: true,
+  usesScrollableContent: true,
+} as const;
+
+export const ACCOUNT_NOTIFICATION_ROW_LAYOUT = {
+  compactMinHeight: 68,
+  defaultMinHeight: 72,
+  usesAbsolutePositioning: false,
+} as const;
+
+export const HELP_CENTER_ROW_LAYOUT = {
+  inlineExpansion: true,
+  minimumTouchHeight: 44,
+  usesFixedHeight: false,
+} as const;
+
+export const PRODUCT_NO_MEDIA_LAYOUT = {
+  compactHeight: 136,
+  defaultHeight: 176,
+  isStructuredCard: true,
+} as const;
+
+export const SHARED_TOP_HEADER_LAYOUT = {
+  centeredTitle: true,
+  titleMaxLines: 2,
+  usesAbsolutePositioning: false,
+} as const;
+
 const VISUAL_QA_SCREENS = [
   "account",
+  "accountHelp",
+  "accountNotifications",
   "checkout",
   "customerHome",
   "marketplace",
   "messages",
   "orders",
+  "product",
   "serviceDiscovery",
+  "signIn",
+  "signUp",
 ] as const;
 
 export type VisualQaScreen = (typeof VISUAL_QA_SCREENS)[number];
@@ -42,6 +77,12 @@ export function resolveVisualQaInitialScreen(
   if (!enabled) return null;
   return VISUAL_QA_SCREENS.includes(candidate as VisualQaScreen)
     ? (candidate as VisualQaScreen)
+    : null;
+}
+
+export function resolveVisualQaLocale(candidate: string | undefined) {
+  return candidate === "ar" || candidate === "ckb" || candidate === "en"
+    ? candidate
     : null;
 }
 

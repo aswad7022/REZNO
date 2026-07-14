@@ -41,6 +41,7 @@ export type MobileResponsiveLayout = {
   categoryTileHeight: number;
   centerNavigationActionSize: number;
   contentBottomInset: number;
+  finalContentGap: number;
   contentTrailingSpace: number;
   fontScale: number;
   headerHeight: number;
@@ -96,7 +97,7 @@ export function createMobileResponsiveLayout({
   const isLargeWidth = width >= 430;
   const bottomNavigationHeight = 64;
   const bottomNavigationBottomGap = isCompactHeight ? 4 : 6;
-  const contentTrailingSpace = isCompactHeight ? 18 : 22;
+  const finalContentGap = isCompactHeight ? 22 : 24;
   const typography: MobileResponsiveTypography = {
     body: 15,
     button: 15,
@@ -121,10 +122,10 @@ export function createMobileResponsiveLayout({
     centerNavigationActionSize: 54,
     contentBottomInset:
       bottomNavigationHeight +
-      bottomNavigationBottomGap +
       safeBottomInset +
-      contentTrailingSpace,
-    contentTrailingSpace,
+      finalContentGap,
+    finalContentGap,
+    contentTrailingSpace: finalContentGap,
     fontScale: Math.max(1, fontScale),
     headerHeight: isCompactHeight ? 56 : 64,
     height: Math.round(height),

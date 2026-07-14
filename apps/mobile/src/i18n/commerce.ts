@@ -79,6 +79,7 @@ export type CommerceCopy = {
   selectAddress: string;
   selectVariant: string;
   sessionRequired: string;
+  signIn: string;
   setDefault: string;
   status: string;
   store: string;
@@ -119,7 +120,7 @@ export const commerceCopy: Record<MobileLocale, CommerceCopy> = {
     recipientName: "اسم المستلم", remove: "إزالة", replaceCart: "استبدال السلة",
     replaceCartBody: "تحتوي سلتك على منتجات من متجر آخر. استبدالها سيزيل السلة الحالية دفعة واحدة.",
     retry: "إعادة المحاولة", save: "حفظ", search: "ابحث عن منتج أو متجر", selectAddress: "اختر عنواناً",
-    selectVariant: "اختر النوع", sessionRequired: "سجّل الدخول للمتابعة في السلة والطلبات والمفضلة.",
+    selectVariant: "اختر النوع", sessionRequired: "سجّل الدخول للمتابعة في السلة والطلبات والمفضلة.", signIn: "تسجيل الدخول",
     setDefault: "تعيين افتراضي", status: "الحالة", store: "متجر", stores: "المتاجر", street: "الشارع",
     subtotal: "المجموع المبدئي", successBody: "استلم الخادم طلبك الحقيقي بنجاح.", successTitle: "تم إنشاء الطلب",
     total: "الإجمالي", unavailableBody: "قد يكون المتجر أو المنتج مخفياً أو غير متاح.",
@@ -151,7 +152,7 @@ export const commerceCopy: Record<MobileLocale, CommerceCopy> = {
     remove: "لابردن", replaceCart: "گۆڕینی سەبەتە", replaceCartBody: "سەبەتەکەت بەرهەمی فرۆشگایەکی تر هەیە.",
     retry: "دووبارە هەوڵبدە", save: "پاشەکەوت", search: "بگەڕێ بۆ بەرهەم یان فرۆشگا",
     selectAddress: "ناونیشان هەڵبژێرە", selectVariant: "جۆر هەڵبژێرە",
-    sessionRequired: "بۆ سەبەتە و داواکارییەکان بچۆ ژوورەوە.", setDefault: "بیکە بنەڕەت",
+    sessionRequired: "بۆ سەبەتە و داواکارییەکان بچۆ ژوورەوە.", signIn: "چوونە ژوورەوە", setDefault: "بیکە بنەڕەت",
     status: "دۆخ", store: "فرۆشگا", stores: "فرۆشگاکان", street: "شەقام", subtotal: "کۆی سەرەتایی",
     successBody: "ڕاژەکار داواکاری ڕاستەقینەکەت وەرگرت.", successTitle: "داواکاری دروستکرا",
     total: "کۆی گشتی", unavailableBody: "لەوانەیە فرۆشگا یان بەرهەم بەردەست نەبێت.",
@@ -178,7 +179,7 @@ export const commerceCopy: Record<MobileLocale, CommerceCopy> = {
     rateLimited: "Too many requests. Wait briefly and retry.", receipt: "Order receipt", recipientName: "Recipient name",
     remove: "Remove", replaceCart: "Replace cart", replaceCartBody: "Your cart contains products from another store. Replacing it removes the current cart atomically.",
     retry: "Retry", save: "Save", search: "Search products or stores", selectAddress: "Select address",
-    selectVariant: "Select variant", sessionRequired: "Sign in to use cart, orders, and favorites.",
+    selectVariant: "Select variant", sessionRequired: "Sign in to use cart, orders, and favorites.", signIn: "Sign in",
     setDefault: "Set default", status: "Status", store: "Store", stores: "Stores", street: "Street",
     subtotal: "Informational subtotal", successBody: "The server accepted your real order.", successTitle: "Order created",
     total: "Total", unavailableBody: "The store or product may be hidden or unavailable.", updateAddress: "Update address",
