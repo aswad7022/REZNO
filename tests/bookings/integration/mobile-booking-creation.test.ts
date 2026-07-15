@@ -695,8 +695,8 @@ function offsetName(instant: string, timezone: string) {
 
 function findUpcomingOffsetTransition(timezone: string) {
   let previous = offsetName(new Date().toISOString(), timezone);
-  for (let day = 1; day <= 90; day += 1) {
-    const instant = new Date(Date.now() + day * 86_400_000);
+  for (let hour = 1; hour <= 90 * 24; hour += 1) {
+    const instant = new Date(Date.now() + hour * 3_600_000);
     const next = offsetName(instant.toISOString(), timezone);
     if (next !== previous) return localDate(instant.toISOString(), timezone);
     previous = next;
