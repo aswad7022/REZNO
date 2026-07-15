@@ -4,6 +4,7 @@ import { restaurantReservationApiError } from "@/features/restaurants/api/errors
 import { handleCustomerRestaurantRequest, restaurantData } from "@/features/restaurants/api/http";
 import {
   parseCancelRestaurantReservationRequest,
+  parseRestaurantBookingVersion,
   parseRestaurantIdempotencyKey,
   parseRestaurantUuid,
 } from "@/features/restaurants/api/validation";
@@ -22,10 +23,12 @@ export function POST(
     async ({ personId }) => {
       const bookingId = parseRestaurantUuid((await params).bookingId, "bookingId");
       const idempotencyKey = parseRestaurantIdempotencyKey(request);
+      const expectedBookingUpdatedAt = parseRestaurantBookingVersion(request);
       const { reason } = await parseCancelRestaurantReservationRequest(request);
       const result = await cancelCustomerRestaurantReservation({
         bookingId,
         customerId: personId,
+        expectedBookingUpdatedAt,
         idempotencyKey,
         reason,
       });

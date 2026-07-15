@@ -43,6 +43,13 @@ export function parseRestaurantIdempotencyKey(request: Request) {
   return value.toLowerCase();
 }
 
+export function parseRestaurantBookingVersion(request: Request) {
+  return parseCanonicalUtcTimestamp(
+    request.headers.get("x-rezno-booking-version"),
+    "X-Rezno-Booking-Version",
+  );
+}
+
 export function parseRestaurantAvailabilityQuery(params: URLSearchParams) {
   assertUniqueQuery(params, ["date", "guestCount", "seatingArea"], ["date", "guestCount"]);
   const date = params.get("date")?.trim() ?? "";

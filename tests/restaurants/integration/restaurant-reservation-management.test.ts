@@ -460,6 +460,7 @@ test(
         cancelCustomerRestaurantReservation({
           bookingId: created.reservation.id,
           customerId: fixture.customer.id,
+          expectedBookingUpdatedAt: created.reservation.updatedAt,
           idempotencyKey: randomUUID(),
           reason: null,
         }),
@@ -899,6 +900,7 @@ test(
           customerId: fixture.customer.id,
           customerNote: "Concurrent reschedule",
           date: fixture.date,
+          expectedBookingUpdatedAt: created.reservation.updatedAt,
           guestCount: 3,
           idempotencyKey: randomUUID(),
           seatingArea: null,
@@ -935,6 +937,7 @@ test(
             customerId: fixture.customer.id,
             customerNote: slot.startsAt,
             date: fixture.date,
+            expectedBookingUpdatedAt: created.reservation.updatedAt,
             guestCount: 2,
             idempotencyKey: randomUUID(),
             seatingArea: null,

@@ -293,6 +293,7 @@ export function CustomerRestaurantReservationManagementScreen({
         selected.id,
         cancellationReason,
         cancellationKey.current,
+        selected.updatedAt,
       );
       setSelected(result.data.reservation);
       setOperationMessage(result.data.replayed ? copy.replayed : copy.persisted);
@@ -371,6 +372,7 @@ export function CustomerRestaurantReservationManagementScreen({
           startsAt: selectedSlot.startsAt,
         },
         rescheduleKey.current,
+        selected.updatedAt,
       );
       setSelected(result.data.reservation);
       setOperationMessage(result.data.replayed ? copy.replayed : copy.persisted);

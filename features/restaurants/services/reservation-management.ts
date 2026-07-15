@@ -51,6 +51,7 @@ const UUID_PATTERN =
 type MutationInput = {
   bookingId: string;
   customerId: string;
+  expectedBookingUpdatedAt?: string;
   idempotencyKey: string;
 };
 
@@ -191,6 +192,7 @@ export async function getCustomerRestaurantRescheduleOptions(input: {
 export async function cancelCustomerRestaurantReservation(input: {
   bookingId: string;
   customerId: string;
+  expectedBookingUpdatedAt?: string;
   idempotencyKey: string;
   reason: string | null;
 }) {
@@ -213,6 +215,11 @@ export async function cancelCustomerRestaurantReservation(input: {
   if (!target) {
     restaurantReservationError("NOT_FOUND", "Restaurant reservation was not found.");
   }
+  const expectedBookingUpdatedAt = expectedRestaurantBookingVersion(
+    canonical.expectedBookingUpdatedAt,
+    target.updatedAt,
+  );
+  assertExpectedBookingVersion(target.updatedAt, expectedBookingUpdatedAt);
 
   try {
     return await serializableRestaurantMutation(async (transaction) => {
@@ -250,7 +257,7 @@ export async function cancelCustomerRestaurantReservation(input: {
         restaurantReservationError("NOT_FOUND", "Restaurant reservation was not found.");
       }
       assertRestaurantReservationRelationships(booking);
-      assertExpectedBookingVersion(booking.updatedAt, target.updatedAt);
+      assertExpectedBookingVersion(booking.updatedAt, expectedBookingUpdatedAt);
       assertManagementEligibility(booking, "cancel");
       const mutationAt = new Date();
       const changed = await transaction.booking.updateMany({
@@ -327,6 +334,7 @@ export async function rescheduleCustomerRestaurantReservation(input: {
   customerId: string;
   customerNote: string | null;
   date: string;
+  expectedBookingUpdatedAt?: string;
   guestCount: number;
   idempotencyKey: string;
   seatingArea: string | null;
@@ -348,6 +356,11 @@ export async function rescheduleCustomerRestaurantReservation(input: {
   if (!target) {
     restaurantReservationError("NOT_FOUND", "Restaurant reservation was not found.");
   }
+  const expectedBookingUpdatedAt = expectedRestaurantBookingVersion(
+    canonical.expectedBookingUpdatedAt,
+    target.updatedAt,
+  );
+  assertExpectedBookingVersion(target.updatedAt, expectedBookingUpdatedAt);
 
   try {
     return await serializableRestaurantMutation(async (transaction) => {
@@ -394,7 +407,7 @@ export async function rescheduleCustomerRestaurantReservation(input: {
         restaurantReservationError("NOT_FOUND", "Restaurant reservation was not found.");
       }
       assertRestaurantReservationRelationships(booking);
-      assertExpectedBookingVersion(booking.updatedAt, target.updatedAt);
+      assertExpectedBookingVersion(booking.updatedAt, expectedBookingUpdatedAt);
       assertManagementEligibility(booking, "reschedule");
       assertReservableRestaurant(booking);
 
@@ -684,6 +697,22 @@ function assertExpectedBookingVersion(current: Date, expected: Date) {
       "Restaurant reservation changed after this mutation began.",
     );
   }
+}
+
+function expectedRestaurantBookingVersion(value: string | undefined, fallback: Date) {
+  if (value === undefined) return fallback;
+  const parsed = new Date(value);
+  if (
+    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value) ||
+    !Number.isFinite(parsed.getTime()) ||
+    parsed.toISOString() !== value
+  ) {
+    restaurantReservationError(
+      "INVALID_REQUEST",
+      "Expected Restaurant reservation version must be a canonical UTC timestamp.",
+    );
+  }
+  return parsed;
 }
 
 function assertManagementEligibility(

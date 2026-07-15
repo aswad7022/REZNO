@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { restaurantReservationApiError } from "@/features/restaurants/api/errors";
 import { handleCustomerRestaurantRequest, restaurantData } from "@/features/restaurants/api/http";
 import {
+  parseRestaurantBookingVersion,
   parseRestaurantIdempotencyKey,
   parseRestaurantUuid,
   parseRescheduleRestaurantReservationRequest,
@@ -22,10 +23,12 @@ export function POST(
     async ({ personId }) => {
       const bookingId = parseRestaurantUuid((await params).bookingId, "bookingId");
       const idempotencyKey = parseRestaurantIdempotencyKey(request);
+      const expectedBookingUpdatedAt = parseRestaurantBookingVersion(request);
       const selection = await parseRescheduleRestaurantReservationRequest(request);
       const result = await rescheduleCustomerRestaurantReservation({
         bookingId,
         customerId: personId,
+        expectedBookingUpdatedAt,
         idempotencyKey,
         ...selection,
       });

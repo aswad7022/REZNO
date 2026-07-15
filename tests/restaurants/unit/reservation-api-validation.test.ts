@@ -8,6 +8,7 @@ import {
   parseCustomerRestaurantReservationListQuery,
   parseCreateRestaurantReservationRequest,
   parseRestaurantAvailabilityQuery,
+  parseRestaurantBookingVersion,
   parseRestaurantIdempotencyKey,
   parseRescheduleRestaurantReservationRequest,
 } from "../../../features/restaurants/api/validation";
@@ -89,7 +90,7 @@ test("Restaurant management list and mutation DTOs reject cross-domain or server
   }
 });
 
-test("availability query and UUID idempotency header are strict", () => {
+test("availability query, UUID idempotency, and booking-version headers are strict", () => {
   assert.deepEqual(
     parseRestaurantAvailabilityQuery(new URLSearchParams("date=2026-07-20&guestCount=2")),
     { date: "2026-07-20", guestCount: 2, seatingArea: null },
@@ -104,6 +105,28 @@ test("availability query and UUID idempotency header are strict", () => {
   );
   assert.throws(
     () => parseRestaurantIdempotencyKey(new Request("https://rezno.invalid", { headers: { "idempotency-key": "not-a-uuid" } })),
+    RestaurantReservationApiError,
+  );
+  const version = "2026-07-20T12:00:00.000Z";
+  assert.equal(
+    parseRestaurantBookingVersion(
+      new Request("https://rezno.invalid", {
+        headers: { "x-rezno-booking-version": version },
+      }),
+    ),
+    version,
+  );
+  assert.throws(
+    () => parseRestaurantBookingVersion(new Request("https://rezno.invalid")),
+    RestaurantReservationApiError,
+  );
+  assert.throws(
+    () =>
+      parseRestaurantBookingVersion(
+        new Request("https://rezno.invalid", {
+          headers: { "x-rezno-booking-version": "2026-07-20T12:00:00Z" },
+        }),
+      ),
     RestaurantReservationApiError,
   );
 });

@@ -43,6 +43,7 @@ test("mobile management uses persisted Restaurant endpoints without service chan
   assert.match(screen, /fetchMobileManagedRestaurantReservations/);
   assert.match(screen, /cancelMobileRestaurantReservation/);
   assert.match(screen, /rescheduleMobileRestaurantReservation/);
+  assert.match(screen, /selected\.updatedAt/);
   assert.match(screen, /optionsRequestSequence/);
   assert.match(screen, /retryDetailId/);
   assert.match(screen, /CANCELLATION_DEADLINE_PASSED/);
@@ -57,6 +58,7 @@ test("mobile management uses persisted Restaurant endpoints without service chan
   assert.match(screen, /onAction=\{\(\) =>/);
   assert.match(service, /restaurantReservationMutation/);
   assert.match(service, /pg_advisory_xact_lock/);
+  assert.match(service, /expectedRestaurantBookingVersion/);
   assert.doesNotMatch(service, /bookingChangeRequest\.create/);
   assert.doesNotMatch(screen, /mock|fixture/i);
 });

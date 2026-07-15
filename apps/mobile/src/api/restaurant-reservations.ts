@@ -99,6 +99,7 @@ export function cancelMobileRestaurantReservation(
   bookingId: string,
   reason: string,
   idempotencyKey: string,
+  bookingVersion: string,
 ) {
   return mobileApiRequest<
     DataResponse<{
@@ -108,7 +109,10 @@ export function cancelMobileRestaurantReservation(
   >(`/api/mobile/restaurant-reservations/${encodeURIComponent(bookingId)}/cancel`, {
     authenticated: true,
     body: { reason },
-    headers: { "Idempotency-Key": idempotencyKey },
+    headers: {
+      "Idempotency-Key": idempotencyKey,
+      "X-Rezno-Booking-Version": bookingVersion,
+    },
     method: "POST",
   });
 }
@@ -142,6 +146,7 @@ export function rescheduleMobileRestaurantReservation(
     startsAt: string;
   },
   idempotencyKey: string,
+  bookingVersion: string,
 ) {
   return mobileApiRequest<
     DataResponse<{
@@ -151,7 +156,10 @@ export function rescheduleMobileRestaurantReservation(
   >(`/api/mobile/restaurant-reservations/${encodeURIComponent(bookingId)}/reschedule`, {
     authenticated: true,
     body: input,
-    headers: { "Idempotency-Key": idempotencyKey },
+    headers: {
+      "Idempotency-Key": idempotencyKey,
+      "X-Rezno-Booking-Version": bookingVersion,
+    },
     method: "POST",
   });
 }

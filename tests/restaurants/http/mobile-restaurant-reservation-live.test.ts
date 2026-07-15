@@ -155,7 +155,7 @@ test(
     });
     assert.equal(created.response.status, 201);
     const createdData = created.body.data as {
-      reservation: { id: string; reference: string; preorderTotal: string; startsAt: string };
+      reservation: { id: string; reference: string; preorderTotal: string; startsAt: string; updatedAt: string };
       replayed: boolean;
     };
     assert.equal(createdData.replayed, false);
@@ -269,12 +269,27 @@ test(
       {
         body: { reason: "forged" },
         cookie: otherCookie,
-        headers: { "idempotency-key": randomUUID() },
+        headers: {
+          "idempotency-key": randomUUID(),
+          "x-rezno-booking-version": createdData.reservation.updatedAt,
+        },
         method: "POST",
       },
     );
     assert.equal(foreignCancel.response.status, 404);
     assert.equal(foreignCancel.body.error?.code, "NOT_FOUND");
+
+    const missingVersion = await request(
+      `/api/mobile/restaurant-reservations/${createdData.reservation.id}/cancel`,
+      {
+        body: { reason: null },
+        cookie: ownerCookie,
+        headers: { "idempotency-key": randomUUID() },
+        method: "POST",
+      },
+    );
+    assert.equal(missingVersion.response.status, 400);
+    assert.equal(missingVersion.body.error?.code, "INVALID_REQUEST");
 
     await prisma.organizationSettings.update({
       where: { organizationId: fixture.organization.id },
@@ -314,7 +329,10 @@ test(
       {
         body: { ...rescheduleBody, tableId: fixture.tables[0]!.id },
         cookie: ownerCookie,
-        headers: { "idempotency-key": randomUUID() },
+        headers: {
+          "idempotency-key": randomUUID(),
+          "x-rezno-booking-version": createdData.reservation.updatedAt,
+        },
         method: "POST",
       },
     );
@@ -325,7 +343,10 @@ test(
       {
         body: { ...rescheduleBody, guestCount: 3 },
         cookie: ownerCookie,
-        headers: { "idempotency-key": randomUUID() },
+        headers: {
+          "idempotency-key": randomUUID(),
+          "x-rezno-booking-version": createdData.reservation.updatedAt,
+        },
         method: "POST",
       },
     );
@@ -337,7 +358,10 @@ test(
       {
         body: rescheduleBody,
         cookie: ownerCookie,
-        headers: { "idempotency-key": rescheduleKey },
+        headers: {
+          "idempotency-key": rescheduleKey,
+          "x-rezno-booking-version": createdData.reservation.updatedAt,
+        },
         method: "POST",
       },
     );
@@ -347,6 +371,7 @@ test(
       reservation: {
         activityHistory: Array<{ kind: string }>;
         startsAt: string;
+        updatedAt: string;
       };
     };
     assert.equal(rescheduledData.replayed, false);
@@ -362,7 +387,10 @@ test(
       {
         body: rescheduleBody,
         cookie: ownerCookie,
-        headers: { "idempotency-key": rescheduleKey },
+        headers: {
+          "idempotency-key": rescheduleKey,
+          "x-rezno-booking-version": createdData.reservation.updatedAt,
+        },
         method: "POST",
       },
     );
@@ -373,7 +401,10 @@ test(
       {
         body: { ...rescheduleBody, customerNote: "changed" },
         cookie: ownerCookie,
-        headers: { "idempotency-key": rescheduleKey },
+        headers: {
+          "idempotency-key": rescheduleKey,
+          "x-rezno-booking-version": createdData.reservation.updatedAt,
+        },
         method: "POST",
       },
     );
@@ -386,7 +417,10 @@ test(
       {
         body: { reason: "Live HTTP cancellation" },
         cookie: ownerCookie,
-        headers: { "idempotency-key": cancelKey },
+        headers: {
+          "idempotency-key": cancelKey,
+          "x-rezno-booking-version": rescheduledData.reservation.updatedAt,
+        },
         method: "POST",
       },
     );
@@ -419,7 +453,10 @@ test(
       {
         body: { reason: "Live HTTP cancellation" },
         cookie: ownerCookie,
-        headers: { "idempotency-key": cancelKey },
+        headers: {
+          "idempotency-key": cancelKey,
+          "x-rezno-booking-version": rescheduledData.reservation.updatedAt,
+        },
         method: "POST",
       },
     );
@@ -514,7 +551,10 @@ test(
       {
         body: { reason: null },
         cookie: ownerCookie,
-        headers: { "idempotency-key": randomUUID() },
+        headers: {
+          "idempotency-key": randomUUID(),
+          "x-rezno-booking-version": genericBooking.updatedAt.toISOString(),
+        },
         method: "POST",
       },
     );
