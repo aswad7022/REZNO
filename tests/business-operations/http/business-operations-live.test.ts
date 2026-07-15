@@ -156,7 +156,16 @@ test("Business Operations live pages and progressive Server Actions persist auth
     await assertForbidden(await page("/business/manage/audit", ownerCookie));
     await prisma.organizationMember.update({ where: { id: fixture.owner.membership.id }, data: { roleId: fixture.receptionist.membership.roleId } });
     await assertForbidden(await page("/business/manage/settings", ownerCookie));
-    assert.equal((await page("/business/manage/locations", ownerCookie)).status, 200);
+    const receptionistLocations = await page("/business/manage/locations", ownerCookie);
+    const receptionistLocationsBody = await receptionistLocations.text();
+    assert.equal(receptionistLocations.status, 200);
+    assert.doesNotMatch(receptionistLocationsBody, /NEXT_HTTP_ERROR_FALLBACK;403/);
+    assert.match(receptionistLocationsBody, new RegExp(fixture.activeBranch.name));
+    const receptionistBlocks = await page(`/business/manage/locations/${fixture.activeBranch.id}/blocks`, ownerCookie);
+    const receptionistBlocksBody = await receptionistBlocks.text();
+    assert.equal(receptionistBlocks.status, 200);
+    assert.doesNotMatch(receptionistBlocksBody, /NEXT_HTTP_ERROR_FALLBACK;403/);
+    assert.ok(forms(receptionistBlocksBody).some((candidate) => candidate.includes('name="startsAt"')));
     await prisma.organizationMember.update({ where: { id: fixture.owner.membership.id }, data: { roleId: fixture.staff.membership.roleId } });
     await assertForbidden(await page("/business/manage/locations", ownerCookie));
     await prisma.organizationMember.update({ where: { id: fixture.owner.membership.id }, data: { roleId: fixture.owner.membership.roleId } });
