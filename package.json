@@ -8,9 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "test": "npm run test:all",
-    "test:unit": "tsx --test tests/commerce/unit/*.test.ts tests/identity/unit/*.test.ts tests/bookings/unit/*.test.ts tests/reviews/unit/*.test.ts tests/restaurants/unit/*.test.ts",
-    "test:integration": "NODE_OPTIONS=--conditions=react-server tsx --test --test-concurrency=1 tests/commerce/integration/*.test.ts tests/identity/integration/*.test.ts tests/bookings/integration/*.test.ts tests/reviews/integration/*.test.ts tests/restaurants/integration/*.test.ts",
-    "test:http": "tsx --test --test-concurrency=1 tests/commerce/http/*.test.ts tests/identity/http/*.test.ts tests/bookings/http/*.test.ts tests/reviews/http/*.test.ts tests/restaurants/http/*.test.ts",
+    "test:unit": "tsx --test tests/commerce/unit/*.test.ts tests/identity/unit/*.test.ts tests/bookings/unit/*.test.ts tests/reviews/unit/*.test.ts tests/restaurants/unit/*.test.ts tests/business-operations/unit/*.test.ts",
+    "test:integration": "NODE_OPTIONS=--conditions=react-server tsx --test --test-concurrency=1 tests/commerce/integration/*.test.ts tests/identity/integration/*.test.ts tests/bookings/integration/*.test.ts tests/reviews/integration/*.test.ts tests/restaurants/integration/*.test.ts tests/business-operations/integration/*.test.ts",
+    "test:http": "tsx --test --test-concurrency=1 tests/commerce/http/*.test.ts tests/identity/http/*.test.ts tests/bookings/http/*.test.ts tests/reviews/http/*.test.ts tests/restaurants/http/*.test.ts tests/business-operations/http/*.test.ts",
     "test:all": "npm run test:unit && npm run test:integration && npm run test:http",
     "test:commerce": "npm run test:all",
     "commerce:expire-pending-orders": "tsx scripts/commerce/expire-pending-orders.ts",
@@ -19,6 +19,7 @@
     "seed:staging:marketplace-demo": "tsx scripts/staging/seed-marketplace-demo.ts",
     "seed:staging:booking-qa": "tsx scripts/staging/seed-booking-qa.ts",
     "seed:staging:restaurant-qa": "tsx scripts/staging/seed-restaurant-qa.ts",
+    "seed:staging:business-operations-stage2a": "tsx scripts/staging/seed-business-operations-stage2a.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {
