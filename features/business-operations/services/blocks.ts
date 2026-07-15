@@ -48,18 +48,38 @@ function blockSnapshot(block: { endsAt: Date; reason: string | null; startsAt: D
   };
 }
 
-async function resolveBlockInput(
-  transaction: Prisma.TransactionClient,
+function operationalBlockBranchScope(
   actor: BusinessOperationActor,
   branchId: string,
+) {
+  return {
+    deletedAt: null,
+    id: branchId,
+    organizationId: actor.organizationId,
+    ...(actor.role === "RECEPTIONIST"
+      ? { status: "ACTIVE" as const }
+      : { status: { not: "ARCHIVED" as const } }),
+  } satisfies Prisma.BranchWhereInput;
+}
+
+async function requireOperationalBlockBranch(
+  client: Pick<Prisma.TransactionClient, "branch">,
+  actor: BusinessOperationActor,
+  branchId: string,
+) {
+  const branch = await client.branch.findFirst({
+    where: operationalBlockBranchScope(actor, branchId),
+  });
+  if (!branch) businessOperationsError("BRANCH_NOT_FOUND", "Branch was not found.");
+  return branch;
+}
+
+function resolveBlockInput(
+  branch: Awaited<ReturnType<typeof requireOperationalBlockBranch>>,
   value: unknown,
 ) {
   const parsed = blockLocalInputSchema.safeParse(value);
   if (!parsed.success) businessOperationsError("INVALID_REQUEST", "Branch block input is invalid.");
-  const branch = await transaction.branch.findFirst({
-    where: { id: branchId, organizationId: actor.organizationId, deletedAt: null, status: { not: "ARCHIVED" } },
-  });
-  if (!branch) businessOperationsError("BRANCH_NOT_FOUND", "Branch was not found.");
   const startsAt = localInstant(parsed.data.startsAt, branch.timezone);
   const endsAt = localInstant(parsed.data.endsAt, branch.timezone);
   if (startsAt >= endsAt || endsAt <= new Date() || endsAt.getTime() - startsAt.getTime() > MAX_BLOCK_DURATION_MS) {
@@ -90,15 +110,7 @@ export async function listOperationalBlocks(
   branchId: string,
 ) {
   const actor = await resolveBusinessOperationActor(reference, "BLOCK_READ");
-  const branch = await prisma.branch.findFirst({
-    where: {
-      id: branchId,
-      organizationId: actor.organizationId,
-      deletedAt: null,
-      ...(actor.role === "RECEPTIONIST" ? { status: "ACTIVE" as const } : { status: { not: "ARCHIVED" as const } }),
-    },
-  });
-  if (!branch) businessOperationsError("BRANCH_NOT_FOUND", "Branch was not found.");
+  const branch = await requireOperationalBlockBranch(prisma, actor, branchId);
   const blocks = await prisma.blockedTime.findMany({
     where: { branchId: branch.id, memberId: null },
     orderBy: [{ startsAt: "asc" }, { id: "asc" }],
@@ -133,9 +145,10 @@ export async function createOperationalBlock(input: {
   assertRenderedOrganization(actor, input.contextOrganizationId);
   return runBusinessOperationTransaction(async (transaction) => {
     await lockOrganization(transaction, actor.organizationId);
-    await lockBranch(transaction, input.branchId, actor.organizationId);
     await assertBusinessOperationActorCurrent(transaction, actor, "BLOCK_WRITE");
-    const resolved = await resolveBlockInput(transaction, actor, input.branchId, input.block);
+    await lockBranch(transaction, input.branchId, actor.organizationId);
+    const branch = await requireOperationalBlockBranch(transaction, actor, input.branchId);
+    const resolved = resolveBlockInput(branch, input.block);
     const requestHash = hashBusinessOperation({
       action: "BLOCK_CREATE",
       block: blockSnapshot(resolved),
@@ -202,9 +215,10 @@ export async function updateOperationalBlock(input: {
   assertRenderedOrganization(actor, input.contextOrganizationId);
   return runBusinessOperationTransaction(async (transaction) => {
     await lockOrganization(transaction, actor.organizationId);
-    await lockBranch(transaction, input.branchId, actor.organizationId);
     await assertBusinessOperationActorCurrent(transaction, actor, "BLOCK_WRITE");
-    const resolved = await resolveBlockInput(transaction, actor, input.branchId, input.block);
+    await lockBranch(transaction, input.branchId, actor.organizationId);
+    const branch = await requireOperationalBlockBranch(transaction, actor, input.branchId);
+    const resolved = resolveBlockInput(branch, input.block);
     const requestHash = hashBusinessOperation({
       action: "BLOCK_UPDATE",
       block: blockSnapshot(resolved),
@@ -264,8 +278,9 @@ export async function deleteOperationalBlock(input: {
   const requestHash = hashBusinessOperation({ action: "BLOCK_DELETE", blockId: input.blockId, branchId: input.branchId });
   return runBusinessOperationTransaction(async (transaction) => {
     await lockOrganization(transaction, actor.organizationId);
-    await lockBranch(transaction, input.branchId, actor.organizationId);
     await assertBusinessOperationActorCurrent(transaction, actor, "BLOCK_WRITE");
+    await lockBranch(transaction, input.branchId, actor.organizationId);
+    await requireOperationalBlockBranch(transaction, actor, input.branchId);
     const replay = await resolveMutationReplay(transaction, {
       actorMembershipId: actor.membershipId,
       idempotencyKey: input.idempotencyKey,

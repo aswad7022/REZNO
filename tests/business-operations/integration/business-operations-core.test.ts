@@ -389,6 +389,156 @@ test("Stage 2A Business Operations core is tenant-safe, replay-safe, and availab
     assert.equal(JSON.stringify(publicProfile).includes("Private operational reason"), false);
   });
 
+  await t.test("block reads and mutations share the active-Branch Receptionist scope", async () => {
+    await resetBusinessOperationsTestData();
+    const fixture = await createBusinessOperationsFixture("block-scope");
+    const date = futureDate();
+    const deniedCreateKey = randomUUID();
+    const deniedCreate = {
+      actor: fixture.receptionist.reference,
+      block: localBlockInput(date, "08:00", "09:00"),
+      branchId: fixture.inactiveBranch.id,
+      confirmFutureReservations: false,
+      contextOrganizationId: fixture.organizationA.id,
+      idempotencyKey: deniedCreateKey,
+    };
+    await assert.rejects(listOperationalBlocks(fixture.receptionist.reference, fixture.inactiveBranch.id), operationCode("BRANCH_NOT_FOUND"));
+    await assert.rejects(createOperationalBlock(deniedCreate), operationCode("BRANCH_NOT_FOUND"));
+    assert.equal(await prisma.blockedTime.count({ where: { branchId: fixture.inactiveBranch.id } }), 0);
+    assert.equal(await prisma.businessOperationMutation.count({ where: { idempotencyKey: deniedCreateKey } }), 0);
+    assert.equal(await prisma.businessAuditLog.count({ where: { organizationId: fixture.organizationA.id } }), 0);
+
+    const active = await createOperationalBlock({
+      ...deniedCreate,
+      branchId: fixture.activeBranch.id,
+      idempotencyKey: randomUUID(),
+    });
+    const ownerInactive = await createOperationalBlock({
+      ...deniedCreate,
+      actor: fixture.owner.reference,
+      block: localBlockInput(date, "10:00", "11:00"),
+      idempotencyKey: randomUUID(),
+    });
+    const managerInactive = await createOperationalBlock({
+      ...deniedCreate,
+      actor: fixture.manager.reference,
+      block: localBlockInput(date, "12:00", "13:00"),
+      idempotencyKey: randomUUID(),
+    });
+    assert.equal((await listOperationalBlocks(fixture.owner.reference, fixture.inactiveBranch.id)).blocks.length, 2);
+    assert.equal((await listOperationalBlocks(fixture.manager.reference, fixture.inactiveBranch.id)).blocks.length, 2);
+
+    const inactiveBefore = await prisma.blockedTime.findUniqueOrThrow({ where: { id: ownerInactive.blockId } });
+    const mutationCountBeforeDenied = await prisma.businessOperationMutation.count({ where: { organizationId: fixture.organizationA.id } });
+    const auditCountBeforeDenied = await prisma.businessAuditLog.count({ where: { organizationId: fixture.organizationA.id } });
+    await assert.rejects(updateOperationalBlock({
+      actor: fixture.receptionist.reference,
+      block: localBlockInput(date, "14:00", "15:00"),
+      blockId: inactiveBefore.id,
+      branchId: fixture.inactiveBranch.id,
+      confirmFutureReservations: false,
+      contextOrganizationId: fixture.organizationA.id,
+      expectedVersion: inactiveBefore.updatedAt.toISOString(),
+      idempotencyKey: randomUUID(),
+    }), operationCode("BRANCH_NOT_FOUND"));
+    await assert.rejects(deleteOperationalBlock({
+      actor: fixture.receptionist.reference,
+      blockId: inactiveBefore.id,
+      branchId: fixture.inactiveBranch.id,
+      contextOrganizationId: fixture.organizationA.id,
+      expectedVersion: inactiveBefore.updatedAt.toISOString(),
+      idempotencyKey: randomUUID(),
+    }), operationCode("BRANCH_NOT_FOUND"));
+    const inactiveAfter = await prisma.blockedTime.findUniqueOrThrow({ where: { id: inactiveBefore.id } });
+    assert.deepEqual(
+      { endsAt: inactiveAfter.endsAt, reason: inactiveAfter.reason, startsAt: inactiveAfter.startsAt, updatedAt: inactiveAfter.updatedAt },
+      { endsAt: inactiveBefore.endsAt, reason: inactiveBefore.reason, startsAt: inactiveBefore.startsAt, updatedAt: inactiveBefore.updatedAt },
+    );
+    assert.equal(await prisma.businessOperationMutation.count({ where: { organizationId: fixture.organizationA.id } }), mutationCountBeforeDenied);
+    assert.equal(await prisma.businessAuditLog.count({ where: { organizationId: fixture.organizationA.id } }), auditCountBeforeDenied);
+
+    const managerUpdated = await updateOperationalBlock({
+      actor: fixture.manager.reference,
+      block: localBlockInput(date, "14:00", "15:00"),
+      blockId: inactiveBefore.id,
+      branchId: fixture.inactiveBranch.id,
+      confirmFutureReservations: false,
+      contextOrganizationId: fixture.organizationA.id,
+      expectedVersion: inactiveBefore.updatedAt.toISOString(),
+      idempotencyKey: randomUUID(),
+    });
+    await deleteOperationalBlock({
+      actor: fixture.owner.reference,
+      blockId: managerInactive.blockId,
+      branchId: fixture.inactiveBranch.id,
+      contextOrganizationId: fixture.organizationA.id,
+      expectedVersion: managerInactive.version,
+      idempotencyKey: randomUUID(),
+    });
+    assert.equal((await prisma.blockedTime.findUniqueOrThrow({ where: { id: managerUpdated.blockId } })).reason, "Private operational reason");
+
+    await prisma.branch.update({ where: { id: fixture.inactiveBranch.id }, data: { status: "ARCHIVED" } });
+    const deniedLifecycleCount = await prisma.businessOperationMutation.count({ where: { organizationId: fixture.organizationA.id } });
+    const deniedLifecycleAuditCount = await prisma.businessAuditLog.count({ where: { organizationId: fixture.organizationA.id } });
+    for (const actor of [fixture.owner.reference, fixture.manager.reference, fixture.receptionist.reference]) {
+      await assert.rejects(createOperationalBlock({
+        ...deniedCreate,
+        actor,
+        block: localBlockInput(date, "16:00", "17:00"),
+        idempotencyKey: randomUUID(),
+      }), operationCode("BRANCH_NOT_FOUND"));
+    }
+    await assert.rejects(createOperationalBlock({
+      ...deniedCreate,
+      branchId: fixture.branchB.id,
+      contextOrganizationId: fixture.organizationA.id,
+      idempotencyKey: randomUUID(),
+    }), operationCode("BRANCH_NOT_FOUND"));
+    await prisma.branch.update({
+      where: { id: fixture.inactiveBranch.id },
+      data: { deletedAt: new Date(), status: "INACTIVE" },
+    });
+    for (const actor of [fixture.owner.reference, fixture.manager.reference, fixture.receptionist.reference]) {
+      await assert.rejects(createOperationalBlock({
+        ...deniedCreate,
+        actor,
+        block: localBlockInput(date, "18:00", "19:00"),
+        idempotencyKey: randomUUID(),
+      }), operationCode("BRANCH_NOT_FOUND"));
+    }
+    assert.equal(await prisma.businessOperationMutation.count({ where: { organizationId: fixture.organizationA.id } }), deniedLifecycleCount);
+    assert.equal(await prisma.businessAuditLog.count({ where: { organizationId: fixture.organizationA.id } }), deniedLifecycleAuditCount);
+
+    for (const [actor, code] of [[fixture.staff.reference, "FORBIDDEN"], [fixture.revoked.reference, "MEMBERSHIP_UNAVAILABLE"]] as const) {
+      await assert.rejects(createOperationalBlock({
+        ...deniedCreate,
+        actor,
+        branchId: fixture.activeBranch.id,
+        idempotencyKey: randomUUID(),
+      }), operationCode(code));
+    }
+    const activeCurrent = await prisma.blockedTime.findUniqueOrThrow({ where: { id: active.blockId } });
+    const activeUpdated = await updateOperationalBlock({
+      actor: fixture.receptionist.reference,
+      block: localBlockInput(date, "09:00", "10:00"),
+      blockId: activeCurrent.id,
+      branchId: fixture.activeBranch.id,
+      confirmFutureReservations: false,
+      contextOrganizationId: fixture.organizationA.id,
+      expectedVersion: activeCurrent.updatedAt.toISOString(),
+      idempotencyKey: randomUUID(),
+    });
+    await deleteOperationalBlock({
+      actor: fixture.receptionist.reference,
+      blockId: activeCurrent.id,
+      branchId: fixture.activeBranch.id,
+      contextOrganizationId: fixture.organizationA.id,
+      expectedVersion: activeUpdated.version,
+      idempotencyKey: randomUUID(),
+    });
+    assert.equal(await prisma.blockedTime.count({ where: { id: active.blockId } }), 0);
+  });
+
   await t.test("Branch blocks remove overlapping generic and Restaurant slots and require reservation impact confirmation", async () => {
     await resetBusinessOperationsTestData();
     const fixture = await createBusinessOperationsFixture("block-impact");

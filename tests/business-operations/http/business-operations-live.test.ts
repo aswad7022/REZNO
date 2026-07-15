@@ -171,6 +171,115 @@ test("Business Operations live pages and progressive Server Actions persist auth
     await prisma.organizationMember.update({ where: { id: fixture.owner.membership.id }, data: { roleId: fixture.owner.membership.roleId } });
   });
 
+  await t.test("forged block Server Actions enforce the Receptionist active-Branch scope", async () => {
+    const date = futureDate(8);
+    const inactivePath = `/business/manage/locations/${fixture.inactiveBranch.id}/blocks`;
+    const activePath = `/business/manage/locations/${fixture.activeBranch.id}/blocks`;
+    const foreignPath = `/business/manage/locations/${fixture.branchB.id}/blocks`;
+    const existingInactive = await prisma.blockedTime.create({
+      data: {
+        branchId: fixture.inactiveBranch.id,
+        endsAt: new Date(`${date}T11:00:00.000Z`),
+        memberId: null,
+        reason: "Inactive Branch original",
+        startsAt: new Date(`${date}T10:00:00.000Z`),
+      },
+    });
+    const inactiveHtml = await (await page(inactivePath, ownerCookie)).text();
+    const inactiveCreateForm = forms(inactiveHtml).find((candidate) => candidate.includes('name="startsAt"') && !candidate.includes('name="expectedVersion"'));
+    const inactiveUpdateForm = forms(inactiveHtml).find((candidate) => candidate.includes(existingInactive.id) && candidate.includes('name="startsAt"') && candidate.includes('name="expectedVersion"'));
+    const inactiveDeleteForm = forms(inactiveHtml).find((candidate) => candidate.includes(existingInactive.id) && !candidate.includes('name="startsAt"') && candidate.includes('name="expectedVersion"'));
+    assert.ok(inactiveCreateForm);
+    assert.ok(inactiveUpdateForm);
+    assert.ok(inactiveDeleteForm);
+    const foreignCookie = activeCookie(ownerSession.cookie, fixture.organizationB.id);
+    const foreignHtml = await (await page(foreignPath, foreignCookie)).text();
+    const foreignCreateForm = forms(foreignHtml).find((candidate) => candidate.includes('name="startsAt"') && !candidate.includes('name="expectedVersion"'));
+    assert.ok(foreignCreateForm);
+
+    await prisma.organizationMember.update({ where: { id: fixture.owner.membership.id }, data: { roleId: fixture.receptionist.membership.roleId } });
+    const receptionistActiveHtml = await (await page(activePath, ownerCookie)).text();
+    assert.doesNotMatch(receptionistActiveHtml, /NEXT_HTTP_ERROR_FALLBACK;403/);
+    const receptionistActiveForm = forms(receptionistActiveHtml).find((candidate) => candidate.includes('name="startsAt"') && !candidate.includes('name="expectedVersion"'));
+    assert.ok(receptionistActiveForm);
+    await submit(activePath, receptionistActiveForm, (parameters) => {
+      parameters.set("startsAt", `${date}T08:00`);
+      parameters.set("endsAt", `${date}T09:00`);
+      parameters.set("reason", "Receptionist active HTTP");
+    }, ownerCookie);
+    assert.equal(await prisma.blockedTime.count({ where: { branchId: fixture.activeBranch.id, reason: "Receptionist active HTTP" } }), 1);
+
+    const deniedMutationCount = await prisma.businessOperationMutation.count({ where: { organizationId: fixture.organizationA.id } });
+    const deniedAuditCount = await prisma.businessAuditLog.count({ where: { organizationId: fixture.organizationA.id } });
+    const deniedInactiveCount = await prisma.blockedTime.count({ where: { branchId: fixture.inactiveBranch.id } });
+    await submit(inactivePath, inactiveCreateForm, (parameters) => {
+      parameters.set("idempotencyKey", randomUUID());
+      parameters.set("startsAt", `${date}T12:00`);
+      parameters.set("endsAt", `${date}T13:00`);
+      parameters.set("reason", "Receptionist forged inactive create");
+    }, ownerCookie);
+    await submit(inactivePath, inactiveUpdateForm, (parameters) => {
+      parameters.set("idempotencyKey", randomUUID());
+      parameters.set("startsAt", `${date}T14:00`);
+      parameters.set("endsAt", `${date}T15:00`);
+      parameters.set("reason", "Receptionist forged inactive update");
+    }, ownerCookie);
+    await submit(inactivePath, inactiveDeleteForm, (parameters) => {
+      parameters.set("idempotencyKey", randomUUID());
+    }, ownerCookie);
+    const inactiveAfterDenied = await prisma.blockedTime.findUniqueOrThrow({ where: { id: existingInactive.id } });
+    assert.deepEqual(
+      { endsAt: inactiveAfterDenied.endsAt, reason: inactiveAfterDenied.reason, startsAt: inactiveAfterDenied.startsAt, updatedAt: inactiveAfterDenied.updatedAt },
+      { endsAt: existingInactive.endsAt, reason: existingInactive.reason, startsAt: existingInactive.startsAt, updatedAt: existingInactive.updatedAt },
+    );
+    assert.equal(await prisma.blockedTime.count({ where: { branchId: fixture.inactiveBranch.id } }), deniedInactiveCount);
+
+    await prisma.branch.update({ where: { id: fixture.inactiveBranch.id }, data: { status: "ARCHIVED" } });
+    await submit(inactivePath, inactiveCreateForm, (parameters) => {
+      parameters.set("idempotencyKey", randomUUID());
+      parameters.set("startsAt", `${date}T16:00`);
+      parameters.set("endsAt", `${date}T17:00`);
+      parameters.set("reason", "Receptionist forged archived create");
+    }, ownerCookie);
+    await submit(foreignPath, foreignCreateForm, (parameters) => {
+      parameters.set("contextOrganizationId", fixture.organizationA.id);
+      parameters.set("idempotencyKey", randomUUID());
+      parameters.set("startsAt", `${date}T18:00`);
+      parameters.set("endsAt", `${date}T19:00`);
+      parameters.set("reason", "Receptionist forged foreign create");
+    }, ownerCookie);
+    assert.equal(await prisma.blockedTime.count({ where: { branchId: fixture.branchB.id } }), 0);
+
+    await prisma.organizationMember.update({ where: { id: fixture.owner.membership.id }, data: { roleId: fixture.staff.membership.roleId } });
+    await submit(activePath, receptionistActiveForm, (parameters) => {
+      parameters.set("idempotencyKey", randomUUID());
+      parameters.set("startsAt", `${date}T20:00`);
+      parameters.set("endsAt", `${date}T21:00`);
+      parameters.set("reason", "Staff forged active create");
+    }, ownerCookie);
+    assert.equal(await prisma.blockedTime.count({ where: { branchId: fixture.activeBranch.id, reason: "Staff forged active create" } }), 0);
+    assert.equal(await prisma.businessOperationMutation.count({ where: { organizationId: fixture.organizationA.id } }), deniedMutationCount);
+    assert.equal(await prisma.businessAuditLog.count({ where: { organizationId: fixture.organizationA.id } }), deniedAuditCount);
+
+    await prisma.branch.update({ where: { id: fixture.inactiveBranch.id }, data: { status: "INACTIVE" } });
+    await prisma.organizationMember.update({ where: { id: fixture.owner.membership.id }, data: { roleId: fixture.owner.membership.roleId } });
+    await submit(inactivePath, inactiveCreateForm, (parameters) => {
+      parameters.set("idempotencyKey", randomUUID());
+      parameters.set("startsAt", `${date}T16:00`);
+      parameters.set("endsAt", `${date}T17:00`);
+      parameters.set("reason", "Owner inactive HTTP");
+    }, ownerCookie);
+    await prisma.organizationMember.update({ where: { id: fixture.owner.membership.id }, data: { roleId: fixture.manager.membership.roleId } });
+    await submit(inactivePath, inactiveCreateForm, (parameters) => {
+      parameters.set("idempotencyKey", randomUUID());
+      parameters.set("startsAt", `${date}T18:00`);
+      parameters.set("endsAt", `${date}T19:00`);
+      parameters.set("reason", "Manager inactive HTTP");
+    }, ownerCookie);
+    assert.equal(await prisma.blockedTime.count({ where: { branchId: fixture.inactiveBranch.id, reason: { in: ["Owner inactive HTTP", "Manager inactive HTTP"] } } }), 2);
+    await prisma.organizationMember.update({ where: { id: fixture.owner.membership.id }, data: { roleId: fixture.owner.membership.roleId } });
+  });
+
   await t.test("the real selector switches businesses and stale cross-tab forms cannot mutate the new tenant", async () => {
     const chooserResponse = await page("/select-business?next=/business/manage/settings", ownerSession.cookie);
     assert.equal(chooserResponse.status, 200);
@@ -292,6 +401,7 @@ test("Business Operations live pages and progressive Server Actions persist auth
     await submit(blocksPath, blockForm, blockMutation);
     await submit(blocksPath, blockForm, blockMutation);
     assert.equal(await prisma.blockedTime.count({ where: { branchId: branch.id, memberId: null } }), 1);
-    assert.equal(await prisma.businessAuditLog.count({ where: { organizationId: fixture.organizationA.id, targetType: "BlockedTime" } }), 1);
+    const persistedBlock = await prisma.blockedTime.findFirstOrThrow({ where: { branchId: branch.id, memberId: null } });
+    assert.equal(await prisma.businessAuditLog.count({ where: { organizationId: fixture.organizationA.id, targetId: persistedBlock.id, targetType: "BlockedTime" } }), 1);
   });
 });
