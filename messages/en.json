@@ -129,6 +129,7 @@
     "noLocations": "No locations have been added.",
     "hoursTitle": "Working hours and closures",
     "editHours": "Edit working hours",
+    "manageClosures": "Manage closures",
     "specialClosures": "Special closing days",
     "closureBranch": "Location",
     "closureReason": "Closure reason",
@@ -175,6 +176,36 @@
       "failure": "We couldn't add blocked time. Try again."
     }
   },
+  "OperationalBlocks": {
+    "title": "Branch closures",
+    "description": "Manage one-time closures for {branch}.",
+    "activeBusiness": "Active business",
+    "add": "Add closure",
+    "startsAt": "Starts",
+    "endsAt": "Ends",
+    "reason": "Internal reason",
+    "reasonPrivate": "The reason is visible to authorized business users only.",
+    "remove": "Remove closure",
+    "empty": "No branch closures have been recorded.",
+    "historical": "Historical closure",
+    "scheduled": "Scheduled closure",
+    "confirmFutureReservations": "I understand that this closure overlaps future bookings or reservations and want to continue.",
+    "impact": "Affected future records: {generic} bookings and {restaurant} restaurant reservations.",
+    "messages": {
+      "created": "Closure added.",
+      "updated": "Closure updated.",
+      "deleted": "Closure removed.",
+      "invalid": "Check the closure details and try again.",
+      "failure": "We couldn't save this closure. Try again."
+    }
+  },
+  "BusinessAudit": {
+    "title": "Operational audit log",
+    "description": "Review recent settings, location, hours, and closure mutations.",
+    "activeBusiness": "Active business",
+    "actor": "Actor membership",
+    "empty": "No operational mutations have been recorded."
+  },
   "WorkingHours": {
     "title": "Working hours",
     "description": "Set the regular weekly schedule for {branch}.",
@@ -182,6 +213,9 @@
     "closed": "Closed",
     "opensAt": "Opens",
     "closesAt": "Closes",
+    "activeBusiness": "Active business",
+    "confirmFutureReservations": "I understand that these hours affect future bookings or reservations and want to continue.",
+    "impact": "Affected future records: {generic} bookings and {restaurant} restaurant reservations.",
     "days": {
       "0": "Sunday",
       "1": "Monday",
@@ -204,6 +238,8 @@
     "description": "Control how customers discover and book your business.",
     "bookingTitle": "Booking preferences",
     "bookingDescription": "Configure the core rules used by future booking flows.",
+    "activeBusiness": "Active business",
+    "replayed": "This request was already saved; the existing result was returned.",
     "fields": {
       "bookingEnabled": "Accept new bookings",
       "bookingEnabledHelp": "Customers can create new appointments when enabled.",
@@ -401,12 +437,23 @@
   "Branches": {
     "title": "Locations",
     "description": "Manage the branches where your business operates.",
+    "viewAudit": "View audit log",
     "add": "Add location",
     "edit": "Edit location",
     "hours": "Working hours",
     "hoursConfigured": "Working hours configured",
     "hoursMissing": "Working hours missing",
     "editHours": "Edit working hours",
+    "activeBusiness": "Active business",
+    "manageBlocks": "Closures ({count})",
+    "activate": "Activate location",
+    "deactivate": "Deactivate location",
+    "archive": "Archive location",
+    "confirmActivate": "Activate this location for new availability?",
+    "confirmDeactivate": "Deactivate this location? Existing records will remain, but no new availability will be offered.",
+    "confirmArchive": "Archive this inactive location? This is a soft archive and requires all operational relationships to be resolved.",
+    "confirmFutureReservations": "I understand that deactivation affects future bookings or reservations and want to continue.",
+    "impact": "Affected future records: {generic} bookings and {restaurant} restaurant reservations.",
     "nextWorkingDay": "Next working day: {day}",
     "locationSet": "Location set",
     "locationNotSet": "Location not set",

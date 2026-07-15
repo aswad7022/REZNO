@@ -1,58 +1,20 @@
 import "server-only";
 
+import { randomUUID } from "node:crypto";
 import { notFound } from "next/navigation";
 
-import { canManageOrganization } from "@/features/business/policies/access";
-import { requireBusinessIdentity } from "@/features/identity/server";
-import { prisma } from "@/lib/db/prisma";
+import { BusinessOperationsError } from "@/features/business-operations/domain/errors";
+import { readOperationalHours } from "@/features/business-operations/services/hours";
+import { currentBusinessOperationReference } from "@/features/business-operations/services/identity-adapter";
 import type { BranchWorkingHours } from "@/features/working-hours/types";
 
-const defaultDays = Array.from({ length: 7 }, (_, dayOfWeek) => ({
-  dayOfWeek,
-  isOpen: false,
-  openTime: "09:00",
-  closeTime: "17:00",
-}));
-
-export async function getBranchWorkingHours(
-  branchId: string,
-): Promise<BranchWorkingHours> {
-  const { membership } = await requireBusinessIdentity();
-  const branch = await prisma.branch.findFirst({
-    where: {
-      id: branchId,
-      organizationId: membership.organizationId,
-      deletedAt: null,
-    },
-    include: {
-      businessHours: {
-        orderBy: { dayOfWeek: "asc" },
-      },
-    },
-  });
-
-  if (!branch) {
-    notFound();
+export async function getBranchWorkingHours(branchId: string): Promise<BranchWorkingHours> {
+  const reference = await currentBusinessOperationReference("HOURS_READ");
+  try {
+    const result = await readOperationalHours(reference, branchId);
+    return { ...result, canEdit: result.canWrite, idempotencyKey: randomUUID() };
+  } catch (error) {
+    if (error instanceof BusinessOperationsError && ["BRANCH_NOT_FOUND", "NOT_FOUND"].includes(error.code)) notFound();
+    throw error;
   }
-
-  const hoursByDay = new Map(
-    branch.businessHours.map((hours) => [hours.dayOfWeek, hours]),
-  );
-
-  return {
-    branchId: branch.id,
-    branchName: branch.name,
-    canEdit: canManageOrganization(membership.role.systemRole),
-    days: defaultDays.map((fallback) => {
-      const saved = hoursByDay.get(fallback.dayOfWeek);
-      return saved
-        ? {
-            dayOfWeek: saved.dayOfWeek,
-            isOpen: saved.isOpen,
-            openTime: saved.openTime,
-            closeTime: saved.closeTime,
-          }
-        : fallback;
-    }),
-  };
 }

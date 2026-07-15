@@ -9,13 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   createBranch,
   updateBranch,
 } from "@/features/branches/actions/manage-branch";
@@ -50,7 +43,15 @@ function Field({
   );
 }
 
-export function BranchForm({ branch }: { branch?: BranchDetails }) {
+export function BranchForm({
+  branch,
+  contextOrganizationId,
+  idempotencyKey,
+}: {
+  branch?: BranchDetails;
+  contextOrganizationId: string;
+  idempotencyKey: string;
+}) {
   const t = useTranslations("Branches");
   const common = useTranslations("Common");
   const action = branch ? updateBranch.bind(null, branch.id) : createBranch;
@@ -71,6 +72,9 @@ export function BranchForm({ branch }: { branch?: BranchDetails }) {
 
   return (
     <form action={formAction} className="space-y-5">
+      <input type="hidden" name="contextOrganizationId" value={contextOrganizationId} />
+      {branch ? <input type="hidden" name="expectedVersion" value={state.version ?? branch.version} /> : null}
+      <input type="hidden" name="idempotencyKey" value={state.nextIdempotencyKey ?? idempotencyKey} />
       <div className="grid gap-5 md:grid-cols-2">
         <Field
           htmlFor="name"
@@ -216,30 +220,6 @@ export function BranchForm({ branch }: { branch?: BranchDetails }) {
             {state.fieldErrors.longitude}
           </p>
         ) : null}
-        {branch ? (
-          <Field
-            htmlFor="status"
-            label={t("fields.status")}
-            error={state.fieldErrors?.status}
-          >
-            <Select name="status" defaultValue={branch.status}>
-              <SelectTrigger id="status" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ACTIVE">{t("statuses.ACTIVE")}</SelectItem>
-                <SelectItem value="INACTIVE">
-                  {t("statuses.INACTIVE")}
-                </SelectItem>
-                <SelectItem value="ARCHIVED">
-                  {t("statuses.ARCHIVED")}
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </Field>
-        ) : (
-          <input type="hidden" name="status" value="ACTIVE" />
-        )}
       </div>
 
       <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">

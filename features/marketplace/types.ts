@@ -105,7 +105,6 @@ export interface PublicBusinessProfile extends MarketplaceBusiness {
       id: string;
       startsAt: Date;
       endsAt: Date;
-      reason: string | null;
     }>;
     offerings: MarketplaceOffering[];
   }>;

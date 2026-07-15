@@ -1,24 +1,21 @@
-import type { BusinessVertical, StaffSelectionMode } from "@prisma/client";
-
 export interface BusinessSettingsDetails {
-  vertical: BusinessVertical;
   bookingEnabled: boolean;
-  marketplaceVisible: boolean;
-  staffSelectionMode: StaffSelectionMode;
   cancellationWindowHours: number;
-  canEdit: boolean;
+  idempotencyKey: string;
+  marketplaceVisible: boolean;
+  organizationId: string;
+  organizationName: string;
+  version: string;
 }
 
 export interface BusinessSettingsActionState {
   status: "idle" | "success" | "error";
+  code?: string;
   message?: string;
-  fieldErrors?: {
-    cancellationWindowHours?: string;
-    vertical?: string;
-    staffSelectionMode?: string;
-  };
+  nextIdempotencyKey?: string;
+  replayed?: boolean;
+  version?: string;
+  fieldErrors?: { cancellationWindowHours?: string };
 }
 
-export const initialBusinessSettingsActionState: BusinessSettingsActionState = {
-  status: "idle",
-};
+export const initialBusinessSettingsActionState: BusinessSettingsActionState = { status: "idle" };

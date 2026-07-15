@@ -15,10 +15,13 @@ function getSafeNext(value: FormDataEntryValue | null) {
 }
 
 export async function selectActiveBusiness(formData: FormData) {
+  const hasUnknownFields = [...formData.keys()].some(
+    (key) => !key.startsWith("$ACTION_") && key !== "businessId" && key !== "next",
+  );
   const businessId = formData.get("businessId");
   const next = getSafeNext(formData.get("next"));
 
-  if (typeof businessId !== "string") {
+  if (hasUnknownFields || typeof businessId !== "string") {
     redirect("/select-business?next=/business");
   }
 

@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 
 import { DashboardLayout } from "@/components/dashboard/dashboard-layout";
 import { getCurrentAdminAccess } from "@/features/admin/services/admin-auth";
+import { canAccessOrganizationConversations } from "@/features/identity/policies/authorization";
 import { requireBusinessIdentity } from "@/features/identity/server";
 import { toDashboardUser } from "@/lib/auth/dashboard-user";
 import {
@@ -28,11 +29,17 @@ export default async function BusinessDashboardLayout({
   const canViewAdminMessages = Boolean(
     adminAccess?.isSuperAdmin || adminAccess?.permissions.includes("MESSAGES_VIEW"),
   );
+  const canViewBusinessMessages = canAccessOrganizationConversations(
+    membership.role.systemRole,
+  );
   const messageRole = canViewAdminMessages ? "admin" : "business";
-  const [unreadMessages, messagePreviews] = await Promise.all([
-    getUnreadMessageCount(messageRole),
-    getDashboardMessagePreviews(messageRole),
-  ]);
+  const [unreadMessages, messagePreviews] =
+    canViewAdminMessages || canViewBusinessMessages
+      ? await Promise.all([
+          getUnreadMessageCount(messageRole),
+          getDashboardMessagePreviews(messageRole),
+        ])
+      : [0, []];
 
   return (
     <DashboardLayout

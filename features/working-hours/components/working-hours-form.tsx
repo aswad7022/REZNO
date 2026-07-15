@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -32,6 +33,10 @@ export function WorkingHoursForm({
 
   return (
     <form action={formAction} className="space-y-4">
+      <input type="hidden" name="contextOrganizationId" value={schedule.organizationId} />
+      <input type="hidden" name="expectedVersion" value={state.version ?? schedule.version} />
+      <input type="hidden" name="idempotencyKey" value={state.nextIdempotencyKey ?? schedule.idempotencyKey} />
+      <Card className="shadow-none"><CardContent className="pt-6 text-sm"><span className="text-muted-foreground">{t("activeBusiness")}:</span> <strong>{schedule.organizationName}</strong> · <span dir="ltr">{schedule.timezone}</span></CardContent></Card>
       {schedule.days.map((day) => {
         const dayKey = String(day.dayOfWeek) as DayKey;
         return (
@@ -122,6 +127,8 @@ export function WorkingHoursForm({
           </span>
         )}
       </div>
+      {schedule.canEdit ? <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 p-3"><Checkbox id="confirmFutureReservations" name="confirmFutureReservations" /><Label htmlFor="confirmFutureReservations" className="text-xs leading-5">{t("confirmFutureReservations")}</Label></div> : null}
+      {state.details?.total ? <p className="text-sm text-amber-700">{t("impact", { generic: Number(state.details.genericBookings ?? 0), restaurant: Number(state.details.restaurantReservations ?? 0) })}</p> : null}
     </form>
   );
 }

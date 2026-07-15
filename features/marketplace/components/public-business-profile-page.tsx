@@ -468,7 +468,6 @@ export async function PublicBusinessProfilePage({ slug }: { slug: string }) {
                               timeStyle: "short",
                               hour12: true,
                             })}
-                            {closure.reason ? ` · ${closure.reason}` : ""}
                           </p>
                         ))}
                       </CardContent>
