@@ -5,6 +5,8 @@ import type {
   MobileRestaurantBusiness,
   MobileRestaurantMenuCategory,
   MobileRestaurantReservationDetail,
+  MobileRestaurantReservationManagementPage,
+  MobileRestaurantReservationManagementTab,
 } from "../types/restaurant-reservations";
 
 type DataResponse<T> = { data: T };
@@ -73,4 +75,91 @@ export function fetchMobileRestaurantReservationDetail(bookingId: string) {
     `/api/mobile/restaurant-reservations/${encodeURIComponent(bookingId)}`,
     { authenticated: true },
   );
+}
+
+export function fetchMobileManagedRestaurantReservations(input: {
+  tab: MobileRestaurantReservationManagementTab;
+  cursor?: string | null;
+  limit?: number;
+}) {
+  return mobileApiRequest<DataResponse<MobileRestaurantReservationManagementPage>>(
+    "/api/mobile/restaurant-reservations",
+    {
+      authenticated: true,
+      params: {
+        tab: input.tab,
+        cursor: input.cursor ?? undefined,
+        limit: input.limit,
+      },
+    },
+  );
+}
+
+export function cancelMobileRestaurantReservation(
+  bookingId: string,
+  reason: string,
+  idempotencyKey: string,
+  bookingVersion: string,
+) {
+  return mobileApiRequest<
+    DataResponse<{
+      reservation: MobileRestaurantReservationDetail;
+      replayed: boolean;
+    }>
+  >(`/api/mobile/restaurant-reservations/${encodeURIComponent(bookingId)}/cancel`, {
+    authenticated: true,
+    body: { reason },
+    headers: {
+      "Idempotency-Key": idempotencyKey,
+      "X-Rezno-Booking-Version": bookingVersion,
+    },
+    method: "POST",
+  });
+}
+
+export function fetchMobileRestaurantRescheduleOptions(input: {
+  bookingId: string;
+  date: string;
+  guestCount: number;
+  seatingArea: string | null;
+}) {
+  return mobileApiRequest<DataResponse<MobileRestaurantAvailability>>(
+    `/api/mobile/restaurant-reservations/${encodeURIComponent(input.bookingId)}/reschedule-options`,
+    {
+      authenticated: true,
+      params: {
+        date: input.date,
+        guestCount: input.guestCount,
+        seatingArea: input.seatingArea ?? undefined,
+      },
+    },
+  );
+}
+
+export function rescheduleMobileRestaurantReservation(
+  bookingId: string,
+  input: {
+    customerNote: string | null;
+    date: string;
+    guestCount: number;
+    seatingArea: string | null;
+    startsAt: string;
+  },
+  idempotencyKey: string,
+  bookingVersion: string,
+) {
+  return mobileApiRequest<
+    DataResponse<{
+      reservation: MobileRestaurantReservationDetail;
+      replayed: boolean;
+    }>
+  >(`/api/mobile/restaurant-reservations/${encodeURIComponent(bookingId)}/reschedule`, {
+    authenticated: true,
+    body: input,
+    headers: {
+      "Idempotency-Key": idempotencyKey,
+      "X-Rezno-Booking-Version": bookingVersion,
+    },
+    method: "POST",
+  });
 }

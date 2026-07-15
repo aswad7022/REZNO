@@ -364,7 +364,7 @@ export async function createCustomerRestaurantReservation(
                     isActive: true,
                   },
                 },
-                select: { id: true, name: true, price: true },
+                select: { id: true, name: true, price: true, currency: true },
               })
             : [];
           if (menuItems.length !== requestedItemIds.length) {
@@ -378,6 +378,8 @@ export async function createCustomerRestaurantReservation(
             menuItemId: item.itemId,
             quantity: item.quantity,
             unitPrice: menuById.get(item.itemId)!.price,
+            itemNameSnapshot: menuById.get(item.itemId)!.name,
+            currencySnapshot: menuById.get(item.itemId)!.currency,
           }));
           const preorderTotal = reservationItems.reduce(
             (total, item) => total.plus(item.unitPrice.times(item.quantity)),

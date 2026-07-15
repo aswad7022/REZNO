@@ -1,8 +1,9 @@
 # Restaurant reservation creation
 
 Gate 2D implements creation and persisted confirmation for `RESTAURANT` and
-`CAFE` businesses. Management, cancellation, rescheduling, restaurant reviews,
-payments, and outbound messaging remain deferred.
+`CAFE` businesses. Customer cancellation and direct rescheduling are specified
+separately in `reservation-management.md`. Restaurant reviews, payments, and
+outbound messaging remain deferred.
 
 ## Domain boundary
 
@@ -34,8 +35,9 @@ for explicit restaurant reservations.
 - Preorder items are optional. Duplicate item IDs are normalized by summing
   quantities up to 20. Every item and its active category must belong to the
   restaurant; unavailable or foreign items reject the whole request. Prices are
-  database-authoritative and `RestaurantReservationItem.unitPrice` is the price
-  snapshot supported by the current schema.
+  database-authoritative. New rows snapshot unit price, item name, and currency;
+  legacy rows without the new text snapshots safely fall back to their related
+  menu item.
 - Notes are trimmed, limited to 500 characters, persisted as text, and rendered
   through normal escaped React text output.
 

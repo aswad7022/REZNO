@@ -98,7 +98,16 @@ export async function getAdminBusinessDetails(id: string) {
         orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
       },
       bookings: {
-        include: { customer: true, branch: true },
+        include: {
+          customer: true,
+          branch: true,
+          restaurantReservation: {
+            include: {
+              table: true,
+              items: { include: { menuItem: true } },
+            },
+          },
+        },
         orderBy: { startsAt: "desc" },
         take: 20,
       },
@@ -192,6 +201,12 @@ export async function getAdminBookings() {
       customer: true,
       branch: true,
       member: { include: { person: true } },
+      restaurantReservation: {
+        include: {
+          table: true,
+          items: { include: { menuItem: true } },
+        },
+      },
     },
     orderBy: { startsAt: "desc" },
     take: 150,

@@ -27,7 +27,13 @@ test("Restaurant QA seed requires exact confirmation and staging marker without 
 
 test("Restaurant QA seed uses one bounded remote transaction", async () => {
   let options: { maxWait?: number; timeout?: number } | undefined;
-  const expected = { branchId: "branch", businessSlug: "business", customerId: "customer", ownerMemberId: "owner" };
+  const expected = {
+    branchId: "branch",
+    businessSlug: "business",
+    customerId: "customer",
+    managementBookingIds: ["cancellable", "reschedulable", "completed", "cancelled"],
+    ownerMemberId: "owner",
+  };
   const database = {
     $transaction: async (_operation: unknown, transactionOptions: typeof options) => {
       options = transactionOptions;

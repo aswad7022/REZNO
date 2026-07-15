@@ -35,6 +35,34 @@ export default async function AdminBookingsPage() {
                     timeZone: booking.branch.timezone,
                   })}
                 </p>
+                {booking.restaurantReservation ? (
+                  <div className="mt-3 space-y-2 text-xs text-muted-foreground">
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant="secondary">
+                        {booking.restaurantReservation.guestCount} ضيوف
+                      </Badge>
+                      <Badge variant="secondary">
+                        {booking.restaurantReservation.table.name}
+                      </Badge>
+                      {booking.restaurantReservation.seatingArea ? (
+                        <Badge variant="outline">
+                          {booking.restaurantReservation.seatingArea}
+                        </Badge>
+                      ) : null}
+                    </div>
+                    {booking.restaurantReservation.items.length ? (
+                      <div className="rounded-xl border bg-background p-3">
+                        {booking.restaurantReservation.items.map((item) => (
+                          <p key={item.id}>
+                            {item.quantity}×{" "}
+                            {item.itemNameSnapshot ?? item.menuItem.name} ·{" "}
+                            {item.unitPrice.toString()} {item.currencySnapshot ?? item.menuItem.currency}
+                          </p>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
               <div className="flex flex-wrap gap-2">
                 <Badge>{booking.status}</Badge>

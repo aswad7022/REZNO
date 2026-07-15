@@ -357,7 +357,7 @@ export async function getBusinessCalendarData(
             tableName: booking.restaurantReservation.table.name,
             seatingArea: booking.restaurantReservation.seatingArea,
             items: booking.restaurantReservation.items.map((item) => ({
-              name: item.menuItem.name,
+              name: item.itemNameSnapshot ?? item.menuItem.name,
               quantity: item.quantity,
             })),
           }

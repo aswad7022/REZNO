@@ -4,9 +4,13 @@ import test from "node:test";
 
 import { RestaurantReservationApiError } from "../../../features/restaurants/api/errors";
 import {
+  parseCancelRestaurantReservationRequest,
+  parseCustomerRestaurantReservationListQuery,
   parseCreateRestaurantReservationRequest,
   parseRestaurantAvailabilityQuery,
+  parseRestaurantBookingVersion,
   parseRestaurantIdempotencyKey,
+  parseRescheduleRestaurantReservationRequest,
 } from "../../../features/restaurants/api/validation";
 
 function request(body: unknown, key = randomUUID()) {
@@ -47,7 +51,46 @@ test("restaurant create DTO accepts only the public contract", async () => {
   );
 });
 
-test("availability query and UUID idempotency header are strict", () => {
+test("Restaurant management list and mutation DTOs reject cross-domain or server-owned fields", async () => {
+  assert.deepEqual(
+    parseCustomerRestaurantReservationListQuery(
+      new URLSearchParams("tab=upcoming&limit=10"),
+    ),
+    { tab: "upcoming", cursor: null, limit: 10 },
+  );
+  assert.throws(
+    () =>
+      parseCustomerRestaurantReservationListQuery(
+        new URLSearchParams("tab=upcoming&tab=all"),
+      ),
+    RestaurantReservationApiError,
+  );
+  assert.deepEqual(
+    await parseCancelRestaurantReservationRequest(request({ reason: "  changed  " })),
+    { reason: "changed" },
+  );
+  const reschedule = {
+    date: "2026-07-20",
+    startsAt: "2026-07-20T12:00:00.000Z",
+    guestCount: 4,
+    seatingArea: "Indoor",
+    customerNote: " Window ",
+  };
+  assert.deepEqual(
+    await parseRescheduleRestaurantReservationRequest(request(reschedule)),
+    { ...reschedule, customerNote: "Window" },
+  );
+  for (const forbidden of ["tableId", "status", "businessSlug", "preorderItems"]) {
+    await assert.rejects(
+      parseRescheduleRestaurantReservationRequest(
+        request({ ...reschedule, [forbidden]: "forged" }),
+      ),
+      RestaurantReservationApiError,
+    );
+  }
+});
+
+test("availability query, UUID idempotency, and booking-version headers are strict", () => {
   assert.deepEqual(
     parseRestaurantAvailabilityQuery(new URLSearchParams("date=2026-07-20&guestCount=2")),
     { date: "2026-07-20", guestCount: 2, seatingArea: null },
@@ -62,6 +105,28 @@ test("availability query and UUID idempotency header are strict", () => {
   );
   assert.throws(
     () => parseRestaurantIdempotencyKey(new Request("https://rezno.invalid", { headers: { "idempotency-key": "not-a-uuid" } })),
+    RestaurantReservationApiError,
+  );
+  const version = "2026-07-20T12:00:00.000Z";
+  assert.equal(
+    parseRestaurantBookingVersion(
+      new Request("https://rezno.invalid", {
+        headers: { "x-rezno-booking-version": version },
+      }),
+    ),
+    version,
+  );
+  assert.throws(
+    () => parseRestaurantBookingVersion(new Request("https://rezno.invalid")),
+    RestaurantReservationApiError,
+  );
+  assert.throws(
+    () =>
+      parseRestaurantBookingVersion(
+        new Request("https://rezno.invalid", {
+          headers: { "x-rezno-booking-version": "2026-07-20T12:00:00Z" },
+        }),
+      ),
     RestaurantReservationApiError,
   );
 });

@@ -295,7 +295,23 @@ export default async function AdminBusinessDetailsPage({
           items={business.bookings.map((booking) => ({
             id: booking.id,
             title: booking.serviceNameSnapshot,
-            meta: `${booking.customerNameSnapshot} · ${booking.status}`,
+            meta: [
+              booking.customerNameSnapshot,
+              booking.status,
+              booking.restaurantReservation
+                ? `${booking.restaurantReservation.guestCount} ضيوف · ${booking.restaurantReservation.table.name}`
+                : null,
+              booking.restaurantReservation?.items.length
+                ? booking.restaurantReservation.items
+                    .map(
+                      (item) =>
+                        `${item.quantity}× ${item.itemNameSnapshot ?? item.menuItem.name} · ${item.unitPrice.toString()} ${item.currencySnapshot ?? item.menuItem.currency}`,
+                    )
+                    .join("، ")
+                : null,
+            ]
+              .filter(Boolean)
+              .join(" · "),
           }))}
         />
       </div>
