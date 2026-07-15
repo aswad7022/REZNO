@@ -47,7 +47,7 @@ async function request(
 }
 
 test(
-  "mobile Restaurant live HTTP contracts cover catalog, availability, auth, create, replay, conflict, and ownership",
+  "mobile Restaurant live HTTP contracts cover catalog, creation, management, replay, conflict, and ownership",
   {
     concurrency: false,
     skip: baseUrl ? false : "COMMERCE_HTTP_BASE_URL is required for live route tests",
@@ -103,10 +103,17 @@ test(
     });
     assert.equal(unauthenticated.response.status, 401);
     assert.equal(unauthenticated.body.error?.code, "UNAUTHENTICATED");
+    const unauthenticatedList = await request(
+      "/api/mobile/restaurant-reservations?tab=all",
+    );
+    assert.equal(unauthenticatedList.response.status, 401);
+    assert.equal(unauthenticatedList.body.error?.code, "UNAUTHENTICATED");
 
     const suffix = randomUUID().slice(0, 8);
-    const ownerCookie = await signUp(`restaurant-owner-${suffix}@rezno.invalid`);
-    const otherCookie = await signUp(`restaurant-other-${suffix}@rezno.invalid`);
+    const ownerEmail = `restaurant-owner-${suffix}@rezno.invalid`;
+    const otherEmail = `restaurant-other-${suffix}@rezno.invalid`;
+    const ownerCookie = await signUp(ownerEmail);
+    const otherCookie = await signUp(otherEmail);
     const incomplete = await request("/api/mobile/restaurant-reservations", {
       body: createBody,
       cookie: ownerCookie,
@@ -148,7 +155,7 @@ test(
     });
     assert.equal(created.response.status, 201);
     const createdData = created.body.data as {
-      reservation: { id: string; reference: string; preorderTotal: string };
+      reservation: { id: string; reference: string; preorderTotal: string; startsAt: string };
       replayed: boolean;
     };
     assert.equal(createdData.replayed, false);
@@ -188,6 +195,203 @@ test(
     assert.equal(capacityConflict.response.status, 409);
     assert.equal(capacityConflict.body.error?.code, "TABLE_CONFLICT");
 
+    const remainingAvailability = await request(
+      `/api/mobile/restaurant-reservations/branches/${fixture.branch.id}/availability?date=${fixture.date}&guestCount=2`,
+    );
+    const secondSlot = (
+      remainingAvailability.body.data as { slots: Array<{ startsAt: string }> }
+    ).slots[0]!;
+    assert.ok(secondSlot);
+    const secondCreated = await request("/api/mobile/restaurant-reservations", {
+      body: { ...createBody, startsAt: secondSlot.startsAt },
+      cookie: ownerCookie,
+      headers: { "idempotency-key": randomUUID() },
+      method: "POST",
+    });
+    assert.equal(secondCreated.response.status, 201);
+    const secondBookingId = (
+      secondCreated.body.data as { reservation: { id: string } }
+    ).reservation.id;
+
+    const list = await request(
+      "/api/mobile/restaurant-reservations?tab=upcoming&limit=1",
+      { cookie: ownerCookie },
+    );
+    assert.equal(list.response.status, 200);
+    assert.equal(list.response.headers.get("cache-control"), "no-store, max-age=0");
+    const listData = list.body.data as {
+      counts: { all: number; upcoming: number };
+      items: Array<{ id: string }>;
+      nextCursor: string | null;
+    };
+    assert.equal(listData.counts.all, 2);
+    assert.equal(listData.counts.upcoming, 2);
+    assert.equal(listData.items.length, 1);
+    assert.ok(listData.nextCursor);
+    const secondPage = await request(
+      `/api/mobile/restaurant-reservations?tab=upcoming&limit=1&cursor=${encodeURIComponent(listData.nextCursor)}`,
+      { cookie: ownerCookie },
+    );
+    const secondPageData = secondPage.body.data as {
+      items: Array<{ id: string }>;
+      nextCursor: string | null;
+    };
+    assert.equal(secondPage.response.status, 200);
+    assert.equal(secondPageData.items.length, 1);
+    assert.equal(secondPageData.nextCursor, null);
+    assert.deepEqual(
+      new Set([...listData.items, ...secondPageData.items].map((item) => item.id)),
+      new Set([createdData.reservation.id, secondBookingId]),
+    );
+
+    const foreignCancel = await request(
+      `/api/mobile/restaurant-reservations/${createdData.reservation.id}/cancel`,
+      {
+        body: { reason: "forged" },
+        cookie: otherCookie,
+        headers: { "idempotency-key": randomUUID() },
+        method: "POST",
+      },
+    );
+    assert.equal(foreignCancel.response.status, 404);
+    assert.equal(foreignCancel.body.error?.code, "NOT_FOUND");
+
+    await prisma.organizationSettings.update({
+      where: { organizationId: fixture.organization.id },
+      data: { cancellationWindowHours: 1_000 },
+    });
+    const deadlineOptions = await request(
+      `/api/mobile/restaurant-reservations/${createdData.reservation.id}/reschedule-options?date=${fixture.date}&guestCount=2`,
+      { cookie: ownerCookie },
+    );
+    assert.equal(deadlineOptions.response.status, 409);
+    assert.equal(
+      deadlineOptions.body.error?.code,
+      "CANCELLATION_DEADLINE_PASSED",
+    );
+    await prisma.organizationSettings.update({
+      where: { organizationId: fixture.organization.id },
+      data: { cancellationWindowHours: 24 },
+    });
+
+    const options = await request(
+      `/api/mobile/restaurant-reservations/${createdData.reservation.id}/reschedule-options?date=${fixture.date}&guestCount=2`,
+      { cookie: ownerCookie },
+    );
+    assert.equal(options.response.status, 200);
+    const nextSlot = (options.body.data as { slots: Array<{ startsAt: string }> }).slots[0]!;
+    assert.ok(nextSlot);
+    assert.notEqual(nextSlot.startsAt, createdData.reservation.startsAt);
+    const rescheduleBody = {
+      date: fixture.date,
+      startsAt: nextSlot.startsAt,
+      guestCount: 2,
+      seatingArea: null,
+      customerNote: "Moved through live HTTP",
+    };
+    const malformedReschedule = await request(
+      `/api/mobile/restaurant-reservations/${createdData.reservation.id}/reschedule`,
+      {
+        body: { ...rescheduleBody, tableId: fixture.tables[0]!.id },
+        cookie: ownerCookie,
+        headers: { "idempotency-key": randomUUID() },
+        method: "POST",
+      },
+    );
+    assert.equal(malformedReschedule.response.status, 400);
+    assert.equal(malformedReschedule.body.error?.code, "INVALID_REQUEST");
+    const noCapacityReschedule = await request(
+      `/api/mobile/restaurant-reservations/${createdData.reservation.id}/reschedule`,
+      {
+        body: { ...rescheduleBody, guestCount: 3 },
+        cookie: ownerCookie,
+        headers: { "idempotency-key": randomUUID() },
+        method: "POST",
+      },
+    );
+    assert.equal(noCapacityReschedule.response.status, 409);
+    assert.equal(noCapacityReschedule.body.error?.code, "CAPACITY_UNAVAILABLE");
+    const rescheduleKey = randomUUID();
+    const rescheduled = await request(
+      `/api/mobile/restaurant-reservations/${createdData.reservation.id}/reschedule`,
+      {
+        body: rescheduleBody,
+        cookie: ownerCookie,
+        headers: { "idempotency-key": rescheduleKey },
+        method: "POST",
+      },
+    );
+    assert.equal(rescheduled.response.status, 200);
+    const rescheduledData = rescheduled.body.data as {
+      replayed: boolean;
+      reservation: { startsAt: string };
+    };
+    assert.equal(rescheduledData.replayed, false);
+    const rescheduleReplay = await request(
+      `/api/mobile/restaurant-reservations/${createdData.reservation.id}/reschedule`,
+      {
+        body: rescheduleBody,
+        cookie: ownerCookie,
+        headers: { "idempotency-key": rescheduleKey },
+        method: "POST",
+      },
+    );
+    assert.equal(rescheduleReplay.response.status, 200);
+    assert.equal((rescheduleReplay.body.data as { replayed: boolean }).replayed, true);
+    const changedReschedule = await request(
+      `/api/mobile/restaurant-reservations/${createdData.reservation.id}/reschedule`,
+      {
+        body: { ...rescheduleBody, customerNote: "changed" },
+        cookie: ownerCookie,
+        headers: { "idempotency-key": rescheduleKey },
+        method: "POST",
+      },
+    );
+    assert.equal(changedReschedule.response.status, 409);
+    assert.equal(changedReschedule.body.error?.code, "IDEMPOTENCY_CONFLICT");
+
+    const cancelKey = randomUUID();
+    const cancelled = await request(
+      `/api/mobile/restaurant-reservations/${createdData.reservation.id}/cancel`,
+      {
+        body: { reason: "Live HTTP cancellation" },
+        cookie: ownerCookie,
+        headers: { "idempotency-key": cancelKey },
+        method: "POST",
+      },
+    );
+    assert.equal(cancelled.response.status, 200);
+    assert.equal(
+      (cancelled.body.data as { reservation: { status: string }; replayed: boolean })
+        .reservation.status,
+      "CANCELLED",
+    );
+    const cancelReplay = await request(
+      `/api/mobile/restaurant-reservations/${createdData.reservation.id}/cancel`,
+      {
+        body: { reason: "Live HTTP cancellation" },
+        cookie: ownerCookie,
+        headers: { "idempotency-key": cancelKey },
+        method: "POST",
+      },
+    );
+    assert.equal(cancelReplay.response.status, 200);
+    assert.equal((cancelReplay.body.data as { replayed: boolean }).replayed, true);
+    const releasedAvailability = await request(
+      `/api/mobile/restaurant-reservations/branches/${fixture.branch.id}/availability?date=${fixture.date}&guestCount=2`,
+    );
+    assert.equal(releasedAvailability.response.status, 200);
+    assert.equal(
+      (
+        releasedAvailability.body.data as {
+          slots: Array<{ startsAt: string }>;
+        }
+      ).slots.some(
+        (candidate) => candidate.startsAt === rescheduledData.reservation.startsAt,
+      ),
+      true,
+    );
+
     const unavailableMenu = await createRestaurantFixture({ label: "gate2d-http-menu" });
     const unavailableAvailability = await request(
       `/api/mobile/restaurant-reservations/branches/${unavailableMenu.branch.id}/availability?date=${unavailableMenu.date}&guestCount=2`,
@@ -213,5 +417,60 @@ test(
     const genericResponse = await request(`/api/mobile/restaurant-reservations/businesses/${generic.organization.slug}`);
     assert.equal(genericResponse.response.status, 409);
     assert.equal(genericResponse.body.error?.code, "RESTAURANT_FLOW_REQUIRED");
+
+    const ownerUser = await prisma.user.findUniqueOrThrow({
+      where: { email: ownerEmail },
+    });
+    const ownerPerson = await prisma.person.findUniqueOrThrow({
+      where: { authUserId: ownerUser.id },
+    });
+    const genericCategory = await prisma.category.create({
+      data: { name: `HTTP Generic ${suffix}`, slug: `http-generic-${suffix}` },
+    });
+    const genericService = await prisma.service.create({
+      data: {
+        categoryId: genericCategory.id,
+        name: "HTTP generic service",
+        organizationId: fixture.organization.id,
+      },
+    });
+    const genericOffering = await prisma.branchService.create({
+      data: {
+        branchId: fixture.branch.id,
+        durationMinutes: 30,
+        price: "1000",
+        serviceId: genericService.id,
+      },
+    });
+    const genericBooking = await prisma.booking.create({
+      data: {
+        branchId: fixture.branch.id,
+        branchServiceId: genericOffering.id,
+        customerId: ownerPerson.id,
+        customerNameSnapshot: "HTTP owner",
+        endsAt: new Date(Date.now() + 10 * 86_400_000 + 30 * 60_000),
+        organizationId: fixture.organization.id,
+        priceSnapshot: "1000",
+        serviceNameSnapshot: "HTTP generic service",
+        startsAt: new Date(Date.now() + 10 * 86_400_000),
+      },
+    });
+    const genericDetail = await request(
+      `/api/mobile/restaurant-reservations/${genericBooking.id}`,
+      { cookie: ownerCookie },
+    );
+    assert.equal(genericDetail.response.status, 404);
+    assert.equal(genericDetail.body.error?.code, "NOT_FOUND");
+    const genericCancel = await request(
+      `/api/mobile/restaurant-reservations/${genericBooking.id}/cancel`,
+      {
+        body: { reason: null },
+        cookie: ownerCookie,
+        headers: { "idempotency-key": randomUUID() },
+        method: "POST",
+      },
+    );
+    assert.equal(genericCancel.response.status, 404);
+    assert.equal(genericCancel.body.error?.code, "NOT_FOUND");
   },
 );

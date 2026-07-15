@@ -101,6 +101,16 @@ test("Gate 2D restaurant reservation creation is tenant-safe, atomic, idempotent
       await prisma.menuItem.count({ where: { businessId: RESTAURANT_QA_FIXTURE.organization.id } }),
       3,
     );
+    assert.equal(
+      await prisma.booking.count({ where: { organizationId: RESTAURANT_QA_FIXTURE.organization.id } }),
+      4,
+    );
+    assert.deepEqual(first.managementBookingIds, [
+      RESTAURANT_QA_FIXTURE.managementBookings.cancellable.bookingId,
+      RESTAURANT_QA_FIXTURE.managementBookings.reschedulable.bookingId,
+      RESTAURANT_QA_FIXTURE.managementBookings.completed.bookingId,
+      RESTAURANT_QA_FIXTURE.managementBookings.cancelled.bookingId,
+    ]);
   });
 
   await t.test("server allocates the smallest sufficient branch table and respects exact seating preference", async () => {

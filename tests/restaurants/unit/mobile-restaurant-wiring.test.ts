@@ -8,6 +8,7 @@ test("production mobile routing separates restaurant and generic booking flows",
   assert.match(app, /selectedBusiness\.vertical === "CAFE"/);
   assert.match(app, /<CustomerRestaurantReservationCreationScreen/);
   assert.match(app, /<CustomerBookingCreationScreen/);
+  assert.match(app, /<CustomerBookingsHubScreen/);
   const screen = await readFile(
     new URL("../../../apps/mobile/src/screens/customer-restaurant-reservation-creation-screen.tsx", import.meta.url),
     "utf8",
@@ -22,6 +23,36 @@ test("production mobile routing separates restaurant and generic booking flows",
   );
   assert.doesNotMatch(screen, /NEARBY_VISUAL_QA_FIXTURES|ReznoNearbyPreviewFlow|local reservation/);
   assert.doesNotMatch(screen, /Intl\.DateTimeFormat\("en-CA"/);
+});
+
+test("mobile management uses persisted Restaurant endpoints without service change requests or mocks", async () => {
+  const hub = await readFile(
+    new URL("../../../apps/mobile/src/screens/customer-bookings-hub-screen.tsx", import.meta.url),
+    "utf8",
+  );
+  const screen = await readFile(
+    new URL("../../../apps/mobile/src/screens/customer-restaurant-reservation-management-screen.tsx", import.meta.url),
+    "utf8",
+  );
+  const service = await readFile(
+    new URL("../../../features/restaurants/services/reservation-management.ts", import.meta.url),
+    "utf8",
+  );
+  assert.match(hub, /domain === "services"/);
+  assert.match(hub, /CustomerRestaurantReservationManagementScreen/);
+  assert.match(screen, /fetchMobileManagedRestaurantReservations/);
+  assert.match(screen, /cancelMobileRestaurantReservation/);
+  assert.match(screen, /rescheduleMobileRestaurantReservation/);
+  assert.match(screen, /optionsRequestSequence/);
+  assert.match(screen, /retryDetailId/);
+  assert.match(screen, /CANCELLATION_DEADLINE_PASSED/);
+  assert.match(screen, /CAPACITY_UNAVAILABLE/);
+  assert.match(screen, /RESTAURANT_CLOSED/);
+  assert.match(screen, /onAction=\{\(\) =>/);
+  assert.match(service, /restaurantReservationMutation/);
+  assert.match(service, /pg_advisory_xact_lock/);
+  assert.doesNotMatch(service, /bookingChangeRequest\.create/);
+  assert.doesNotMatch(screen, /mock|fixture/i);
 });
 
 test("web and mobile creation both use the canonical shared service", async () => {
