@@ -171,7 +171,7 @@ export async function getCustomerAccountHomeData(): Promise<AccountHomeData> {
         customerId: person.id,
         branchService: {
           isAvailable: true,
-          service: { status: "ACTIVE" },
+          service: { deletedAt: null, status: "ACTIVE" },
           branch: {
             deletedAt: null,
             status: "ACTIVE",

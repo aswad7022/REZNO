@@ -76,6 +76,7 @@ export async function getPublicBookingServices(
 
   const services = await prisma.service.findMany({
     where: {
+      deletedAt: null,
       organizationId: business.id,
       status: "ACTIVE",
       branchServices: {
@@ -131,6 +132,7 @@ export async function getPublicServiceBranches(
     where: {
       isAvailable: true,
       service: {
+        deletedAt: null,
         id: serviceId,
         organizationId: business.id,
         status: "ACTIVE",
@@ -172,7 +174,7 @@ export async function getPublicOfferingStaff(
     where: {
       id: branchServiceId,
       isAvailable: true,
-      service: { status: "ACTIVE" },
+      service: { deletedAt: null, status: "ACTIVE" },
       branch: {
         ...activeBranchWhere,
         organization: publicOrganizationWhere,

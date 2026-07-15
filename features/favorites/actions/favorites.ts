@@ -129,7 +129,7 @@ export async function toggleFavoriteServiceById(
     where: {
       id: parsed.data.branchServiceId,
       isAvailable: true,
-      service: { status: "ACTIVE" },
+      service: { deletedAt: null, status: "ACTIVE" },
       branch: {
         deletedAt: null,
         status: "ACTIVE",

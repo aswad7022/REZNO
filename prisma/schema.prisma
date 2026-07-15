@@ -156,6 +156,7 @@ model Service {
   staffSelectionMode StaffSelectionMode       @default(OPTIONAL)
   createdAt          DateTime                 @default(now()) @db.Timestamptz(6)
   updatedAt          DateTime                 @updatedAt @db.Timestamptz(6)
+  deletedAt          DateTime?                @db.Timestamptz(6)
   branchServices     BranchService[]
   staffAssignments   ServiceStaffAssignment[]
   reviews            Review[]
@@ -164,7 +165,7 @@ model Service {
 
   @@index([organizationId])
   @@index([categoryId])
-  @@index([organizationId, status])
+  @@index([organizationId, status, deletedAt])
 }
 
 model BranchService {
@@ -175,6 +176,8 @@ model BranchService {
   pricingType     PricingType               @default(FIXED)
   durationMinutes Int
   isAvailable     Boolean                   @default(true)
+  createdAt       DateTime                  @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime                  @updatedAt @db.Timestamptz(6)
   branch          Branch                    @relation(fields: [branchId], references: [id])
   service         Service                   @relation(fields: [serviceId], references: [id])
   bookings        Booking[]
@@ -1338,6 +1341,7 @@ enum PricingType {
 enum ServiceStatus {
   ACTIVE
   INACTIVE
+  ARCHIVED
 }
 
 enum BookingStatus {

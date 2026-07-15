@@ -15,7 +15,7 @@ export async function getPublicBookingAvailability(input: {
     where: {
       id: input.branchServiceId,
       isAvailable: true,
-      service: { status: "ACTIVE" },
+      service: { deletedAt: null, status: "ACTIVE" },
       branch: {
         deletedAt: null,
         status: "ACTIVE",

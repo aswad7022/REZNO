@@ -138,6 +138,7 @@ export async function searchMarketplace(options?: {
             where: {
               isAvailable: true,
               service: {
+                deletedAt: null,
                 status: "ACTIVE",
                 ...(category
                   ? { category: { slug: category } }
@@ -149,7 +150,7 @@ export async function searchMarketplace(options?: {
         },
       },
       services: {
-        where: { status: "ACTIVE" },
+        where: { deletedAt: null, status: "ACTIVE" },
         include: { category: true },
       },
       restaurantTables: {
@@ -426,7 +427,7 @@ export const getPublicBusiness = cache(
               take: 12,
             },
             branchServices: {
-              where: { isAvailable: true, service: { status: "ACTIVE" } },
+              where: { isAvailable: true, service: { deletedAt: null, status: "ACTIVE" } },
               include: {
                 service: {
                   include: {

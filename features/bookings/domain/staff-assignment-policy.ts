@@ -57,8 +57,5 @@ export function serviceStaffPolicyAllowsMember(
   activeAssignmentMemberIds: ReadonlySet<string>,
   memberId: string,
 ) {
-  return (
-    activeAssignmentMemberIds.size === 0 ||
-    activeAssignmentMemberIds.has(memberId)
-  );
+  return activeAssignmentMemberIds.has(memberId);
 }

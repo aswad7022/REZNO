@@ -99,7 +99,7 @@ export async function getCurrentCustomerFavoriteServiceIds(
       branchServiceId: { in: uniqueBranchServiceIds },
       branchService: {
         isAvailable: true,
-        service: { status: "ACTIVE" },
+        service: { deletedAt: null, status: "ACTIVE" },
         branch: {
           deletedAt: null,
           status: "ACTIVE",
@@ -144,7 +144,7 @@ export const getCustomerFavoriteBusinesses = cache(async () => {
             take: 1,
           },
           services: {
-            where: { status: "ACTIVE" },
+            where: { deletedAt: null, status: "ACTIVE" },
             include: { category: true },
           },
           restaurantTables: {
@@ -213,7 +213,7 @@ export const getCustomerFavoriteServices = cache(async () => {
       customerId: person.id,
       branchService: {
         isAvailable: true,
-        service: { status: "ACTIVE" },
+        service: { deletedAt: null, status: "ACTIVE" },
         branch: {
           deletedAt: null,
           status: "ACTIVE",

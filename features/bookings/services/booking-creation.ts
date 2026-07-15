@@ -187,7 +187,7 @@ export async function createCustomerBooking(
             where: {
               id: input.branchServiceId,
               isAvailable: true,
-              service: { status: "ACTIVE" },
+              service: { deletedAt: null, status: "ACTIVE" },
               branch: {
                 deletedAt: null,
                 status: "ACTIVE",
@@ -292,10 +292,75 @@ export async function createCustomerBooking(
             );
           }
 
-          if (input.memberId) {
+          let selectedMemberId = input.memberId;
+          if (mode === "OPTIONAL" && !selectedMemberId) {
+            const assignedMemberIds = activeServiceStaffAssignmentMemberIds({
+              assignments: offering.service.staffAssignments,
+              organizationId: offering.service.organizationId,
+              serviceId: offering.service.id,
+            });
+            if (assignedMemberIds.size > 0) {
+              const candidates = await transaction.organizationMember.findMany({
+                where: {
+                  id: { in: [...assignedMemberIds] },
+                  organizationId: offering.branch.organizationId,
+                  deletedAt: null,
+                  status: "ACTIVE",
+                  person: { deletedAt: null, status: "ACTIVE" },
+                  assignments: { some: { branchId: offering.branchId } },
+                },
+                include: {
+                  availabilities: {
+                    where: {
+                      branchId: offering.branchId,
+                      dayOfWeek,
+                      isActive: true,
+                    },
+                  },
+                },
+                orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+              });
+              for (const candidate of candidates) {
+                const insideAvailability = candidate.availabilities.some(
+                  (window) =>
+                    startsAt >= atLocalTime(parsedDate, window.startTime, offering.branch.timezone) &&
+                    endsAt <= atLocalTime(parsedDate, window.endTime, offering.branch.timezone),
+                );
+                if (!insideAvailability) continue;
+                const candidateConflict = await transaction.booking.findFirst({
+                    where: {
+                      branchId: offering.branchId,
+                      memberId: candidate.id,
+                      status: { in: [...ACTIVE_BOOKING_STATUSES] },
+                      startsAt: { lt: endsAt },
+                      endsAt: { gt: startsAt },
+                    },
+                    select: { id: true },
+                  });
+                const candidateBlock = await transaction.blockedTime.findFirst({
+                    where: {
+                      branchId: offering.branchId,
+                      memberId: candidate.id,
+                      startsAt: { lt: endsAt },
+                      endsAt: { gt: startsAt },
+                    },
+                    select: { id: true },
+                  });
+                if (!candidateConflict && !candidateBlock) {
+                  selectedMemberId = candidate.id;
+                  break;
+                }
+              }
+              if (!selectedMemberId) {
+                bookingDomainError("STAFF_UNAVAILABLE", "No assigned staff member is available for this time.");
+              }
+            }
+          }
+
+          if (selectedMemberId) {
             const member = await transaction.organizationMember.findFirst({
               where: {
-                id: input.memberId,
+                id: selectedMemberId,
                 organizationId: offering.branch.organizationId,
                 deletedAt: null,
                 status: "ACTIVE",
@@ -320,7 +385,7 @@ export async function createCustomerBooking(
               });
             const assignedToService = serviceStaffPolicyAllowsMember(
               activeAssignmentMemberIds,
-              input.memberId,
+              selectedMemberId,
             );
             const insideAvailability = member?.availabilities.some(
               (window) =>
@@ -352,7 +417,7 @@ export async function createCustomerBooking(
           const conflict = await transaction.booking.findFirst({
             where: {
               branchId: offering.branchId,
-              memberId: input.memberId,
+              memberId: selectedMemberId,
               status: { in: [...ACTIVE_BOOKING_STATUSES] },
               startsAt: { lt: endsAt },
               endsAt: { gt: startsAt },
@@ -364,7 +429,7 @@ export async function createCustomerBooking(
               branchId: offering.branchId,
               OR: [
                 { memberId: null },
-                ...(input.memberId ? [{ memberId: input.memberId }] : []),
+                ...(selectedMemberId ? [{ memberId: selectedMemberId }] : []),
               ],
               startsAt: { lt: endsAt },
               endsAt: { gt: startsAt },
@@ -384,7 +449,7 @@ export async function createCustomerBooking(
               branchId: offering.branchId,
               branchServiceId: offering.id,
               customerId: customer.id,
-              memberId: input.memberId,
+              memberId: selectedMemberId,
               startsAt,
               endsAt,
               serviceNameSnapshot: offering.service.name,

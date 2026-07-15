@@ -39,7 +39,7 @@ export async function getBusinessSetupStatus(): Promise<BusinessSetupStatus> {
         include: { businessHours: { where: { isOpen: true } } },
       },
       services: {
-        where: { status: "ACTIVE" },
+        where: { deletedAt: null, status: "ACTIVE" },
         select: { staffSelectionMode: true },
       },
       restaurantTables: {
