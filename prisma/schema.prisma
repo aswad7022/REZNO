@@ -27,6 +27,7 @@ model Person {
   bookingChanges                  BookingStatusHistory[]
   requestedBookingChanges         BookingChangeRequest[]          @relation("BookingChangeRequester")
   restaurantReservationMutations  RestaurantReservationMutation[] @relation("RestaurantReservationMutationCustomer")
+  businessAuditLogs               BusinessAuditLog[]              @relation("BusinessAuditLogActorPerson")
   reviews                         Review[]                        @relation("ReviewCustomer")
   notifications                   Notification[]
   customerConversations           Conversation[]                  @relation("ConversationCustomer")
@@ -45,35 +46,37 @@ model Person {
 }
 
 model Organization {
-  id                     String                         @id @default(uuid()) @db.Uuid
-  name                   String
-  slug                   String                         @unique
-  status                 EntityStatus                   @default(ACTIVE)
-  businessType           BusinessType                   @default(PHYSICAL)
-  vertical               BusinessVertical               @default(OTHER)
-  isVerified             Boolean                        @default(false)
-  isActive               Boolean                        @default(true)
-  createdAt              DateTime                       @default(now()) @db.Timestamptz(6)
-  updatedAt              DateTime                       @updatedAt @db.Timestamptz(6)
-  deletedAt              DateTime?                      @db.Timestamptz(6)
-  branches               Branch[]
-  profile                BusinessProfile?
-  organizationMembers    OrganizationMember[]
-  settings               OrganizationSettings?
-  roles                  Role[]
-  services               Service[]
-  bookings               Booking[]
-  reviews                Review[]
-  restaurantTables       RestaurantTable[]
-  menuCategories         MenuCategory[]
-  menuItems              MenuItem[]
-  restaurantReservations RestaurantReservationDetails[]
-  notifications          Notification[]
-  conversations          Conversation[]
-  favoritedBy            CustomerFavoriteBusiness[]
-  favoritedServices      CustomerFavoriteService[]
-  invitations            OrganizationInvitation[]
-  store                  Store?
+  id                         String                         @id @default(uuid()) @db.Uuid
+  name                       String
+  slug                       String                         @unique
+  status                     EntityStatus                   @default(ACTIVE)
+  businessType               BusinessType                   @default(PHYSICAL)
+  vertical                   BusinessVertical               @default(OTHER)
+  isVerified                 Boolean                        @default(false)
+  isActive                   Boolean                        @default(true)
+  createdAt                  DateTime                       @default(now()) @db.Timestamptz(6)
+  updatedAt                  DateTime                       @updatedAt @db.Timestamptz(6)
+  deletedAt                  DateTime?                      @db.Timestamptz(6)
+  branches                   Branch[]
+  profile                    BusinessProfile?
+  organizationMembers        OrganizationMember[]
+  settings                   OrganizationSettings?
+  roles                      Role[]
+  services                   Service[]
+  bookings                   Booking[]
+  reviews                    Review[]
+  restaurantTables           RestaurantTable[]
+  menuCategories             MenuCategory[]
+  menuItems                  MenuItem[]
+  restaurantReservations     RestaurantReservationDetails[]
+  businessOperationMutations BusinessOperationMutation[]
+  businessAuditLogs          BusinessAuditLog[]
+  notifications              Notification[]
+  conversations              Conversation[]
+  favoritedBy                CustomerFavoriteBusiness[]
+  favoritedServices          CustomerFavoriteService[]
+  invitations                OrganizationInvitation[]
+  store                      Store?
 
   @@index([vertical])
   @@index([status, isActive, deletedAt])
@@ -183,30 +186,32 @@ model BranchService {
 }
 
 model OrganizationMember {
-  id                     String                   @id @default(uuid()) @db.Uuid
-  personId               String                   @db.Uuid
-  organizationId         String                   @db.Uuid
-  roleId                 String                   @db.Uuid
-  createdAt              DateTime                 @default(now()) @db.Timestamptz(6)
-  updatedAt              DateTime                 @updatedAt @db.Timestamptz(6)
-  status                 EntityStatus             @default(ACTIVE)
-  deletedAt              DateTime?                @db.Timestamptz(6)
-  photoUrl               String?
-  bio                    String?
-  specialties            String[]                 @default([])
-  publicSlug             String?
-  isPublicProfessional   Boolean                  @default(false)
-  assignments            BranchAssignment[]
-  availabilities         Availability[]
-  blockedTimes           BlockedTime[]
-  bookings               Booking[]
-  serviceAssignments     ServiceStaffAssignment[]
-  reviews                Review[]
-  reviewReplies          Review[]                 @relation("ReviewBusinessReplyAuthor")
-  proposedBookingChanges BookingChangeRequest[]
-  organization           Organization             @relation(fields: [organizationId], references: [id])
-  person                 Person                   @relation(fields: [personId], references: [id])
-  role                   Role                     @relation(fields: [roleId], references: [id])
+  id                         String                      @id @default(uuid()) @db.Uuid
+  personId                   String                      @db.Uuid
+  organizationId             String                      @db.Uuid
+  roleId                     String                      @db.Uuid
+  createdAt                  DateTime                    @default(now()) @db.Timestamptz(6)
+  updatedAt                  DateTime                    @updatedAt @db.Timestamptz(6)
+  status                     EntityStatus                @default(ACTIVE)
+  deletedAt                  DateTime?                   @db.Timestamptz(6)
+  photoUrl                   String?
+  bio                        String?
+  specialties                String[]                    @default([])
+  publicSlug                 String?
+  isPublicProfessional       Boolean                     @default(false)
+  assignments                BranchAssignment[]
+  availabilities             Availability[]
+  blockedTimes               BlockedTime[]
+  bookings                   Booking[]
+  serviceAssignments         ServiceStaffAssignment[]
+  reviews                    Review[]
+  reviewReplies              Review[]                    @relation("ReviewBusinessReplyAuthor")
+  proposedBookingChanges     BookingChangeRequest[]
+  businessOperationMutations BusinessOperationMutation[]
+  businessAuditLogs          BusinessAuditLog[]
+  organization               Organization                @relation(fields: [organizationId], references: [id])
+  person                     Person                      @relation(fields: [personId], references: [id])
+  role                       Role                        @relation(fields: [roleId], references: [id])
 
   @@unique([personId, organizationId])
   @@unique([organizationId, publicSlug])
@@ -615,6 +620,48 @@ model RestaurantReservationMutation {
 
   @@unique([customerId, idempotencyKey])
   @@index([bookingId, type, createdAt])
+}
+
+model BusinessOperationMutation {
+  id                String             @id @default(uuid()) @db.Uuid
+  organizationId    String             @db.Uuid
+  actorMembershipId String             @db.Uuid
+  idempotencyKey    String             @db.Uuid
+  action            String             @db.VarChar(80)
+  requestHash       String             @db.VarChar(64)
+  targetType        String             @db.VarChar(60)
+  targetId          String?            @db.Uuid
+  resultVersion     DateTime           @db.Timestamptz(6)
+  result            Json?
+  createdAt         DateTime           @default(now()) @db.Timestamptz(6)
+  organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  actorMembership   OrganizationMember @relation(fields: [actorMembershipId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, idempotencyKey])
+  @@index([organizationId, action, createdAt])
+  @@index([targetType, targetId])
+  @@index([actorMembershipId, createdAt])
+}
+
+model BusinessAuditLog {
+  id                String             @id @default(uuid()) @db.Uuid
+  organizationId    String             @db.Uuid
+  actorMembershipId String             @db.Uuid
+  actorPersonId     String             @db.Uuid
+  action            String             @db.VarChar(80)
+  targetType        String             @db.VarChar(60)
+  targetId          String             @db.Uuid
+  before            Json?
+  after             Json?
+  createdAt         DateTime           @default(now()) @db.Timestamptz(6)
+  organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  actorMembership   OrganizationMember @relation(fields: [actorMembershipId], references: [id], onDelete: Restrict)
+  actorPerson       Person             @relation("BusinessAuditLogActorPerson", fields: [actorPersonId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, createdAt])
+  @@index([organizationId, action, createdAt])
+  @@index([targetType, targetId])
+  @@index([actorMembershipId, createdAt])
 }
 
 model User {
