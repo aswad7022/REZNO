@@ -229,6 +229,7 @@ export type HomeBusiness = {
   slug: string;
   status: string;
   tag: string;
+  vertical: MobileBusinessVertical;
 };
 
 export type HomeMarketplaceState =
@@ -1351,6 +1352,7 @@ function mapMarketplaceBusiness(
     slug: business.slug,
     status,
     tag: status,
+    vertical: business.vertical,
   };
 }
 

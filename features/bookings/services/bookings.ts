@@ -155,16 +155,20 @@ function withCustomerPermissions(
 
   return {
     ...item,
-    canCustomerCancel: canCustomerCancelBooking({
-      status: booking.status,
-      startsAt: booking.startsAt,
-      cancellationWindowHours,
-    }),
-    canCustomerReschedule: canCustomerRequestBookingChange({
-      status: booking.status,
-      startsAt: booking.startsAt,
-      cancellationWindowHours,
-    }),
+    canCustomerCancel:
+      !booking.restaurantReservation &&
+      canCustomerCancelBooking({
+        status: booking.status,
+        startsAt: booking.startsAt,
+        cancellationWindowHours,
+      }),
+    canCustomerReschedule:
+      !booking.restaurantReservation &&
+      canCustomerRequestBookingChange({
+        status: booking.status,
+        startsAt: booking.startsAt,
+        cancellationWindowHours,
+      }),
     canCustomerReview:
       booking.status === "COMPLETED" &&
       !booking.review &&
@@ -309,14 +313,19 @@ export async function getBusinessBookings(options?: {
 export async function getCustomerBookingForReschedule(bookingId: string) {
   const { person } = await requireCustomerIdentity();
   const booking = await prisma.booking.findFirst({
-    where: { id: bookingId, customerId: person.id },
+    where: {
+      id: bookingId,
+      customerId: person.id,
+      branchServiceId: { not: null },
+      restaurantReservation: null,
+    },
     include: {
       branch: true,
       branchService: { include: { service: true } },
       organization: { include: { settings: true } },
     },
   });
-  if (!booking) return null;
+  if (!booking || !booking.branchService || !booking.branchServiceId) return null;
 
   const canReschedule = canCustomerRequestBookingChange({
     status: booking.status,
@@ -344,6 +353,8 @@ export async function getBusinessBookingForChange(bookingId: string) {
     where: {
       id: bookingId,
       organizationId: membership.organizationId,
+      branchServiceId: { not: null },
+      restaurantReservation: null,
       status: { in: ["PENDING", "CONFIRMED"] },
     },
     include: {
@@ -351,7 +362,7 @@ export async function getBusinessBookingForChange(bookingId: string) {
       branchService: { include: { service: true } },
     },
   });
-  if (!booking) return null;
+  if (!booking || !booking.branchService || !booking.branchServiceId) return null;
 
   return {
     id: booking.id,

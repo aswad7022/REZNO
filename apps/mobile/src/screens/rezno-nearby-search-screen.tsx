@@ -177,6 +177,7 @@ export type NearbySearchBusiness = {
   slug: string;
   status: string;
   tag: string;
+  vertical: MobileBusinessVertical;
 };
 
 type NearbyResultBase = {
@@ -1085,6 +1086,12 @@ function deriveVisualQaResults(
       slug: fixture.id,
       status: fixture.status,
       tag: fixture.badge,
+      vertical:
+        fixture.vertical === "restaurant"
+          ? "RESTAURANT"
+          : fixture.vertical === "clinic"
+            ? "CLINIC"
+            : "BEAUTY",
     },
     category: fixture.category,
     distanceKm: fixture.distanceKm,
@@ -1172,6 +1179,7 @@ function mapNearbyResult(
       slug: source.slug,
       status,
       tag: serviceLabel ?? category,
+      vertical: source.vertical,
     },
     category,
     distanceKm,

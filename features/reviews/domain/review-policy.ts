@@ -93,7 +93,7 @@ export type PublicReviewRelationship = {
       branchId: string;
       serviceId: string;
       service: { organizationId: string };
-    };
+    } | null;
     member: { organizationId: string } | null;
     restaurantReservation: { id: string } | null;
   };
@@ -107,7 +107,9 @@ export function isPublicReviewRelationshipValid(
     : review.member?.organizationId === review.organizationId &&
       review.booking.member?.organizationId === review.organizationId;
 
+  const branchService = review.booking.branchService;
   return (
+    branchService !== null &&
     isPublicReviewStatus(review.status) &&
     Number.isInteger(review.rating) &&
     review.rating >= 1 &&
@@ -118,11 +120,11 @@ export function isPublicReviewRelationshipValid(
     review.bookingId === review.booking.id &&
     review.customerId === review.booking.customerId &&
     review.organizationId === review.booking.organizationId &&
-    review.serviceId === review.booking.branchService.serviceId &&
+    review.serviceId === branchService.serviceId &&
     review.memberId === review.booking.memberId &&
-    review.booking.branchId === review.booking.branchService.branchId &&
+    review.booking.branchId === branchService.branchId &&
     review.booking.branch.organizationId === review.organizationId &&
-    review.booking.branchService.service.organizationId === review.organizationId &&
+    branchService.service.organizationId === review.organizationId &&
     review.service.organizationId === review.organizationId &&
     memberRelationshipValid
   );

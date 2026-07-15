@@ -89,6 +89,7 @@ import {
 import { CommerceMarketScreen } from "./src/screens/commerce-market-screen";
 import { ReznoNearbySearchScreen } from "./src/screens/rezno-nearby-search-screen";
 import { CustomerBookingCreationScreen } from "./src/screens/customer-booking-creation-screen";
+import { CustomerRestaurantReservationCreationScreen } from "./src/screens/customer-restaurant-reservation-creation-screen";
 import { CustomerBookingManagementScreen } from "./src/screens/customer-booking-management-screen";
 import type { MobileMarketplaceBusiness } from "./src/types/marketplace";
 import type { CommerceNotification } from "./src/types/commerce";
@@ -112,6 +113,7 @@ type PremiumBusiness = {
   slug: string;
   status: string;
   tag: string;
+  vertical: MobileMarketplaceBusiness["vertical"];
 };
 
 type BookingFlowStepId = "staff" | "datetime" | "payment" | "confirmation";
@@ -1077,7 +1079,22 @@ export default function App() {
           showsVerticalScrollIndicator={false}
           style={styles.appScroll}
         >
-        {selectedBusiness ? (
+        {selectedBusiness &&
+        (selectedBusiness.vertical === "RESTAURANT" ||
+          selectedBusiness.vertical === "CAFE") ? (
+          <CustomerRestaurantReservationCreationScreen
+            businessSlug={selectedBusiness.slug}
+            isAuthenticated={Boolean(authSession)}
+            isRtl={isRtl}
+            onBack={() => {
+              setBookingFlowStep(null);
+              setSelectedBusiness(null);
+            }}
+            onSignIn={() => handleOpenAuth("signin")}
+            locale={locale}
+            theme={theme}
+          />
+        ) : selectedBusiness ? (
           <CustomerBookingCreationScreen
             businessSlug={selectedBusiness.slug}
             isAuthenticated={Boolean(authSession)}

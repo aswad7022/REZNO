@@ -408,7 +408,7 @@ model Booking {
   organizationId                     String                        @db.Uuid
   branchId                           String                        @db.Uuid
   customerId                         String                        @db.Uuid
-  branchServiceId                    String                        @db.Uuid
+  branchServiceId                    String?                       @db.Uuid
   memberId                           String?                       @db.Uuid
   status                             BookingStatus                 @default(CONFIRMED)
   startsAt                           DateTime                      @db.Timestamptz(6)
@@ -428,7 +428,7 @@ model Booking {
   organization                       Organization                  @relation(fields: [organizationId], references: [id])
   branch                             Branch                        @relation(fields: [branchId], references: [id])
   customer                           Person                        @relation("BookingCustomer", fields: [customerId], references: [id])
-  branchService                      BranchService                 @relation(fields: [branchServiceId], references: [id])
+  branchService                      BranchService?                @relation(fields: [branchServiceId], references: [id])
   member                             OrganizationMember?           @relation(fields: [memberId], references: [id])
   statusHistory                      BookingStatusHistory[]
   changeRequests                     BookingChangeRequest[]
@@ -591,6 +591,7 @@ model RestaurantReservationItem {
   reservation                    RestaurantReservationDetails @relation(fields: [restaurantReservationDetailsId], references: [id], onDelete: Cascade)
   menuItem                       MenuItem                     @relation(fields: [menuItemId], references: [id])
 
+  @@unique([restaurantReservationDetailsId, menuItemId])
   @@index([restaurantReservationDetailsId])
   @@index([menuItemId])
 }

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { randomUUID } from "node:crypto";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Armchair, CalendarDays, Clock3, MapPin, Minus, Plus, Utensils } from "lucide-react";
@@ -78,8 +79,6 @@ export default async function RestaurantReservationRoute({
       evening: [] as typeof data.slots,
     },
   );
-  const selectedTable =
-    data.availableTables.length === 1 ? data.availableTables[0] : null;
   const branchParam = data.branch ? `&branchId=${data.branch.id}` : "";
   const branchInput = data.branch ? (
     <input type="hidden" name="branchId" value={data.branch.id} />
@@ -245,11 +244,7 @@ export default async function RestaurantReservationRoute({
               <input type="hidden" name="branchId" value={data.branch.id} />
               <input type="hidden" name="startsAt" value={selectedStartsAt} />
               <input type="hidden" name="guestCount" value={data.guestCount} />
-              <input
-                type="hidden"
-                name="durationMinutes"
-                value={data.durationMinutes}
-              />
+              <input type="hidden" name="idempotencyKey" value={randomUUID()} />
 
               <Card id="confirm" className="border-primary/10">
                 <CardHeader>
@@ -258,36 +253,21 @@ export default async function RestaurantReservationRoute({
                     {t("steps.table")}
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="grid gap-3 sm:grid-cols-2">
-                  {data.availableTables.length === 0 ? (
-                    <p className="rounded-2xl bg-muted p-4 text-sm text-muted-foreground">
-                      {t("empty.NO_TABLES")}
-                    </p>
-                  ) : (
-                    data.availableTables.map((table) => (
-                      <label
-                        key={table.id}
-                        className="cursor-pointer rounded-2xl border border-primary/10 bg-background p-4 transition hover:border-primary/30 hover:shadow-md"
-                      >
-                        <input
-                          className="sr-only peer"
-                          type="radio"
-                          name="tableId"
-                          value={table.id}
-                          defaultChecked={table.id === selectedTable?.id}
-                          required
-                        />
-                        <span className="block rounded-xl border border-transparent p-1 peer-checked:border-primary">
-                          <span className="block font-semibold">{table.name}</span>
-                          <span className="mt-1 block text-sm text-muted-foreground">
-                            {t("tableCapacity", { count: table.capacity })}
-                            {table.area ? ` · ${table.area}` : ""}
-                            {table.positionLabel ? ` · ${table.positionLabel}` : ""}
-                          </span>
-                        </span>
-                      </label>
-                    ))
-                  )}
+                <CardContent className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    سيخصص النظام أصغر طاولة مناسبة تلقائياً. يمكنك اختيار منطقة جلوس مفضلة.
+                  </p>
+                  <select
+                    name="seatingArea"
+                    defaultValue=""
+                    className="h-11 w-full rounded-xl border bg-background px-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+                    aria-label="منطقة الجلوس المفضلة"
+                  >
+                    <option value="">أي منطقة متاحة</option>
+                    {data.seatingAreas.map((area) => (
+                      <option key={area} value={area}>{area}</option>
+                    ))}
+                  </select>
                 </CardContent>
               </Card>
 

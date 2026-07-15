@@ -82,6 +82,7 @@ type CustomerReviewBooking = Prisma.BookingGetPayload<{
 }>;
 
 function relationshipsAreValid(booking: CustomerReviewBooking) {
+  if (!booking.branchService || !booking.branchServiceId) return false;
   return (
     booking.branch.organizationId === booking.organizationId &&
     booking.branchService.branchId === booking.branchId &&
@@ -188,6 +189,12 @@ export async function createOrReplayCustomerReview(input: {
           "BOOKING_NOT_REVIEWABLE",
           "This booking is not eligible for a service review.",
           { reason: eligibility.reason },
+        );
+      }
+      if (!booking.branchService || !booking.branchServiceId) {
+        reviewDomainError(
+          "BOOKING_NOT_REVIEWABLE",
+          "This booking does not have a generic service relationship.",
         );
       }
 
