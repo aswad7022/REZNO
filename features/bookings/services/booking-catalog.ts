@@ -14,6 +14,7 @@ import type {
   PublicBookingStaffMember,
 } from "@/features/bookings/types";
 import { prisma } from "@/lib/db/prisma";
+import { getPublicOrganizationReviewAggregates } from "@/features/reviews/services/review-lifecycle";
 
 const publicOrganizationWhere = {
   deletedAt: null,
@@ -43,6 +44,10 @@ export async function getPublicBookingBusiness(
 
   const restaurantFlow =
     organization.vertical === "RESTAURANT" || organization.vertical === "CAFE";
+  const reviewAggregates = await getPublicOrganizationReviewAggregates([
+    organization.id,
+  ]);
+  const reviewAggregate = reviewAggregates.get(organization.id);
   return {
     id: organization.id,
     slug: organization.slug,
@@ -53,6 +58,8 @@ export async function getPublicBookingBusiness(
     categoryName: organization.profile?.businessCategory ?? null,
     vertical: organization.vertical,
     supportsServiceBooking: !restaurantFlow,
+    averageRating: reviewAggregate?.averageRating ?? null,
+    reviewCount: reviewAggregate?.reviewCount ?? 0,
   };
 }
 
