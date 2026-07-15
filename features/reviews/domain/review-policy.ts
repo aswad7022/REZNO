@@ -71,6 +71,63 @@ export function isPublicReviewStatus(status: ReviewStatus) {
   return status === "VISIBLE";
 }
 
+export type PublicReviewRelationship = {
+  bookingId: string;
+  customerId: string;
+  memberId: string | null;
+  organizationId: string;
+  rating: number;
+  serviceId: string;
+  status: ReviewStatus;
+  organization: { vertical: BusinessVertical };
+  service: { organizationId: string };
+  member: { organizationId: string } | null;
+  booking: {
+    id: string;
+    branchId: string;
+    customerId: string;
+    memberId: string | null;
+    organizationId: string;
+    branch: { organizationId: string };
+    branchService: {
+      branchId: string;
+      serviceId: string;
+      service: { organizationId: string };
+    };
+    member: { organizationId: string } | null;
+    restaurantReservation: { id: string } | null;
+  };
+};
+
+export function isPublicReviewRelationshipValid(
+  review: PublicReviewRelationship,
+) {
+  const memberRelationshipValid = review.memberId === null
+    ? review.member === null && review.booking.member === null
+    : review.member?.organizationId === review.organizationId &&
+      review.booking.member?.organizationId === review.organizationId;
+
+  return (
+    isPublicReviewStatus(review.status) &&
+    Number.isInteger(review.rating) &&
+    review.rating >= 1 &&
+    review.rating <= 5 &&
+    review.organization.vertical !== "RESTAURANT" &&
+    review.organization.vertical !== "CAFE" &&
+    review.booking.restaurantReservation === null &&
+    review.bookingId === review.booking.id &&
+    review.customerId === review.booking.customerId &&
+    review.organizationId === review.booking.organizationId &&
+    review.serviceId === review.booking.branchService.serviceId &&
+    review.memberId === review.booking.memberId &&
+    review.booking.branchId === review.booking.branchService.branchId &&
+    review.booking.branch.organizationId === review.organizationId &&
+    review.booking.branchService.service.organizationId === review.organizationId &&
+    review.service.organizationId === review.organizationId &&
+    memberRelationshipValid
+  );
+}
+
 export function roundPublicRating(value: number | null) {
   return value === null ? null : Math.round((value + Number.EPSILON) * 10) / 10;
 }

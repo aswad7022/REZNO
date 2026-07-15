@@ -11,6 +11,7 @@ import {
   DEFAULT_PUBLIC_REVIEW_PAGE_SIZE,
   encodePublicReviewCursor,
   evaluateReviewEligibility,
+  isPublicReviewRelationshipValid,
   MAX_PUBLIC_REVIEW_PAGE_SIZE,
   publicReviewCursorWhere,
   reviewPayloadsEqual,
@@ -248,55 +249,20 @@ export async function createOrReplayCustomerReview(input: {
   }
 }
 
-function scopedPublicReviewWhere(organizationId: string): Prisma.ReviewWhereInput {
+function publicReviewCandidateWhere(organizationId: string): Prisma.ReviewWhereInput {
   return {
     organizationId,
     status: "VISIBLE",
     rating: { gte: 1, lte: 5 },
     organization: { vertical: { notIn: ["RESTAURANT", "CAFE"] } },
-    service: { organizationId },
-    OR: [
-      { memberId: null },
-      { member: { organizationId } },
-    ],
     booking: {
-      organizationId,
       restaurantReservation: { is: null },
-      branch: { organizationId },
-      branchService: { service: { organizationId } },
     },
   };
 }
 
-type AggregateRow = {
-  organizationId: string;
-  serviceId: string;
-  memberId: string | null;
-  rating: number;
-  service: { organizationId: string };
-  member: { organizationId: string } | null;
-  booking: {
-    organizationId: string;
-    memberId: string | null;
-    branch: { organizationId: string };
-    branchService: {
-      serviceId: string;
-      service: { organizationId: string };
-    };
-  };
-};
-
-function aggregateRows(rows: AggregateRow[]): PublicReviewSummary {
-  const valid = rows.filter(
-    (row) =>
-      row.organizationId === row.booking.organizationId &&
-      row.organizationId === row.service.organizationId &&
-      row.organizationId === row.booking.branch.organizationId &&
-      row.organizationId === row.booking.branchService.service.organizationId &&
-      row.serviceId === row.booking.branchService.serviceId &&
-      row.memberId === row.booking.memberId &&
-      (!row.member || row.member.organizationId === row.organizationId),
-  );
+function aggregateRows(rows: PublicReviewRelationshipRow[]): PublicReviewSummary {
+  const valid = rows.filter(isPublicReviewRelationshipValid);
   const distribution: PublicReviewSummary["ratingDistribution"] = {
     "1": 0,
     "2": 0,
@@ -317,26 +283,104 @@ function aggregateRows(rows: AggregateRow[]): PublicReviewSummary {
 }
 
 const aggregateRowSelect = Prisma.validator<Prisma.ReviewSelect>()({
+  bookingId: true,
+  customerId: true,
   organizationId: true,
   serviceId: true,
   memberId: true,
   rating: true,
+  status: true,
+  organization: { select: { vertical: true } },
   service: { select: { organizationId: true } },
   member: { select: { organizationId: true } },
   booking: {
     select: {
+      id: true,
+      branchId: true,
+      customerId: true,
       organizationId: true,
       memberId: true,
       branch: { select: { organizationId: true } },
       branchService: {
         select: {
+          branchId: true,
           serviceId: true,
           service: { select: { organizationId: true } },
         },
       },
+      member: { select: { organizationId: true } },
+      restaurantReservation: { select: { id: true } },
     },
   },
 });
+
+type PublicReviewRelationshipRow = Prisma.ReviewGetPayload<{
+  select: typeof aggregateRowSelect;
+}>;
+
+const publicReviewListSelect = Prisma.validator<Prisma.ReviewSelect>()({
+  ...aggregateRowSelect,
+  id: true,
+  comment: true,
+  createdAt: true,
+  businessReply: true,
+  businessRepliedAt: true,
+  customer: { select: { firstName: true, displayName: true } },
+  booking: {
+    select: {
+      ...aggregateRowSelect.booking.select,
+      serviceNameSnapshot: true,
+    },
+  },
+});
+
+type PublicReviewListRow = Prisma.ReviewGetPayload<{
+  select: typeof publicReviewListSelect;
+}>;
+
+const PUBLIC_REVIEW_SCAN_BATCH_SIZE = 100;
+
+async function scanPublicReviewPage(input: {
+  organizationId: string;
+  cursor: ReturnType<typeof decodePublicReviewCursor> | null;
+  validRowTarget: number;
+}) {
+  const validRows: PublicReviewListRow[] = [];
+  let scanCursor = input.cursor;
+
+  while (validRows.length < input.validRowTarget) {
+    const batch = await prisma.review.findMany({
+      where: {
+        AND: [
+          publicReviewCandidateWhere(input.organizationId),
+          ...(scanCursor ? [publicReviewCursorWhere(scanCursor)] : []),
+        ],
+      },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: PUBLIC_REVIEW_SCAN_BATCH_SIZE,
+      select: publicReviewListSelect,
+    });
+
+    for (const review of batch) {
+      if (isPublicReviewRelationshipValid(review)) validRows.push(review);
+      if (validRows.length === input.validRowTarget) break;
+    }
+    if (
+      validRows.length === input.validRowTarget ||
+      batch.length < PUBLIC_REVIEW_SCAN_BATCH_SIZE
+    ) break;
+
+    const lastScanned = batch.at(-1);
+    if (!lastScanned) break;
+    scanCursor = {
+      organizationId: input.organizationId,
+      createdAt: lastScanned.createdAt.toISOString(),
+      id: lastScanned.id,
+    };
+  }
+
+  return validRows;
+}
 
 export async function getPublicOrganizationReviewAggregates(
   organizationIds: string[],
@@ -392,7 +436,7 @@ export async function getPublicMemberReviewAggregate(
   memberId: string,
 ) {
   const rows = await prisma.review.findMany({
-    where: { ...scopedPublicReviewWhere(organizationId), memberId },
+    where: { ...publicReviewCandidateWhere(organizationId), memberId },
     select: aggregateRowSelect,
   });
   return aggregateRows(rows);
@@ -420,28 +464,13 @@ export async function listPublicBusinessReviews(input: {
     ? decodePublicReviewCursor(input.cursor, organization.id)
     : null;
   const [rows, aggregateRowsData] = await Promise.all([
-    prisma.review.findMany({
-      where: {
-        AND: [
-          scopedPublicReviewWhere(organization.id),
-          ...(cursor ? [publicReviewCursorWhere(cursor)] : []),
-        ],
-      },
-      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-      take: limit + 1,
-      select: {
-        id: true,
-        rating: true,
-        comment: true,
-        createdAt: true,
-        businessReply: true,
-        businessRepliedAt: true,
-        customer: { select: { firstName: true, displayName: true } },
-        booking: { select: { serviceNameSnapshot: true } },
-      },
+    scanPublicReviewPage({
+      organizationId: organization.id,
+      cursor,
+      validRowTarget: limit + 1,
     }),
     prisma.review.findMany({
-      where: scopedPublicReviewWhere(organization.id),
+      where: publicReviewCandidateWhere(organization.id),
       select: aggregateRowSelect,
     }),
   ]);

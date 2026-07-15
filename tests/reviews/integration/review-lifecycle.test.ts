@@ -218,6 +218,231 @@ test("Gate 2C review lifecycle is owner-scoped, duplicate-safe, visible, and aud
     assert.equal(second.nextCursor, null);
   });
 
+  await t.test("public consumers reject corrupt relationships without breaking pagination", async () => {
+    await resetBookingTestData();
+    const fixture = await createBookingFixture({
+      label: `review-integrity-${randomUUID().slice(0, 6)}`,
+      mode: "REQUIRED",
+    });
+    const other = await createBookingFixture({
+      label: `review-cross-tenant-${randomUUID().slice(0, 6)}`,
+      mode: "REQUIRED",
+    });
+    await prisma.person.update({
+      where: { id: other.customer.id },
+      data: { firstName: "Wrong Review Customer" },
+    });
+    const mismatchedMember = await createBusinessMember(fixture.organization.id, "MANAGER");
+    const mismatchedService = await prisma.service.create({
+      data: {
+        categoryId: fixture.category.id,
+        name: "Same tenant mismatched service",
+        organizationId: fixture.organization.id,
+        staffSelectionMode: "REQUIRED",
+      },
+    });
+    const mismatchedServiceOffering = await prisma.branchService.create({
+      data: {
+        branchId: fixture.branch.id,
+        durationMinutes: 30,
+        price: "25000",
+        serviceId: mismatchedService.id,
+      },
+    });
+    const secondBranch = await prisma.branch.create({
+      data: {
+        city: "QA City",
+        name: "Same tenant second branch",
+        organizationId: fixture.organization.id,
+        slug: "second",
+        timezone: "UTC",
+      },
+    });
+    const secondBranchOffering = await prisma.branchService.create({
+      data: {
+        branchId: secondBranch.id,
+        durationMinutes: 30,
+        price: "25000",
+        serviceId: fixture.service.id,
+      },
+    });
+
+    let position = 0;
+    const insertReview = async (
+      bookingId: string,
+      comment: string,
+      overrides: {
+        customerId?: string;
+        memberId?: string | null;
+        rating?: number;
+        serviceId?: string;
+        status?: "FLAGGED" | "HIDDEN" | "VISIBLE";
+        businessReply?: string | null;
+      } = {},
+    ) => {
+      const createdAt = new Date(
+        Date.parse("2026-07-15T12:00:00.000Z") - position * 60_000,
+      );
+      position += 1;
+      return prisma.review.create({
+        data: {
+          bookingId,
+          businessReply: overrides.businessReply ?? null,
+          businessRepliedAt: overrides.businessReply ? createdAt : null,
+          comment,
+          createdAt,
+          customerId: overrides.customerId ?? fixture.customer.id,
+          memberId: overrides.memberId === undefined ? fixture.member!.id : overrides.memberId,
+          organizationId: fixture.organization.id,
+          rating: overrides.rating ?? 5,
+          serviceId: overrides.serviceId ?? fixture.service.id,
+          status: overrides.status ?? "VISIBLE",
+        },
+      });
+    };
+    const validIds: string[] = [];
+    const invalidComments: string[] = [];
+    const addValid = async (label: string, rating: number) => {
+      const booking = await createCompletedBooking(fixture);
+      const review = await insertReview(booking.id, label, { rating });
+      validIds.push(review.id);
+    };
+    const addInvalid = async (
+      label: string,
+      bookingId: string,
+      overrides: Parameters<typeof insertReview>[2] = {},
+    ) => {
+      invalidComments.push(label);
+      await insertReview(bookingId, label, {
+        ...overrides,
+        businessReply: `Invalid reply: ${label}`,
+      });
+    };
+
+    await addValid("Valid historical 1", 5);
+    const customerMismatch = await createCompletedBooking(fixture);
+    await addInvalid("Invalid customer", customerMismatch.id, {
+      customerId: other.customer.id,
+    });
+
+    await addValid("Valid historical 2", 4);
+    const serviceMismatch = await createCompletedBooking(fixture, {
+      branchServiceId: mismatchedServiceOffering.id,
+    });
+    await addInvalid("Invalid service", serviceMismatch.id);
+
+    await addValid("Valid historical 3", 3);
+    const memberMismatch = await createCompletedBooking(fixture, {
+      memberId: mismatchedMember.id,
+    });
+    await addInvalid("Invalid member", memberMismatch.id);
+
+    await addValid("Valid historical 4", 2);
+    const branchMismatch = await createCompletedBooking(fixture, {
+      branchServiceId: secondBranchOffering.id,
+    });
+    await addInvalid("Invalid branch offering", branchMismatch.id);
+
+    await addValid("Valid historical 5", 1);
+    const crossTenantBooking = await createCompletedBooking(other);
+    await addInvalid("Invalid cross-tenant booking", crossTenantBooking.id);
+
+    const crossTenantService = await createCompletedBooking(fixture);
+    await addInvalid("Invalid cross-tenant review service", crossTenantService.id, {
+      serviceId: other.service.id,
+    });
+
+    const crossTenantMember = await createCompletedBooking(fixture, {
+      memberId: other.member!.id,
+    });
+    await addInvalid("Invalid cross-tenant member", crossTenantMember.id, {
+      memberId: other.member!.id,
+    });
+
+    const hiddenBooking = await createCompletedBooking(fixture);
+    await insertReview(hiddenBooking.id, "Hidden review", { status: "HIDDEN" });
+    const flaggedBooking = await createCompletedBooking(fixture);
+    await insertReview(flaggedBooking.id, "Flagged review", { status: "FLAGGED" });
+
+    await prisma.service.update({
+      where: { id: fixture.service.id },
+      data: { status: "INACTIVE" },
+    });
+    await prisma.organizationMember.update({
+      where: { id: fixture.member!.id },
+      data: { status: "INACTIVE" },
+    });
+
+    const organizationSummary = (
+      await getPublicOrganizationReviewAggregates([fixture.organization.id])
+    ).get(fixture.organization.id);
+    const serviceSummary = (
+      await getPublicServiceReviewAggregates([
+        { organizationId: fixture.organization.id, serviceId: fixture.service.id },
+      ])
+    ).get(`${fixture.organization.id}:${fixture.service.id}`);
+    const memberSummary = await getPublicMemberReviewAggregate(
+      fixture.organization.id,
+      fixture.member!.id,
+    );
+    const crossTenantMemberSummary = await getPublicMemberReviewAggregate(
+      fixture.organization.id,
+      other.member!.id,
+    );
+    for (const summary of [organizationSummary, serviceSummary, memberSummary]) {
+      assert.equal(summary?.reviewCount, 5);
+      assert.equal(summary?.averageRating, 3);
+      assert.deepEqual(summary?.ratingDistribution, {
+        "1": 1,
+        "2": 1,
+        "3": 1,
+        "4": 1,
+        "5": 1,
+      });
+    }
+    assert.equal(crossTenantMemberSummary.reviewCount, 0);
+
+    const first = await listPublicBusinessReviews({
+      slug: fixture.organization.slug,
+      limit: 2,
+    });
+    const second = await listPublicBusinessReviews({
+      slug: fixture.organization.slug,
+      cursor: first.nextCursor,
+      limit: 2,
+    });
+    const third = await listPublicBusinessReviews({
+      slug: fixture.organization.slug,
+      cursor: second.nextCursor,
+      limit: 2,
+    });
+    assert.equal(first.reviews.length, 2);
+    assert.equal(second.reviews.length, 2);
+    assert.equal(third.reviews.length, 1);
+    assert.ok(first.nextCursor);
+    assert.ok(second.nextCursor);
+    assert.equal(third.nextCursor, null);
+    assert.equal(first.summary.reviewCount, 5);
+    assert.deepEqual(second.summary, first.summary);
+    assert.deepEqual(third.summary, first.summary);
+
+    const returned = [...first.reviews, ...second.reviews, ...third.reviews];
+    assert.deepEqual(returned.map((review) => review.id), validIds);
+    assert.equal(new Set(returned.map((review) => review.id)).size, 5);
+    assert.equal(
+      returned.some((review) => invalidComments.includes(review.comment ?? "")),
+      false,
+    );
+    assert.equal(
+      returned.some((review) => review.businessReply?.startsWith("Invalid")),
+      false,
+    );
+    assert.equal(
+      returned.some((review) => review.customerName !== "Booking Customer"),
+      false,
+    );
+  });
+
   await t.test("owner and manager replies are tenant-scoped while staff and receptionist fail", async () => {
     await resetBookingTestData();
     const fixture = await createBookingFixture({ mode: "REQUIRED" });

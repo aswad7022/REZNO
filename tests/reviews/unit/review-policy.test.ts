@@ -8,6 +8,7 @@ import {
   decodePublicReviewCursor,
   encodePublicReviewCursor,
   evaluateReviewEligibility,
+  isPublicReviewRelationshipValid,
   isPublicReviewStatus,
   publicReviewCursorWhere,
   reviewInputSchema,
@@ -100,6 +101,64 @@ test("visibility, rounding, response roles, and moderation fail closed", () => {
     () => assertModerationTransition("VISIBLE", "FLAGGED"),
     (error: unknown) => error instanceof ReviewDomainError && error.code === "INVALID_REQUEST",
   );
+});
+
+test("public relationship integrity derives every duplicated foreign key from the booking", () => {
+  const organizationId = randomUUID();
+  const customerId = randomUUID();
+  const serviceId = randomUUID();
+  const memberId = randomUUID();
+  const branchId = randomUUID();
+  const bookingId = randomUUID();
+  const valid = {
+    bookingId,
+    customerId,
+    memberId,
+    organizationId,
+    rating: 5,
+    serviceId,
+    status: "VISIBLE" as const,
+    organization: { vertical: "BEAUTY" as const },
+    service: { organizationId },
+    member: { organizationId },
+    booking: {
+      id: bookingId,
+      branchId,
+      customerId,
+      memberId,
+      organizationId,
+      branch: { organizationId },
+      branchService: {
+        branchId,
+        serviceId,
+        service: { organizationId },
+      },
+      member: { organizationId },
+      restaurantReservation: null,
+    },
+  };
+  assert.equal(isPublicReviewRelationshipValid(valid), true);
+  for (const invalid of [
+    { ...valid, customerId: randomUUID() },
+    { ...valid, serviceId: randomUUID() },
+    { ...valid, memberId: randomUUID() },
+    {
+      ...valid,
+      booking: {
+        ...valid.booking,
+        branchService: { ...valid.booking.branchService, branchId: randomUUID() },
+      },
+    },
+    { ...valid, organizationId: randomUUID() },
+    { ...valid, rating: 6 },
+    { ...valid, status: "HIDDEN" as const },
+    {
+      ...valid,
+      booking: { ...valid.booking, restaurantReservation: { id: randomUUID() } },
+    },
+  ]) {
+    assert.equal(isPublicReviewRelationshipValid(invalid), false);
+  }
 });
 
 test("public cursor is organization-bound and uses timestamp plus unique ID", () => {
