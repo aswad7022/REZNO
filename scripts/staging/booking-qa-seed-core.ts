@@ -19,6 +19,19 @@ export const BOOKING_QA_FIXTURE = {
   },
   role: { id: "7a000000-0000-4000-8000-000000000007" },
   member: { id: "7a000000-0000-4000-8000-000000000008" },
+  reviewCustomer: {
+    id: "7a000000-0000-4000-8000-000000000009",
+    authUserId: "fixture:rezno-qa-booking-gate2c:customer",
+  },
+  reviewBookings: {
+    eligible: "7a000000-0000-4000-8000-000000000010",
+    visible: "7a000000-0000-4000-8000-000000000011",
+    moderation: "7a000000-0000-4000-8000-000000000012",
+  },
+  reviews: {
+    visible: "7a000000-0000-4000-8000-000000000013",
+    moderation: "7a000000-0000-4000-8000-000000000014",
+  },
 } as const;
 
 export class BookingQaSeedInvariantError extends Error {
@@ -226,11 +239,124 @@ export async function seedBookingQaFixture(database: PrismaClient) {
       });
     }
 
+    const reviewCustomer = await transaction.person.upsert({
+      where: { authUserId: BOOKING_QA_FIXTURE.reviewCustomer.authUserId },
+      create: {
+        id: BOOKING_QA_FIXTURE.reviewCustomer.id,
+        authUserId: BOOKING_QA_FIXTURE.reviewCustomer.authUserId,
+        displayName: "Gate 2C QA Customer",
+        firstName: "Gate 2C QA",
+        isOnboarded: true,
+        phone: "+9647500000098",
+        status: "ACTIVE",
+      },
+      update: {
+        deletedAt: null,
+        displayName: "Gate 2C QA Customer",
+        firstName: "Gate 2C QA",
+        isOnboarded: true,
+        status: "ACTIVE",
+      },
+    });
+    const completedStarts = [
+      new Date("2026-07-01T07:00:00.000Z"),
+      new Date("2026-07-01T08:00:00.000Z"),
+      new Date("2026-07-01T09:00:00.000Z"),
+    ];
+    const bookingIds = [
+      BOOKING_QA_FIXTURE.reviewBookings.eligible,
+      BOOKING_QA_FIXTURE.reviewBookings.visible,
+      BOOKING_QA_FIXTURE.reviewBookings.moderation,
+    ];
+    for (const [index, bookingId] of bookingIds.entries()) {
+      const startsAt = completedStarts[index]!;
+      await transaction.booking.upsert({
+        where: { id: bookingId },
+        create: {
+          id: bookingId,
+          organizationId: organization.id,
+          branchId: branch.id,
+          branchServiceId: offering.id,
+          customerId: reviewCustomer.id,
+          memberId: member.id,
+          status: "COMPLETED",
+          startsAt,
+          endsAt: new Date(startsAt.getTime() + 30 * 60_000),
+          serviceNameSnapshot: "Gate 2C QA Service",
+          customerNameSnapshot: "Gate 2C QA Customer",
+          priceSnapshot: "25000",
+          notes: "Namespaced Gate 2C review fixture",
+        },
+        update: {
+          organizationId: organization.id,
+          branchId: branch.id,
+          branchServiceId: offering.id,
+          customerId: reviewCustomer.id,
+          memberId: member.id,
+          status: "COMPLETED",
+          startsAt,
+          endsAt: new Date(startsAt.getTime() + 30 * 60_000),
+          serviceNameSnapshot: "Gate 2C QA Service",
+          customerNameSnapshot: "Gate 2C QA Customer",
+          priceSnapshot: "25000",
+          notes: "Namespaced Gate 2C review fixture",
+        },
+      });
+    }
+    await transaction.review.upsert({
+      where: { bookingId: BOOKING_QA_FIXTURE.reviewBookings.visible },
+      create: {
+        id: BOOKING_QA_FIXTURE.reviews.visible,
+        bookingId: BOOKING_QA_FIXTURE.reviewBookings.visible,
+        customerId: reviewCustomer.id,
+        organizationId: organization.id,
+        serviceId: service.id,
+        memberId: member.id,
+        rating: 5,
+        comment: "rezno-qa-booking-gate2c visible review",
+        status: "VISIBLE",
+      },
+      update: {
+        customerId: reviewCustomer.id,
+        organizationId: organization.id,
+        serviceId: service.id,
+        memberId: member.id,
+        rating: 5,
+        comment: "rezno-qa-booking-gate2c visible review",
+        status: "VISIBLE",
+      },
+    });
+    await transaction.review.upsert({
+      where: { bookingId: BOOKING_QA_FIXTURE.reviewBookings.moderation },
+      create: {
+        id: BOOKING_QA_FIXTURE.reviews.moderation,
+        bookingId: BOOKING_QA_FIXTURE.reviewBookings.moderation,
+        customerId: reviewCustomer.id,
+        organizationId: organization.id,
+        serviceId: service.id,
+        memberId: member.id,
+        rating: 4,
+        comment: "rezno-qa-booking-gate2c moderation review",
+        status: "VISIBLE",
+      },
+      update: {
+        customerId: reviewCustomer.id,
+        organizationId: organization.id,
+        serviceId: service.id,
+        memberId: member.id,
+        rating: 4,
+        comment: "rezno-qa-booking-gate2c moderation review",
+        status: "VISIBLE",
+      },
+    });
+
     return {
       branchServiceId: offering.id,
       businessSlug: organization.slug,
       memberId: member.id,
       serviceId: service.id,
+      eligibleReviewBookingId: BOOKING_QA_FIXTURE.reviewBookings.eligible,
+      moderationReviewId: BOOKING_QA_FIXTURE.reviews.moderation,
     };
   };
 
@@ -249,6 +375,14 @@ async function assertFixtureIdentity(transaction: Prisma.TransactionClient) {
     where: { slug: BOOKING_QA_FIXTURE.category.slug },
     select: { id: true },
   });
+  const reviewCustomer = await transaction.person.findUnique({
+    where: { authUserId: BOOKING_QA_FIXTURE.reviewCustomer.authUserId },
+    select: { id: true },
+  });
+  const fixtureBookings = await transaction.booking.findMany({
+    where: { id: { in: Object.values(BOOKING_QA_FIXTURE.reviewBookings) } },
+    select: { id: true, organizationId: true },
+  });
   if (organization && organization.id !== BOOKING_QA_FIXTURE.organization.id) {
     throw new BookingQaSeedInvariantError(
       "The namespaced Booking QA organization slug is owned by another record.",
@@ -257,6 +391,20 @@ async function assertFixtureIdentity(transaction: Prisma.TransactionClient) {
   if (category && category.id !== BOOKING_QA_FIXTURE.category.id) {
     throw new BookingQaSeedInvariantError(
       "The namespaced Booking QA category slug is owned by another record.",
+    );
+  }
+  if (reviewCustomer && reviewCustomer.id !== BOOKING_QA_FIXTURE.reviewCustomer.id) {
+    throw new BookingQaSeedInvariantError(
+      "The namespaced Booking QA review customer is owned by another record.",
+    );
+  }
+  if (
+    fixtureBookings.some(
+      (booking) => booking.organizationId !== BOOKING_QA_FIXTURE.organization.id,
+    )
+  ) {
+    throw new BookingQaSeedInvariantError(
+      "A namespaced Booking QA review booking is owned by another organization.",
     );
   }
 }

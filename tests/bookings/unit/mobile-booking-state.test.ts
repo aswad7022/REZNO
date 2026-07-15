@@ -123,6 +123,11 @@ test("mobile management pagination de-duplicates and classifies recovery", () =>
       cancelledAt: null,
     },
     changeRequest: null,
+    reviewState: {
+      eligible: false,
+      hasReview: false,
+      reason: "BOOKING_NOT_COMPLETED" as const,
+    },
   };
   const merged = mergeMobileBookingPage([booking], {
     items: [{ ...booking, status: "CANCELLED", cancellation: { ...booking.cancellation, eligible: false } }],
