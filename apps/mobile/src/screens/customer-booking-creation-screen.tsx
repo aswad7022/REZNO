@@ -395,6 +395,11 @@ export function CustomerBookingCreationScreen({
           <Text style={[styles.body, isRtl && styles.rtlText]}>
             {business.description ?? copy.chooseService}
           </Text>
+          {business.averageRating !== null ? (
+            <Text style={[styles.body, isRtl && styles.rtlText]}>
+              ★ {business.averageRating.toFixed(1)} · {business.reviewCount}
+            </Text>
+          ) : null}
           {!business.supportsServiceBooking ? (
             <Text style={[styles.errorText, isRtl && styles.rtlText]}>
               {copy.businessUnavailable}
