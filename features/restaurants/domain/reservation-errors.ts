@@ -1,5 +1,9 @@
 export type RestaurantReservationErrorCode =
+  | "BOOKING_NOT_CANCELLABLE"
+  | "BOOKING_NOT_RESCHEDULABLE"
   | "BOOKING_STATE_CONFLICT"
+  | "BUSINESS_UNAVAILABLE"
+  | "CANCELLATION_DEADLINE_PASSED"
   | "CAPACITY_UNAVAILABLE"
   | "CUSTOMER_UNAVAILABLE"
   | "DATE_OUT_OF_RANGE"
@@ -9,6 +13,7 @@ export type RestaurantReservationErrorCode =
   | "NOT_FOUND"
   | "RESTAURANT_CLOSED"
   | "RESTAURANT_FLOW_REQUIRED"
+  | "SLOT_UNAVAILABLE"
   | "TABLE_CONFLICT";
 
 export class RestaurantReservationError extends Error {

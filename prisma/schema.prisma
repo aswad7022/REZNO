@@ -7,28 +7,29 @@ datasource db {
 }
 
 model Person {
-  id                              String                     @id @default(uuid()) @db.Uuid
-  authUserId                      String                     @unique
+  id                              String                          @id @default(uuid()) @db.Uuid
+  authUserId                      String                          @unique
   firstName                       String
   lastName                        String?
   displayName                     String?
   phone                           String?
   avatarUrl                       String?
   gender                          Gender?
-  preferredLanguage               LanguageCode               @default(AR)
-  timezone                        String                     @default("Asia/Baghdad")
-  status                          EntityStatus               @default(ACTIVE)
-  isOnboarded                     Boolean                    @default(false)
-  createdAt                       DateTime                   @default(now()) @db.Timestamptz(6)
-  updatedAt                       DateTime                   @updatedAt @db.Timestamptz(6)
-  deletedAt                       DateTime?                  @db.Timestamptz(6)
+  preferredLanguage               LanguageCode                    @default(AR)
+  timezone                        String                          @default("Asia/Baghdad")
+  status                          EntityStatus                    @default(ACTIVE)
+  isOnboarded                     Boolean                         @default(false)
+  createdAt                       DateTime                        @default(now()) @db.Timestamptz(6)
+  updatedAt                       DateTime                        @updatedAt @db.Timestamptz(6)
+  deletedAt                       DateTime?                       @db.Timestamptz(6)
   memberships                     OrganizationMember[]
-  customerBookings                Booking[]                  @relation("BookingCustomer")
+  customerBookings                Booking[]                       @relation("BookingCustomer")
   bookingChanges                  BookingStatusHistory[]
-  requestedBookingChanges         BookingChangeRequest[]     @relation("BookingChangeRequester")
-  reviews                         Review[]                   @relation("ReviewCustomer")
+  requestedBookingChanges         BookingChangeRequest[]          @relation("BookingChangeRequester")
+  restaurantReservationMutations  RestaurantReservationMutation[] @relation("RestaurantReservationMutationCustomer")
+  reviews                         Review[]                        @relation("ReviewCustomer")
   notifications                   Notification[]
-  customerConversations           Conversation[]             @relation("ConversationCustomer")
+  customerConversations           Conversation[]                  @relation("ConversationCustomer")
   favoriteBusinesses              CustomerFavoriteBusiness[]
   favoriteServices                CustomerFavoriteService[]
   commerceAddresses               CustomerAddress[]
@@ -37,8 +38,8 @@ model Person {
   commerceOrders                  Order[]
   favoriteStores                  CustomerFavoriteStore[]
   favoriteProducts                CustomerFavoriteProduct[]
-  sentOrganizationInvitations     OrganizationInvitation[]   @relation("OrganizationInvitationInvitedBy")
-  receivedOrganizationInvitations OrganizationInvitation[]   @relation("OrganizationInvitationRecipient")
+  sentOrganizationInvitations     OrganizationInvitation[]        @relation("OrganizationInvitationInvitedBy")
+  receivedOrganizationInvitations OrganizationInvitation[]        @relation("OrganizationInvitationRecipient")
 
   @@index([phone])
 }
@@ -404,36 +405,37 @@ model BlockedTime {
 }
 
 model Booking {
-  id                                 String                        @id @default(uuid()) @db.Uuid
-  organizationId                     String                        @db.Uuid
-  branchId                           String                        @db.Uuid
-  customerId                         String                        @db.Uuid
-  branchServiceId                    String?                       @db.Uuid
-  memberId                           String?                       @db.Uuid
-  status                             BookingStatus                 @default(CONFIRMED)
-  startsAt                           DateTime                      @db.Timestamptz(6)
-  endsAt                             DateTime                      @db.Timestamptz(6)
+  id                                 String                          @id @default(uuid()) @db.Uuid
+  organizationId                     String                          @db.Uuid
+  branchId                           String                          @db.Uuid
+  customerId                         String                          @db.Uuid
+  branchServiceId                    String?                         @db.Uuid
+  memberId                           String?                         @db.Uuid
+  status                             BookingStatus                   @default(CONFIRMED)
+  startsAt                           DateTime                        @db.Timestamptz(6)
+  endsAt                             DateTime                        @db.Timestamptz(6)
   serviceNameSnapshot                String
   customerNameSnapshot               String
-  priceSnapshot                      Decimal                       @db.Decimal(10, 2)
+  priceSnapshot                      Decimal                         @db.Decimal(10, 2)
   notes                              String?
   cancellationReason                 String?
-  cancelledAt                        DateTime?                     @db.Timestamptz(6)
-  creationIdempotencyKey             String?                       @db.Uuid
-  creationRequestHash                String?                       @db.VarChar(64)
-  customerCancellationIdempotencyKey String?                       @db.Uuid
-  customerCancellationRequestHash    String?                       @db.VarChar(64)
-  createdAt                          DateTime                      @default(now()) @db.Timestamptz(6)
-  updatedAt                          DateTime                      @updatedAt @db.Timestamptz(6)
-  organization                       Organization                  @relation(fields: [organizationId], references: [id])
-  branch                             Branch                        @relation(fields: [branchId], references: [id])
-  customer                           Person                        @relation("BookingCustomer", fields: [customerId], references: [id])
-  branchService                      BranchService?                @relation(fields: [branchServiceId], references: [id])
-  member                             OrganizationMember?           @relation(fields: [memberId], references: [id])
+  cancelledAt                        DateTime?                       @db.Timestamptz(6)
+  creationIdempotencyKey             String?                         @db.Uuid
+  creationRequestHash                String?                         @db.VarChar(64)
+  customerCancellationIdempotencyKey String?                         @db.Uuid
+  customerCancellationRequestHash    String?                         @db.VarChar(64)
+  createdAt                          DateTime                        @default(now()) @db.Timestamptz(6)
+  updatedAt                          DateTime                        @updatedAt @db.Timestamptz(6)
+  organization                       Organization                    @relation(fields: [organizationId], references: [id])
+  branch                             Branch                          @relation(fields: [branchId], references: [id])
+  customer                           Person                          @relation("BookingCustomer", fields: [customerId], references: [id])
+  branchService                      BranchService?                  @relation(fields: [branchServiceId], references: [id])
+  member                             OrganizationMember?             @relation(fields: [memberId], references: [id])
   statusHistory                      BookingStatusHistory[]
   changeRequests                     BookingChangeRequest[]
   review                             Review?
   restaurantReservation              RestaurantReservationDetails?
+  restaurantReservationMutations     RestaurantReservationMutation[]
   conversations                      Conversation[]
 
   @@unique([customerId, creationIdempotencyKey])
@@ -585,6 +587,8 @@ model RestaurantReservationItem {
   menuItemId                     String                       @db.Uuid
   quantity                       Int                          @default(1)
   unitPrice                      Decimal                      @db.Decimal(10, 2)
+  itemNameSnapshot               String?
+  currencySnapshot               String?                      @db.VarChar(3)
   note                           String?
   createdAt                      DateTime                     @default(now()) @db.Timestamptz(6)
   updatedAt                      DateTime                     @updatedAt @db.Timestamptz(6)
@@ -594,6 +598,23 @@ model RestaurantReservationItem {
   @@unique([restaurantReservationDetailsId, menuItemId])
   @@index([restaurantReservationDetailsId])
   @@index([menuItemId])
+}
+
+model RestaurantReservationMutation {
+  id                       String                            @id @default(uuid()) @db.Uuid
+  bookingId                String                            @db.Uuid
+  customerId               String                            @db.Uuid
+  type                     RestaurantReservationMutationType
+  idempotencyKey           String                            @db.Uuid
+  requestHash              String                            @db.VarChar(64)
+  bookingUpdatedAtSnapshot DateTime                          @db.Timestamptz(6)
+  resultBookingUpdatedAt   DateTime                          @db.Timestamptz(6)
+  createdAt                DateTime                          @default(now()) @db.Timestamptz(6)
+  booking                  Booking                           @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  customer                 Person                            @relation("RestaurantReservationMutationCustomer", fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, idempotencyKey])
+  @@index([bookingId, type, createdAt])
 }
 
 model User {
@@ -1291,6 +1312,11 @@ enum BookingChangeRequestStatus {
   ACCEPTED
   REJECTED
   CANCELLED
+}
+
+enum RestaurantReservationMutationType {
+  CANCELLATION
+  RESCHEDULE
 }
 
 enum OrganizationInvitationStatus {

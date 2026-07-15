@@ -83,7 +83,7 @@ export default async function BusinessReservationsRoute() {
                       <div className="space-y-1 text-sm text-muted-foreground">
                         {booking.restaurantReservation.items.map((item) => (
                           <p key={item.id}>
-                            {item.quantity}× {item.menuItem.name}
+                            {item.quantity}× {item.itemNameSnapshot ?? item.menuItem.name}
                           </p>
                         ))}
                       </div>

@@ -82,6 +82,7 @@ function toListItem(booking: {
     table: { name: string };
     items: Array<{
       quantity: number;
+      itemNameSnapshot: string | null;
       menuItem: { name: string };
     }>;
   } | null;
@@ -116,7 +117,7 @@ function toListItem(booking: {
           tableName: booking.restaurantReservation.table.name,
           seatingArea: booking.restaurantReservation.seatingArea,
           items: booking.restaurantReservation.items.map((item) => ({
-            name: item.menuItem.name,
+            name: item.itemNameSnapshot ?? item.menuItem.name,
             quantity: item.quantity,
           })),
         }

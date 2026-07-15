@@ -156,6 +156,7 @@ export async function getPublicRestaurantReservationMenu(slug: string) {
 export interface RestaurantAvailabilityInput {
   branchId: string;
   date: string;
+  excludeBookingId?: string;
   guestCount: number;
   seatingArea: string | null;
 }
@@ -244,6 +245,7 @@ export async function getPublicRestaurantReservationAvailability(
   }
   const occupied = await database.booking.findMany({
     where: {
+      ...(input.excludeBookingId ? { id: { not: input.excludeBookingId } } : {}),
       status: { in: [...ACTIVE_RESERVATION_STATUSES] },
       startsAt: { lt: dayEnd },
       endsAt: { gt: dayStart },

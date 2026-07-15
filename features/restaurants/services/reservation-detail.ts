@@ -1,15 +1,64 @@
 import "server-only";
 
+import { Prisma } from "@prisma/client";
+
+import {
+  canCustomerManageRestaurantReservation,
+  restaurantReservationRelationshipsAreValid,
+  restaurantReservationCancellationDeadline,
+} from "@/features/restaurants/domain/reservation-management";
 import { restaurantReservationReference } from "@/features/restaurants/domain/reservation-policy";
+import type {
+  CustomerRestaurantReservationDetail,
+  CustomerRestaurantReservationItem,
+} from "@/features/restaurants/types";
 import { prisma } from "@/lib/db/prisma";
 
-export const restaurantReservationDetailInclude = {
-  organization: true,
-  branch: true,
-  restaurantReservation: {
-    include: { items: { include: { menuItem: true } } },
-  },
-} as const;
+export const restaurantReservationDetailInclude =
+  Prisma.validator<Prisma.BookingInclude>()({
+    organization: { include: { settings: true } },
+    branch: true,
+    statusHistory: {
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    },
+    restaurantReservation: {
+      include: {
+        items: {
+          include: {
+            menuItem: {
+              select: {
+                id: true,
+                businessId: true,
+                name: true,
+                currency: true,
+              },
+            },
+          },
+          orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        },
+        table: { select: { branchId: true, businessId: true } },
+      },
+    },
+  });
+
+export const restaurantReservationListInclude =
+  Prisma.validator<Prisma.BookingInclude>()({
+    organization: { include: { settings: true } },
+    branch: true,
+    restaurantReservation: {
+      include: {
+        table: { select: { branchId: true, businessId: true } },
+      },
+    },
+  });
+
+type RestaurantReservationDetailBooking = Prisma.BookingGetPayload<{
+  include: typeof restaurantReservationDetailInclude;
+}>;
+
+type RestaurantReservationListBooking = Prisma.BookingGetPayload<{
+  include: typeof restaurantReservationListInclude;
+}>;
 
 export async function getRestaurantReservationDetailForCustomer(
   customerId: string,
@@ -19,37 +68,34 @@ export async function getRestaurantReservationDetailForCustomer(
     where: {
       id: bookingId,
       customerId,
+      branchServiceId: null,
       restaurantReservation: { isNot: null },
     },
     include: restaurantReservationDetailInclude,
   });
-  return booking ? serializeRestaurantReservationDetail(booking) : null;
+  return booking && restaurantReservationRelationshipsAreValid(booking)
+    ? serializeRestaurantReservationDetail(booking)
+    : null;
 }
 
-export function serializeRestaurantReservationDetail(booking: {
-  id: string;
-  startsAt: Date;
-  endsAt: Date;
-  status: "PENDING" | "CONFIRMED" | "COMPLETED" | "CANCELLED" | "NO_SHOW";
-  createdAt: Date;
-  priceSnapshot: { toString(): string };
-  organization: { name: string; slug: string };
-  branch: { id: string; name: string; timezone: string };
-  restaurantReservation: {
-    guestCount: number;
-    durationMinutes: number;
-    seatingArea: string | null;
-    customerNote: string | null;
-    items: Array<{
-      id: string;
-      quantity: number;
-      unitPrice: { toString(): string };
-      menuItem: { id: string; name: string; currency: string };
-    }>;
-  } | null;
-}) {
+export function serializeRestaurantReservationListItem(
+  booking: RestaurantReservationListBooking,
+  now = new Date(),
+): CustomerRestaurantReservationItem {
   const reservation = booking.restaurantReservation;
-  if (!reservation) throw new Error("Restaurant reservation detail is missing.");
+  if (!restaurantReservationRelationshipsAreValid(booking) || !reservation) {
+    throw new Error("Restaurant reservation relationships are invalid.");
+  }
+  const cancellationWindowHours =
+    booking.organization.settings?.cancellationWindowHours ?? 24;
+  const eligible = canCustomerManageRestaurantReservation(
+    {
+      status: booking.status,
+      startsAt: booking.startsAt,
+      cancellationWindowHours,
+    },
+    now,
+  );
   return {
     id: booking.id,
     reference: restaurantReservationReference(booking.id),
@@ -57,10 +103,7 @@ export function serializeRestaurantReservationDetail(booking: {
       name: booking.organization.name,
       slug: booking.organization.slug,
     },
-    branch: {
-      id: booking.branch.id,
-      name: booking.branch.name,
-    },
+    branch: { id: booking.branch.id, name: booking.branch.name },
     startsAt: booking.startsAt.toISOString(),
     endsAt: booking.endsAt.toISOString(),
     timezone: booking.branch.timezone,
@@ -68,16 +111,60 @@ export function serializeRestaurantReservationDetail(booking: {
     seatingArea: reservation.seatingArea,
     durationMinutes: reservation.durationMinutes,
     status: booking.status,
-    customerNote: reservation.customerNote,
     preorderTotal: booking.priceSnapshot.toString(),
-    preorderItems: reservation.items.map((item) => ({
-      id: item.id,
-      itemId: item.menuItem.id,
-      name: item.menuItem.name,
-      quantity: item.quantity,
-      unitPrice: item.unitPrice.toString(),
-      currency: item.menuItem.currency,
-    })),
     createdAt: booking.createdAt.toISOString(),
+    updatedAt: booking.updatedAt.toISOString(),
+    cancellation: {
+      eligible,
+      deadline: restaurantReservationCancellationDeadline(
+        booking.startsAt,
+        cancellationWindowHours,
+      ).toISOString(),
+      cancelledAt: booking.cancelledAt?.toISOString() ?? null,
+    },
+    reschedule: {
+      eligible,
+      deadline: restaurantReservationCancellationDeadline(
+        booking.startsAt,
+        cancellationWindowHours,
+      ).toISOString(),
+    },
+  };
+}
+
+export function serializeRestaurantReservationDetail(
+  booking: RestaurantReservationDetailBooking,
+  now = new Date(),
+): CustomerRestaurantReservationDetail {
+  const reservation = booking.restaurantReservation;
+  if (!restaurantReservationRelationshipsAreValid(booking) || !reservation) {
+    throw new Error("Restaurant reservation relationships are invalid.");
+  }
+  const item = serializeRestaurantReservationListItem(
+    booking as RestaurantReservationListBooking,
+    now,
+  );
+  return {
+    ...item,
+    customerNote: reservation.customerNote,
+    preorderItems: reservation.items.map((preorder) => ({
+      id: preorder.id,
+      itemId: preorder.menuItemId,
+      name: preorder.itemNameSnapshot ?? preorder.menuItem.name,
+      quantity: preorder.quantity,
+      unitPrice: preorder.unitPrice.toString(),
+      currency: preorder.currencySnapshot ?? preorder.menuItem.currency,
+    })),
+    cancellation: {
+      ...item.cancellation,
+      reason: booking.cancellationReason,
+    },
+    statusHistory: booking.statusHistory.map((entry) => ({
+      id: entry.id,
+      fromStatus: entry.fromStatus,
+      toStatus: entry.toStatus,
+      note: entry.note,
+      createdAt: entry.createdAt.toISOString(),
+    })),
   };
 }
