@@ -9,6 +9,7 @@ import type {
   MobileBookingManagementPage,
   MobileBookingManagementTab,
   MobileManagedBookingDetail,
+  MobileBookingReviewState,
   MobileStaffSelectionMode,
 } from "../types/bookings";
 
@@ -147,5 +148,54 @@ export function requestMobileBookingChange(
     body: input,
     headers: { "Idempotency-Key": idempotencyKey },
     method: "POST",
+  });
+}
+
+export function fetchMobileBookingReview(bookingId: string) {
+  return mobileApiRequest<DataResponse<MobileBookingReviewState>>(
+    `/api/mobile/bookings/${encodeURIComponent(bookingId)}/review`,
+    { authenticated: true },
+  );
+}
+
+export function submitMobileBookingReview(
+  bookingId: string,
+  input: { rating: number; comment: string | null },
+) {
+  return mobileApiRequest<
+    DataResponse<{ review: MobileBookingReviewState["review"]; replayed: boolean }>
+  >(`/api/mobile/bookings/${encodeURIComponent(bookingId)}/review`, {
+    authenticated: true,
+    body: input,
+    method: "POST",
+  });
+}
+
+export function fetchMobilePublicBusinessReviews(input: {
+  slug: string;
+  cursor?: string | null;
+  limit?: number;
+}) {
+  return mobileApiRequest<
+    DataResponse<{
+      summary: {
+        averageRating: number | null;
+        reviewCount: number;
+        ratingDistribution: Record<"1" | "2" | "3" | "4" | "5", number>;
+      };
+      reviews: Array<{
+        id: string;
+        rating: number;
+        comment: string | null;
+        createdAt: string;
+        customerName: string;
+        serviceName: string;
+        businessReply: string | null;
+        businessRepliedAt: string | null;
+      }>;
+      nextCursor: string | null;
+    }>
+  >(`/api/mobile/bookings/businesses/${encodeURIComponent(input.slug)}/reviews`, {
+    params: { cursor: input.cursor ?? undefined, limit: input.limit },
   });
 }

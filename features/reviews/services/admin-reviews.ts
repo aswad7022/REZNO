@@ -14,6 +14,8 @@ export async function getAdminReviewsPageData() {
       rating: true,
       comment: true,
       status: true,
+      businessReply: true,
+      businessRepliedAt: true,
       createdAt: true,
       organization: {
         select: {

@@ -10,6 +10,8 @@ export type MobileBookingBusiness = {
   categoryName: string | null;
   vertical: string;
   supportsServiceBooking: boolean;
+  averageRating: number | null;
+  reviewCount: number;
 };
 
 export type MobileBookingService = {
@@ -76,6 +78,30 @@ export type MobilePersistedBooking = {
 };
 
 export type MobileBookingStatus = MobilePersistedBooking["status"];
+export type MobileReviewStatus = "VISIBLE" | "HIDDEN" | "FLAGGED";
+export type MobileReviewEligibilityReason =
+  | "ELIGIBLE"
+  | "ALREADY_REVIEWED"
+  | "BOOKING_NOT_COMPLETED"
+  | "RELATED_RECORDS_INVALID"
+  | "RESTAURANT_FLOW_EXCLUDED";
+
+export type MobileCustomerReview = {
+  id: string;
+  rating: number;
+  comment: string | null;
+  status: MobileReviewStatus;
+  createdAt: string;
+  updatedAt: string;
+  businessReply: string | null;
+  businessRepliedAt: string | null;
+};
+
+export type MobileBookingReviewState = {
+  booking: { id: string; reference: string; status: MobileBookingStatus };
+  eligibility: { eligible: boolean; reason: MobileReviewEligibilityReason };
+  review: MobileCustomerReview | null;
+};
 export type MobileBookingManagementTab =
   | "all"
   | "upcoming"
@@ -100,6 +126,11 @@ export type MobileManagedBooking = MobilePersistedBooking & {
     cancelledAt: string | null;
   };
   changeRequest: MobileBookingChangeRequest | null;
+  reviewState: {
+    eligible: boolean;
+    reason: MobileReviewEligibilityReason;
+    hasReview: boolean;
+  };
 };
 
 export type MobileManagedBookingDetail = MobileManagedBooking & {
@@ -109,6 +140,7 @@ export type MobileManagedBookingDetail = MobileManagedBooking & {
     reason: string | null;
   };
   reschedule: { eligible: boolean };
+  review: MobileCustomerReview | null;
   statusHistory: Array<{
     id: string;
     fromStatus: MobileBookingStatus | null;

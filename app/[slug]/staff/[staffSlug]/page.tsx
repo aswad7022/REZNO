@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowLeft, BadgeCheck, BriefcaseBusiness, ImageIcon, Sparkles } from "lucide-react";
+import { ArrowLeft, BadgeCheck, BriefcaseBusiness, ImageIcon, Sparkles, Star } from "lucide-react";
 import { getFormatter, getTranslations } from "next-intl/server";
 import { notFound } from "next/navigation";
 
@@ -108,6 +108,13 @@ export default async function PublicProfessionalRoute({
                       business: profile.business.name,
                     })}
                   </p>
+                  {profile.averageRating !== null ? (
+                    <p className="mt-3 flex items-center gap-2 text-sm font-semibold">
+                      <Star className="size-4 fill-amber-400 text-amber-400" />
+                      {format.number(profile.averageRating, { maximumFractionDigits: 1 })}
+                      <span className="text-muted-foreground">({format.number(profile.reviewCount)})</span>
+                    </p>
+                  ) : null}
                   {profile.specialties.length > 0 ? (
                     <div className="mt-5 flex flex-wrap gap-2">
                       {profile.specialties.map((specialty) => (

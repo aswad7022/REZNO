@@ -5,6 +5,10 @@ import { cache } from "react";
 import { getCurrentIdentity, requireCustomerIdentity } from "@/features/identity/server";
 import type { MarketplaceBusiness } from "@/features/marketplace/types";
 import { prisma } from "@/lib/db/prisma";
+import {
+  getPublicOrganizationReviewAggregates,
+  getPublicServiceReviewAggregates,
+} from "@/features/reviews/services/review-lifecycle";
 
 const favoriteBusinessWhere = {
   deletedAt: null,
@@ -157,26 +161,8 @@ export const getCustomerFavoriteBusinesses = cache(async () => {
   });
 
   const organizationIds = favorites.map((favorite) => favorite.organizationId);
-  const reviewAggregates =
-    organizationIds.length > 0
-      ? await prisma.review.groupBy({
-          by: ["organizationId"],
-          where: {
-            organizationId: { in: organizationIds },
-            status: "VISIBLE",
-          },
-          _avg: { rating: true },
-          _count: { _all: true },
-        })
-      : [];
-  const reviewsByOrganizationId = new Map(
-    reviewAggregates.map((aggregate) => [
-      aggregate.organizationId,
-      {
-        averageRating: aggregate._avg.rating ?? null,
-        reviewCount: aggregate._count._all,
-      },
-    ]),
+  const reviewsByOrganizationId = await getPublicOrganizationReviewAggregates(
+    organizationIds,
   );
 
   return favorites.map((favorite): MarketplaceBusiness => {
@@ -251,39 +237,19 @@ export const getCustomerFavoriteServices = cache(async () => {
     },
   });
 
-  const organizationIds = [
-    ...new Set(
-      favorites.map(
-        (favorite) => favorite.branchService.branch.organizationId,
-      ),
-    ),
-  ];
-  const reviewAggregates =
-    organizationIds.length > 0
-      ? await prisma.review.groupBy({
-          by: ["organizationId"],
-          where: {
-            organizationId: { in: organizationIds },
-            status: "VISIBLE",
-          },
-          _avg: { rating: true },
-          _count: { _all: true },
-        })
-      : [];
-  const reviewsByOrganizationId = new Map(
-    reviewAggregates.map((aggregate) => [
-      aggregate.organizationId,
-      {
-        averageRating: aggregate._avg.rating ?? null,
-        reviewCount: aggregate._count._all,
-      },
-    ]),
+  const reviewsByService = await getPublicServiceReviewAggregates(
+    favorites.map((favorite) => ({
+      organizationId: favorite.branchService.branch.organizationId,
+      serviceId: favorite.branchService.service.id,
+    })),
   );
 
   return favorites.map((favorite): FavoriteServiceItem => {
     const branchService = favorite.branchService;
     const organization = branchService.branch.organization;
-    const reviewStats = reviewsByOrganizationId.get(organization.id);
+    const reviewStats = reviewsByService.get(
+      `${organization.id}:${branchService.service.id}`,
+    );
 
     return {
       id: branchService.id,

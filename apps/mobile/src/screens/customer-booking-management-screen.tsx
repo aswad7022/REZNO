@@ -25,6 +25,7 @@ import type {
   MobileManagedBooking,
   MobileManagedBookingDetail,
 } from "../types/bookings";
+import { CustomerReviewPanel } from "../reviews/customer-review-panel";
 
 type RequestState =
   | { status: "idle" }
@@ -69,6 +70,8 @@ const COPY = {
     rejected: "رفض النشاط طلب التغيير",
     cancelledRequest: "أُلغي طلب التغيير",
     businessProposal: "النشاط اقترح موعداً جديداً؛ راجعه من موقع الويب.",
+    reviewAvailable: "متاح للتقييم",
+    reviewed: "تم التقييم",
   },
   en: {
     title: "My bookings",
@@ -99,6 +102,8 @@ const COPY = {
     rejected: "The business rejected the change request",
     cancelledRequest: "The change request was cancelled",
     businessProposal: "The business proposed a new time; review it on the web.",
+    reviewAvailable: "Ready to review",
+    reviewed: "Reviewed",
   },
   ckb: {
     title: "حجزەکانم",
@@ -129,6 +134,8 @@ const COPY = {
     rejected: "چالاکی داواکارییەکەی ڕەت کردەوە",
     cancelledRequest: "داواکاری گۆڕانکاری هەڵوەشایەوە",
     businessProposal: "چالاکی کاتێکی نوێی پێشنیار کردووە؛ لە وێب بیبینە.",
+    reviewAvailable: "ئامادەی هەڵسەنگاندنە",
+    reviewed: "هەڵسەنگێنرا",
   },
 } as const;
 
@@ -344,6 +351,29 @@ export function CustomerBookingManagementScreen({
           </View>
         ) : null}
 
+        {selected.reviewState.eligible || selected.reviewState.hasReview ? (
+          <CustomerReviewPanel
+            key={`${selected.id}:${selected.review?.updatedAt ?? "eligible"}`}
+            bookingId={selected.id}
+            initialState={{
+              booking: {
+                id: selected.id,
+                reference: selected.reference,
+                status: selected.status,
+              },
+              eligibility: {
+                eligible: selected.reviewState.eligible,
+                reason: selected.reviewState.reason,
+              },
+              review: selected.review,
+            }}
+            locale={locale}
+            onReviewPersisted={() => refreshAuthoritative(selected.id)}
+            onSessionExpired={() => setDetailState({ status: "session-expired" })}
+            theme={theme}
+          />
+        ) : null}
+
         {operationMessage ? <Text style={[styles.message, isRtl && styles.rtl]}>{operationMessage}</Text> : null}
         {operationPending ? <Text style={styles.body}>{copy.operationPending}</Text> : null}
 
@@ -414,19 +444,35 @@ export function CustomerBookingManagementScreen({
       {listState.status === "loading" && items.length === 0 ? <StateCard message={copy.loading} styles={styles} /> : null}
       {listState.status !== "loading" && listState.status !== "error" && items.length === 0 ? <StateCard message={copy.empty} styles={styles} /> : null}
       {items.map((booking) => (
-        <BookingCard key={booking.id} booking={booking} locale={locale} isRtl={isRtl} onOpen={() => openDetail(booking.id)} detailsLabel={copy.details} styles={styles} />
+        <BookingCard
+          key={booking.id}
+          booking={booking}
+          locale={locale}
+          isRtl={isRtl}
+          onOpen={() => openDetail(booking.id)}
+          detailsLabel={copy.details}
+          reviewLabel={
+            booking.reviewState.hasReview
+              ? copy.reviewed
+              : booking.reviewState.eligible
+                ? copy.reviewAvailable
+                : null
+          }
+          styles={styles}
+        />
       ))}
       {nextCursor ? <Action disabled={listState.status === "loading"} label={listState.status === "loading" ? copy.loading : copy.more} onPress={() => void loadList(true, nextCursor)} styles={styles} tone="neutral" /> : null}
     </View>
   );
 }
 
-function BookingCard({ booking, detailsLabel, isRtl, locale, onOpen, styles }: {
+function BookingCard({ booking, detailsLabel, isRtl, locale, onOpen, reviewLabel, styles }: {
   booking: MobileManagedBooking;
   detailsLabel: string;
   isRtl: boolean;
   locale: MobileLocale;
   onOpen: () => void;
+  reviewLabel: string | null;
   styles: ReturnType<typeof createStyles>;
 }) {
   return (
@@ -435,6 +481,7 @@ function BookingCard({ booking, detailsLabel, isRtl, locale, onOpen, styles }: {
       <Text style={[styles.body, isRtl && styles.rtl]}>{booking.serviceName} · {booking.branchName}</Text>
       <Text style={[styles.meta, isRtl && styles.rtl]}>{formatRange(booking, locale)}</Text>
       <Text style={[styles.meta, isRtl && styles.rtl]}>{booking.status} · {booking.reference}</Text>
+      {reviewLabel ? <Text style={[styles.message, isRtl && styles.rtl]}>{reviewLabel}</Text> : null}
       <Action label={detailsLabel} onPress={onOpen} styles={styles} tone="primary" />
     </View>
   );

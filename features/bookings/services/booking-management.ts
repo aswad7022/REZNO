@@ -38,14 +38,29 @@ import type {
   CustomerBookingPage,
 } from "@/features/bookings/types";
 import { bookingReference } from "@/features/bookings/domain/creation";
+import { evaluateReviewEligibility } from "@/features/reviews/domain/review-policy";
+import { serializeCustomerReview } from "@/features/reviews/services/review-lifecycle";
 import { prisma } from "@/lib/db/prisma";
 
 const MAX_SERIALIZABLE_ATTEMPTS = 4;
 
 const managementInclude = Prisma.validator<Prisma.BookingInclude>()({
   branch: true,
+  branchService: { select: { branchId: true, service: { select: { organizationId: true } } } },
   member: { include: { person: true } },
   organization: { include: { settings: true } },
+  review: {
+    select: {
+      id: true,
+      rating: true,
+      comment: true,
+      status: true,
+      createdAt: true,
+      updatedAt: true,
+      businessReply: true,
+      businessRepliedAt: true,
+    },
+  },
   changeRequests: {
     include: { proposedMember: { include: { person: true } } },
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
@@ -86,6 +101,17 @@ function serializeManagementItem(
 ): CustomerBookingManagementItem {
   const cancellationWindowHours =
     booking.organization.settings?.cancellationWindowHours ?? 24;
+  const reviewEligibility = evaluateReviewEligibility({
+    bookingStatus: booking.status,
+    businessVertical: booking.organization.vertical,
+    hasRestaurantReservation: false,
+    hasReview: Boolean(booking.review),
+    relationshipsValid:
+      booking.branch.organizationId === booking.organizationId &&
+      booking.branchService.branchId === booking.branchId &&
+      booking.branchService.service.organizationId === booking.organizationId &&
+      (!booking.member || booking.member.organizationId === booking.organizationId),
+  });
   return {
     id: booking.id,
     reference: bookingReference(booking.id),
@@ -116,6 +142,10 @@ function serializeManagementItem(
       cancelledAt: booking.cancelledAt?.toISOString() ?? null,
     },
     changeRequest: serializeChangeRequest(booking),
+    reviewState: {
+      ...reviewEligibility,
+      hasReview: Boolean(booking.review),
+    },
   };
 }
 
@@ -220,6 +250,7 @@ export async function getCustomerBookingManagementDetail(
         cancellationWindowHours,
       }),
     },
+    review: booking.review ? serializeCustomerReview(booking.review) : null,
     statusHistory: booking.statusHistory.map((entry) => ({
       id: entry.id,
       fromStatus: entry.fromStatus,

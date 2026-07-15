@@ -81,6 +81,10 @@ export interface PublicBusinessProfile extends MarketplaceBusiness {
     rating: number;
     comment: string;
     customerName: string;
+    createdAt: string;
+    serviceName: string;
+    businessReply: string | null;
+    businessRepliedAt: string | null;
   }>;
   branches: Array<{
     id: string;
@@ -122,6 +126,8 @@ export interface PublicProfessionalProfile {
   photoUrl: string | null;
   bio: string | null;
   specialties: string[];
+  averageRating: number | null;
+  reviewCount: number;
   business: {
     id: string;
     name: string;

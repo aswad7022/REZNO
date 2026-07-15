@@ -1,12 +1,14 @@
 import "server-only";
 
 import { requireBusinessIdentity } from "@/features/identity/server";
+import { canRespondToBusinessReview } from "@/features/reviews/domain/review-policy";
+import { getPublicOrganizationReviewAggregates } from "@/features/reviews/services/review-lifecycle";
 import { prisma } from "@/lib/db/prisma";
 
 export async function getBusinessReviewsPageData() {
   const { membership } = await requireBusinessIdentity();
 
-  const [reviews, aggregate] = await Promise.all([
+  const [reviews, aggregates] = await Promise.all([
     prisma.review.findMany({
       where: { organizationId: membership.organizationId },
       orderBy: { createdAt: "desc" },
@@ -16,6 +18,8 @@ export async function getBusinessReviewsPageData() {
         rating: true,
         comment: true,
         status: true,
+        businessReply: true,
+        businessRepliedAt: true,
         createdAt: true,
         customer: {
           select: {
@@ -34,16 +38,15 @@ export async function getBusinessReviewsPageData() {
         },
       },
     }),
-    prisma.review.aggregate({
-      where: { organizationId: membership.organizationId, status: "VISIBLE" },
-      _avg: { rating: true },
-      _count: { _all: true },
-    }),
+    getPublicOrganizationReviewAggregates([membership.organizationId]),
   ]);
+
+  const aggregate = aggregates.get(membership.organizationId);
 
   return {
     reviews,
-    averageRating: aggregate._avg.rating ?? null,
-    visibleReviewCount: aggregate._count._all,
+    averageRating: aggregate?.averageRating ?? null,
+    visibleReviewCount: aggregate?.reviewCount ?? 0,
+    canRespond: canRespondToBusinessReview(membership.role.systemRole),
   };
 }
