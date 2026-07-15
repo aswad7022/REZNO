@@ -425,7 +425,7 @@ test("Gate 2A mobile booking creation is tenant-safe, transactional, and idempot
     );
   });
 
-  await t.test("inactive stale assignment falls back consistently and the displayed slot creates", async () => {
+  await t.test("inactive stale assignment fails closed without exposing an unassigned fallback", async () => {
     await resetBookingTestData();
     const fixture = await createBookingFixture({ mode: "REQUIRED" });
     await prisma.organizationMember.update({
@@ -434,18 +434,16 @@ test("Gate 2A mobile booking creation is tenant-safe, transactional, and idempot
     });
     const fallback = await createAdditionalStaff(fixture);
     const staff = await getPublicOfferingStaff(fixture.offering.id);
-    assert.deepEqual(staff.staff.map((item) => item.id), [fallback.member.id]);
-    const selection = await availableSelection(fixture, fallback.member.id);
-    const created = await createCustomerBooking({
-      ...selection,
-      customerId: fixture.customer.id,
-      idempotencyKey: randomUUID(),
-    });
-    assert.equal(
-      (await prisma.booking.findUnique({ where: { id: created.booking.id } }))
-        ?.memberId,
-      fallback.member.id,
+    assert.deepEqual(staff.staff, []);
+    await assert.rejects(
+      getPublicBookingAvailability({
+        branchServiceId: fixture.offering.id,
+        date: fixture.date,
+        memberId: fallback.member.id,
+      }),
+      expectBookingCode("STAFF_UNAVAILABLE"),
     );
+    assert.equal(await prisma.booking.count(), 0);
   });
 
   await t.test("deleted membership assignment is ignored", async () => {
@@ -457,8 +455,11 @@ test("Gate 2A mobile booking creation is tenant-safe, transactional, and idempot
     });
     const fallback = await createAdditionalStaff(fixture);
     const staff = await getPublicOfferingStaff(fixture.offering.id);
-    assert.deepEqual(staff.staff.map((item) => item.id), [fallback.member.id]);
-    assert.ok((await availableSelection(fixture, fallback.member.id)).startsAt);
+    assert.deepEqual(staff.staff, []);
+    await assert.rejects(
+      availableSelection(fixture, fallback.member.id),
+      expectBookingCode("STAFF_UNAVAILABLE"),
+    );
   });
 
   await t.test("inactive and deleted Person assignments are ignored", async () => {
@@ -472,13 +473,13 @@ test("Gate 2A mobile booking creation is tenant-safe, transactional, and idempot
       assignToService: true,
       personDeletedAt: new Date(),
     });
-    const fallback = await createAdditionalStaff(fixture);
+    await createAdditionalStaff(fixture);
     const staff = await getPublicOfferingStaff(fixture.offering.id);
-    assert.deepEqual(staff.staff.map((item) => item.id), [fallback.member.id]);
     assert.equal(
       staff.staff.some((item) => item.id === deletedPersonAssignment.member.id),
       false,
     );
+    assert.deepEqual(staff.staff, []);
   });
 
   await t.test("valid active explicit assignment restricts slots to the assigned employee", async () => {
@@ -524,7 +525,7 @@ test("Gate 2A mobile booking creation is tenant-safe, transactional, and idempot
     assert.equal(await prisma.booking.count(), 0);
   });
 
-  await t.test("cross-organization Service assignment cannot grant eligibility or disable fallback", async () => {
+  await t.test("cross-organization Service assignment cannot grant eligibility or enable fallback", async () => {
     await resetBookingTestData();
     const fixture = await createBookingFixture({
       label: "gate2a-policy-owner",
@@ -544,7 +545,7 @@ test("Gate 2A mobile booking creation is tenant-safe, transactional, and idempot
       data: { memberId: foreign.member!.id, serviceId: fixture.service.id },
     });
     const staff = await getPublicOfferingStaff(fixture.offering.id);
-    assert.deepEqual(staff.staff.map((item) => item.id), [fallback.member.id]);
+    assert.deepEqual(staff.staff, []);
     await assert.rejects(
       getPublicBookingAvailability({
         branchServiceId: fixture.offering.id,
@@ -553,7 +554,10 @@ test("Gate 2A mobile booking creation is tenant-safe, transactional, and idempot
       }),
       expectBookingCode("STAFF_UNAVAILABLE"),
     );
-    assert.ok((await availableSelection(fixture, fallback.member.id)).startsAt);
+    await assert.rejects(
+      availableSelection(fixture, fallback.member.id),
+      expectBookingCode("STAFF_UNAVAILABLE"),
+    );
   });
 
   await t.test("employee becoming inactive after availability fails without partial persistence", async () => {
@@ -589,22 +593,13 @@ test("Gate 2A mobile booking creation is tenant-safe, transactional, and idempot
       fixture.offering.id,
       fixture.date,
     );
-    assert.deepEqual(staff.staff.map((item) => item.id), [fallback.member.id]);
-    assert.deepEqual(
-      new Set(slotResult.slots.map((slot) => slot.memberId)),
-      new Set([fallback.member.id]),
+    assert.deepEqual(staff.staff, []);
+    assert.deepEqual(slotResult.slots, []);
+    await assert.rejects(
+      availableSelection(fixture, fallback.member.id),
+      expectBookingCode("STAFF_UNAVAILABLE"),
     );
-    const selection = await availableSelection(fixture, fallback.member.id);
-    const created = await createCustomerBooking({
-      ...selection,
-      customerId: fixture.customer.id,
-      idempotencyKey: randomUUID(),
-    });
-    assert.equal(
-      (await prisma.booking.findUnique({ where: { id: created.booking.id } }))
-        ?.memberId,
-      fallback.member.id,
-    );
+    assert.equal(await prisma.booking.count(), 0);
   });
 
   await t.test("staging fixture core is deterministic, idempotent, namespaced, and service-only", async () => {

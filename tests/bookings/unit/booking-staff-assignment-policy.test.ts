@@ -67,10 +67,10 @@ test("canonical Service staff policy accepts only active same-service same-tenan
   );
 });
 
-test("canonical policy preserves fallback only when no valid explicit assignment remains", () => {
+test("canonical policy rejects fallback when no valid explicit assignment remains", () => {
   const noAssignments = new Set<string>();
   const explicitlyAssigned = new Set(["member-active"]);
-  assert.equal(serviceStaffPolicyAllowsMember(noAssignments, "fallback"), true);
+  assert.equal(serviceStaffPolicyAllowsMember(noAssignments, "fallback"), false);
   assert.equal(
     serviceStaffPolicyAllowsMember(explicitlyAssigned, "member-active"),
     true,

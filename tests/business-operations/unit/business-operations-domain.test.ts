@@ -30,7 +30,14 @@ test("business operations role matrix fails closed", () => {
   assert.equal(canPerformBusinessOperation("RECEPTIONIST", "BLOCK_WRITE"), true);
   assert.equal(canPerformBusinessOperation("RECEPTIONIST", "HOURS_WRITE"), false);
   assert.equal(canPerformBusinessOperation("RECEPTIONIST", "SETTINGS_READ"), false);
-  assert.deepEqual([...businessOperationCapabilities("STAFF")], []);
+  assert.deepEqual([...businessOperationCapabilities("STAFF")].sort(), [
+    "MEMBER_BLOCK_READ",
+    "MEMBER_BLOCK_WRITE_SELF",
+    "OFFERING_READ",
+    "SERVICE_READ",
+    "STAFF_SCHEDULE_READ",
+    "WORKFORCE_READ",
+  ].sort());
   assert.deepEqual([...businessOperationCapabilities(null)], []);
 });
 
