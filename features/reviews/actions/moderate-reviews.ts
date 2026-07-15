@@ -4,9 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
-import { logAdminAuditEvent } from "@/features/admin/services/admin-audit";
 import { requireAdminPermission } from "@/features/admin/services/admin-auth";
-import { prisma } from "@/lib/db/prisma";
+import { moderateReview } from "@/features/reviews/services/review-lifecycle";
 import { logServerError } from "@/lib/logging/server";
 
 const reviewVisibilitySchema = z.object({
@@ -28,40 +27,14 @@ export async function updateReviewVisibility(
     adminReviewsRedirect("error");
   }
 
-  const review = await prisma.review.findUnique({
-    where: { id: reviewId },
-    select: {
-      id: true,
-      status: true,
-      organizationId: true,
-      organization: { select: { slug: true } },
-    },
-  });
-
-  if (!review) {
-    adminReviewsRedirect("error");
-  }
-
+  let organizationSlug: string;
   try {
-    await prisma.review.update({
-      where: { id: review.id },
-      data: { status: parsed.data.status },
-    });
-
-    await logAdminAuditEvent({
+    const result = await moderateReview({
       adminUserId: identity.session.user.id,
-      action:
-        parsed.data.status === "VISIBLE"
-          ? "admin.review.unhide"
-          : "admin.review.hide",
-      targetType: "review",
-      targetId: review.id,
-      metadata: {
-        previousStatus: review.status,
-        nextStatus: parsed.data.status,
-        organizationId: review.organizationId,
-      },
+      reviewId,
+      status: parsed.data.status,
     });
+    organizationSlug = result.organization.slug;
   } catch (error) {
     logServerError("admin.review.visibility", error, { reviewId });
     adminReviewsRedirect("error");
@@ -69,7 +42,7 @@ export async function updateReviewVisibility(
 
   revalidatePath("/admin/reviews");
   revalidatePath("/marketplace");
-  revalidatePath(`/${review.organization.slug}`);
-  revalidatePath(`/businesses/${review.organization.slug}`);
+  revalidatePath(`/${organizationSlug}`);
+  revalidatePath(`/businesses/${organizationSlug}`);
   adminReviewsRedirect("success");
 }

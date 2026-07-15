@@ -2,7 +2,10 @@ import { Star } from "lucide-react";
 import { getFormatter, getTranslations } from "next-intl/server";
 
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
+import { respondToReview } from "@/features/reviews/actions/respond-to-review";
 import { getBusinessReviewsPageData } from "@/features/reviews/services/reviews";
 
 function getCustomerName(review: {
@@ -106,6 +109,34 @@ export async function BusinessReviewsPage() {
                   <p className="mt-3 leading-7 text-muted-foreground">
                     {review.comment}
                   </p>
+                ) : null}
+                {review.businessReply ? (
+                  <div className="mt-3 rounded-xl bg-muted/60 p-3">
+                    <p className="text-xs font-semibold text-muted-foreground">
+                      {t("businessResponse")}
+                    </p>
+                    <p className="mt-1 leading-7">{review.businessReply}</p>
+                  </div>
+                ) : null}
+                {data.canRespond ? (
+                  <form
+                    action={respondToReview.bind(null, review.id)}
+                    className="mt-3 space-y-2"
+                  >
+                    <Textarea
+                      aria-label={t("businessResponse")}
+                      defaultValue={review.businessReply ?? ""}
+                      maxLength={1000}
+                      name="reply"
+                      placeholder={t("businessResponsePlaceholder")}
+                      required
+                    />
+                    <Button size="sm" type="submit">
+                      {review.businessReply
+                        ? t("updateBusinessResponse")
+                        : t("submitBusinessResponse")}
+                    </Button>
+                  </form>
                 ) : null}
               </article>
             ))

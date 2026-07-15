@@ -1,13 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { Prisma } from "@prisma/client";
 import { getTranslations } from "next-intl/server";
 
 import { requireCustomerIdentity } from "@/features/identity/server";
 import { reviewSchema } from "@/features/reviews/schemas/review";
+import { ReviewDomainError } from "@/features/reviews/domain/errors";
+import { createOrReplayCustomerReview } from "@/features/reviews/services/review-lifecycle";
 import type { ReviewActionState } from "@/features/reviews/types";
-import { prisma } from "@/lib/db/prisma";
 import { logServerError } from "@/lib/logging/server";
 
 export async function submitReview(
@@ -27,67 +27,22 @@ export async function submitReview(
     return { status: "error", message: t("invalidReview") };
   }
 
-  const booking = await prisma.booking.findFirst({
-    where: {
-      id: bookingId,
-      customerId: identity.person.id,
-      status: "COMPLETED",
-      review: null,
-    },
-    select: {
-      id: true,
-      customerId: true,
-      organizationId: true,
-      memberId: true,
-      serviceNameSnapshot: true,
-      customerNameSnapshot: true,
-      branchService: { select: { serviceId: true } },
-      organization: { select: { slug: true, name: true } },
-    },
-  });
-  if (!booking) {
-    return {
-      status: "error",
-      message: t("thisBookingCannotBeReviewed"),
-    };
-  }
-
+  let organizationSlug: string;
   try {
-    await prisma.$transaction([
-      prisma.review.create({
-        data: {
-          bookingId: booking.id,
-          customerId: booking.customerId,
-          organizationId: booking.organizationId,
-          serviceId: booking.branchService.serviceId,
-          memberId: booking.memberId,
-          rating: parsed.data.rating,
-          comment: parsed.data.comment,
-          status: "VISIBLE",
-        },
-      }),
-      prisma.notification.create({
-        data: {
-          audience: "BUSINESS",
-          businessId: booking.organizationId,
-          priority: "NORMAL",
-          title: t("newReviewReceived"),
-          body: t("newReviewNotificationBody", {
-            customer: booking.customerNameSnapshot,
-            service: booking.serviceNameSnapshot,
-            rating: parsed.data.rating,
-          }),
-        },
-      }),
-    ]);
+    const result = await createOrReplayCustomerReview({
+      bookingId,
+      customerId: identity.person.id,
+      review: parsed.data,
+    });
+    organizationSlug = result.organizationSlug;
   } catch (error) {
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === "P2002"
-    ) {
+    if (error instanceof ReviewDomainError) {
       return {
         status: "error",
-        message: t("alreadyReviewed"),
+        message:
+          error.code === "REVIEW_CONFLICT"
+            ? t("alreadyReviewed")
+            : t("thisBookingCannotBeReviewed"),
       };
     }
 
@@ -106,8 +61,8 @@ export async function submitReview(
   revalidatePath("/business/reviews");
   revalidatePath("/business/notifications");
   revalidatePath("/marketplace");
-  revalidatePath(`/${booking.organization.slug}`);
-  revalidatePath(`/businesses/${booking.organization.slug}`);
+  revalidatePath(`/${organizationSlug}`);
+  revalidatePath(`/businesses/${organizationSlug}`);
 
   return { status: "success", message: t("submitted") };
 }

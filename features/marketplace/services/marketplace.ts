@@ -20,6 +20,11 @@ import {
   normalizeNearbyInput,
 } from "@/features/location/services/nearby-businesses";
 import { prisma } from "@/lib/db/prisma";
+import {
+  getPublicMemberReviewAggregate,
+  getPublicOrganizationReviewAggregates,
+  listPublicBusinessReviews,
+} from "@/features/reviews/services/review-lifecycle";
 
 const publicOrganizationWhere = {
   deletedAt: null,
@@ -159,28 +164,8 @@ export async function searchMarketplace(options?: {
     orderBy: [{ isVerified: "desc" }, { name: "asc" }],
     take: nearbyInput?.take ?? options?.take ?? 24,
   });
-  const reviewAggregates =
-    organizations.length > 0
-      ? await prisma.review.groupBy({
-          by: ["organizationId"],
-          where: {
-            organizationId: {
-              in: organizations.map((organization) => organization.id),
-            },
-            status: "VISIBLE",
-          },
-          _avg: { rating: true },
-          _count: { _all: true },
-        })
-      : [];
-  const reviewStatsByOrganizationId = new Map(
-    reviewAggregates.map((aggregate) => [
-      aggregate.organizationId,
-      {
-        averageRating: aggregate._avg.rating ?? null,
-        reviewCount: aggregate._count._all,
-      },
-    ]),
+  const reviewStatsByOrganizationId = await getPublicOrganizationReviewAggregates(
+    organizations.map((organization) => organization.id),
   );
 
   return organizations
@@ -380,12 +365,6 @@ export const getPublicBusiness = cache(
       where: { slug, ...publicOrganizationWhere },
       include: {
         profile: true,
-        reviews: {
-          where: { comment: { not: null }, status: "VISIBLE" },
-          include: { customer: true },
-          orderBy: { createdAt: "desc" },
-          take: 6,
-        },
         organizationMembers: {
           where: {
             isPublicProfessional: true,
@@ -478,13 +457,17 @@ export const getPublicBusiness = cache(
       (branch) => branch.branchServices,
     );
     const prices = offerings.map((offering) => Number(offering.price));
-    const ratingAggregate = await prisma.review.aggregate({
-      where: { organizationId: organization.id, status: "VISIBLE" },
-      _avg: { rating: true },
-      _count: { _all: true },
-    });
-    const averageRating = ratingAggregate._avg.rating ?? null;
-    const reviewCount = ratingAggregate._count._all;
+    const genericServiceBusiness =
+      organization.vertical !== "RESTAURANT" && organization.vertical !== "CAFE";
+    const [organizationAggregates, publicReviewPage] = await Promise.all([
+      getPublicOrganizationReviewAggregates([organization.id]),
+      genericServiceBusiness
+        ? listPublicBusinessReviews({ slug: organization.slug, limit: 6 })
+        : Promise.resolve(null),
+    ]);
+    const ratingAggregate = organizationAggregates.get(organization.id);
+    const averageRating = ratingAggregate?.averageRating ?? null;
+    const reviewCount = ratingAggregate?.reviewCount ?? 0;
     return {
       id: organization.id,
       slug: organization.slug,
@@ -565,14 +548,17 @@ export const getPublicBusiness = cache(
           ),
         ),
       ),
-      recentReviews: organization.reviews
+      recentReviews: (publicReviewPage?.reviews ?? [])
         .filter((review) => review.comment)
         .map((review) => ({
           id: review.id,
           rating: review.rating,
           comment: review.comment ?? "",
-          customerName:
-            review.customer.displayName ?? review.customer.firstName,
+          customerName: review.customerName,
+          createdAt: review.createdAt,
+          serviceName: review.serviceName,
+          businessReply: review.businessReply,
+          businessRepliedAt: review.businessRepliedAt,
         })),
       branches: organization.branches
         .filter(
@@ -727,6 +713,11 @@ export const getPublicProfessionalProfile = cache(
 
     if (services.length === 0) return null;
 
+    const reviewAggregate = await getPublicMemberReviewAggregate(
+      member.organizationId,
+      member.id,
+    );
+
     return {
       id: member.id,
       publicSlug: member.publicSlug,
@@ -738,6 +729,8 @@ export const getPublicProfessionalProfile = cache(
       photoUrl: member.photoUrl ?? member.person.avatarUrl,
       bio: member.bio,
       specialties: member.specialties,
+      averageRating: reviewAggregate.averageRating,
+      reviewCount: reviewAggregate.reviewCount,
       business: {
         id: member.organization.id,
         name: member.organization.name,

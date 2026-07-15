@@ -66,10 +66,16 @@ function toListItem(booking: {
   branch: { name: string; timezone: string; phone: string | null };
   organization: {
     name: string;
+    vertical: "BARBER" | "BEAUTY" | "CAFE" | "CLINIC" | "CONSULTANT" | "DENTIST" | "GYM" | "OTHER" | "RESTAURANT" | "SPA";
     profile?: { businessPhone: string | null } | null;
   };
   member: { person: { displayName: string | null; firstName: string } } | null;
-  review?: { rating: number; comment: string | null } | null;
+  review?: {
+    rating: number;
+    comment: string | null;
+    status: "VISIBLE" | "HIDDEN" | "FLAGGED";
+    businessReply: string | null;
+  } | null;
   restaurantReservation?: {
     guestCount: number;
     seatingArea: string | null;
@@ -137,9 +143,11 @@ function withCustomerPermissions(
     status: BookingListItem["status"];
     startsAt: Date;
     organization: {
+      vertical: "BARBER" | "BEAUTY" | "CAFE" | "CLINIC" | "CONSULTANT" | "DENTIST" | "GYM" | "OTHER" | "RESTAURANT" | "SPA";
       settings?: { cancellationWindowHours: number | null } | null;
     };
     review?: { rating: number; comment: string | null } | null;
+    restaurantReservation?: { id: string } | null;
   },
 ): BookingListItem {
   const cancellationWindowHours =
@@ -157,7 +165,12 @@ function withCustomerPermissions(
       startsAt: booking.startsAt,
       cancellationWindowHours,
     }),
-    canCustomerReview: booking.status === "COMPLETED" && !booking.review,
+    canCustomerReview:
+      booking.status === "COMPLETED" &&
+      !booking.review &&
+      !booking.restaurantReservation &&
+      booking.organization.vertical !== "RESTAURANT" &&
+      booking.organization.vertical !== "CAFE",
   };
 }
 

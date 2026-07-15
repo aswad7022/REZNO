@@ -94,6 +94,14 @@ export async function AdminReviewsPage() {
                   {review.comment}
                 </p>
               ) : null}
+              {review.businessReply ? (
+                <div className="mt-3 rounded-xl bg-muted/60 p-3">
+                  <p className="text-xs font-semibold text-muted-foreground">
+                    {reviewsT("businessResponse")}
+                  </p>
+                  <p className="mt-1 leading-7">{review.businessReply}</p>
+                </div>
+              ) : null}
             </article>
           ))
         )}

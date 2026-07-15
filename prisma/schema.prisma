@@ -201,6 +201,7 @@ model OrganizationMember {
   bookings               Booking[]
   serviceAssignments     ServiceStaffAssignment[]
   reviews                Review[]
+  reviewReplies          Review[]                 @relation("ReviewBusinessReplyAuthor")
   proposedBookingChanges BookingChangeRequest[]
   organization           Organization             @relation(fields: [organizationId], references: [id])
   person                 Person                   @relation(fields: [personId], references: [id])
@@ -493,28 +494,34 @@ model BookingChangeRequest {
 }
 
 model Review {
-  id             String              @id @default(uuid()) @db.Uuid
-  bookingId      String              @unique @db.Uuid
-  customerId     String              @db.Uuid
-  organizationId String              @db.Uuid
-  serviceId      String              @db.Uuid
-  memberId       String?             @db.Uuid
-  rating         Int
-  comment        String?
-  status         ReviewStatus        @default(VISIBLE)
-  createdAt      DateTime            @default(now()) @db.Timestamptz(6)
-  updatedAt      DateTime            @updatedAt @db.Timestamptz(6)
-  booking        Booking             @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  customer       Person              @relation("ReviewCustomer", fields: [customerId], references: [id])
-  organization   Organization        @relation(fields: [organizationId], references: [id])
-  service        Service             @relation(fields: [serviceId], references: [id])
-  member         OrganizationMember? @relation(fields: [memberId], references: [id])
+  id                    String              @id @default(uuid()) @db.Uuid
+  bookingId             String              @unique @db.Uuid
+  customerId            String              @db.Uuid
+  organizationId        String              @db.Uuid
+  serviceId             String              @db.Uuid
+  memberId              String?             @db.Uuid
+  rating                Int
+  comment               String?
+  status                ReviewStatus        @default(VISIBLE)
+  businessReply         String?
+  businessReplyAuthorId String?             @db.Uuid
+  businessRepliedAt     DateTime?           @db.Timestamptz(6)
+  createdAt             DateTime            @default(now()) @db.Timestamptz(6)
+  updatedAt             DateTime            @updatedAt @db.Timestamptz(6)
+  booking               Booking             @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  customer              Person              @relation("ReviewCustomer", fields: [customerId], references: [id])
+  organization          Organization        @relation(fields: [organizationId], references: [id])
+  service               Service             @relation(fields: [serviceId], references: [id])
+  member                OrganizationMember? @relation(fields: [memberId], references: [id])
+  businessReplyAuthor   OrganizationMember? @relation("ReviewBusinessReplyAuthor", fields: [businessReplyAuthorId], references: [id], onDelete: SetNull)
 
   @@index([organizationId, createdAt])
   @@index([serviceId])
   @@index([memberId])
   @@index([customerId])
   @@index([status, createdAt])
+  @@index([organizationId, businessRepliedAt])
+  @@index([businessReplyAuthorId])
 }
 
 model CustomerFavoriteBusiness {

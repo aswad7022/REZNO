@@ -4,6 +4,9 @@ import type {
   StaffSelectionMode,
 } from "@prisma/client";
 
+import type { ReviewEligibilityReason } from "@/features/reviews/domain/review-policy";
+import type { CustomerReviewRecord } from "@/features/reviews/types";
+
 export interface BookingSlot {
   startsAt: string;
   endsAt: string;
@@ -51,6 +54,8 @@ export interface PublicBookingBusiness {
   categoryName: string | null;
   vertical: string;
   supportsServiceBooking: boolean;
+  averageRating: number | null;
+  reviewCount: number;
 }
 
 export interface PublicBookingService {
@@ -131,6 +136,11 @@ export interface CustomerBookingManagementItem {
     cancelledAt: string | null;
   };
   changeRequest: CustomerBookingChangeRequest | null;
+  reviewState: {
+    eligible: boolean;
+    reason: ReviewEligibilityReason;
+    hasReview: boolean;
+  };
 }
 
 export interface CustomerBookingManagementDetail
@@ -143,6 +153,7 @@ export interface CustomerBookingManagementDetail
   reschedule: {
     eligible: boolean;
   };
+  review: CustomerReviewRecord | null;
   statusHistory: Array<{
     id: string;
     fromStatus: BookingStatus | null;
@@ -187,7 +198,12 @@ export interface BookingListItem {
   canCustomerCancel?: boolean;
   canCustomerReschedule?: boolean;
   canCustomerReview?: boolean;
-  review?: { rating: number; comment: string | null } | null;
+  review?: {
+    rating: number;
+    comment: string | null;
+    status: "VISIBLE" | "HIDDEN" | "FLAGGED";
+    businessReply: string | null;
+  } | null;
   pendingChange?: {
     id: string;
     startsAt: Date;
