@@ -2,391 +2,101 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { Prisma } from "@prisma/client";
-import { z } from "zod";
 
 import { requireCustomerIdentity } from "@/features/identity/server";
-import {
-  ensureRestaurantReservationOffering,
-  hasRestaurantTableConflict,
-} from "@/features/restaurants/services/reservations";
-import {
-  getPublicBusinessPath,
-  isValidBusinessSlug,
-} from "@/features/business/lib/business-slug";
-import { isRestaurantVertical } from "@/features/businesses/config/verticals";
-import { prisma } from "@/lib/db/prisma";
+import { RestaurantReservationError } from "@/features/restaurants/domain/reservation-errors";
+import { createCustomerRestaurantReservation } from "@/features/restaurants/services/reservation-creation";
+import { isValidBusinessSlug } from "@/features/business/lib/business-slug";
 import { logServerError } from "@/lib/logging/server";
 import { consumeRateLimit } from "@/lib/security/rate-limit";
 
-const reservationSchema = z.object({
-  slug: z
-    .string()
-    .trim()
-    .toLowerCase()
-    .refine(isValidBusinessSlug),
-  branchId: z.string().uuid(),
-  tableId: z.string().uuid(),
-  startsAt: z.string().datetime(),
-  guestCount: z.coerce.number().int().min(1).max(100),
-  durationMinutes: z.coerce.number().int().min(30).max(360).default(90),
-  customerNote: z
-    .string()
-    .trim()
-    .max(500)
-    .transform((value) => (value.length > 0 ? value : null)),
-});
-
-function parseMenuItems(formData: FormData) {
-  return Array.from(formData.entries()).flatMap(([key, value]) => {
-    if (!key.startsWith("menuItem:")) return [];
-    const menuItemId = key.replace("menuItem:", "");
-    const quantity = Number(value);
-    if (!menuItemId || !Number.isInteger(quantity) || quantity <= 0) return [];
-    return [{ menuItemId, quantity: Math.min(quantity, 20) }];
-  });
-}
-
-function reservationErrorUrl({
-  slug,
-  date,
-  guests,
-  startsAt,
-  error,
-}: {
+function errorUrl(input: {
   slug: string;
+  branchId: string;
   date: string;
   guests: string;
-  startsAt?: string;
+  startsAt: string;
   error: string;
 }) {
-  const query = new URLSearchParams();
-  if (date) query.set("date", date);
-  if (guests) query.set("guests", guests);
-  if (startsAt) query.set("startsAt", startsAt);
-  query.set("error", error);
-
-  const businessPath = getPublicBusinessPath(slug, "");
-  const basePath = businessPath ? `${businessPath}/reserve` : "/marketplace";
-
-  return `${basePath}?${query.toString()}`;
-}
-
-function timeToMinutes(value: string) {
-  const [hour, minute] = value.split(":").map(Number);
-  return hour * 60 + minute;
-}
-
-function getLocalParts(date: Date, timezone: string) {
-  const parts = new Intl.DateTimeFormat("en", {
-    timeZone: timezone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).formatToParts(date);
-  const get = (type: Intl.DateTimeFormatPartTypes) =>
-    Number(parts.find((part) => part.type === type)?.value);
-  return {
-    year: get("year"),
-    month: get("month"),
-    day: get("day"),
-    hour: get("hour"),
-    minute: get("minute"),
-  };
-}
-
-function isWithinWorkingHours({
-  startsAt,
-  endsAt,
-  timezone,
-  businessHours,
-}: {
-  startsAt: Date;
-  endsAt: Date;
-  timezone: string;
-  businessHours: Array<{
-    dayOfWeek: number;
-    isOpen: boolean;
-    openTime: string;
-    closeTime: string;
-  }>;
-}) {
-  const start = getLocalParts(startsAt, timezone);
-  const end = getLocalParts(endsAt, timezone);
-  const dayOfWeek = new Date(
-    Date.UTC(start.year, start.month - 1, start.day),
-  ).getUTCDay();
-  const hours = businessHours.find(
-    (item) => item.dayOfWeek === dayOfWeek && item.isOpen,
-  );
-  if (!hours) return false;
-  const startMinutes = start.hour * 60 + start.minute;
-  const endMinutes = end.hour * 60 + end.minute;
-  return (
-    start.year === end.year &&
-    start.month === end.month &&
-    start.day === end.day &&
-    startMinutes >= timeToMinutes(hours.openTime) &&
-    endMinutes <= timeToMinutes(hours.closeTime)
-  );
+  const query = new URLSearchParams({
+    branchId: input.branchId,
+    date: input.date,
+    guests: input.guests,
+    startsAt: input.startsAt,
+    error: input.error,
+  });
+  return `/${isValidBusinessSlug(input.slug) ? input.slug : "marketplace"}/reserve?${query}`;
 }
 
 export async function createRestaurantReservation(formData: FormData) {
   const { person } = await requireCustomerIdentity();
-  const rateLimit = consumeRateLimit(
-    "restaurantReservation:create",
-    person.id,
-    {
-      limit: 6,
-      windowMs: 60_000,
-    },
-  );
-  const parsed = reservationSchema.safeParse(Object.fromEntries(formData));
-  const fallbackSlug = String(formData.get("slug") ?? "");
-  const fallbackDate = String(formData.get("date") ?? "");
-  const fallbackGuests = String(formData.get("guestCount") ?? "2");
-  const fallbackStartsAt = String(formData.get("startsAt") ?? "");
+  const slug = String(formData.get("slug") ?? "").trim().toLowerCase();
+  const branchId = String(formData.get("branchId") ?? "");
+  const date = String(formData.get("date") ?? "");
+  const startsAt = String(formData.get("startsAt") ?? "");
+  const guests = String(formData.get("guestCount") ?? "");
+  const failure = (error: string): never =>
+    redirect(errorUrl({ slug, branchId, date, startsAt, guests, error }));
+  const rateLimit = consumeRateLimit("restaurantReservation:create", person.id, {
+    limit: 6,
+    windowMs: 60_000,
+  });
+  if (!rateLimit.success) failure("rateLimited");
 
-  if (!rateLimit.success) {
-    redirect(
-      reservationErrorUrl({
-        slug: fallbackSlug,
-        date: fallbackDate,
-        guests: fallbackGuests,
-        startsAt: fallbackStartsAt,
-        error: "rateLimited",
-      }),
-    );
+  const knownFields = new Set([
+    "slug",
+    "branchId",
+    "date",
+    "startsAt",
+    "guestCount",
+    "seatingArea",
+    "customerNote",
+    "idempotencyKey",
+  ]);
+  const preorderItems: Array<{ itemId: string; quantity: number }> = [];
+  for (const [key, value] of formData.entries()) {
+    if (knownFields.has(key) || key.startsWith("$ACTION_")) continue;
+    if (!key.startsWith("menuItem:")) failure("invalid");
+    const quantity = Number(value);
+    if (!Number.isInteger(quantity) || quantity < 0 || quantity > 20) failure("invalid");
+    if (quantity > 0) preorderItems.push({ itemId: key.slice("menuItem:".length), quantity });
   }
 
-  if (!parsed.success) {
-    redirect(
-      reservationErrorUrl({
-        slug: fallbackSlug,
-        date: fallbackDate,
-        guests: fallbackGuests,
-        error: "invalid",
-      }),
-    );
-  }
-
-  const startsAt = new Date(parsed.data.startsAt);
-  const endsAt = new Date(
-    startsAt.getTime() + parsed.data.durationMinutes * 60_000,
-  );
-  const selectedMenuItems = parseMenuItems(formData);
-
-  if (startsAt <= new Date()) {
-    redirect(
-      reservationErrorUrl({
-        slug: parsed.data.slug,
-        date: fallbackDate,
-        guests: String(parsed.data.guestCount),
-        startsAt: parsed.data.startsAt,
-        error: "time",
-      }),
-    );
-  }
-
-  const result = await prisma
-    .$transaction(
-      async (tx) => {
-        const organization = await tx.organization.findFirst({
-      where: {
-        slug: parsed.data.slug,
-        deletedAt: null,
-        isActive: true,
-        status: "ACTIVE",
-        settings: { bookingEnabled: true, marketplaceVisible: true },
-      },
-      include: { profile: true },
-    });
-    if (!organization || !isRestaurantVertical(organization.vertical)) {
-      return { ok: false as const, reason: "not-found" };
-    }
-
-    const table = await tx.restaurantTable.findFirst({
-      where: {
-        id: parsed.data.tableId,
-        businessId: organization.id,
-        isActive: true,
-        capacity: { gte: parsed.data.guestCount },
-        OR: [{ branchId: null }, { branchId: parsed.data.branchId }],
-      },
-    });
-    if (!table) return { ok: false as const, reason: "table" };
-
-    const branch = await tx.branch.findFirst({
-      where: {
-        id: parsed.data.branchId,
-        organizationId: organization.id,
-        deletedAt: null,
-        status: "ACTIVE",
-      },
-      include: { businessHours: true, blockedTimes: true },
-    });
-    if (!branch) return { ok: false as const, reason: "branch" };
-    if (
-      !isWithinWorkingHours({
-        startsAt,
-        endsAt,
-        timezone: branch.timezone,
-        businessHours: branch.businessHours,
-      })
-    ) {
-      return { ok: false as const, reason: "hours" };
-    }
-    const blocked = branch.blockedTimes.some(
-      (block) =>
-        block.memberId === null && startsAt < block.endsAt && endsAt > block.startsAt,
-    );
-    if (blocked) return { ok: false as const, reason: "blocked" };
-
-    const conflict = await hasRestaurantTableConflict(
-      tx,
-      table.id,
+  let reservationId: string | null = null;
+  try {
+    const result = await createCustomerRestaurantReservation({
+      businessSlug: slug,
+      branchId,
+      customerId: person.id,
+      customerNote: String(formData.get("customerNote") ?? ""),
+      date,
+      guestCount: Number(guests),
+      idempotencyKey: String(formData.get("idempotencyKey") ?? ""),
+      preorderItems,
+      seatingArea: String(formData.get("seatingArea") ?? "") || null,
       startsAt,
-      endsAt,
-    );
-    if (conflict) return { ok: false as const, reason: "conflict" };
-
-    const menuItems =
-      selectedMenuItems.length > 0
-        ? await tx.menuItem.findMany({
-            where: {
-              businessId: organization.id,
-              isAvailable: true,
-              id: { in: selectedMenuItems.map((item) => item.menuItemId) },
-            },
-            select: { id: true, price: true, name: true },
-          })
-        : [];
-    const menuItemMap = new Map(menuItems.map((item) => [item.id, item]));
-    const reservationItems = selectedMenuItems.flatMap((item) => {
-      const menuItem = menuItemMap.get(item.menuItemId);
-      return menuItem
-        ? [
-            {
-              menuItemId: item.menuItemId,
-              quantity: item.quantity,
-              unitPrice: menuItem.price,
-            },
-          ]
-        : [];
     });
-    const preorderTotal = reservationItems.reduce(
-      (total, item) => total + Number(item.unitPrice) * item.quantity,
-      0,
-    );
-    const branchService = await ensureRestaurantReservationOffering(
-      tx,
-      organization.id,
-      branch.id,
-    );
-    const customerName =
-      person.displayName ??
-      [person.firstName, person.lastName].filter(Boolean).join(" ");
-    const booking = await tx.booking.create({
-      data: {
-        organizationId: organization.id,
-        branchId: branch.id,
-        branchServiceId: branchService.id,
-        customerId: person.id,
-        memberId: null,
-        status: "CONFIRMED",
-        startsAt,
-        endsAt,
-        serviceNameSnapshot: "حجز طاولة",
-        customerNameSnapshot: customerName,
-        priceSnapshot: preorderTotal,
-        notes: parsed.data.customerNote,
-        statusHistory: {
-          create: {
-            toStatus: "CONFIRMED",
-            changedByPersonId: person.id,
-            note: "Restaurant table reservation created by customer.",
-          },
-        },
-        restaurantReservation: {
-          create: {
-            businessId: organization.id,
-            branchId: branch.id,
-            tableId: table.id,
-            guestCount: parsed.data.guestCount,
-            reservationDateTime: startsAt,
-            durationMinutes: parsed.data.durationMinutes,
-            seatingArea: table.area,
-            customerNote: parsed.data.customerNote,
-            items:
-              reservationItems.length > 0
-                ? { create: reservationItems }
-                : undefined,
-          },
-        },
-      },
-      select: { id: true },
-    });
-
-    await tx.notification.createMany({
-      data: [
-        {
-          audience: "BUSINESS",
-          businessId: organization.id,
-          priority: "IMPORTANT",
-          title: "حجز طاولة جديد",
-          body: `${customerName} حجز ${table.name} لعدد ${parsed.data.guestCount} ضيوف.`,
-        },
-        {
-          audience: "USER",
-          recipientPersonId: person.id,
-          priority: "NORMAL",
-          title: "تم تأكيد حجز الطاولة",
-          body: `تم تأكيد حجزك لدى ${organization.name}.`,
-        },
-      ],
-    });
-
-        return { ok: true as const, bookingId: booking.id };
-      },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-    )
-    .catch((error) => {
-      logServerError("restaurantReservation.create", error, {
-        slug: parsed.data.slug,
-        branchId: parsed.data.branchId,
-        tableId: parsed.data.tableId,
-        customerId: person.id,
-      });
-      return { ok: false as const, reason: "unexpected" as const };
-    });
-
-  if (!result.ok) {
-    const error =
-      result.reason === "conflict"
-        ? "table-unavailable"
-        : result.reason === "table"
-          ? "table"
-          : result.reason === "hours" || result.reason === "blocked"
+    reservationId = result.reservation.id;
+  } catch (error) {
+    if (error instanceof RestaurantReservationError) {
+      const code =
+        error.code === "TABLE_CONFLICT" || error.code === "CAPACITY_UNAVAILABLE"
+          ? "table-unavailable"
+          : error.code === "RESTAURANT_CLOSED" || error.code === "DATE_OUT_OF_RANGE"
             ? "time"
-          : result.reason === "unexpected"
-            ? "failed"
-          : "invalid";
-    redirect(
-      reservationErrorUrl({
-        slug: parsed.data.slug,
-        date: fallbackDate,
-        guests: String(parsed.data.guestCount),
-        startsAt: parsed.data.startsAt,
-        error,
-      }),
-    );
+            : "invalid";
+      failure(code);
+    }
+    logServerError("restaurantReservation.create", error, {
+      slug,
+      branchId,
+      customerId: person.id,
+    });
+    failure("failed");
   }
-
   revalidatePath("/customer/bookings");
   revalidatePath("/business/reservations");
-  revalidatePath(`/${parsed.data.slug}`);
-  redirect(`/customer/bookings?reserved=${result.bookingId}`);
+  revalidatePath(`/${slug}`);
+  if (!reservationId) failure("failed");
+  redirect(`/customer/bookings?reserved=${reservationId}`);
 }

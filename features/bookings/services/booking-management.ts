@@ -99,6 +99,13 @@ function serializeManagementItem(
   booking: ManagementBooking,
   now = new Date(),
 ): CustomerBookingManagementItem {
+  const branchService = booking.branchService;
+  if (!branchService || !booking.branchServiceId) {
+    bookingDomainError(
+      "BUSINESS_UNAVAILABLE",
+      "Generic booking is missing its service relationship.",
+    );
+  }
   const cancellationWindowHours =
     booking.organization.settings?.cancellationWindowHours ?? 24;
   const reviewEligibility = evaluateReviewEligibility({
@@ -108,8 +115,8 @@ function serializeManagementItem(
     hasReview: Boolean(booking.review),
     relationshipsValid:
       booking.branch.organizationId === booking.organizationId &&
-      booking.branchService.branchId === booking.branchId &&
-      booking.branchService.service.organizationId === booking.organizationId &&
+      branchService.branchId === booking.branchId &&
+      branchService.service.organizationId === booking.organizationId &&
       (!booking.member || booking.member.organizationId === booking.organizationId),
   });
   return {
@@ -166,6 +173,7 @@ export async function listCustomerBookings(input: {
   const snapshotAt = decoded ? new Date(decoded.snapshotAt) : new Date();
   const baseWhere: Prisma.BookingWhereInput = {
     customerId: input.customerId,
+    branchServiceId: { not: null },
     restaurantReservation: null,
   };
   const tabWhere = customerBookingTabWhere(input.tab, snapshotAt);
@@ -217,7 +225,12 @@ export async function getCustomerBookingManagementDetail(
 ): Promise<CustomerBookingManagementDetail | null> {
   await assertActiveCustomer(customerId);
   const booking = await prisma.booking.findFirst({
-    where: { id: bookingId, customerId, restaurantReservation: null },
+    where: {
+      id: bookingId,
+      customerId,
+      branchServiceId: { not: null },
+      restaurantReservation: null,
+    },
     include: {
       ...managementInclude,
       statusHistory: {
@@ -231,7 +244,7 @@ export async function getCustomerBookingManagementDetail(
       },
     },
   });
-  if (!booking) return null;
+  if (!booking || !booking.branchServiceId) return null;
   const item = serializeManagementItem(booking);
   const cancellationWindowHours =
     booking.organization.settings?.cancellationWindowHours ?? 24;
@@ -271,11 +284,12 @@ export async function getCustomerRescheduleOptions(input: {
     where: {
       id: input.bookingId,
       customerId: input.customerId,
+      branchServiceId: { not: null },
       restaurantReservation: null,
     },
     include: { organization: { include: { settings: true } } },
   });
-  if (!booking) bookingDomainError("NOT_FOUND", "Booking was not found.");
+  if (!booking || !booking.branchServiceId) bookingDomainError("NOT_FOUND", "Booking was not found.");
   if (
     !canCustomerRequestBookingChange({
       status: booking.status,
@@ -453,11 +467,12 @@ export async function requestCustomerBookingChange(input: {
     where: {
       id: input.bookingId,
       customerId: input.customerId,
+      branchServiceId: { not: null },
       restaurantReservation: null,
     },
     include: { organization: { include: { settings: true } } },
   });
-  if (!booking) bookingDomainError("NOT_FOUND", "Booking was not found.");
+  if (!booking || !booking.branchServiceId) bookingDomainError("NOT_FOUND", "Booking was not found.");
   if (
     !canCustomerRequestBookingChange({
       status: booking.status,
@@ -508,6 +523,7 @@ export async function requestCustomerBookingChange(input: {
         where: {
           id: input.bookingId,
           customerId: input.customerId,
+          branchServiceId: { not: null },
           restaurantReservation: null,
         },
         include: {
@@ -527,7 +543,9 @@ export async function requestCustomerBookingChange(input: {
           organization: { include: { settings: true } },
         },
       });
-      if (!current) bookingDomainError("NOT_FOUND", "Booking was not found.");
+      if (!current || !current.branchService || !current.branchServiceId) {
+        bookingDomainError("NOT_FOUND", "Booking was not found.");
+      }
       if (
         !canCustomerRequestBookingChange({
           status: current.status,
@@ -635,6 +653,8 @@ export async function respondToCustomerBookingChange(input: {
         status: "PENDING",
         booking: {
           organizationId: input.organizationId,
+          branchServiceId: { not: null },
+          restaurantReservation: { is: null },
           status: { in: [...ACTIVE_BOOKING_STATUSES] },
         },
       },
@@ -661,6 +681,8 @@ export async function respondToCustomerBookingChange(input: {
     });
     if (
       !request ||
+      !request.booking.branchService ||
+      !request.booking.branchServiceId ||
       request.requestedByPersonId !== request.booking.customerId
     ) {
       bookingDomainError(
@@ -748,7 +770,7 @@ async function assertChangeSlotAvailable(
   booking: {
     id: string;
     branchId: string;
-    branchServiceId: string;
+    branchServiceId: string | null;
     organizationId: string;
     branch: {
       timezone: string;
@@ -779,7 +801,7 @@ async function assertChangeSlotAvailable(
         staffSelectionMode: string;
         staffAssignments: Array<ServiceStaffAssignmentPolicyRecord>;
       };
-    };
+    } | null;
   },
   proposed: {
     date: string;
@@ -790,6 +812,8 @@ async function assertChangeSlotAvailable(
 ) {
   const { branch, branchService } = booking;
   if (
+    !booking.branchServiceId ||
+    !branchService ||
     branch.deletedAt ||
     branch.status !== "ACTIVE" ||
     branch.organization.deletedAt ||
