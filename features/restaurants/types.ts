@@ -1,6 +1,7 @@
 import type { BookingStatus } from "@prisma/client";
 
 import type { CustomerRestaurantReservationTab } from "@/features/restaurants/domain/reservation-management";
+import type { CustomerRestaurantReservationActivity } from "@/features/restaurants/domain/customer-activity";
 
 export type RestaurantReservationPreorderSnapshot = {
   id: string;
@@ -41,13 +42,7 @@ export type CustomerRestaurantReservationDetail =
     cancellation: CustomerRestaurantReservationItem["cancellation"] & {
       reason: string | null;
     };
-    statusHistory: Array<{
-      id: string;
-      fromStatus: BookingStatus | null;
-      toStatus: BookingStatus;
-      note: string | null;
-      createdAt: string;
-    }>;
+    activityHistory: CustomerRestaurantReservationActivity[];
   };
 
 export type CustomerRestaurantReservationPage = {

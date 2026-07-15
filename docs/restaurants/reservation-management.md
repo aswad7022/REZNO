@@ -53,8 +53,8 @@ settings, and active branch tables after acquiring the same transaction-scoped
 branch advisory lock used by creation. It excludes the current booking from
 overlap checks, selects the smallest sufficient available table, and updates
 the Booking plus Restaurant details atomically. The unchanged Booking status is
-recorded with an explicit reschedule note because the existing history model
-already uses same-status entries for non-status lifecycle changes.
+recorded in the operational history and the successful mutation is recorded in
+the Restaurant mutation ledger.
 
 ## Replay and concurrency
 
@@ -87,7 +87,12 @@ List cursors are opaque, versioned, and tab-bound. They contain `startsAt`,
 booking UUID, and the snapshot time. Upcoming orders ascending; All, Completed,
 and Cancelled order descending. Counts use the same customer, Restaurant, and
 snapshot scope. Customer DTOs never expose table IDs, table names, capacities,
-internal notes, or another customer's data.
+internal notes, or another customer's data. Restaurant detail exposes
+`activityHistory` built only from safe status fields and successful reschedule
+ledger timestamps. It uses canonical event kinds (`CREATED`, `CANCELLED`,
+`RESCHEDULED`, and `STATUS_CHANGED`); operational history notes and mutation
+metadata are never selected or serialized. Cancellation reasons remain only in
+the dedicated customer cancellation object.
 
 Mobile My Bookings is a presentation orchestrator with Services and Restaurants
 selectors over separate APIs and policies. Restaurant mutations update local UI

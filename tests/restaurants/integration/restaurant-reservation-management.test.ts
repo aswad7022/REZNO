@@ -153,6 +153,117 @@ test(
       );
     });
 
+    await t.test("customer activity is safe, canonical, replay-deduplicated, and legacy-readable", async () => {
+      await resetRestaurantTestData();
+      const fixture = await createRestaurantFixture({ label: "gate2e-safe-activity" });
+      const created = await createManagedReservation(fixture);
+      const internalNote = "INTERNAL: move this customer away from the kitchen";
+      await prisma.bookingStatusHistory.updateMany({
+        where: { bookingId: created.reservation.id },
+        data: { note: internalNote },
+      });
+      await prisma.bookingStatusHistory.create({
+        data: {
+          bookingId: created.reservation.id,
+          fromStatus: "CONFIRMED",
+          toStatus: "CONFIRMED",
+          note: "LEGACY INTERNAL NOTE: manager approval required",
+        },
+      });
+
+      const legacyDetail = await getRestaurantReservationDetailForCustomer(
+        fixture.customer.id,
+        created.reservation.id,
+      );
+      assert.deepEqual(
+        legacyDetail?.activityHistory.map((activity) => activity.kind),
+        ["CREATED"],
+      );
+      assert.equal("statusHistory" in (legacyDetail ?? {}), false);
+      assert.doesNotMatch(JSON.stringify(legacyDetail), /INTERNAL|manager approval/);
+
+      const options = await getCustomerRestaurantRescheduleOptions({
+        bookingId: created.reservation.id,
+        customerId: fixture.customer.id,
+        date: fixture.date,
+        guestCount: 2,
+        seatingArea: null,
+      });
+      assert.ok(options.slots[0]);
+      const rescheduleKey = randomUUID();
+      const rescheduleInput = {
+        bookingId: created.reservation.id,
+        customerId: fixture.customer.id,
+        customerNote: "Customer-visible reservation note",
+        date: fixture.date,
+        guestCount: 2,
+        idempotencyKey: rescheduleKey,
+        seatingArea: null,
+        startsAt: options.slots[0]!.startsAt,
+      };
+      assert.equal(
+        (await rescheduleCustomerRestaurantReservation(rescheduleInput)).replayed,
+        false,
+      );
+      assert.equal(
+        (await rescheduleCustomerRestaurantReservation(rescheduleInput)).replayed,
+        true,
+      );
+      const afterReschedule = await getRestaurantReservationDetailForCustomer(
+        fixture.customer.id,
+        created.reservation.id,
+      );
+      assert.deepEqual(
+        afterReschedule?.activityHistory.map((activity) => activity.kind),
+        ["CREATED", "RESCHEDULED"],
+      );
+
+      const cancellationKey = randomUUID();
+      const cancellationInput = {
+        bookingId: created.reservation.id,
+        customerId: fixture.customer.id,
+        idempotencyKey: cancellationKey,
+        reason: "Customer plans changed",
+      };
+      assert.equal(
+        (await cancelCustomerRestaurantReservation(cancellationInput)).replayed,
+        false,
+      );
+      assert.equal(
+        (await cancelCustomerRestaurantReservation(cancellationInput)).replayed,
+        true,
+      );
+      await prisma.bookingStatusHistory.updateMany({
+        where: { bookingId: created.reservation.id },
+        data: { note: internalNote },
+      });
+      const finalDetail = await getRestaurantReservationDetailForCustomer(
+        fixture.customer.id,
+        created.reservation.id,
+      );
+      assert.deepEqual(
+        finalDetail?.activityHistory.map((activity) => activity.kind),
+        ["CREATED", "RESCHEDULED", "CANCELLED"],
+      );
+      assert.equal(finalDetail?.cancellation.reason, "Customer plans changed");
+      assert.equal(
+        finalDetail?.activityHistory.filter(
+          (activity) => activity.kind === "RESCHEDULED",
+        ).length,
+        1,
+      );
+      assert.equal(
+        finalDetail?.activityHistory.filter(
+          (activity) => activity.kind === "CANCELLED",
+        ).length,
+        1,
+      );
+      assert.doesNotMatch(
+        JSON.stringify(finalDetail?.activityHistory),
+        /INTERNAL|Customer plans changed|manager approval/,
+      );
+    });
+
     await t.test("cancellation works for owned historical business records and is exact under replay", async () => {
       await resetRestaurantTestData();
       const fixture = await createRestaurantFixture({ label: "gate2e-cancel" });

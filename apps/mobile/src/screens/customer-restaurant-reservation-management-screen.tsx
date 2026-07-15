@@ -61,6 +61,10 @@ const COPY = {
     preorder: "الطلب المسبق المحفوظ",
     noPreorder: "لا يوجد طلب مسبق.",
     history: "سجل الحجز",
+    activityCreated: "تم إنشاء الحجز",
+    activityCancelled: "تم إلغاء الحجز",
+    activityRescheduled: "تمت إعادة جدولة الحجز",
+    activityStatusChanged: "تغيّرت حالة الحجز",
     cancel: "إلغاء الحجز",
     cancelReason: "سبب الإلغاء (اختياري)",
     confirmCancel: "تأكيد الإلغاء",
@@ -98,6 +102,10 @@ const COPY = {
     preorder: "Persisted preorder",
     noPreorder: "No preorder items.",
     history: "Reservation history",
+    activityCreated: "Reservation created",
+    activityCancelled: "Reservation cancelled",
+    activityRescheduled: "Reservation rescheduled",
+    activityStatusChanged: "Reservation status changed",
     cancel: "Cancel reservation",
     cancelReason: "Cancellation reason (optional)",
     confirmCancel: "Confirm cancellation",
@@ -135,6 +143,10 @@ const COPY = {
     preorder: "داواکاری پێشوەختە",
     noPreorder: "داواکاری پێشوەختە نییە.",
     history: "مێژووی حجز",
+    activityCreated: "حجزەکە دروستکرا",
+    activityCancelled: "حجزەکە هەڵوەشێندرایەوە",
+    activityRescheduled: "کاتی حجزەکە گۆڕدرا",
+    activityStatusChanged: "دۆخی حجزەکە گۆڕا",
     cancel: "هەڵوەشاندنەوەی حجز",
     cancelReason: "هۆکاری هەڵوەشاندنەوە (ئارەزوومەندانە)",
     confirmCancel: "پشتڕاستکردنەوە",
@@ -455,12 +467,17 @@ export function CustomerRestaurantReservationManagementScreen({
 
         <View style={styles.card}>
           <Text style={[styles.sectionTitle, isRtl && styles.rtl]}>{copy.history}</Text>
-          {selected.statusHistory.map((entry) => (
-            <View key={entry.id} style={styles.historyEntry}>
+          {selected.activityHistory.map((entry, index) => (
+            <View key={`${entry.kind}:${entry.createdAt}:${index}`} style={styles.historyEntry}>
               <Text style={[styles.body, isRtl && styles.rtl]}>
-                {entry.fromStatus ? `${entry.fromStatus} → ` : ""}{entry.toStatus}
+                {entry.kind === "CREATED"
+                  ? copy.activityCreated
+                  : entry.kind === "CANCELLED"
+                    ? copy.activityCancelled
+                    : entry.kind === "RESCHEDULED"
+                      ? copy.activityRescheduled
+                      : copy.activityStatusChanged}
               </Text>
-              {entry.note ? <Text style={[styles.meta, isRtl && styles.rtl]}>{entry.note}</Text> : null}
               <Text style={[styles.meta, isRtl && styles.rtl]}>
                 {formatInstant(entry.createdAt, selected.timezone, locale)}
               </Text>

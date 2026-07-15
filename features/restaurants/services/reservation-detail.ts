@@ -7,6 +7,7 @@ import {
   restaurantReservationRelationshipsAreValid,
   restaurantReservationCancellationDeadline,
 } from "@/features/restaurants/domain/reservation-management";
+import { serializeCustomerRestaurantReservationActivity } from "@/features/restaurants/domain/customer-activity";
 import { restaurantReservationReference } from "@/features/restaurants/domain/reservation-policy";
 import type {
   CustomerRestaurantReservationDetail,
@@ -19,6 +20,17 @@ export const restaurantReservationDetailInclude =
     organization: { include: { settings: true } },
     branch: true,
     statusHistory: {
+      select: {
+        id: true,
+        fromStatus: true,
+        toStatus: true,
+        createdAt: true,
+      },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    },
+    restaurantReservationMutations: {
+      where: { type: "RESCHEDULE" },
+      select: { id: true, type: true, createdAt: true },
       orderBy: [{ createdAt: "asc" }, { id: "asc" }],
     },
     restaurantReservation: {
@@ -159,12 +171,9 @@ export function serializeRestaurantReservationDetail(
       ...item.cancellation,
       reason: booking.cancellationReason,
     },
-    statusHistory: booking.statusHistory.map((entry) => ({
-      id: entry.id,
-      fromStatus: entry.fromStatus,
-      toStatus: entry.toStatus,
-      note: entry.note,
-      createdAt: entry.createdAt.toISOString(),
-    })),
+    activityHistory: serializeCustomerRestaurantReservationActivity({
+      mutations: booking.restaurantReservationMutations,
+      statusHistory: booking.statusHistory,
+    }),
   };
 }

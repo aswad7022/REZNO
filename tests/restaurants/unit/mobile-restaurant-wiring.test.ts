@@ -48,6 +48,12 @@ test("mobile management uses persisted Restaurant endpoints without service chan
   assert.match(screen, /CANCELLATION_DEADLINE_PASSED/);
   assert.match(screen, /CAPACITY_UNAVAILABLE/);
   assert.match(screen, /RESTAURANT_CLOSED/);
+  assert.match(screen, /selected\.activityHistory\.map/);
+  assert.match(screen, /activityCreated/);
+  assert.match(screen, /activityCancelled/);
+  assert.match(screen, /activityRescheduled/);
+  assert.match(screen, /activityStatusChanged/);
+  assert.doesNotMatch(screen, /selected\.statusHistory|entry\.note/);
   assert.match(screen, /onAction=\{\(\) =>/);
   assert.match(service, /restaurantReservationMutation/);
   assert.match(service, /pg_advisory_xact_lock/);

@@ -85,11 +85,10 @@ export type MobileRestaurantReservationDetail = {
     reason: string | null;
   };
   reschedule: { eligible: boolean; deadline: string };
-  statusHistory: Array<{
-    id: string;
+  activityHistory: Array<{
+    kind: "CREATED" | "CANCELLED" | "RESCHEDULED" | "STATUS_CHANGED";
     fromStatus: MobileRestaurantReservationDetail["status"] | null;
-    toStatus: MobileRestaurantReservationDetail["status"];
-    note: string | null;
+    toStatus: MobileRestaurantReservationDetail["status"] | null;
     createdAt: string;
   }>;
 };
@@ -102,7 +101,7 @@ export type MobileRestaurantReservationManagementTab =
 
 export type MobileManagedRestaurantReservation = Omit<
   MobileRestaurantReservationDetail,
-  "cancellation" | "customerNote" | "preorderItems" | "statusHistory"
+  "activityHistory" | "cancellation" | "customerNote" | "preorderItems"
 > & {
   cancellation: Omit<
     MobileRestaurantReservationDetail["cancellation"],

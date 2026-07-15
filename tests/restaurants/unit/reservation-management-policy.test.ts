@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import test from "node:test";
 
 import { RestaurantReservationError } from "../../../features/restaurants/domain/reservation-errors";
+import { serializeCustomerRestaurantReservationActivity } from "../../../features/restaurants/domain/customer-activity";
 import {
   canCustomerManageRestaurantReservation,
   customerRestaurantReservationCursorWhere,
@@ -152,6 +153,95 @@ test("Restaurant mutation hashes bind the booking and canonical material fields"
   assert.notEqual(
     restaurantRescheduleRequestHash(reschedule),
     restaurantRescheduleRequestHash({ ...reschedule, guestCount: 3 }),
+  );
+});
+
+test("Restaurant customer activity is canonical, deterministic, and excludes operational text", () => {
+  const internalNote = "VIP complaint: call the manager before seating";
+  const statusHistory = [
+    {
+      id: "00000000-0000-0000-0000-000000000004",
+      fromStatus: "CONFIRMED" as const,
+      toStatus: "CANCELLED" as const,
+      note: internalNote,
+      createdAt: new Date("2026-07-15T12:04:00.000Z"),
+    },
+    {
+      id: "00000000-0000-0000-0000-000000000001",
+      fromStatus: null,
+      toStatus: "CONFIRMED" as const,
+      note: "internal creation metadata",
+      createdAt: new Date("2026-07-15T12:01:00.000Z"),
+    },
+    {
+      id: "00000000-0000-0000-0000-000000000002",
+      fromStatus: "CONFIRMED" as const,
+      toStatus: "CONFIRMED" as const,
+      note: "customer rescheduled from an operational terminal",
+      createdAt: new Date("2026-07-15T12:02:00.000Z"),
+    },
+    {
+      id: "00000000-0000-0000-0000-000000000003",
+      fromStatus: "PENDING" as const,
+      toStatus: "CONFIRMED" as const,
+      note: "business accepted after manual review",
+      createdAt: new Date("2026-07-15T12:03:00.000Z"),
+    },
+  ];
+  const mutations = [
+    {
+      id: "10000000-0000-0000-0000-000000000002",
+      type: "RESCHEDULE" as const,
+      requestHash: internalNote,
+      createdAt: new Date("2026-07-15T12:02:00.000Z"),
+    },
+    {
+      id: "10000000-0000-0000-0000-000000000004",
+      type: "CANCELLATION" as const,
+      requestHash: internalNote,
+      createdAt: new Date("2026-07-15T12:04:00.000Z"),
+    },
+  ];
+
+  const activity = serializeCustomerRestaurantReservationActivity({
+    mutations,
+    statusHistory,
+  });
+
+  assert.deepEqual(activity, [
+    {
+      kind: "CREATED",
+      fromStatus: null,
+      toStatus: "CONFIRMED",
+      createdAt: "2026-07-15T12:01:00.000Z",
+    },
+    {
+      kind: "RESCHEDULED",
+      fromStatus: null,
+      toStatus: null,
+      createdAt: "2026-07-15T12:02:00.000Z",
+    },
+    {
+      kind: "STATUS_CHANGED",
+      fromStatus: "PENDING",
+      toStatus: "CONFIRMED",
+      createdAt: "2026-07-15T12:03:00.000Z",
+    },
+    {
+      kind: "CANCELLED",
+      fromStatus: "CONFIRMED",
+      toStatus: "CANCELLED",
+      createdAt: "2026-07-15T12:04:00.000Z",
+    },
+  ]);
+  assert.doesNotMatch(JSON.stringify(activity), new RegExp(internalNote));
+  assert.equal(
+    serializeCustomerRestaurantReservationActivity({
+      mutations: [],
+      statusHistory: statusHistory.slice(1, 3),
+    }).length,
+    1,
+    "legacy rows without a mutation ledger remain readable without forwarding same-status notes",
   );
 });
 

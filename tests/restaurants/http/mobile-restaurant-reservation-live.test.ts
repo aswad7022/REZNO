@@ -179,9 +179,29 @@ test(
     assert.equal(changed.response.status, 409);
     assert.equal(changed.body.error?.code, "IDEMPOTENCY_CONFLICT");
 
+    const internalActivityNote =
+      "BUSINESS INTERNAL: verify table manually before confirming";
+    await prisma.bookingStatusHistory.create({
+      data: {
+        bookingId: createdData.reservation.id,
+        fromStatus: "CONFIRMED",
+        toStatus: "CONFIRMED",
+        note: internalActivityNote,
+      },
+    });
     const owned = await request(`/api/mobile/restaurant-reservations/${createdData.reservation.id}`, { cookie: ownerCookie });
     assert.equal(owned.response.status, 200);
     assert.equal(owned.response.headers.get("cache-control"), "no-store, max-age=0");
+    const ownedDetail = owned.body.data as {
+      activityHistory: Array<{ kind: string }>;
+      statusHistory?: unknown;
+    };
+    assert.deepEqual(
+      ownedDetail.activityHistory.map((activity) => activity.kind),
+      ["CREATED"],
+    );
+    assert.equal(ownedDetail.statusHistory, undefined);
+    assert.doesNotMatch(JSON.stringify(owned.body), new RegExp(internalActivityNote));
     const foreign = await request(`/api/mobile/restaurant-reservations/${createdData.reservation.id}`, { cookie: otherCookie });
     assert.equal(foreign.response.status, 404);
     assert.equal(foreign.body.error?.code, "NOT_FOUND");
@@ -324,9 +344,19 @@ test(
     assert.equal(rescheduled.response.status, 200);
     const rescheduledData = rescheduled.body.data as {
       replayed: boolean;
-      reservation: { startsAt: string };
+      reservation: {
+        activityHistory: Array<{ kind: string }>;
+        startsAt: string;
+      };
     };
     assert.equal(rescheduledData.replayed, false);
+    assert.deepEqual(
+      rescheduledData.reservation.activityHistory.map(
+        (activity) => activity.kind,
+      ),
+      ["CREATED", "RESCHEDULED"],
+    );
+    assert.doesNotMatch(JSON.stringify(rescheduled.body), /BUSINESS INTERNAL/);
     const rescheduleReplay = await request(
       `/api/mobile/restaurant-reservations/${createdData.reservation.id}/reschedule`,
       {
@@ -361,10 +391,28 @@ test(
       },
     );
     assert.equal(cancelled.response.status, 200);
+    const cancelledData = cancelled.body.data as {
+      reservation: {
+        activityHistory: Array<{ kind: string }>;
+        cancellation: { reason: string | null };
+        status: string;
+      };
+      replayed: boolean;
+    };
+    assert.equal(cancelledData.reservation.status, "CANCELLED");
     assert.equal(
-      (cancelled.body.data as { reservation: { status: string }; replayed: boolean })
-        .reservation.status,
-      "CANCELLED",
+      cancelledData.reservation.cancellation.reason,
+      "Live HTTP cancellation",
+    );
+    assert.deepEqual(
+      cancelledData.reservation.activityHistory.map(
+        (activity) => activity.kind,
+      ),
+      ["CREATED", "RESCHEDULED", "CANCELLED"],
+    );
+    assert.doesNotMatch(
+      JSON.stringify(cancelledData.reservation.activityHistory),
+      /BUSINESS INTERNAL|Live HTTP cancellation/,
     );
     const cancelReplay = await request(
       `/api/mobile/restaurant-reservations/${createdData.reservation.id}/cancel`,
