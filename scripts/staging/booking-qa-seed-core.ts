@@ -29,7 +29,7 @@ export class BookingQaSeedInvariantError extends Error {
 }
 
 export async function seedBookingQaFixture(database: PrismaClient) {
-  return database.$transaction(async (transaction) => {
+  const runTransaction = async (transaction: Prisma.TransactionClient) => {
     await assertFixtureIdentity(transaction);
     const category = await transaction.category.upsert({
       where: { slug: BOOKING_QA_FIXTURE.category.slug },
@@ -232,6 +232,11 @@ export async function seedBookingQaFixture(database: PrismaClient) {
       memberId: member.id,
       serviceId: service.id,
     };
+  };
+
+  return database.$transaction(runTransaction, {
+    maxWait: 10_000,
+    timeout: 30_000,
   });
 }
 
