@@ -77,4 +77,42 @@ export type MobileRestaurantReservationDetail = {
     currency: string;
   }>;
   createdAt: string;
+  updatedAt: string;
+  cancellation: {
+    eligible: boolean;
+    deadline: string;
+    cancelledAt: string | null;
+    reason: string | null;
+  };
+  reschedule: { eligible: boolean; deadline: string };
+  statusHistory: Array<{
+    id: string;
+    fromStatus: MobileRestaurantReservationDetail["status"] | null;
+    toStatus: MobileRestaurantReservationDetail["status"];
+    note: string | null;
+    createdAt: string;
+  }>;
+};
+
+export type MobileRestaurantReservationManagementTab =
+  | "all"
+  | "upcoming"
+  | "completed"
+  | "cancelled";
+
+export type MobileManagedRestaurantReservation = Omit<
+  MobileRestaurantReservationDetail,
+  "cancellation" | "customerNote" | "preorderItems" | "statusHistory"
+> & {
+  cancellation: Omit<
+    MobileRestaurantReservationDetail["cancellation"],
+    "reason"
+  >;
+};
+
+export type MobileRestaurantReservationManagementPage = {
+  tab: MobileRestaurantReservationManagementTab;
+  items: MobileManagedRestaurantReservation[];
+  nextCursor: string | null;
+  counts: Record<MobileRestaurantReservationManagementTab, number>;
 };

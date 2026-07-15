@@ -90,7 +90,7 @@ import { CommerceMarketScreen } from "./src/screens/commerce-market-screen";
 import { ReznoNearbySearchScreen } from "./src/screens/rezno-nearby-search-screen";
 import { CustomerBookingCreationScreen } from "./src/screens/customer-booking-creation-screen";
 import { CustomerRestaurantReservationCreationScreen } from "./src/screens/customer-restaurant-reservation-creation-screen";
-import { CustomerBookingManagementScreen } from "./src/screens/customer-booking-management-screen";
+import { CustomerBookingsHubScreen } from "./src/screens/customer-bookings-hub-screen";
 import type { MobileMarketplaceBusiness } from "./src/types/marketplace";
 import type { CommerceNotification } from "./src/types/commerce";
 
@@ -1160,7 +1160,7 @@ export default function App() {
         ) : null}
 
         {!selectedBusiness && activeTab === "bookings" ? (
-          <CustomerBookingManagementScreen
+          <CustomerBookingsHubScreen
             isAuthenticated={Boolean(authSession)}
             isRtl={isRtl}
             locale={locale}
