@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { headers } from "next/headers";
 import {
+  CalendarOff,
   CalendarDays,
   ExternalLink,
   ImageIcon,
@@ -17,14 +18,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BusinessProfileForm } from "@/features/business/components/business-profile-form";
-import { PublicClosureForm } from "@/features/business/components/public-closure-form";
-import { deletePublicClosure } from "@/features/business/actions/manage-public-closures";
+import { currentBusinessOperationReference } from "@/features/business-operations/services/identity-adapter";
 import { getCurrentBusinessProfile } from "@/features/business/services/business-profile";
 import { getPublicProfileManagementData } from "@/features/business/services/public-profile-management";
 import { PublicProfileActions } from "@/features/marketplace/components/public-profile-actions";
 import { PublicProfileSection } from "@/features/marketplace/components/public-profile-motion";
 
 export async function PublicProfileManagementPage() {
+  await currentBusinessOperationReference("BRANCH_READ");
   const [profile, data, t, hoursT, format, headerList] = await Promise.all([
     getCurrentBusinessProfile(),
     getPublicProfileManagementData(),
@@ -153,18 +154,23 @@ export async function PublicProfileManagementPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-5">
-            <PublicClosureForm
-              branches={data.branches.map(({ id, name }) => ({ id, name }))}
-            />
             {data.branches.map((branch) => (
               <div key={branch.id} className="rounded-xl border p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <p className="font-semibold">{branch.name}</p>
-                  <Button asChild size="sm" variant="outline">
-                    <Link href={`/business/manage/locations/${branch.id}/hours`}>
-                      {t("editHours")}
-                    </Link>
-                  </Button>
+                  <div className="flex flex-wrap gap-2">
+                    <Button asChild size="sm" variant="outline">
+                      <Link href={`/business/manage/locations/${branch.id}/hours`}>
+                        {t("editHours")}
+                      </Link>
+                    </Button>
+                    <Button asChild size="sm" variant="outline">
+                      <Link href={`/business/manage/locations/${branch.id}/blocks`}>
+                        <CalendarOff />
+                        {t("manageClosures")}
+                      </Link>
+                    </Button>
+                  </div>
                 </div>
                 <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
                   {branch.days.filter((day) => day.isOpen).map((day) => (
@@ -191,7 +197,7 @@ export async function PublicProfileManagementPage() {
                   <div className="mt-4 border-t pt-3">
                     <p className="text-sm font-medium">{t("specialClosures")}</p>
                     {branch.specialClosures.map((closure) => (
-                      <div key={closure.id} className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+                      <div key={closure.id} className="mt-2 text-xs text-muted-foreground">
                         <span>
                           {format.dateTimeRange(closure.startsAt, closure.endsAt, {
                             dateStyle: "medium",
@@ -200,11 +206,6 @@ export async function PublicProfileManagementPage() {
                           })}
                           {closure.reason ? ` · ${closure.reason}` : ""}
                         </span>
-                        <form action={deletePublicClosure.bind(null, closure.id)}>
-                          <Button type="submit" size="sm" variant="ghost">
-                            {t("removeClosure")}
-                          </Button>
-                        </form>
                       </div>
                     ))}
                   </div>

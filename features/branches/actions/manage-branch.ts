@@ -4,192 +4,133 @@ import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { getTranslations } from "next-intl/server";
 
-import { canManageOrganization } from "@/features/business/policies/access";
-import { createBranchSchema } from "@/features/branches/schemas/branch";
-import type {
-  BranchActionState,
-  BranchField,
-} from "@/features/branches/types";
-import { requireBusinessIdentity } from "@/features/identity/server";
-import { prisma } from "@/lib/db/prisma";
+import { BusinessOperationsError } from "@/features/business-operations/domain/errors";
+import { createOperationEnvelopeSchema, operationEnvelopeSchema } from "@/features/business-operations/domain/validation";
+import { archiveOperationalBranch, createOperationalBranch, setOperationalBranchActive, updateOperationalBranch } from "@/features/business-operations/services/branches";
+import { currentBusinessOperationReference } from "@/features/business-operations/services/identity-adapter";
+import type { BranchActionState } from "@/features/branches/types";
 import { logServerError } from "@/lib/logging/server";
 
-const branchFields: ReadonlySet<string> = new Set([
-  "name",
-  "phone",
-  "email",
-  "timezone",
-  "addressLine1",
-  "addressLine2",
-  "city",
-  "country",
-  "latitude",
-  "longitude",
-  "locationLabel",
-  "nearbyLandmark",
-  "locationInstructions",
-  "status",
-]);
+const branchFields = ["addressLine1", "addressLine2", "city", "country", "email", "latitude", "locationInstructions", "locationLabel", "longitude", "name", "nearbyLandmark", "phone", "timezone"] as const;
+const envelopeFields = ["contextOrganizationId", "expectedVersion", "idempotencyKey"] as const;
 
-function slugify(value: string): string {
-  return value
-    .normalize("NFKC")
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}]+/gu, "-")
-    .replace(/^-+|-+$/g, "");
+function nullable(value: FormDataEntryValue | null) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
-function getBranchFieldErrors(
-  issues: ReadonlyArray<{ path: PropertyKey[]; message: string }>,
-): BranchActionState["fieldErrors"] {
-  const errors: NonNullable<BranchActionState["fieldErrors"]> = {};
-
-  for (const issue of issues) {
-    const field = issue.path[0];
-    if (typeof field === "string" && branchFields.has(field)) {
-      errors[field as BranchField] ??= issue.message;
-    }
-  }
-
-  return errors;
+function coordinate(value: FormDataEntryValue | null) {
+  const normalized = nullable(value);
+  return normalized === null ? null : Number(normalized);
 }
 
-async function getActionContext(formData: FormData) {
-  const [identity, tMessages, tValidation] = await Promise.all([
-    requireBusinessIdentity(),
-    getTranslations("Branches.messages"),
-    getTranslations("Validation"),
-  ]);
-
-  if (!canManageOrganization(identity.membership.role.systemRole)) {
-    return {
-      error: {
-        status: "error",
-        message: tMessages("forbidden"),
-      } satisfies BranchActionState,
-    };
-  }
-
-  const schema = createBranchSchema((key) => tValidation(key));
-  const parsed = schema.safeParse({
-    name: formData.get("name"),
-    phone: formData.get("phone"),
-    email: formData.get("email"),
-    timezone: formData.get("timezone"),
-    addressLine1: formData.get("addressLine1"),
-    addressLine2: formData.get("addressLine2"),
-    city: formData.get("city"),
-    country: formData.get("country"),
-    latitude: formData.get("latitude"),
-    longitude: formData.get("longitude"),
-    locationLabel: formData.get("locationLabel"),
-    nearbyLandmark: formData.get("nearbyLandmark"),
-    locationInstructions: formData.get("locationInstructions"),
-    status: formData.get("status") ?? "ACTIVE",
-  });
-
-  if (!parsed.success) {
-    return {
-      error: {
-        status: "error",
-        message: tMessages("invalid"),
-        fieldErrors: getBranchFieldErrors(parsed.error.issues),
-      } satisfies BranchActionState,
-    };
-  }
-
+function branchInput(formData: FormData) {
   return {
-    data: parsed.data,
-    identity,
-    tMessages,
+    addressLine1: nullable(formData.get("addressLine1")),
+    addressLine2: nullable(formData.get("addressLine2")),
+    city: nullable(formData.get("city")),
+    country: nullable(formData.get("country")),
+    email: nullable(formData.get("email")),
+    latitude: coordinate(formData.get("latitude")),
+    locationInstructions: nullable(formData.get("locationInstructions")),
+    locationLabel: nullable(formData.get("locationLabel")),
+    longitude: coordinate(formData.get("longitude")),
+    name: formData.get("name"),
+    nearbyLandmark: nullable(formData.get("nearbyLandmark")),
+    phone: nullable(formData.get("phone")),
+    timezone: formData.get("timezone"),
   };
 }
 
-export async function createBranch(
-  _previousState: BranchActionState,
-  formData: FormData,
-): Promise<BranchActionState> {
-  const context = await getActionContext(formData);
-
-  if (context.error) {
-    return context.error;
-  }
-
-  const { data, identity, tMessages } = context;
-  const slugBase = slugify(data.name) || "branch";
-  const slug = `${slugBase}-${randomUUID().slice(0, 6)}`;
-
-  try {
-    await prisma.branch.create({
-      data: {
-        ...data,
-        latitude: data.latitude,
-        longitude: data.longitude,
-        organizationId: identity.membership.organizationId,
-        slug,
-      },
-    });
-  } catch (error) {
-    logServerError("branch.create", error, {
-      organizationId: identity.membership.organizationId,
-    });
-    return { status: "error", message: tMessages("failure") };
-  }
-
-  revalidatePath("/business/manage/locations");
-  return { status: "success", message: tMessages("created") };
+function unknownFields(formData: FormData, extra: readonly string[] = []) {
+  const allowed = new Set([...branchFields, ...envelopeFields, ...extra]);
+  return [...formData.keys()].some((key) => !key.startsWith("$ACTION_") && !allowed.has(key));
 }
 
-export async function updateBranch(
-  branchId: string,
-  _previousState: BranchActionState,
-  formData: FormData,
-): Promise<BranchActionState> {
-  const context = await getActionContext(formData);
+async function messages() {
+  return getTranslations("Branches.messages");
+}
 
-  if (context.error) {
-    return context.error;
+function actionError(error: unknown, failure: string): BranchActionState {
+  if (error instanceof BusinessOperationsError) {
+    return { status: "error", code: error.code, details: error.details, message: error.message };
   }
+  logServerError("businessOperations.branch", error);
+  return { status: "error", message: failure };
+}
 
-  const { data, identity, tMessages } = context;
-  const organizationId = identity.membership.organizationId;
-
-  if (data.status !== "ACTIVE") {
-    const otherActiveBranches = await prisma.branch.count({
-      where: {
-        organizationId,
-        deletedAt: null,
-        status: "ACTIVE",
-        id: { not: branchId },
-      },
-    });
-
-    if (otherActiveBranches === 0) {
-      return { status: "error", message: tMessages("lastActive") };
-    }
-  }
-
+export async function createBranch(_previous: BranchActionState, formData: FormData): Promise<BranchActionState> {
+  const t = await messages();
+  const envelope = createOperationEnvelopeSchema.safeParse({
+    contextOrganizationId: formData.get("contextOrganizationId"),
+    idempotencyKey: formData.get("idempotencyKey"),
+  });
+  if (!envelope.success || unknownFields(formData)) return { status: "error", code: "INVALID_REQUEST", message: t("invalid") };
   try {
-    const result = await prisma.branch.updateMany({
-      where: {
-        id: branchId,
-        organizationId,
-        deletedAt: null,
-      },
-      data,
+    const result = await createOperationalBranch({
+      actor: await currentBusinessOperationReference(),
+      branch: branchInput(formData),
+      ...envelope.data,
     });
-
-    if (result.count !== 1) {
-      return { status: "error", message: tMessages("notFound") };
-    }
+    revalidatePath("/business/manage/locations");
+    return { status: "success", message: t("created"), nextIdempotencyKey: randomUUID(), replayed: result.replayed, version: result.version };
   } catch (error) {
-    logServerError("branch.update", error, {
-      branchId,
-      organizationId,
-    });
-    return { status: "error", message: tMessages("failure") };
+    return actionError(error, t("failure"));
   }
+}
 
-  revalidatePath("/business/manage/locations");
-  return { status: "success", message: tMessages("updated") };
+export async function updateBranch(branchId: string, _previous: BranchActionState, formData: FormData): Promise<BranchActionState> {
+  const t = await messages();
+  const envelope = operationEnvelopeSchema.safeParse({
+    contextOrganizationId: formData.get("contextOrganizationId"),
+    expectedVersion: formData.get("expectedVersion"),
+    idempotencyKey: formData.get("idempotencyKey"),
+  });
+  if (!envelope.success || unknownFields(formData)) return { status: "error", code: "INVALID_REQUEST", message: t("invalid") };
+  try {
+    const result = await updateOperationalBranch({ actor: await currentBusinessOperationReference(), branch: branchInput(formData), branchId, ...envelope.data });
+    revalidatePath("/business/manage/locations");
+    return { status: "success", message: t("updated"), nextIdempotencyKey: randomUUID(), replayed: result.replayed, version: result.version };
+  } catch (error) {
+    return actionError(error, t("failure"));
+  }
+}
+
+export async function setBranchActive(branchId: string, active: boolean, _previous: BranchActionState, formData: FormData): Promise<BranchActionState> {
+  const t = await messages();
+  const envelope = operationEnvelopeSchema.safeParse({
+    contextOrganizationId: formData.get("contextOrganizationId"),
+    expectedVersion: formData.get("expectedVersion"),
+    idempotencyKey: formData.get("idempotencyKey"),
+  });
+  if (!envelope.success || unknownFields(formData, ["confirmFutureReservations"])) return { status: "error", code: "INVALID_REQUEST", message: t("invalid") };
+  try {
+    const result = await setOperationalBranchActive({
+      active,
+      actor: await currentBusinessOperationReference(),
+      branchId,
+      confirmFutureReservations: formData.get("confirmFutureReservations") === "on",
+      ...envelope.data,
+    });
+    revalidatePath("/business/manage/locations");
+    return { status: "success", message: t("updated"), nextIdempotencyKey: randomUUID(), replayed: result.replayed, version: result.version };
+  } catch (error) {
+    return actionError(error, t("failure"));
+  }
+}
+
+export async function archiveBranch(branchId: string, _previous: BranchActionState, formData: FormData): Promise<BranchActionState> {
+  const t = await messages();
+  const envelope = operationEnvelopeSchema.safeParse({
+    contextOrganizationId: formData.get("contextOrganizationId"),
+    expectedVersion: formData.get("expectedVersion"),
+    idempotencyKey: formData.get("idempotencyKey"),
+  });
+  if (!envelope.success || unknownFields(formData)) return { status: "error", code: "INVALID_REQUEST", message: t("invalid") };
+  try {
+    const result = await archiveOperationalBranch({ actor: await currentBusinessOperationReference(), branchId, ...envelope.data });
+    revalidatePath("/business/manage/locations");
+    return { status: "success", message: t("updated"), nextIdempotencyKey: randomUUID(), replayed: result.replayed, version: result.version };
+  } catch (error) {
+    return actionError(error, t("failure"));
+  }
 }

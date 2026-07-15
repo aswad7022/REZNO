@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Clock3, MapPin, Navigation, Plus } from "lucide-react";
+import { CalendarOff, Clock3, MapPin, Navigation, Plus, ShieldCheck } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 
 import { DashboardEmpty } from "@/components/dashboard/dashboard-empty";
@@ -17,19 +17,29 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { BranchForm } from "@/features/branches/components/branch-form";
+import { BranchLifecycleControls } from "@/features/branches/components/branch-lifecycle-controls";
 import { getCurrentOrganizationBranches } from "@/features/branches/services/branches";
 import { buildWazeNavigationUrl } from "@/features/location/services/waze";
 
 export async function BranchManagementPage() {
-  const [{ branches, canEdit }, t, hoursT] = await Promise.all([
+  const [{ branches, canArchive, canEdit, createIdempotencyKey, organizationId, organizationName }, t] = await Promise.all([
     getCurrentOrganizationBranches(),
     getTranslations("Branches"),
-    getTranslations("WorkingHours"),
   ]);
 
   return (
     <DashboardShell>
-      <DashboardPageHeader title={t("title")} description={t("description")} />
+      <DashboardPageHeader
+        title={t("title")}
+        description={t("description")}
+        actions={canArchive ? (
+          <Button asChild size="sm" variant="outline">
+            <Link href="/business/manage/audit"><ShieldCheck />{t("viewAudit")}</Link>
+          </Button>
+        ) : undefined}
+      />
+
+      <Card className="shadow-none"><CardContent className="pt-6"><span className="text-sm text-muted-foreground">{t("activeBusiness")}:</span> <strong>{organizationName}</strong></CardContent></Card>
 
       {canEdit ? (
         <Card>
@@ -40,7 +50,7 @@ export async function BranchManagementPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <BranchForm />
+            <BranchForm contextOrganizationId={organizationId} idempotencyKey={createIdempotencyKey} />
           </CardContent>
         </Card>
       ) : null}
@@ -82,27 +92,11 @@ export async function BranchManagementPage() {
                   >
                     {t(`statuses.${branch.status}`)}
                   </Badge>
-                  {branch.nextWorkingDay !== null ? (
-                    <span className="text-xs text-muted-foreground">
-                      {t("nextWorkingDay", {
-                        day: hoursT(
-                          `days.${branch.nextWorkingDay}` as
-                            | "days.0"
-                            | "days.1"
-                            | "days.2"
-                            | "days.3"
-                            | "days.4"
-                            | "days.5"
-                            | "days.6",
-                        ),
-                      })}
-                    </span>
-                  ) : null}
                   <Badge
-                    variant={branch.hasWorkingHours ? "outline" : "destructive"}
+                    variant={branch.openDays.length ? "outline" : "destructive"}
                   >
                     {t(
-                      branch.hasWorkingHours
+                      branch.openDays.length
                         ? "hoursConfigured"
                         : "hoursMissing",
                       )}
@@ -120,17 +114,22 @@ export async function BranchManagementPage() {
                   </Badge>
                 </div>
               </CardHeader>
-              {canEdit ? (
-                <CardContent>
+              <CardContent className="space-y-4">
                   <div className="mb-4 flex flex-wrap gap-2">
-                    <Button asChild variant="outline" size="sm">
+                    {branch.status !== "ARCHIVED" ? <Button asChild variant="outline" size="sm">
                       <Link
                         href={`/business/manage/locations/${branch.id}/hours`}
                       >
                         <Clock3 aria-hidden="true" />
                         {t("editHours")}
                       </Link>
-                    </Button>
+                    </Button> : null}
+                    {branch.status !== "ARCHIVED" ? <Button asChild variant="outline" size="sm">
+                      <Link href={`/business/manage/locations/${branch.id}/blocks`}>
+                        <CalendarOff aria-hidden="true" />
+                        {t("manageBlocks", { count: branch.upcomingBlockCount })}
+                      </Link>
+                    </Button> : null}
                     {branch.latitude && branch.longitude ? (
                       <Button asChild variant="outline" size="sm">
                         <a
@@ -149,16 +148,16 @@ export async function BranchManagementPage() {
                       </Button>
                     ) : null}
                   </div>
-                  <details>
+                  {canEdit && branch.status !== "ARCHIVED" ? <details>
                     <summary className="cursor-pointer text-sm font-medium text-primary outline-none focus-visible:ring-2 focus-visible:ring-ring">
                       {t("edit")}
                     </summary>
                     <div className="mt-5 border-t pt-5">
-                      <BranchForm branch={branch} />
+                      <BranchForm branch={branch} contextOrganizationId={organizationId} idempotencyKey={branch.idempotencyKey} />
                     </div>
-                  </details>
+                  </details> : null}
+                  {canEdit ? <BranchLifecycleControls branch={branch} canArchive={canArchive} contextOrganizationId={organizationId} /> : null}
                 </CardContent>
-              ) : null}
             </Card>
           ))}
         </div>

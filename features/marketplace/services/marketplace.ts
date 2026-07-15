@@ -589,7 +589,6 @@ export const getPublicBusiness = cache(
             id: closure.id,
             startsAt: closure.startsAt,
             endsAt: closure.endsAt,
-            reason: closure.reason,
           })),
           offerings: branch.branchServices.map((offering) => ({
             id: offering.id,

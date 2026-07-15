@@ -10,10 +10,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { BusinessProfileForm } from "@/features/business/components/business-profile-form";
+import { currentBusinessOperationReference } from "@/features/business-operations/services/identity-adapter";
 import { getCurrentBusinessProfile } from "@/features/business/services/business-profile";
 import { CopyProfileLink } from "@/features/dashboard/components/copy-profile-link";
 
 export async function BusinessManagementPage() {
+  await currentBusinessOperationReference("BRANCH_READ");
   const [profile, t] = await Promise.all([
     getCurrentBusinessProfile(),
     getTranslations("BusinessManagement"),

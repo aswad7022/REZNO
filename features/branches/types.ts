@@ -1,48 +1,45 @@
 import type { EntityStatus } from "@prisma/client";
 
 export interface BranchDetails {
-  id: string;
-  name: string;
-  slug: string;
-  phone: string;
-  email: string;
-  timezone: string;
   addressLine1: string;
   addressLine2: string;
+  archivedAt: string | null;
   city: string;
   country: string;
+  email: string;
+  id: string;
+  archiveIdempotencyKey: string;
+  idempotencyKey: string;
+  lifecycleIdempotencyKey: string;
   latitude: string;
-  longitude: string;
-  locationLabel: string;
-  nearbyLandmark: string;
   locationInstructions: string;
+  locationLabel: string;
+  longitude: string;
+  name: string;
+  nearbyLandmark: string;
+  openDays: number[];
+  phone: string;
+  slug: string;
   status: EntityStatus;
-  hasWorkingHours: boolean;
-  nextWorkingDay: number | null;
+  timezone: string;
+  upcomingBlockCount: number;
+  version: string;
 }
 
 export type BranchField =
-  | "name"
-  | "phone"
-  | "email"
-  | "timezone"
-  | "addressLine1"
-  | "addressLine2"
-  | "city"
-  | "country"
-  | "latitude"
-  | "longitude"
-  | "locationLabel"
-  | "nearbyLandmark"
-  | "locationInstructions"
-  | "status";
+  | "addressLine1" | "addressLine2" | "city" | "country" | "email"
+  | "latitude" | "locationInstructions" | "locationLabel" | "longitude"
+  | "name" | "nearbyLandmark" | "phone" | "timezone";
 
 export interface BranchActionState {
   status: "idle" | "success" | "error";
-  message?: string;
+  code?: string;
+  details?: { genericBookings?: number; restaurantReservations?: number; total?: number };
   fieldErrors?: Partial<Record<BranchField, string>>;
+  message?: string;
+  nextIdempotencyKey?: string;
+  replayed?: boolean;
+  version?: string;
 }
 
-export const initialBranchActionState: BranchActionState = {
-  status: "idle",
-};
+export const initialBranchActionState: BranchActionState = { status: "idle" };

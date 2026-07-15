@@ -1,74 +1,75 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { getTranslations } from "next-intl/server";
 
-import { canManageOrganization } from "@/features/business/policies/access";
-import { createBusinessSettingsSchema } from "@/features/business-settings/schemas/business-settings";
+import { BusinessOperationsError } from "@/features/business-operations/domain/errors";
+import { operationEnvelopeSchema } from "@/features/business-operations/domain/validation";
+import { currentBusinessOperationReference } from "@/features/business-operations/services/identity-adapter";
+import { updateOperationalSettings } from "@/features/business-operations/services/settings";
 import type { BusinessSettingsActionState } from "@/features/business-settings/types";
-import { requireBusinessIdentity } from "@/features/identity/server";
-import { prisma } from "@/lib/db/prisma";
 import { logServerError } from "@/lib/logging/server";
+
+const allowedFields = new Set([
+  "bookingEnabled",
+  "cancellationWindowHours",
+  "contextOrganizationId",
+  "expectedVersion",
+  "idempotencyKey",
+  "marketplaceVisible",
+]);
 
 export async function updateBusinessSettings(
   _previousState: BusinessSettingsActionState,
   formData: FormData,
 ): Promise<BusinessSettingsActionState> {
-  const [identity, tMessages, tValidation] = await Promise.all([
-    requireBusinessIdentity(),
-    getTranslations("BusinessSettings.messages"),
-    getTranslations("Validation"),
-  ]);
-
-  if (!canManageOrganization(identity.membership.role.systemRole)) {
-    return { status: "error", message: tMessages("forbidden") };
+  const t = await getTranslations("BusinessSettings.messages");
+  if ([...formData.keys()].some((key) => !key.startsWith("$ACTION_") && !allowedFields.has(key))) {
+    return { status: "error", code: "INVALID_REQUEST", message: t("invalid") };
   }
-
-  const schema = createBusinessSettingsSchema((key) => tValidation(key));
-  const parsed = schema.safeParse({
-    bookingEnabled: formData.get("bookingEnabled"),
-    marketplaceVisible: formData.get("marketplaceVisible"),
-    vertical: formData.get("vertical"),
-    staffSelectionMode: formData.get("staffSelectionMode"),
-    cancellationWindowHours: formData.get("cancellationWindowHours"),
+  const envelope = operationEnvelopeSchema.safeParse({
+    contextOrganizationId: formData.get("contextOrganizationId"),
+    expectedVersion: formData.get("expectedVersion"),
+    idempotencyKey: formData.get("idempotencyKey"),
   });
-
-  if (!parsed.success) {
-    const errors = parsed.error.flatten().fieldErrors;
+  const rawCancellation = formData.get("cancellationWindowHours");
+  if (!envelope.success || typeof rawCancellation !== "string" || !/^\d+$/.test(rawCancellation)) {
     return {
       status: "error",
-      message: tMessages("invalid"),
-      fieldErrors: {
-        vertical: errors.vertical?.[0],
-        staffSelectionMode: errors.staffSelectionMode?.[0],
-        cancellationWindowHours: errors.cancellationWindowHours?.[0],
-      },
+      code: "INVALID_REQUEST",
+      message: t("invalid"),
+      fieldErrors: { cancellationWindowHours: t("invalid") },
     };
   }
-
   try {
-    const { vertical, ...settings } = parsed.data;
-    await prisma.$transaction([
-      prisma.organization.update({
-        where: { id: identity.membership.organizationId },
-        data: { vertical },
-      }),
-      prisma.organizationSettings.upsert({
-        where: { organizationId: identity.membership.organizationId },
-        create: {
-          organizationId: identity.membership.organizationId,
-          ...settings,
-        },
-        update: settings,
-      }),
-    ]);
-  } catch (error) {
-    logServerError("businessSettings.update", error, {
-      organizationId: identity.membership.organizationId,
+    const result = await updateOperationalSettings({
+      actor: await currentBusinessOperationReference(),
+      ...envelope.data,
+      settings: {
+        bookingEnabled: formData.get("bookingEnabled") === "on",
+        cancellationWindowHours: Number(rawCancellation),
+        marketplaceVisible: formData.get("marketplaceVisible") === "on",
+      },
     });
-    return { status: "error", message: tMessages("failure") };
+    revalidatePath("/business/manage/settings");
+    revalidatePath("/marketplace");
+    return {
+      status: "success",
+      message: t("success"),
+      nextIdempotencyKey: randomUUID(),
+      replayed: result.replayed,
+      version: result.version,
+    };
+  } catch (error) {
+    if (error instanceof BusinessOperationsError) {
+      return {
+        status: "error",
+        code: error.code,
+        message: error.code === "FORBIDDEN" ? t("forbidden") : error.code === "INVALID_REQUEST" ? t("invalid") : t("failure"),
+      };
+    }
+    logServerError("businessOperations.settings", error);
+    return { status: "error", message: t("failure") };
   }
-
-  revalidatePath("/business/manage/settings");
-  return { status: "success", message: tMessages("success") };
 }
