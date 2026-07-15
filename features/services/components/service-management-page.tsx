@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -29,6 +30,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { CreateServiceForm } from "@/features/services/components/create-service-form";
+import { ServiceOperations } from "@/features/services/components/service-operations";
 import { getCurrentServiceCatalog } from "@/features/services/services/service-catalog";
 
 export async function ServiceManagementPage({
@@ -36,7 +38,7 @@ export async function ServiceManagementPage({
 }: {
   editId?: string;
 }) {
-  const [{ services, branches, categories, members, canEdit }, t, format] =
+  const [{ services, branches, categories, members, canEdit, organizationId, organizationName }, t, format] =
     await Promise.all([
       getCurrentServiceCatalog(),
       getTranslations("Services"),
@@ -50,6 +52,7 @@ export async function ServiceManagementPage({
   return (
     <DashboardShell>
       <DashboardPageHeader title={t("title")} description={t("description")} />
+      <p className="text-sm text-muted-foreground">{t("activeOrganization", { organization: organizationName })}</p>
 
       {canEdit && !editableService ? (
         <Card>
@@ -58,9 +61,9 @@ export async function ServiceManagementPage({
           </CardHeader>
           <CardContent>
             <CreateServiceForm
-              branches={branches}
               categories={categories}
-              members={members}
+              idempotencyKey={randomUUID()}
+              organizationId={organizationId}
             />
           </CardContent>
         </Card>
@@ -74,9 +77,9 @@ export async function ServiceManagementPage({
           </CardHeader>
           <CardContent>
             <CreateServiceForm
-              branches={branches}
               categories={categories}
-              members={members}
+              idempotencyKey={randomUUID()}
+              organizationId={organizationId}
               service={editableService}
             />
           </CardContent>
@@ -123,6 +126,23 @@ export async function ServiceManagementPage({
                 </Badge>
               </CardHeader>
               <CardContent className="space-y-3">
+                {canEdit && service.status !== "ARCHIVED" ? (
+                  <ServiceOperations
+                    branches={branches}
+                    keys={{
+                      archive: randomUUID(),
+                      assignmentAdd: randomUUID(),
+                      assignmentRemove: Object.fromEntries(service.staffAssignments.map((assignment) => [assignment.id, randomUUID()])),
+                      lifecycle: randomUUID(),
+                      offeringCreate: randomUUID(),
+                      offeringRemove: Object.fromEntries(service.offerings.map((offering) => [offering.id, randomUUID()])),
+                      offeringUpdate: Object.fromEntries(service.offerings.map((offering) => [offering.id, randomUUID()])),
+                    }}
+                    members={members}
+                    organizationId={organizationId}
+                    service={service}
+                  />
+                ) : null}
                 {canEdit ? (
                   <div className="flex flex-wrap gap-2 border-b pb-3">
                     <Button asChild variant="outline" size="sm">

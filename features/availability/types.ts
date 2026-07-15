@@ -5,6 +5,8 @@ export interface MemberAvailabilityBranch {
   name: string;
   timezone: string;
   days: WorkingDay[];
+  canEditSchedule: boolean;
+  version: string;
 }
 
 export interface MemberBlockedTime {
@@ -13,6 +15,8 @@ export interface MemberBlockedTime {
   startsAt: Date;
   endsAt: Date;
   reason: string;
+  branchId: string;
+  version: string;
 }
 
 export interface MemberAvailabilityData {
@@ -21,12 +25,17 @@ export interface MemberAvailabilityData {
   branches: MemberAvailabilityBranch[];
   blockedTimes: MemberBlockedTime[];
   canEdit: boolean;
+  organizationId: string;
 }
 
 export interface AvailabilityActionState {
   status: "idle" | "success" | "error";
   message?: string;
   dayErrors?: Partial<Record<number, string>>;
+  code?: string;
+  replayed?: boolean;
+  version?: string;
+  nextIdempotencyKey?: string;
 }
 
 export interface BlockedTimeActionState {
@@ -38,6 +47,10 @@ export interface BlockedTimeActionState {
     endsAt?: string;
     reason?: string;
   };
+  code?: string;
+  replayed?: boolean;
+  version?: string;
+  nextIdempotencyKey?: string;
 }
 
 export const initialAvailabilityActionState: AvailabilityActionState = {

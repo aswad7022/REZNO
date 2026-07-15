@@ -16,8 +16,10 @@ const initialWorkInvitationActionState: WorkInvitationActionState = {
 };
 
 export function WorkInvitationActions({
+  idempotencyKey,
   invitationId,
 }: {
+  idempotencyKey: string;
   invitationId: string;
 }) {
   const t = useTranslations("WorkInvitations");
@@ -37,6 +39,7 @@ export function WorkInvitationActions({
     <div className="space-y-3">
       <div className="flex flex-col gap-2 sm:flex-row">
         <form action={acceptAction}>
+          <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
           <Button type="submit" disabled={accepting || declining}>
             {accepting ? (
               <LoaderCircle className="animate-spin" aria-hidden="true" />

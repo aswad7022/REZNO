@@ -1,145 +1,97 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { getTranslations } from "next-intl/server";
 
-import { canManageOrganization } from "@/features/business/policies/access";
-import { requireBusinessIdentity } from "@/features/identity/server";
-import { createServiceSchema } from "@/features/services/schemas/service";
-import type {
-  ServiceActionState,
-  ServiceField,
-} from "@/features/services/types";
-import { prisma } from "@/lib/db/prisma";
+import { BusinessOperationsError } from "@/features/business-operations/domain/errors";
+import {
+  createOperationEnvelopeSchema,
+  operationEnvelopeSchema,
+} from "@/features/business-operations/domain/validation";
+import {
+  archiveOperationalService,
+  createOperationalService,
+  setOperationalServiceActive,
+  updateOperationalService,
+} from "@/features/business-operations/services/service-catalog";
+import { currentBusinessOperationReference } from "@/features/business-operations/services/identity-adapter";
+import type { ServiceActionState } from "@/features/services/types";
 import { logServerError } from "@/lib/logging/server";
 
-const serviceFields: ReadonlySet<string> = new Set([
-  "name",
-  "description",
-  "imageUrl",
+const serviceFields = [
   "categoryId",
-  "status",
+  "confirmFutureBookings",
+  "contextOrganizationId",
+  "description",
+  "expectedVersion",
+  "idempotencyKey",
+  "imageUrl",
+  "name",
   "staffSelectionMode",
-  "price",
-  "durationMinutes",
-  "pricingType",
-  "branchIds",
-  "memberIds",
-]);
+] as const;
 
-function getFieldErrors(
-  issues: ReadonlyArray<{ path: PropertyKey[]; message: string }>,
-): ServiceActionState["fieldErrors"] {
-  const errors: NonNullable<ServiceActionState["fieldErrors"]> = {};
+function hasUnknownFields(formData: FormData, allowed: readonly string[] = serviceFields) {
+  const fields = new Set<string>(allowed);
+  return [...formData.keys()].some(
+    (key) => !key.startsWith("$ACTION_") && !fields.has(key),
+  );
+}
 
-  for (const issue of issues) {
-    const field = issue.path[0];
-    if (typeof field === "string" && serviceFields.has(field)) {
-      errors[field as ServiceField] ??= issue.message;
-    }
+function serviceInput(formData: FormData) {
+  return {
+    categoryId: formData.get("categoryId"),
+    description: formData.get("description") ?? "",
+    imageUrl: formData.get("imageUrl") ?? "",
+    name: formData.get("name"),
+    staffSelectionMode: formData.get("staffSelectionMode") ?? "OPTIONAL",
+  };
+}
+
+async function actionError(error: unknown): Promise<ServiceActionState> {
+  const t = await getTranslations("Services.messages");
+  if (error instanceof BusinessOperationsError) {
+    return { code: error.code, message: error.message, status: "error" };
   }
+  logServerError("businessOperations.service", error);
+  return { message: t("failure"), status: "error" };
+}
 
-  return errors;
+function revalidateServices() {
+  revalidatePath("/business/services");
+  revalidatePath("/business/public-profile");
+  revalidatePath("/marketplace");
 }
 
 export async function createService(
   _previousState: ServiceActionState,
   formData: FormData,
 ): Promise<ServiceActionState> {
-  const [identity, tMessages, tValidation] = await Promise.all([
-    requireBusinessIdentity(),
-    getTranslations("Services.messages"),
-    getTranslations("Validation"),
-  ]);
-
-  if (!canManageOrganization(identity.membership.role.systemRole)) {
-    return { status: "error", message: tMessages("forbidden") };
-  }
-
-  const schema = createServiceSchema((key) => tValidation(key));
-  const parsed = schema.safeParse({
-    name: formData.get("name"),
-    description: formData.get("description") ?? "",
-    imageUrl: formData.get("imageUrl") ?? "",
-    categoryId: formData.get("categoryId"),
-    status: formData.get("status") ?? "ACTIVE",
-    staffSelectionMode:
-      formData.get("staffSelectionMode") ?? "OPTIONAL",
-    price: formData.get("price"),
-    durationMinutes: formData.get("durationMinutes"),
-    pricingType: formData.get("pricingType"),
-    branchIds: formData.getAll("branchIds"),
-    memberIds: formData.getAll("memberIds"),
+  const t = await getTranslations("Services.messages");
+  const envelope = createOperationEnvelopeSchema.safeParse({
+    contextOrganizationId: formData.get("contextOrganizationId"),
+    idempotencyKey: formData.get("idempotencyKey"),
   });
-
-  if (!parsed.success) {
-    return {
-      status: "error",
-      message: tMessages("invalid"),
-      fieldErrors: getFieldErrors(parsed.error.issues),
-    };
+  if (!envelope.success || hasUnknownFields(formData)) {
+    return { code: "INVALID_REQUEST", message: t("invalid"), status: "error" };
   }
-
-  const { branchIds, memberIds, categoryId, ...serviceData } = parsed.data;
-  const selectedMemberIds =
-    serviceData.staffSelectionMode === "NONE" ? [] : memberIds;
-  const organizationId = identity.membership.organizationId;
-  const [category, branchCount, memberCount] = await Promise.all([
-    prisma.category.findUnique({
-      where: { id: categoryId },
-      select: { id: true },
-    }),
-    prisma.branch.count({
-      where: {
-        id: { in: branchIds },
-        organizationId,
-        deletedAt: null,
-        status: "ACTIVE",
-      },
-    }),
-    prisma.organizationMember.count({
-      where: { id: { in: selectedMemberIds }, organizationId },
-    }),
-  ]);
-
-  if (
-    !category ||
-    branchCount !== branchIds.length ||
-    memberCount !== selectedMemberIds.length
-  ) {
-    return { status: "error", message: tMessages("invalidReferences") };
-  }
-
   try {
-    await prisma.service.create({
-      data: {
-        organizationId,
-        categoryId,
-        name: serviceData.name,
-        description: serviceData.description,
-        imageUrl: serviceData.imageUrl,
-        status: serviceData.status,
-        staffSelectionMode: serviceData.staffSelectionMode,
-        branchServices: {
-          create: branchIds.map((branchId) => ({
-            branchId,
-            price: serviceData.price,
-            durationMinutes: serviceData.durationMinutes,
-            pricingType: serviceData.pricingType,
-          })),
-        },
-        staffAssignments: {
-          create: selectedMemberIds.map((memberId) => ({ memberId })),
-        },
-      },
+    const result = await createOperationalService({
+      actor: await currentBusinessOperationReference(),
+      service: serviceInput(formData),
+      ...envelope.data,
     });
+    revalidateServices();
+    return {
+      message: t("created"),
+      nextIdempotencyKey: randomUUID(),
+      replayed: result.replayed,
+      status: "success",
+      version: result.version,
+    };
   } catch (error) {
-    logServerError("service.create", error, { organizationId });
-    return { status: "error", message: tMessages("failure") };
+    return actionError(error);
   }
-
-  revalidatePath("/business/services");
-  return { status: "success", message: tMessages("created") };
 }
 
 export async function updateService(
@@ -147,131 +99,89 @@ export async function updateService(
   _previousState: ServiceActionState,
   formData: FormData,
 ): Promise<ServiceActionState> {
-  const [identity, tMessages, tValidation] = await Promise.all([
-    requireBusinessIdentity(),
-    getTranslations("Services.messages"),
-    getTranslations("Validation"),
-  ]);
-  if (!canManageOrganization(identity.membership.role.systemRole)) {
-    return { status: "error", message: tMessages("forbidden") };
-  }
-
-  const parsed = createServiceSchema((key) => tValidation(key)).safeParse({
-    name: formData.get("name"),
-    description: formData.get("description") ?? "",
-    imageUrl: formData.get("imageUrl") ?? "",
-    categoryId: formData.get("categoryId"),
-    status: formData.get("status"),
-    staffSelectionMode: formData.get("staffSelectionMode"),
-    price: formData.get("price"),
-    durationMinutes: formData.get("durationMinutes"),
-    pricingType: formData.get("pricingType"),
-    branchIds: formData.getAll("branchIds"),
-    memberIds: formData.getAll("memberIds"),
+  const t = await getTranslations("Services.messages");
+  const envelope = operationEnvelopeSchema.safeParse({
+    contextOrganizationId: formData.get("contextOrganizationId"),
+    expectedVersion: formData.get("expectedVersion"),
+    idempotencyKey: formData.get("idempotencyKey"),
   });
-  if (!parsed.success) {
-    return {
-      status: "error",
-      message: tMessages("invalid"),
-      fieldErrors: getFieldErrors(parsed.error.issues),
-    };
+  if (!envelope.success || hasUnknownFields(formData)) {
+    return { code: "INVALID_REQUEST", message: t("invalid"), status: "error" };
   }
-
-  const organizationId = identity.membership.organizationId;
-  const {
-    branchIds,
-    memberIds,
-    categoryId,
-    price,
-    durationMinutes,
-    pricingType,
-    ...data
-  } = parsed.data;
-  const selectedMemberIds =
-    data.staffSelectionMode === "NONE" ? [] : memberIds;
-  const [service, category, branchCount, memberCount] = await Promise.all([
-    prisma.service.findFirst({
-      where: { id: serviceId, organizationId },
-      select: { id: true },
-    }),
-    prisma.category.findUnique({
-      where: { id: categoryId },
-      select: { id: true },
-    }),
-    prisma.branch.count({
-      where: {
-        id: { in: branchIds },
-        organizationId,
-        deletedAt: null,
-        status: "ACTIVE",
-      },
-    }),
-    prisma.organizationMember.count({
-      where: { id: { in: selectedMemberIds }, organizationId },
-    }),
-  ]);
-  if (!service) {
-    return { status: "error", message: tMessages("notFound") };
-  }
-  if (
-    !category ||
-    branchCount !== branchIds.length ||
-    memberCount !== selectedMemberIds.length
-  ) {
-    return { status: "error", message: tMessages("invalidReferences") };
-  }
-
   try {
-    await prisma.$transaction(async (transaction) => {
-      await transaction.service.update({
-        where: { id: service.id },
-        data: { ...data, categoryId },
-      });
-      await transaction.branchService.updateMany({
-        where: { serviceId: service.id, branchId: { notIn: branchIds } },
-        data: { isAvailable: false },
-      });
-      await transaction.serviceStaffAssignment.deleteMany({
-        where: { serviceId: service.id },
-      });
-      if (selectedMemberIds.length > 0) {
-        await transaction.serviceStaffAssignment.createMany({
-          data: selectedMemberIds.map((memberId) => ({
-            serviceId: service.id,
-            memberId,
-          })),
-        });
-      }
-      for (const branchId of branchIds) {
-        await transaction.branchService.upsert({
-          where: {
-            branchId_serviceId: { branchId, serviceId: service.id },
-          },
-          create: {
-            branchId,
-            serviceId: service.id,
-            price,
-            durationMinutes,
-            pricingType,
-          },
-          update: {
-            price,
-            durationMinutes,
-            pricingType,
-            isAvailable: true,
-          },
-        });
-      }
+    const result = await updateOperationalService({
+      actor: await currentBusinessOperationReference(),
+      confirmFutureBookings: formData.get("confirmFutureBookings") === "on",
+      service: serviceInput(formData),
+      serviceId,
+      ...envelope.data,
     });
+    revalidateServices();
+    return {
+      message: t("updated"),
+      nextIdempotencyKey: randomUUID(),
+      replayed: result.replayed,
+      status: "success",
+      version: result.version,
+    };
   } catch (error) {
-    logServerError("service.update", error, {
-      serviceId: service.id,
-      organizationId,
-    });
-    return { status: "error", message: tMessages("failure") };
+    return actionError(error);
   }
+}
 
-  revalidatePath("/business/services");
-  revalidatePath("/marketplace");
-  return { status: "success", message: tMessages("updated") };
+export async function setServiceActive(
+  serviceId: string,
+  active: boolean,
+  _previousState: ServiceActionState,
+  formData: FormData,
+): Promise<ServiceActionState> {
+  const envelope = operationEnvelopeSchema.safeParse({
+    contextOrganizationId: formData.get("contextOrganizationId"),
+    expectedVersion: formData.get("expectedVersion"),
+    idempotencyKey: formData.get("idempotencyKey"),
+  });
+  const allowed = ["confirmFutureBookings", "contextOrganizationId", "expectedVersion", "idempotencyKey"] as const;
+  if (!envelope.success || hasUnknownFields(formData, allowed)) {
+    return { code: "INVALID_REQUEST", message: "Invalid Service lifecycle request.", status: "error" };
+  }
+  try {
+    const result = await setOperationalServiceActive({
+      active,
+      actor: await currentBusinessOperationReference(),
+      confirmFutureBookings: formData.get("confirmFutureBookings") === "on",
+      serviceId,
+      ...envelope.data,
+    });
+    revalidateServices();
+    return { nextIdempotencyKey: randomUUID(), replayed: result.replayed, status: "success", version: result.version };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function archiveService(
+  serviceId: string,
+  _previousState: ServiceActionState,
+  formData: FormData,
+): Promise<ServiceActionState> {
+  const envelope = operationEnvelopeSchema.safeParse({
+    contextOrganizationId: formData.get("contextOrganizationId"),
+    expectedVersion: formData.get("expectedVersion"),
+    idempotencyKey: formData.get("idempotencyKey"),
+  });
+  const allowed = ["contextOrganizationId", "expectedVersion", "idempotencyKey"] as const;
+  if (!envelope.success || hasUnknownFields(formData, allowed)) {
+    return { code: "INVALID_REQUEST", message: "Invalid Service archive request.", status: "error" };
+  }
+  try {
+    const result = await archiveOperationalService({
+      actor: await currentBusinessOperationReference(),
+      serviceId,
+      ...envelope.data,
+    });
+    revalidateServices();
+    return { nextIdempotencyKey: randomUUID(), replayed: result.replayed, status: "success", version: result.version };
+  } catch (error) {
+    return actionError(error);
+  }
 }

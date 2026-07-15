@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { Metadata } from "next";
 import { BriefcaseBusiness } from "lucide-react";
 import { getFormatter, getTranslations } from "next-intl/server";
@@ -67,7 +68,7 @@ export default async function CustomerWorkInvitationsPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <WorkInvitationActions invitationId={invitation.id} />
+                <WorkInvitationActions idempotencyKey={randomUUID()} invitationId={invitation.id} />
               </CardContent>
             </Card>
           ))}

@@ -5,198 +5,86 @@ import { cookies } from "next/headers";
 import { getTranslations } from "next-intl/server";
 import { z } from "zod";
 
+import { BusinessOperationsError } from "@/features/business-operations/domain/errors";
+import {
+  acceptOperationalInvitation,
+  declineOperationalInvitation,
+} from "@/features/business-operations/services/invitations";
 import {
   ACTIVE_BUSINESS_COOKIE,
   requireCustomerIdentity,
 } from "@/features/identity/server";
-import { prisma } from "@/lib/db/prisma";
 import { logServerError } from "@/lib/logging/server";
 
 export interface WorkInvitationActionState {
   status: "idle" | "success" | "error";
   message?: string;
+  replayed?: boolean;
 }
 
 const invitationIdSchema = z.string().uuid();
+const keySchema = z.string().uuid();
 
-function normalizeEmail(email: string): string {
-  return email.trim().toLowerCase();
-}
-
-async function getInvitationActionContext(invitationId: string) {
+export async function acceptWorkInvitation(
+  invitationId: string,
+  _previousState: WorkInvitationActionState,
+  formData: FormData,
+): Promise<WorkInvitationActionState> {
   const [identity, t] = await Promise.all([
     requireCustomerIdentity(),
     getTranslations("WorkInvitations.messages"),
   ]);
   const parsedId = invitationIdSchema.safeParse(invitationId);
-
-  if (!parsedId.success) {
-    return { identity, t, invitationId: null };
-  }
-
-  return { identity, t, invitationId: parsedId.data };
-}
-
-export async function acceptWorkInvitation(
-  invitationId: string,
-  previousState: WorkInvitationActionState,
-): Promise<WorkInvitationActionState> {
-  void previousState;
-
-  const context = await getInvitationActionContext(invitationId);
-
-  if (!context.invitationId) {
-    return { status: "error", message: context.t("notFound") };
-  }
-
-  const normalizedEmail = normalizeEmail(context.identity.session.user.email);
-
+  const parsedKey = keySchema.safeParse(formData.get("idempotencyKey"));
+  if (!parsedId.success || !parsedKey.success) return { status: "error", message: t("notFound") };
   try {
-    const acceptedOrganizationId = await prisma.$transaction(
-      async (transaction) => {
-        const invitation = await transaction.organizationInvitation.findFirst({
-          where: {
-            id: context.invitationId,
-            status: "PENDING",
-            OR: [
-              { recipientPersonId: context.identity.person.id },
-              { normalizedEmail },
-            ],
-          },
-          include: {
-            role: true,
-            organization: true,
-          },
-        });
-
-        if (!invitation) {
-          throw new Error("INVITATION_NOT_FOUND");
-        }
-
-        if (invitation.expiresAt && invitation.expiresAt < new Date()) {
-          await transaction.organizationInvitation.update({
-            where: { id: invitation.id },
-            data: { status: "EXPIRED" },
-          });
-          throw new Error("INVITATION_EXPIRED");
-        }
-
-        const existingMember = await transaction.organizationMember.findUnique({
-          where: {
-            personId_organizationId: {
-              personId: context.identity.person.id,
-              organizationId: invitation.organizationId,
-            },
-          },
-          select: { id: true },
-        });
-
-        if (!existingMember) {
-          if (!invitation.roleId) {
-            throw new Error("INVITATION_ROLE_MISSING");
-          }
-
-          await transaction.organizationMember.create({
-            data: {
-              personId: context.identity.person.id,
-              organizationId: invitation.organizationId,
-              roleId: invitation.roleId,
-            },
-          });
-        }
-
-        await transaction.organizationInvitation.update({
-          where: { id: invitation.id },
-          data: {
-            status: "ACCEPTED",
-            recipientPersonId: context.identity.person.id,
-            acceptedAt: new Date(),
-          },
-        });
-
-        return invitation.organizationId;
-      },
-    );
-
-    (await cookies()).set(ACTIVE_BUSINESS_COOKIE, acceptedOrganizationId, {
+    const result = await acceptOperationalInvitation({
+      email: identity.session.user.email,
+      idempotencyKey: parsedKey.data,
+      invitationId: parsedId.data,
+      personId: identity.person.id,
+    });
+    (await cookies()).set(ACTIVE_BUSINESS_COOKIE, result.organizationId ?? "", {
       httpOnly: true,
       maxAge: 60 * 60 * 24 * 180,
       path: "/",
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
     });
+    revalidatePath("/customer/work-invitations");
+    revalidatePath("/business");
+    return { status: "success", message: t("accepted"), replayed: result.replayed };
   } catch (error) {
-    if (error instanceof Error) {
-      if (error.message === "INVITATION_NOT_FOUND") {
-        return { status: "error", message: context.t("notFound") };
-      }
-
-      if (error.message === "INVITATION_EXPIRED") {
-        return { status: "error", message: context.t("expired") };
-      }
-
-      if (error.message === "INVITATION_ROLE_MISSING") {
-        return { status: "error", message: context.t("roleMissing") };
-      }
+    if (error instanceof BusinessOperationsError) {
+      return { status: "error", message: error.code === "INVITATION_EXPIRED" ? t("expired") : t("notFound") };
     }
-
-    logServerError("workInvitation.accept", error, {
-      invitationId: context.invitationId,
-    });
-    return { status: "error", message: context.t("failure") };
+    logServerError("workInvitation.accept", error, { invitationId: parsedId.data });
+    return { status: "error", message: t("failure") };
   }
-
-  revalidatePath("/customer/work-invitations");
-  revalidatePath("/business");
-  return { status: "success", message: context.t("accepted") };
 }
 
 export async function declineWorkInvitation(
   invitationId: string,
-  previousState: WorkInvitationActionState,
+  _previousState: WorkInvitationActionState,
 ): Promise<WorkInvitationActionState> {
-  void previousState;
-
-  const context = await getInvitationActionContext(invitationId);
-
-  if (!context.invitationId) {
-    return { status: "error", message: context.t("notFound") };
-  }
-
-  const normalizedEmail = normalizeEmail(context.identity.session.user.email);
-
+  void _previousState;
+  const [identity, t] = await Promise.all([
+    requireCustomerIdentity(),
+    getTranslations("WorkInvitations.messages"),
+  ]);
+  const parsedId = invitationIdSchema.safeParse(invitationId);
+  if (!parsedId.success) return { status: "error", message: t("notFound") };
   try {
-    const invitation = await prisma.organizationInvitation.findFirst({
-      where: {
-        id: context.invitationId,
-        status: "PENDING",
-        OR: [
-          { recipientPersonId: context.identity.person.id },
-          { normalizedEmail },
-        ],
-      },
-      select: { id: true },
+    const result = await declineOperationalInvitation({
+      email: identity.session.user.email,
+      invitationId: parsedId.data,
+      personId: identity.person.id,
     });
-
-    if (!invitation) {
-      return { status: "error", message: context.t("notFound") };
-    }
-
-    await prisma.organizationInvitation.update({
-      where: { id: invitation.id },
-      data: {
-        status: "DECLINED",
-        recipientPersonId: context.identity.person.id,
-        declinedAt: new Date(),
-      },
-    });
+    revalidatePath("/customer/work-invitations");
+    return { status: result.status === "EXPIRED" ? "error" : "success", message: result.status === "EXPIRED" ? t("expired") : t("declined") };
   } catch (error) {
-    logServerError("workInvitation.decline", error, {
-      invitationId: context.invitationId,
-    });
-    return { status: "error", message: context.t("failure") };
+    if (error instanceof BusinessOperationsError) return { status: "error", message: t("notFound") };
+    logServerError("workInvitation.decline", error, { invitationId: parsedId.data });
+    return { status: "error", message: t("failure") };
   }
-
-  revalidatePath("/customer/work-invitations");
-  return { status: "success", message: context.t("declined") };
 }

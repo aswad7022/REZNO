@@ -5,6 +5,7 @@ import type {
 } from "@prisma/client";
 
 export interface ServiceOfferingDetails {
+  id: string;
   branchId: string;
   branchName: string;
   price: string;
@@ -12,6 +13,7 @@ export interface ServiceOfferingDetails {
   pricingType: PricingType;
   isAvailable: boolean;
   readinessIssue: "HOURS" | "STAFF" | null;
+  version: string;
 }
 
 export interface ServiceDetails {
@@ -24,7 +26,9 @@ export interface ServiceDetails {
   status: ServiceStatus;
   staffSelectionMode: StaffSelectionMode;
   assignedMemberIds: string[];
+  staffAssignments: Array<{ id: string; memberId: string; version: string }>;
   offerings: ServiceOfferingDetails[];
+  version: string;
 }
 
 export interface ServiceCatalogData {
@@ -37,6 +41,8 @@ export interface ServiceCatalogData {
   categories: Array<{ id: string; slug: string; name: string }>;
   members: Array<{ id: string; name: string }>;
   canEdit: boolean;
+  organizationId: string;
+  organizationName: string;
 }
 
 export type ServiceField =
@@ -56,6 +62,10 @@ export interface ServiceActionState {
   status: "idle" | "success" | "error";
   message?: string;
   fieldErrors?: Partial<Record<ServiceField, string>>;
+  code?: string;
+  replayed?: boolean;
+  version?: string;
+  nextIdempotencyKey?: string;
 }
 
 export const initialServiceActionState: ServiceActionState = {

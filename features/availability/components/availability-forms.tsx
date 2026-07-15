@@ -5,6 +5,7 @@ import { LoaderCircle, Plus, Save } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -17,6 +18,8 @@ import {
 import { Switch } from "@/components/ui/switch";
 import {
   createBlockedTime,
+  deleteBlockedTime,
+  updateBlockedTime,
   updateMemberAvailability,
 } from "@/features/availability/actions/manage-availability";
 import {
@@ -29,12 +32,17 @@ type DayKey = "0" | "1" | "2" | "3" | "4" | "5" | "6";
 
 export function AvailabilityForm({
   branch,
+  idempotencyKey,
   memberId,
+  organizationId,
 }: {
   branch: MemberAvailabilityBranch;
+  idempotencyKey: string;
   memberId: string;
+  organizationId: string;
 }) {
   const t = useTranslations("WorkingHours");
+  const availabilityT = useTranslations("Availability");
   const common = useTranslations("Common");
   const action = updateMemberAvailability.bind(null, memberId, branch.id);
   const [state, formAction, pending] = useActionState(
@@ -44,6 +52,9 @@ export function AvailabilityForm({
 
   return (
     <form action={formAction} className="space-y-3">
+      <input type="hidden" name="contextOrganizationId" value={organizationId} />
+      <input type="hidden" name="expectedVersion" value={state.version ?? branch.version} />
+      <input type="hidden" name="idempotencyKey" value={state.nextIdempotencyKey ?? idempotencyKey} />
       {branch.days.map((day) => {
         const key = String(day.dayOfWeek) as DayKey;
         return (
@@ -81,6 +92,10 @@ export function AvailabilityForm({
         );
       })}
       <div className="flex items-center justify-between gap-3">
+        <Label className="flex items-center gap-2 font-normal">
+          <Checkbox name="confirmFutureBookings" />
+          {availabilityT("confirmImpact")}
+        </Label>
         <p
           aria-live="polite"
           className={
@@ -101,23 +116,41 @@ export function AvailabilityForm({
 }
 
 export function BlockedTimeForm({
+  blockedTime,
   branches,
+  idempotencyKey,
   memberId,
+  organizationId,
 }: {
+  blockedTime?: {
+    branchId: string;
+    endsAt: string;
+    id: string;
+    reason: string;
+    startsAt: string;
+    version: string;
+  };
   branches: Array<{ id: string; name: string }>;
+  idempotencyKey: string;
   memberId: string;
+  organizationId: string;
 }) {
   const t = useTranslations("BlockedTime");
   const [state, formAction, pending] = useActionState(
-    createBlockedTime.bind(null, memberId),
+    blockedTime
+      ? updateBlockedTime.bind(null, memberId, blockedTime.id)
+      : createBlockedTime.bind(null, memberId),
     initialBlockedTimeActionState,
   );
 
   return (
     <form action={formAction} className="grid gap-4 md:grid-cols-2">
+      <input type="hidden" name="contextOrganizationId" value={organizationId} />
+      <input type="hidden" name="idempotencyKey" value={state.nextIdempotencyKey ?? idempotencyKey} />
+      {blockedTime ? <input type="hidden" name="expectedVersion" value={state.version ?? blockedTime.version} /> : null}
       <div className="space-y-2">
         <Label htmlFor="blocked-branch">{t("branch")}</Label>
-        <Select name="branchId" defaultValue={branches[0]?.id}>
+        <Select name="branchId" defaultValue={blockedTime?.branchId ?? branches[0]?.id}>
           <SelectTrigger id="blocked-branch" className="w-full">
             <SelectValue />
           </SelectTrigger>
@@ -132,7 +165,7 @@ export function BlockedTimeForm({
       </div>
       <div className="space-y-2">
         <Label htmlFor="blocked-reason">{t("reason")}</Label>
-        <Input id="blocked-reason" name="reason" />
+        <Input id="blocked-reason" name="reason" defaultValue={blockedTime?.reason} />
       </div>
       <div className="space-y-2">
         <Label htmlFor="blocked-start">{t("startsAt")}</Label>
@@ -142,6 +175,7 @@ export function BlockedTimeForm({
           type="datetime-local"
           required
           dir="ltr"
+          defaultValue={blockedTime?.startsAt}
         />
       </div>
       <div className="space-y-2">
@@ -152,9 +186,14 @@ export function BlockedTimeForm({
           type="datetime-local"
           required
           dir="ltr"
+          defaultValue={blockedTime?.endsAt}
         />
       </div>
       <div className="flex items-center justify-between gap-3 md:col-span-2">
+        <Label className="flex items-center gap-2 font-normal">
+          <Checkbox name="confirmFutureBookings" />
+          {t("confirmImpact")}
+        </Label>
         <p
           aria-live="polite"
           className={
@@ -167,9 +206,41 @@ export function BlockedTimeForm({
         </p>
         <Button type="submit" disabled={pending || branches.length === 0}>
           {pending ? <LoaderCircle className="animate-spin" /> : <Plus />}
-          {t("add")}
+          {blockedTime ? t("save") : t("add")}
         </Button>
       </div>
+    </form>
+  );
+}
+
+export function DeleteBlockedTimeForm({
+  blockedTimeId,
+  expectedVersion,
+  idempotencyKey,
+  memberId,
+  organizationId,
+}: {
+  blockedTimeId: string;
+  expectedVersion: string;
+  idempotencyKey: string;
+  memberId: string;
+  organizationId: string;
+}) {
+  const t = useTranslations("BlockedTime");
+  const [state, formAction, pending] = useActionState(
+    deleteBlockedTime.bind(null, memberId, blockedTimeId),
+    initialBlockedTimeActionState,
+  );
+  return (
+    <form action={formAction} className="flex items-center gap-2">
+      <input type="hidden" name="contextOrganizationId" value={organizationId} />
+      <input type="hidden" name="expectedVersion" value={expectedVersion} />
+      <input type="hidden" name="idempotencyKey" value={state.nextIdempotencyKey ?? idempotencyKey} />
+      <Button type="submit" size="sm" variant="ghost" disabled={pending}>
+        {pending ? <LoaderCircle className="animate-spin" /> : null}
+        {t("remove")}
+      </Button>
+      {state.message ? <p aria-live="polite" className={state.status === "error" ? "text-xs text-destructive" : "text-xs text-muted-foreground"}>{state.message}</p> : null}
     </form>
   );
 }
