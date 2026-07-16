@@ -3,7 +3,11 @@ import test from "node:test";
 
 import type { PrismaClient } from "@prisma/client";
 
-import { seedBusinessDailyOperationsStage2cFixture } from "../../../scripts/staging/business-daily-operations-stage2c-seed-core";
+import {
+  BUSINESS_DAILY_OPERATIONS_STAGE2C_FIXTURE,
+  businessDailyOperationsStage2cBookingLane,
+  seedBusinessDailyOperationsStage2cFixture,
+} from "../../../scripts/staging/business-daily-operations-stage2c-seed-core";
 import {
   BUSINESS_DAILY_OPERATIONS_STAGE2C_CONFIRMATION_ENV,
   BUSINESS_DAILY_OPERATIONS_STAGE2C_CONFIRMATION_TOKEN,
@@ -65,4 +69,22 @@ test("Stage 2C fixture uses one bounded transaction", async () => {
   } as unknown as PrismaClient;
   assert.equal(await seedBusinessDailyOperationsStage2cFixture(database), expected);
   assert.deepEqual(options, { maxWait: 10_000, timeout: 60_000 });
+});
+
+test("Stage 2C fixture keeps generic change workflows in a non-Restaurant organization", () => {
+  const fixture = BUSINESS_DAILY_OPERATIONS_STAGE2C_FIXTURE;
+  assert.notEqual(fixture.organizations.a.id, fixture.organizations.generic.id);
+  assert.notEqual(fixture.organizations.b.id, fixture.organizations.generic.id);
+  assert.equal(
+    businessDailyOperationsStage2cBookingLane(fixture.bookings.customerRequest),
+    "generic-change",
+  );
+  assert.equal(
+    businessDailyOperationsStage2cBookingLane(fixture.bookings.businessProposal),
+    "generic-change",
+  );
+  assert.equal(
+    businessDailyOperationsStage2cBookingLane(fixture.bookings.pending),
+    "primary-daily",
+  );
 });

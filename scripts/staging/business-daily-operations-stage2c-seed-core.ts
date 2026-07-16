@@ -20,6 +20,10 @@ export const BUSINESS_DAILY_OPERATIONS_STAGE2C_FIXTURE = {
       id: "2c000000-0000-4000-8000-000000000003",
       slug: "rezno-qa-business-daily-operations-stage2c-b",
     },
+    generic: {
+      id: "2c000000-0000-4000-8000-000000000004",
+      slug: "rezno-qa-business-daily-operations-stage2c-generic",
+    },
   },
   people: {
     owner: ["2c000000-0000-4000-8000-000000000010", "fixture:stage2c:owner"],
@@ -36,6 +40,8 @@ export const BUSINESS_DAILY_OPERATIONS_STAGE2C_FIXTURE = {
     receptionistA: "2c000000-0000-4000-8000-000000000022",
     staffA: "2c000000-0000-4000-8000-000000000023",
     ownerB: "2c000000-0000-4000-8000-000000000024",
+    ownerGeneric: "2c000000-0000-4000-8000-000000000025",
+    managerGeneric: "2c000000-0000-4000-8000-000000000026",
   },
   members: {
     ownerA: "2c000000-0000-4000-8000-000000000030",
@@ -44,14 +50,19 @@ export const BUSINESS_DAILY_OPERATIONS_STAGE2C_FIXTURE = {
     staffA: "2c000000-0000-4000-8000-000000000033",
     staffB: "2c000000-0000-4000-8000-000000000034",
     ownerB: "2c000000-0000-4000-8000-000000000035",
+    ownerGeneric: "2c000000-0000-4000-8000-000000000036",
+    managerGeneric: "2c000000-0000-4000-8000-000000000037",
   },
   branches: {
     service: ["2c000000-0000-4000-8000-000000000040", "service"],
     restaurant: ["2c000000-0000-4000-8000-000000000041", "restaurant"],
     foreign: ["2c000000-0000-4000-8000-000000000042", "foreign"],
+    generic: ["2c000000-0000-4000-8000-000000000043", "generic"],
   },
   service: "2c000000-0000-4000-8000-000000000050",
   offering: "2c000000-0000-4000-8000-000000000051",
+  genericChangeService: "2c000000-0000-4000-8000-000000000052",
+  genericChangeOffering: "2c000000-0000-4000-8000-000000000053",
   branchAssignments: {
     receptionistService: "2c000000-0000-4000-8000-000000000060",
     receptionistRestaurant: "2c000000-0000-4000-8000-000000000061",
@@ -103,6 +114,14 @@ export const BUSINESS_DAILY_OPERATIONS_STAGE2C_FIXTURE = {
   },
   preorderItem: "2c000000-0000-4000-8000-000000000130",
 } as const;
+
+export function businessDailyOperationsStage2cBookingLane(bookingId: string) {
+  const fixture = BUSINESS_DAILY_OPERATIONS_STAGE2C_FIXTURE;
+  return bookingId === fixture.bookings.customerRequest ||
+      bookingId === fixture.bookings.businessProposal
+    ? "generic-change" as const
+    : "primary-daily" as const;
+}
 
 export class BusinessDailyOperationsStage2cSeedInvariantError extends Error {
   constructor(message: string) {
@@ -407,6 +426,12 @@ export async function seedBusinessDailyOperationsStage2cFixture(
       "REZNO QA Business Daily Operations Stage 2C Foreign",
       "BEAUTY",
     );
+    const organizationGeneric = await upsertOrganization(
+      transaction,
+      fixture.organizations.generic,
+      "REZNO QA Business Daily Operations Stage 2C Generic",
+      "BEAUTY",
+    );
     const people = {
       owner: await upsertPerson(transaction, fixture.people.owner, "Stage2C Owner", "+9647502000010"),
       manager: await upsertPerson(transaction, fixture.people.manager, "Stage2C Manager", "+9647502000011"),
@@ -422,6 +447,8 @@ export async function seedBusinessDailyOperationsStage2cFixture(
       receptionistA: await upsertRole(transaction, fixture.roles.receptionistA, organizationA.id, "RECEPTIONIST"),
       staffA: await upsertRole(transaction, fixture.roles.staffA, organizationA.id, "STAFF"),
       ownerB: await upsertRole(transaction, fixture.roles.ownerB, organizationB.id, "OWNER"),
+      ownerGeneric: await upsertRole(transaction, fixture.roles.ownerGeneric, organizationGeneric.id, "OWNER"),
+      managerGeneric: await upsertRole(transaction, fixture.roles.managerGeneric, organizationGeneric.id, "MANAGER"),
     };
     const members = {
       owner: await upsertMember(transaction, fixture.members.ownerA, organizationA.id, people.owner.id, roles.ownerA.id),
@@ -430,11 +457,14 @@ export async function seedBusinessDailyOperationsStage2cFixture(
       staffA: await upsertMember(transaction, fixture.members.staffA, organizationA.id, people.staffA.id, roles.staffA.id),
       staffB: await upsertMember(transaction, fixture.members.staffB, organizationA.id, people.staffB.id, roles.staffA.id),
       ownerB: await upsertMember(transaction, fixture.members.ownerB, organizationB.id, people.foreignOwner.id, roles.ownerB.id),
+      ownerGeneric: await upsertMember(transaction, fixture.members.ownerGeneric, organizationGeneric.id, people.owner.id, roles.ownerGeneric.id),
+      managerGeneric: await upsertMember(transaction, fixture.members.managerGeneric, organizationGeneric.id, people.manager.id, roles.managerGeneric.id),
     };
     const branches = {
       service: await upsertBranch(transaction, fixture.branches.service, organizationA.id, "Stage2C Service Branch"),
       restaurant: await upsertBranch(transaction, fixture.branches.restaurant, organizationA.id, "Stage2C Restaurant Branch"),
       foreign: await upsertBranch(transaction, fixture.branches.foreign, organizationB.id, "Stage2C Foreign Branch"),
+      generic: await upsertBranch(transaction, fixture.branches.generic, organizationGeneric.id, "Stage2C Generic Change Branch"),
     };
     await assignBranch(transaction, fixture.branchAssignments.receptionistService, branches.service.id, members.receptionist.id);
     await assignBranch(transaction, fixture.branchAssignments.receptionistRestaurant, branches.restaurant.id, members.receptionist.id);
@@ -473,6 +503,39 @@ export async function seedBusinessDailyOperationsStage2cFixture(
         id: fixture.offering,
         price: "25000",
         serviceId: service.id,
+      },
+      update: { durationMinutes: 30, isAvailable: true, price: "25000" },
+    });
+    const genericChangeService = await transaction.service.upsert({
+      where: { id: fixture.genericChangeService },
+      create: {
+        categoryId: category.id,
+        id: fixture.genericChangeService,
+        name: "Stage2C Generic Change Service",
+        organizationId: organizationGeneric.id,
+        staffSelectionMode: "NONE",
+      },
+      update: {
+        categoryId: category.id,
+        deletedAt: null,
+        name: "Stage2C Generic Change Service",
+        staffSelectionMode: "NONE",
+        status: "ACTIVE",
+      },
+    });
+    const genericChangeOffering = await transaction.branchService.upsert({
+      where: {
+        branchId_serviceId: {
+          branchId: branches.generic.id,
+          serviceId: genericChangeService.id,
+        },
+      },
+      create: {
+        branchId: branches.generic.id,
+        durationMinutes: 30,
+        id: fixture.genericChangeOffering,
+        price: "25000",
+        serviceId: genericChangeService.id,
       },
       update: { durationMinutes: 30, isAvailable: true, price: "25000" },
     });
@@ -541,14 +604,24 @@ export async function seedBusinessDailyOperationsStage2cFixture(
     ] as const;
     const genericBookings = new Map<string, Awaited<ReturnType<typeof upsertBooking>>>();
     for (const [id, status, days, hour, memberId] of genericSpecs) {
+      const usesGenericChangeOrganization =
+        businessDailyOperationsStage2cBookingLane(id) === "generic-change";
       genericBookings.set(id, await upsertBooking(transaction, {
-        branchId: branches.service.id,
-        branchServiceId: offering.id,
+        branchId: usesGenericChangeOrganization
+          ? branches.generic.id
+          : branches.service.id,
+        branchServiceId: usesGenericChangeOrganization
+          ? genericChangeOffering.id
+          : offering.id,
         customerId: people.customer.id,
         id,
-        memberId,
-        organizationId: organizationA.id,
-        serviceName: service.name,
+        memberId: usesGenericChangeOrganization ? undefined : memberId,
+        organizationId: usesGenericChangeOrganization
+          ? organizationGeneric.id
+          : organizationA.id,
+        serviceName: usesGenericChangeOrganization
+          ? genericChangeService.name
+          : service.name,
         startsAt: instant(days, hour),
         status,
       }));
@@ -562,7 +635,7 @@ export async function seedBusinessDailyOperationsStage2cFixture(
         bookingUpdatedAtSnapshot: customerRequestBooking.updatedAt,
         id: fixture.changeRequests.customer,
         proposedEndsAt: instant(9, 12, 30),
-        proposedMemberId: members.staffA.id,
+        proposedMemberId: null,
         proposedStartsAt: instant(9, 12),
         requestedByPersonId: people.customer.id,
       },
@@ -570,7 +643,7 @@ export async function seedBusinessDailyOperationsStage2cFixture(
         bookingId: customerRequestBooking.id,
         bookingUpdatedAtSnapshot: customerRequestBooking.updatedAt,
         proposedEndsAt: instant(9, 12, 30),
-        proposedMemberId: members.staffA.id,
+        proposedMemberId: null,
         proposedStartsAt: instant(9, 12),
         requestedByPersonId: people.customer.id,
         respondedAt: null,
@@ -584,7 +657,7 @@ export async function seedBusinessDailyOperationsStage2cFixture(
         bookingUpdatedAtSnapshot: businessProposalBooking.updatedAt,
         id: fixture.changeRequests.business,
         proposedEndsAt: instant(10, 13, 30),
-        proposedMemberId: members.staffB.id,
+        proposedMemberId: null,
         proposedStartsAt: instant(10, 13),
         requestedByPersonId: people.owner.id,
       },
@@ -592,7 +665,7 @@ export async function seedBusinessDailyOperationsStage2cFixture(
         bookingId: businessProposalBooking.id,
         bookingUpdatedAtSnapshot: businessProposalBooking.updatedAt,
         proposedEndsAt: instant(10, 13, 30),
-        proposedMemberId: members.staffB.id,
+        proposedMemberId: null,
         proposedStartsAt: instant(10, 13),
         requestedByPersonId: people.owner.id,
         respondedAt: null,
@@ -671,7 +744,7 @@ export async function seedBusinessDailyOperationsStage2cFixture(
       menuCategories: Object.keys(menuCategories).length,
       menuItems: Object.keys(menuItems).length,
       namespace: fixture.namespace,
-      organizations: 2,
+      organizations: 3,
       restaurantReservations: restaurantSpecs.length,
       roles: Object.keys(roles).length,
       tables: Object.keys(tables).length,
