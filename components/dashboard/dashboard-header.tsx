@@ -27,6 +27,7 @@ export function DashboardHeader({
   canAccessAdmin,
   canAccessCustomerDashboard,
   canAccessBusinessDashboard,
+  canAccessMessages = true,
   vertical,
   activeBusinessId,
   businesses = [],
@@ -41,6 +42,7 @@ export function DashboardHeader({
   canAccessAdmin?: boolean;
   canAccessCustomerDashboard?: boolean;
   canAccessBusinessDashboard?: boolean;
+  canAccessMessages?: boolean;
   vertical?: BusinessVertical;
   activeBusinessId?: string;
   businesses?: Array<{ id: string; name: string }>;
@@ -78,11 +80,13 @@ export function DashboardHeader({
             />
           ) : null}
           <DashboardCommandTrigger />
-          <DashboardMessagesShortcut
-            href={messagesHref}
-            unreadCount={unreadMessages}
-            items={messagePreviews}
-          />
+          {canAccessMessages ? (
+            <DashboardMessagesShortcut
+              href={messagesHref}
+              unreadCount={unreadMessages}
+              items={messagePreviews}
+            />
+          ) : null}
           <DashboardNotifications role={role} items={notifications} />
           <DashboardLanguageSwitcher />
           <DashboardThemeToggle />

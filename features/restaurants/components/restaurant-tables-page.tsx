@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { Armchair, Building2, Plus } from "lucide-react";
 
 import { DashboardEmpty } from "@/components/dashboard/dashboard-empty";
@@ -16,11 +17,19 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { RestaurantTableForm } from "@/features/restaurants/components/restaurant-forms";
+import {
+  RestaurantCatalogLifecycleForm,
+  RestaurantTableForm,
+} from "@/features/restaurants/components/restaurant-forms";
 import { getRestaurantTables } from "@/features/restaurants/services/restaurant-management";
 
-export async function RestaurantTablesPage() {
-  const { tables, branches, canEdit } = await getRestaurantTables();
+export async function RestaurantTablesPage({
+  showCreateForm = false,
+}: {
+  showCreateForm?: boolean;
+}) {
+  const { tables, branches, canEdit, organizationId, organizationName } =
+    await getRestaurantTables();
 
   return (
     <DashboardShell>
@@ -43,12 +52,35 @@ export async function RestaurantTablesPage() {
                     أضف طاولة حقيقية لاستخدامها لاحقًا في حجوزات المطاعم.
                   </DialogDescription>
                 </DialogHeader>
-                <RestaurantTableForm branches={branches} />
+                <RestaurantTableForm
+                  branches={branches}
+                  contextOrganizationId={organizationId}
+                  idempotencyKey={randomUUID()}
+                />
               </DialogContent>
             </Dialog>
           ) : null
         }
       />
+
+      <p className="rounded-2xl border bg-muted/30 px-4 py-3 text-sm">
+        النشاط النشط: <strong>{organizationName}</strong>
+      </p>
+
+      {canEdit && showCreateForm ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>إضافة طاولة جديدة</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <RestaurantTableForm
+              branches={branches}
+              contextOrganizationId={organizationId}
+              idempotencyKey={randomUUID()}
+            />
+          </CardContent>
+        </Card>
+      ) : null}
 
       {tables.length === 0 ? (
         <DashboardEmpty
@@ -71,7 +103,11 @@ export async function RestaurantTablesPage() {
                       حدّد الاسم والسعة والمنطقة والفرع إن وجد.
                     </DialogDescription>
                   </DialogHeader>
-                  <RestaurantTableForm branches={branches} />
+                  <RestaurantTableForm
+                    branches={branches}
+                    contextOrganizationId={organizationId}
+                    idempotencyKey={randomUUID()}
+                  />
                 </DialogContent>
               </Dialog>
             ) : null
@@ -124,12 +160,54 @@ export async function RestaurantTablesPage() {
                       <DialogHeader>
                         <DialogTitle>تعديل الطاولة</DialogTitle>
                         <DialogDescription>
-                          التعديل لا يؤثر على منطق الحجز الحالي.
+                          تحقّق من الفرع والسعة قبل حفظ التغيير.
                         </DialogDescription>
                       </DialogHeader>
-                      <RestaurantTableForm branches={branches} table={table} />
+                      <RestaurantTableForm
+                        branches={branches}
+                        contextOrganizationId={organizationId}
+                        idempotencyKey={randomUUID()}
+                        table={table}
+                      />
                     </DialogContent>
                   </Dialog>
+                ) : null}
+                {canEdit && table.version ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    <LifecycleDialog
+                      description={
+                        table.isActive
+                          ? "لن تُستخدم الطاولة للحجوزات الجديدة. تُرفض العملية إذا كانت مرتبطة بحجز مستقبلي نشط."
+                          : "ستصبح الطاولة متاحة للتخصيص في الحجوزات الجديدة."
+                      }
+                      title={table.isActive ? "تعطيل الطاولة؟" : "تفعيل الطاولة؟"}
+                      trigger={table.isActive ? "تعطيل" : "تفعيل"}
+                    >
+                      <RestaurantCatalogLifecycleForm
+                        action="table-active"
+                        active={!table.isActive}
+                        contextOrganizationId={organizationId}
+                        expectedVersion={table.version}
+                        id={table.id}
+                        idempotencyKey={randomUUID()}
+                        label={table.isActive ? "تأكيد التعطيل" : "تأكيد التفعيل"}
+                      />
+                    </LifecycleDialog>
+                    <LifecycleDialog
+                      description="لا يمكن حذف طاولة لها أي علاقة تاريخية بحجز؛ استخدم التعطيل حينها."
+                      title="حذف الطاولة نهائيًا؟"
+                      trigger="حذف"
+                    >
+                      <RestaurantCatalogLifecycleForm
+                        action="table-remove"
+                        contextOrganizationId={organizationId}
+                        expectedVersion={table.version}
+                        id={table.id}
+                        idempotencyKey={randomUUID()}
+                        label="تأكيد الحذف"
+                      />
+                    </LifecycleDialog>
+                  </div>
                 ) : null}
               </CardContent>
             </Card>
@@ -137,6 +215,33 @@ export async function RestaurantTablesPage() {
         </div>
       )}
     </DashboardShell>
+  );
+}
+
+function LifecycleDialog({
+  children,
+  description,
+  title,
+  trigger,
+}: {
+  children: React.ReactNode;
+  description: string;
+  title: string;
+  trigger: string;
+}) {
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button size="sm" variant="outline">{trigger}</Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
+        </DialogHeader>
+        {children}
+      </DialogContent>
+    </Dialog>
   );
 }
 

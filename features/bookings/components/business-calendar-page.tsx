@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import Link from "next/link";
 import {
   CalendarDays,
@@ -21,14 +22,16 @@ import {
   DashboardShell,
 } from "@/components/dashboard/dashboard-shell";
 import {
-  getAvailableTransitions,
-} from "@/features/bookings/policies/booking-lifecycle";
-import { transitionBusinessBooking } from "@/features/bookings/actions/manage-bookings";
-import type { BookingLifecycleStatus } from "@/features/bookings/types";
+  type BookingStatus,
+} from "@prisma/client";
+import { BookingTransitionForm } from "@/features/business-operations/components/daily-operation-forms";
+import { listOperationalCustomerChangeRequests } from "@/features/business-operations/services/booking-operations";
+import { currentBusinessOperationReference } from "@/features/business-operations/services/identity-adapter";
 import { getBusinessCalendarData } from "@/features/bookings/services/business-calendar";
 import type {
   BusinessCalendarBookingItem,
   BusinessCalendarSearchParams,
+  StaffSelfCalendarBookingItem,
 } from "@/features/bookings/services/business-calendar";
 import { openBookingConversation } from "@/features/messages/actions/messages";
 
@@ -46,6 +49,7 @@ function buildCalendarHref(
 ) {
   const query = new URLSearchParams();
   const merged = { ...params, ...updates };
+  if (!("cursor" in updates)) delete merged.cursor;
   for (const [key, value] of Object.entries(merged)) {
     if (value && value !== "all") query.set(key, value);
   }
@@ -65,7 +69,7 @@ export async function BusinessCalendarPage({
     getFormatter(),
   ]);
 
-  const summaryCards = [
+  const summaryCards = data.summary ? [
     {
       label: t("totalBookings"),
       value: data.summary.total,
@@ -92,7 +96,12 @@ export async function BusinessCalendarPage({
       value: data.summary.restaurantReservations,
       icon: Utensils,
     },
-  ];
+  ] : [];
+  const pendingCustomerRequests = data.scope === "STAFF_SELF"
+    ? []
+    : await listOperationalCustomerChangeRequests(
+        await currentBusinessOperationReference("BOOKING_CHANGE_REQUEST_READ"),
+      );
 
   return (
     <DashboardShell>
@@ -100,6 +109,38 @@ export async function BusinessCalendarPage({
         title={t("title")}
         description={t("description")}
       />
+
+      <p className="rounded-2xl border bg-muted/30 px-4 py-3 text-sm">
+        النشاط النشط: <strong>{data.organizationName}</strong> · نطاق الدور: <strong>{data.scope}</strong>
+      </p>
+
+      {pendingCustomerRequests.length > 0 ? (
+        <section aria-labelledby="pending-customer-requests" className="space-y-3">
+          <h2 id="pending-customer-requests" className="text-lg font-semibold">
+            طلبات تغيير العملاء المعلّقة
+          </h2>
+          <div className="grid gap-3 lg:grid-cols-2">
+            {pendingCustomerRequests.map((request) => (
+              <Card key={request.id} className="border-indigo-300/40">
+                <CardContent className="space-y-2 p-4 text-sm">
+                  <p className="font-semibold">{request.customerName} · {request.serviceName}</p>
+                  <p className="text-muted-foreground">{request.branchName}</p>
+                  <p>
+                    {format.dateTimeRange(
+                      new Date(request.proposedStartsAt),
+                      new Date(request.proposedEndsAt),
+                      { dateStyle: "medium", timeStyle: "short", timeZone: request.timezone },
+                    )}
+                  </p>
+                  <Button asChild size="sm" variant="outline">
+                    <Link href={`/business/bookings/${request.bookingId}`}>فتح الطلب ومعالجته</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <section aria-labelledby="daily-summary" className="space-y-4">
         <div className="flex flex-col gap-3 rounded-3xl border border-primary/10 bg-gradient-to-l from-primary/10 via-indigo-500/5 to-background p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
@@ -147,8 +188,9 @@ export async function BusinessCalendarPage({
           </div>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-          {summaryCards.map((item) => (
+        {data.summary ? (
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+            {summaryCards.map((item) => (
             <Card key={item.label} className="border-primary/10">
               <CardContent className="flex items-center justify-between gap-3 p-4">
                 <div>
@@ -160,11 +202,13 @@ export async function BusinessCalendarPage({
                 </span>
               </CardContent>
             </Card>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : null}
       </section>
 
-      <Card className="mt-6 border-primary/10">
+      {data.scope !== "STAFF_SELF" ? (
+        <Card className="mt-6 border-primary/10">
         <CardContent className="p-4">
           <form className="grid gap-3 md:grid-cols-2 xl:grid-cols-7">
             <input type="hidden" name="view" value={data.view} />
@@ -230,7 +274,8 @@ export async function BusinessCalendarPage({
             </div>
           </form>
         </CardContent>
-      </Card>
+        </Card>
+      ) : null}
 
       <div className="mt-6 flex flex-wrap gap-2" aria-label={t("views")}>
         {[
@@ -259,16 +304,36 @@ export async function BusinessCalendarPage({
           />
         ) : (
           <div className="grid gap-4 xl:grid-cols-2">
-            {data.bookings.map((booking) => (
-              <BusinessCalendarBookingCard
-                key={booking.id}
-                booking={booking}
-                canOperate={data.canOperate}
-              />
-            ))}
+            {data.scope === "STAFF_SELF"
+              ? data.bookings.map((booking) => (
+                  <StaffCalendarBookingCard key={booking.id} booking={booking} />
+                ))
+              : data.bookings.map((booking) => (
+                  <BusinessCalendarBookingCard
+                    key={booking.id}
+                    booking={booking}
+                    canMessage={data.scope === "MANAGEMENT"}
+                    organizationId={data.organizationId}
+                  />
+                ))}
           </div>
         )}
       </section>
+      {data.nextCursor ? (
+        <div className="mt-6 flex justify-center">
+          <Button asChild variant="outline">
+            <Link
+              href={buildCalendarHref(searchParams, {
+                cursor: data.nextCursor,
+                date: data.selectedDate,
+                view: data.view,
+              })}
+            >
+              {t("nextPage")}
+            </Link>
+          </Button>
+        </div>
+      ) : null}
     </DashboardShell>
   );
 }
@@ -310,17 +375,19 @@ function NativeSelect({
 
 async function BusinessCalendarBookingCard({
   booking,
-  canOperate,
+  canMessage,
+  organizationId,
 }: {
   booking: BusinessCalendarBookingItem;
-  canOperate: boolean;
+  canMessage: boolean;
+  organizationId: string;
 }) {
   const [t, bookingsT, format] = await Promise.all([
     getTranslations("BusinessCalendar"),
     getTranslations("Bookings"),
     getFormatter(),
   ]);
-  const transitions = getAvailableTransitions(booking.status);
+  const transitions = booking.permittedTransitions;
 
   return (
     <Card className="border-primary/10 bg-card/95 shadow-sm">
@@ -366,7 +433,7 @@ async function BusinessCalendarBookingCard({
           {booking.type === "service" ? (
             <InfoLine
               label={t("employee")}
-              value={booking.memberName ?? t("anyEmployee")}
+              value={booking.member?.name ?? t("anyEmployee")}
             />
           ) : null}
           <InfoLine label={t("price")} value={booking.price} />
@@ -406,30 +473,75 @@ async function BusinessCalendarBookingCard({
           </div>
         ) : null}
 
-        {canOperate ? (
-          <div className="flex flex-wrap gap-2 pt-2">
+        <div className="flex flex-wrap gap-2 pt-2">
+          <Button asChild size="sm" variant="outline">
+            <Link
+              href={booking.type === "restaurant"
+                ? `/business/reservations/${booking.id}`
+                : `/business/bookings/${booking.id}`}
+            >
+              {bookingsT("viewDetails")}
+            </Link>
+          </Button>
+          {canMessage ? (
             <form action={openBookingConversation.bind(null, "business", booking.id)}>
               <Button size="sm" variant="outline" type="submit">
                 <MessageCircle className="size-4" />
                 {t("messageCustomer")}
               </Button>
             </form>
-            {transitions.map((status) => (
-              <form
-                key={status}
-                action={transitionBusinessBooking.bind(null, booking.id)}
-              >
-                <input type="hidden" name="status" value={status} />
-                <Button
-                  size="sm"
-                  type="submit"
-                  variant={status === "CANCELLED" ? "destructive" : "outline"}
-                >
-                  {transitionLabel(t, status)}
-                </Button>
-              </form>
-            ))}
-          </div>
+          ) : null}
+          {transitions.map((status) => (
+            <BookingTransitionForm
+              key={status}
+              bookingId={booking.id}
+              contextOrganizationId={organizationId}
+              expectedVersion={booking.version}
+              idempotencyKey={randomUUID()}
+              label={transitionLabel(t, status)}
+              nextStatus={status}
+            />
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+async function StaffCalendarBookingCard({
+  booking,
+}: {
+  booking: StaffSelfCalendarBookingItem;
+}) {
+  const [t, bookingsT, format] = await Promise.all([
+    getTranslations("BusinessCalendar"),
+    getTranslations("Bookings"),
+    getFormatter(),
+  ]);
+  return (
+    <Card className="border-primary/10 bg-card/95 shadow-sm">
+      <CardHeader className="flex-row items-start justify-between gap-4">
+        <div>
+          <CardTitle className="text-lg">{booking.serviceName}</CardTitle>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {format.dateTimeRange(booking.startsAt, booking.endsAt, {
+              dateStyle: "medium",
+              hour12: true,
+              timeStyle: "short",
+              timeZone: booking.timezone,
+            })}
+          </p>
+        </div>
+        <Badge>{bookingsT(`statuses.${booking.status}`)}</Badge>
+      </CardHeader>
+      <CardContent className="space-y-3 text-sm">
+        <InfoLine label={t("customer")} value={booking.customerName} />
+        <InfoLine label={t("branch")} value={booking.branchName} />
+        {booking.notes ? (
+          <p className="rounded-xl bg-muted p-3">
+            <span className="font-medium">{t("notes")}: </span>
+            {booking.notes}
+          </p>
         ) : null}
       </CardContent>
     </Card>
@@ -438,7 +550,7 @@ async function BusinessCalendarBookingCard({
 
 function transitionLabel(
   t: Awaited<ReturnType<typeof getTranslations>>,
-  status: BookingLifecycleStatus,
+  status: BookingStatus,
 ) {
   if (status === "CONFIRMED") return t("confirmBooking");
   if (status === "CANCELLED") return t("cancelBooking");

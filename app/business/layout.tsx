@@ -46,12 +46,19 @@ export default async function BusinessDashboardLayout({
       role="business"
       user={toDashboardUser(session.user)}
       notifications={notifications}
-      messagesHref={canViewAdminMessages ? "/admin/messages" : "/business/messages"}
+      messagesHref={
+        canViewAdminMessages
+          ? "/admin/messages"
+          : canViewBusinessMessages
+            ? "/business/messages"
+            : ""
+      }
       unreadMessages={unreadMessages}
       messagePreviews={messagePreviews}
       isSuperAdmin={Boolean(adminAccess?.isSuperAdmin)}
       canAccessAdmin={canAccessAdmin}
       canAccessCustomerDashboard
+      canAccessMessages={canViewAdminMessages || canViewBusinessMessages}
       publicSlug={membership.organization.slug}
       vertical={membership.organization.vertical}
       activeBusinessId={membership.organizationId}

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { ImageIcon, Plus, Utensils } from "lucide-react";
 
 import { DashboardEmpty } from "@/components/dashboard/dashboard-empty";
@@ -19,20 +20,24 @@ import {
 import {
   MenuCategoryForm,
   MenuItemForm,
+  RestaurantCatalogLifecycleForm,
 } from "@/features/restaurants/components/restaurant-forms";
 import { getRestaurantMenu } from "@/features/restaurants/services/restaurant-management";
 
-export async function RestaurantMenuPage() {
-  const { categories, canEdit } = await getRestaurantMenu();
+export async function RestaurantMenuPage({
+  showCreateForm = false,
+}: {
+  showCreateForm?: boolean;
+}) {
+  const { categories, canEdit, organizationId, organizationName } =
+    await getRestaurantMenu();
   const categoryOptions = categories.map((category) => ({
     id: category.id,
-    businessId: category.businessId,
     name: category.name,
     description: category.description,
     sortOrder: category.sortOrder,
     isActive: category.isActive,
-    createdAt: category.createdAt,
-    updatedAt: category.updatedAt,
+    version: category.version,
   }));
 
   return (
@@ -43,21 +48,46 @@ export async function RestaurantMenuPage() {
         actions={
           canEdit ? (
             <div className="flex flex-wrap gap-2">
-              <MenuCategoryDialog />
+              <MenuCategoryDialog contextOrganizationId={organizationId} />
               {categoryOptions.length > 0 ? (
-                <MenuItemDialog categories={categoryOptions} />
+                <MenuItemDialog
+                  categories={categoryOptions}
+                  contextOrganizationId={organizationId}
+                />
               ) : null}
             </div>
           ) : null
         }
       />
 
+      <p className="rounded-2xl border bg-muted/30 px-4 py-3 text-sm">
+        النشاط النشط: <strong>{organizationName}</strong>
+      </p>
+
+      {canEdit && showCreateForm ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>إضافة قسم للقائمة</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <MenuCategoryForm
+              contextOrganizationId={organizationId}
+              idempotencyKey={randomUUID()}
+            />
+          </CardContent>
+        </Card>
+      ) : null}
+
       {categories.length === 0 ? (
         <DashboardEmpty
           icon={Utensils}
           title="لا توجد أقسام في القائمة"
           description="أضف قسمًا مثل المشروبات أو الأطباق الرئيسية، ثم أضف الأصناف داخله."
-          action={canEdit ? <MenuCategoryDialog /> : null}
+          action={
+            canEdit ? (
+              <MenuCategoryDialog contextOrganizationId={organizationId} />
+            ) : null
+          }
         />
       ) : (
         <div className="space-y-5">
@@ -96,9 +126,46 @@ export async function RestaurantMenuPage() {
                             ترتيب القسم يتحكم بمكان ظهوره في الصفحة العامة.
                           </DialogDescription>
                         </DialogHeader>
-                        <MenuCategoryForm category={category} />
+                        <MenuCategoryForm
+                          category={category}
+                          contextOrganizationId={organizationId}
+                          idempotencyKey={randomUUID()}
+                        />
                       </DialogContent>
                     </Dialog>
+                  ) : null}
+                  {canEdit && category.version ? (
+                    <CatalogLifecycleDialog
+                      description="إخفاء القسم يمنعه من الظهور في اكتشاف الطلبات الجديدة ولا يغيّر اللقطات التاريخية."
+                      title={category.isActive ? "تعطيل القسم؟" : "تفعيل القسم؟"}
+                      trigger={category.isActive ? "تعطيل" : "تفعيل"}
+                    >
+                      <RestaurantCatalogLifecycleForm
+                        action="category-active"
+                        active={!category.isActive}
+                        contextOrganizationId={organizationId}
+                        expectedVersion={category.version}
+                        id={category.id}
+                        idempotencyKey={randomUUID()}
+                        label={category.isActive ? "تأكيد التعطيل" : "تأكيد التفعيل"}
+                      />
+                    </CatalogLifecycleDialog>
+                  ) : null}
+                  {canEdit && category.version ? (
+                    <CatalogLifecycleDialog
+                      description="يُرفض الحذف ما دام القسم يحتوي على أصناف."
+                      title="حذف القسم نهائيًا؟"
+                      trigger="حذف"
+                    >
+                      <RestaurantCatalogLifecycleForm
+                        action="category-remove"
+                        contextOrganizationId={organizationId}
+                        expectedVersion={category.version}
+                        id={category.id}
+                        idempotencyKey={randomUUID()}
+                        label="تأكيد الحذف"
+                      />
+                    </CatalogLifecycleDialog>
                   ) : null}
                 </div>
               </CardHeader>
@@ -111,7 +178,10 @@ export async function RestaurantMenuPage() {
                     </p>
                     {canEdit ? (
                       <div className="mt-4">
-                        <MenuItemDialog categories={categoryOptions} />
+                        <MenuItemDialog
+                          categories={categoryOptions}
+                          contextOrganizationId={organizationId}
+                        />
                       </div>
                     ) : null}
                   </div>
@@ -171,10 +241,45 @@ export async function RestaurantMenuPage() {
                                   </DialogHeader>
                                   <MenuItemForm
                                     categories={categoryOptions}
+                                    contextOrganizationId={organizationId}
+                                    idempotencyKey={randomUUID()}
                                     item={item}
                                   />
                                 </DialogContent>
                               </Dialog>
+                            ) : null}
+                            {canEdit && item.version ? (
+                              <div className="mt-2 grid grid-cols-2 gap-2">
+                                <CatalogLifecycleDialog
+                                  description="سيبقى الصنف ظاهرًا في الحجوزات التاريخية، لكنه لن يُعرض للطلبات الجديدة."
+                                  title={item.isAvailable ? "إيقاف توفر الصنف؟" : "إتاحة الصنف؟"}
+                                  trigger={item.isAvailable ? "غير متاح" : "إتاحة"}
+                                >
+                                  <RestaurantCatalogLifecycleForm
+                                    action="item-available"
+                                    active={!item.isAvailable}
+                                    contextOrganizationId={organizationId}
+                                    expectedVersion={item.version}
+                                    id={item.id}
+                                    idempotencyKey={randomUUID()}
+                                    label={item.isAvailable ? "تأكيد الإيقاف" : "تأكيد الإتاحة"}
+                                  />
+                                </CatalogLifecycleDialog>
+                                <CatalogLifecycleDialog
+                                  description="يُرفض الحذف إذا استُخدم الصنف في أي طلب مسبق؛ استخدم عدم الإتاحة حينها."
+                                  title="حذف الصنف نهائيًا؟"
+                                  trigger="حذف"
+                                >
+                                  <RestaurantCatalogLifecycleForm
+                                    action="item-remove"
+                                    contextOrganizationId={organizationId}
+                                    expectedVersion={item.version}
+                                    id={item.id}
+                                    idempotencyKey={randomUUID()}
+                                    label="تأكيد الحذف"
+                                  />
+                                </CatalogLifecycleDialog>
+                              </div>
                             ) : null}
                           </div>
                         </CardContent>
@@ -191,7 +296,11 @@ export async function RestaurantMenuPage() {
   );
 }
 
-function MenuCategoryDialog() {
+function MenuCategoryDialog({
+  contextOrganizationId,
+}: {
+  contextOrganizationId: string;
+}) {
   return (
     <Dialog>
       <DialogTrigger asChild>
@@ -207,7 +316,10 @@ function MenuCategoryDialog() {
             مثال: مشروبات، حلويات، أطباق رئيسية.
           </DialogDescription>
         </DialogHeader>
-        <MenuCategoryForm />
+        <MenuCategoryForm
+          contextOrganizationId={contextOrganizationId}
+          idempotencyKey={randomUUID()}
+        />
       </DialogContent>
     </Dialog>
   );
@@ -215,8 +327,17 @@ function MenuCategoryDialog() {
 
 function MenuItemDialog({
   categories,
+  contextOrganizationId,
 }: {
-  categories: Array<{ id: string; name: string; businessId: string; description: string | null; sortOrder: number; isActive: boolean; createdAt: Date; updatedAt: Date }>;
+  categories: Array<{
+    id: string;
+    name: string;
+    description: string | null;
+    sortOrder: number;
+    isActive: boolean;
+    version?: string;
+  }>;
+  contextOrganizationId: string;
 }) {
   return (
     <Dialog>
@@ -233,7 +354,38 @@ function MenuItemDialog({
             أضف السعر والصورة وحالة توفر الصنف.
           </DialogDescription>
         </DialogHeader>
-        <MenuItemForm categories={categories} />
+        <MenuItemForm
+          categories={categories}
+          contextOrganizationId={contextOrganizationId}
+          idempotencyKey={randomUUID()}
+        />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function CatalogLifecycleDialog({
+  children,
+  description,
+  title,
+  trigger,
+}: {
+  children: React.ReactNode;
+  description: string;
+  title: string;
+  trigger: string;
+}) {
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button size="sm" variant="outline">{trigger}</Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
+        </DialogHeader>
+        {children}
       </DialogContent>
     </Dialog>
   );
