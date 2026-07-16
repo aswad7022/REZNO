@@ -21,6 +21,7 @@
     "seed:staging:restaurant-qa": "tsx scripts/staging/seed-restaurant-qa.ts",
     "seed:staging:business-operations-stage2a": "tsx scripts/staging/seed-business-operations-stage2a.ts",
     "seed:staging:business-workforce-stage2b": "tsx scripts/staging/seed-business-workforce-stage2b.ts",
+    "seed:staging:business-daily-operations-stage2c": "tsx scripts/staging/seed-business-daily-operations-stage2c.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {
