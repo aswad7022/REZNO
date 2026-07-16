@@ -1,7 +1,8 @@
 "use client";
 
 import { useActionState } from "react";
-import { LoaderCircle, UserPlus } from "lucide-react";
+import type { SystemRole } from "@prisma/client";
+import { LoaderCircle, Save, UserPlus } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
@@ -16,248 +17,56 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  addTeamMember,
-  updateTeamMember,
-} from "@/features/team/actions/manage-team-member";
+import { addTeamMember, updateTeamMember } from "@/features/team/actions/manage-team-member";
 import {
   initialTeamMemberActionState,
-  type TeamBranchOption,
   type TeamMemberDetails,
 } from "@/features/team/types";
 
 export function TeamMemberForm({
-  branches,
+  actorRole,
+  defaultExpiresAt,
+  idempotencyKey,
   member,
+  organizationId,
 }: {
-  branches: TeamBranchOption[];
+  actorRole: SystemRole;
+  defaultExpiresAt?: string;
+  idempotencyKey: string;
   member?: TeamMemberDetails;
+  organizationId: string;
 }) {
   const t = useTranslations("Team");
   const common = useTranslations("Common");
-  const action = member
-    ? updateTeamMember.bind(null, member.id)
-    : addTeamMember;
   const [state, formAction, pending] = useActionState(
-    action,
+    member ? updateTeamMember.bind(null, member.id) : addTeamMember,
     initialTeamMemberActionState,
   );
-
   return (
     <form action={formAction} className="space-y-5">
-      <div className="grid gap-5 md:grid-cols-2">
-        {!member ? (
-          <div className="space-y-2">
-            <Label htmlFor="team-email">{t("fields.email")}</Label>
-            <Input
-              id="team-email"
-              name="email"
-              type="email"
-              dir="ltr"
-              required
-              aria-invalid={Boolean(state.fieldErrors?.email)}
-              aria-describedby={
-                state.fieldErrors?.email ? "team-email-error" : undefined
-              }
-            />
-            {state.fieldErrors?.email ? (
-              <p
-                id="team-email-error"
-                role="alert"
-                className="text-xs text-destructive"
-              >
-                {state.fieldErrors.email}
-              </p>
-            ) : null}
-          </div>
-        ) : null}
-
-        <div className="space-y-2">
-          <Label htmlFor={`team-role-${member?.id ?? "new"}`}>
-            {t("fields.role")}
-          </Label>
-          <Select
-            name="systemRole"
-            defaultValue={
-              member?.systemRole && member.systemRole !== "OWNER"
-                ? member.systemRole
-                : "STAFF"
-            }
-          >
-            <SelectTrigger
-              id={`team-role-${member?.id ?? "new"}`}
-              className="w-full"
-              aria-invalid={Boolean(state.fieldErrors?.systemRole)}
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="MANAGER">{t("roles.MANAGER")}</SelectItem>
-              <SelectItem value="RECEPTIONIST">
-                {t("roles.RECEPTIONIST")}
-              </SelectItem>
-              <SelectItem value="STAFF">{t("roles.STAFF")}</SelectItem>
-            </SelectContent>
-          </Select>
-          {state.fieldErrors?.systemRole ? (
-            <p role="alert" className="text-xs text-destructive">
-              {state.fieldErrors.systemRole}
-            </p>
-          ) : null}
+      <input type="hidden" name="contextOrganizationId" value={organizationId} />
+      <input type="hidden" name="idempotencyKey" value={state.nextIdempotencyKey ?? idempotencyKey} />
+      {member ? <input type="hidden" name="expectedVersion" value={state.version ?? member.version} /> : null}
+      {!member ? (
+        <div className="grid gap-5 md:grid-cols-3">
+          <div className="space-y-2"><Label htmlFor="team-email">{t("fields.email")}</Label><Input id="team-email" name="email" type="email" dir="ltr" required /></div>
+          <div className="space-y-2"><Label htmlFor="team-role-new">{t("fields.role")}</Label><Select name="systemRole" defaultValue="STAFF"><SelectTrigger id="team-role-new" className="w-full"><SelectValue /></SelectTrigger><SelectContent>{actorRole === "OWNER" ? <SelectItem value="MANAGER">{t("roles.MANAGER")}</SelectItem> : null}<SelectItem value="RECEPTIONIST">{t("roles.RECEPTIONIST")}</SelectItem><SelectItem value="STAFF">{t("roles.STAFF")}</SelectItem></SelectContent></Select></div>
+          <div className="space-y-2"><Label htmlFor="team-expires">{t("fields.expiresAt")}</Label><Input id="team-expires" name="expiresAt" type="datetime-local" dir="ltr" defaultValue={defaultExpiresAt} required /></div>
         </div>
-      </div>
-
-      {member ? (
+      ) : (
         <>
           <div className="grid gap-5 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor={`team-photo-${member.id}`}>
-                {t("fields.photoUrl")}
-              </Label>
-              <Input
-                id={`team-photo-${member.id}`}
-                name="photoUrl"
-                type="url"
-                dir="ltr"
-                defaultValue={member.photoUrl}
-                placeholder="https://"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor={`team-specialties-${member.id}`}>
-                {t("fields.specialties")}
-              </Label>
-              <Input
-                id={`team-specialties-${member.id}`}
-                name="specialties"
-                defaultValue={member.specialties.join(", ")}
-                placeholder={t("placeholders.specialties")}
-              />
-            </div>
-            <div className="space-y-2 md:col-span-2">
-              <Label htmlFor={`team-bio-${member.id}`}>
-                {t("fields.bio")}
-              </Label>
-              <Textarea
-                id={`team-bio-${member.id}`}
-                name="bio"
-                defaultValue={member.bio}
-                maxLength={1000}
-                className="min-h-24"
-              />
-            </div>
+            <div className="space-y-2"><Label htmlFor={`team-photo-${member.id}`}>{t("fields.photoUrl")}</Label><Input id={`team-photo-${member.id}`} name="photoUrl" type="url" dir="ltr" defaultValue={member.photoUrl} placeholder="https://" /></div>
+            <div className="space-y-2"><Label htmlFor={`team-specialties-${member.id}`}>{t("fields.specialties")}</Label><Input id={`team-specialties-${member.id}`} name="specialties" defaultValue={member.specialties.join(", ")} /></div>
+            <div className="space-y-2 md:col-span-2"><Label htmlFor={`team-bio-${member.id}`}>{t("fields.bio")}</Label><Textarea id={`team-bio-${member.id}`} name="bio" defaultValue={member.bio} maxLength={1000} /></div>
+            <Label className="flex min-h-11 items-center gap-3 rounded-lg border p-3 font-normal"><Checkbox name="isPublicProfessional" defaultChecked={member.isPublicProfessional} />{t("fields.publicProfileEnabled")}</Label>
+            <div className="space-y-2"><Label htmlFor={`team-public-slug-${member.id}`}>{t("fields.publicSlug")}</Label><Input id={`team-public-slug-${member.id}`} name="publicSlug" dir="ltr" defaultValue={member.publicSlug} placeholder="staff-name" /></div>
           </div>
-
-          <fieldset className="rounded-2xl border bg-muted/20 p-4 md:col-span-2">
-            <legend className="px-1 text-sm font-medium">
-              {t("professionalProfile.title")}
-            </legend>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {t("professionalProfile.description")}
-            </p>
-            <div className="mt-4 grid gap-4 md:grid-cols-2">
-              <Label
-                htmlFor={`team-public-profile-${member.id}`}
-                className="flex min-h-11 items-center gap-3 rounded-lg border bg-background p-3 font-normal"
-              >
-                <Checkbox
-                  id={`team-public-profile-${member.id}`}
-                  name="isPublicProfessional"
-                  defaultChecked={member.isPublicProfessional}
-                />
-                <span>{t("fields.publicProfileEnabled")}</span>
-              </Label>
-              <div className="space-y-2">
-                <Label htmlFor={`team-public-slug-${member.id}`}>
-                  {t("fields.publicSlug")}
-                </Label>
-                <Input
-                  id={`team-public-slug-${member.id}`}
-                  name="publicSlug"
-                  dir="ltr"
-                  defaultValue={member.publicSlug}
-                  placeholder="staff-name"
-                  aria-invalid={Boolean(state.fieldErrors?.publicSlug)}
-                  aria-describedby={
-                    state.fieldErrors?.publicSlug
-                      ? `team-public-slug-${member.id}-error`
-                      : `team-public-slug-${member.id}-help`
-                  }
-                />
-                <p
-                  id={`team-public-slug-${member.id}-help`}
-                  className="text-xs text-muted-foreground"
-                >
-                  {t("professionalProfile.slugHelp")}
-                </p>
-                {state.fieldErrors?.publicSlug ? (
-                  <p
-                    id={`team-public-slug-${member.id}-error`}
-                    role="alert"
-                    className="text-xs text-destructive"
-                  >
-                    {state.fieldErrors.publicSlug}
-                  </p>
-                ) : null}
-              </div>
-            </div>
-          </fieldset>
-
-          <fieldset className="space-y-3">
-            <legend className="text-sm font-medium">
-              {t("fields.branches")}
-            </legend>
-            {branches.length === 0 ? (
-              <p className="text-sm text-muted-foreground">{t("noBranches")}</p>
-            ) : (
-              <div className="grid gap-3 sm:grid-cols-2">
-                {branches.map((branch) => (
-                  <Label
-                    key={branch.id}
-                    className="flex min-h-10 items-center gap-3 rounded-lg border p-3 font-normal"
-                  >
-                    <Checkbox
-                      name="branchIds"
-                      value={branch.id}
-                      defaultChecked={member.branchIds.includes(branch.id)}
-                    />
-                    {branch.name}
-                  </Label>
-                ))}
-              </div>
-            )}
-            {state.fieldErrors?.branchIds ? (
-              <p role="alert" className="text-xs text-destructive">
-                {state.fieldErrors.branchIds}
-              </p>
-            ) : null}
-          </fieldset>
         </>
-      ) : null}
-
+      )}
       <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p
-          aria-live="polite"
-          className={
-            state.status === "error"
-              ? "text-sm text-destructive"
-              : "text-sm text-muted-foreground"
-          }
-        >
-          {state.message}
-        </p>
-        <Button type="submit" disabled={pending}>
-          {pending ? (
-            <LoaderCircle className="animate-spin" aria-hidden="true" />
-          ) : (
-            <UserPlus aria-hidden="true" />
-          )}
-          {pending
-            ? common("saving")
-            : member
-              ? common("saveChanges")
-              : t("sendInvitation")}
-        </Button>
+        <p aria-live="polite" className={state.status === "error" ? "text-sm text-destructive" : "text-sm text-muted-foreground"}>{state.message}{state.replayed ? ` · ${t("replayed")}` : ""}</p>
+        <Button type="submit" disabled={pending}>{pending ? <LoaderCircle className="animate-spin" /> : member ? <Save /> : <UserPlus />}{pending ? common("saving") : member ? common("saveChanges") : t("sendInvitation")}</Button>
       </div>
     </form>
   );

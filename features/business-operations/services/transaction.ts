@@ -50,6 +50,26 @@ export async function lockBranch(
   );
 }
 
+export async function lockService(
+  transaction: Prisma.TransactionClient,
+  serviceId: string,
+  organizationId: string,
+) {
+  await transaction.$queryRaw(
+    Prisma.sql`SELECT "id" FROM "Service" WHERE "id" = CAST(${serviceId} AS uuid) AND "organizationId" = CAST(${organizationId} AS uuid) FOR UPDATE`,
+  );
+}
+
+export async function lockMembership(
+  transaction: Prisma.TransactionClient,
+  membershipId: string,
+  organizationId: string,
+) {
+  await transaction.$queryRaw(
+    Prisma.sql`SELECT "id" FROM "OrganizationMember" WHERE "id" = CAST(${membershipId} AS uuid) AND "organizationId" = CAST(${organizationId} AS uuid) FOR UPDATE`,
+  );
+}
+
 export async function resolveMutationReplay(
   transaction: Prisma.TransactionClient,
   input: {

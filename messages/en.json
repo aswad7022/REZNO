@@ -149,6 +149,16 @@
     "description": "Set recurring availability for {member}.",
     "branchTitle": "{branch} availability",
     "manage": "Availability",
+    "confirmImpact": "Confirm affected future bookings",
+    "days": {
+      "0": "Sunday",
+      "1": "Monday",
+      "2": "Tuesday",
+      "3": "Wednesday",
+      "4": "Thursday",
+      "5": "Friday",
+      "6": "Saturday"
+    },
     "messages": {
       "success": "Availability updated.",
       "invalid": "Check the highlighted times and try again.",
@@ -166,6 +176,9 @@
     "reason": "Reason",
     "branch": "Location",
     "remove": "Remove",
+    "edit": "Edit leave",
+    "save": "Save leave",
+    "confirmImpact": "Confirm overlapping future bookings",
     "empty": "No upcoming blocked time.",
     "messages": {
       "success": "Blocked time added.",
@@ -277,6 +290,29 @@
   "Services": {
     "title": "Services",
     "description": "Create the services customers can book at your locations.",
+    "activeOrganization": "Active organization: {organization}",
+    "confirmFutureBookings": "I confirm the impact on existing future bookings.",
+    "replayed": "Exact retry confirmed",
+    "operations": {
+      "title": "Operational lifecycle, offerings, and staff assignments",
+      "offerings": "Branch offerings",
+      "staffAssignments": "Assigned service providers",
+      "employee": "Employee",
+      "replayed": "Exact retry confirmed",
+      "confirmImpact": "Confirm affected future bookings",
+      "deactivate": "Deactivate",
+      "activate": "Activate",
+      "archive": "Archive",
+      "branch": "Branch",
+      "price": "Price",
+      "duration": "Duration",
+      "addOffering": "Add offering",
+      "available": "Available",
+      "save": "Save",
+      "removeUnusedOffering": "Remove unused offering",
+      "assignEmployee": "Assign employee",
+      "remove": "Remove"
+    },
     "add": "Add service",
     "emptyTitle": "No services yet",
     "emptyDescription": "Create your first service to begin accepting bookings.",
@@ -299,7 +335,8 @@
     },
     "statuses": {
       "ACTIVE": "Active",
-      "INACTIVE": "Inactive"
+      "INACTIVE": "Inactive",
+      "ARCHIVED": "Archived"
     },
     "staffModes": {
       "NONE": "No employee needed",
@@ -314,7 +351,8 @@
       "branchBased": "This service uses branch working hours and the availability of its selected providers.",
       "editBranch": "{branch} hours",
       "editEmployee": "Edit employee availability",
-      "editBranches": "Edit service locations"
+      "editBranches": "Edit service locations",
+      "viewOwn": "View my availability"
     },
     "edit": {
       "title": "Edit service",
@@ -354,6 +392,8 @@
   "Team": {
     "title": "Team",
     "description": "Manage organization members, roles, invitations, and location assignments.",
+    "activeOrganization": "Active organization: {organization}",
+    "replayed": "Exact retry confirmed",
     "add": "Add team member",
     "invite": "Invite staff",
     "inviteDescription": "Send a work invitation. Membership starts only after the person accepts.",
@@ -369,6 +409,7 @@
     "fields": {
       "email": "REZNO account email",
       "role": "Role",
+      "expiresAt": "Invitation expires",
       "branches": "Assigned locations",
       "photoUrl": "Employee photo URL",
       "bio": "Employee bio",
@@ -393,6 +434,20 @@
     },
     "noBranches": "All locations / no specific assignment",
     "joined": "Joined {date}",
+    "operations": {
+      "role": "Operational role",
+      "updateRole": "Update role",
+      "confirmImpact": "Confirm affected future bookings",
+      "activate": "Activate membership",
+      "deactivate": "Deactivate membership",
+      "removeMember": "Soft remove",
+      "branch": "Branch",
+      "assignBranch": "Assign branch",
+      "remove": "Remove",
+      "branchAssignments": "Branch assignments",
+      "assignedServices": "Assigned services:",
+      "revoke": "Revoke"
+    },
     "messages": {
       "added": "Team member added.",
       "invited": "Invitation sent.",

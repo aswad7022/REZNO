@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import Link from "next/link";
 import { CalendarClock, UsersRound } from "lucide-react";
 import { getFormatter, getTranslations } from "next-intl/server";
@@ -18,6 +19,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { TeamMemberForm } from "@/features/team/components/team-member-form";
+import { InvitationRevoke, TeamOperations } from "@/features/team/components/team-operations";
 import { getCurrentOrganizationTeam } from "@/features/team/services/team";
 
 function initials(name: string): string {
@@ -30,7 +32,7 @@ function initials(name: string): string {
 }
 
 export async function TeamManagementPage() {
-  const [{ members, invitations, branches, canEdit }, t, format] = await Promise.all([
+  const [{ members, invitations, branches, canEdit, organizationId, organizationName, actorRole }, t, format] = await Promise.all([
     getCurrentOrganizationTeam(),
     getTranslations("Team"),
     getFormatter(),
@@ -39,6 +41,7 @@ export async function TeamManagementPage() {
   return (
     <DashboardShell>
       <DashboardPageHeader title={t("title")} description={t("description")} />
+      <p className="text-sm text-muted-foreground">{t("activeOrganization", { organization: organizationName })}</p>
 
       {canEdit ? (
         <Card>
@@ -47,7 +50,11 @@ export async function TeamManagementPage() {
             <CardDescription>{t("inviteDescription")}</CardDescription>
           </CardHeader>
           <CardContent>
-            <TeamMemberForm branches={branches} />
+            <TeamMemberForm
+              actorRole={actorRole}
+              idempotencyKey={randomUUID()}
+              organizationId={organizationId}
+            />
           </CardContent>
         </Card>
       ) : null}
@@ -80,7 +87,10 @@ export async function TeamManagementPage() {
                       })}
                     </p>
                   </div>
-                  <Badge variant="secondary">{t("pending")}</Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary">{t("pending")}</Badge>
+                    {actorRole === "OWNER" || invitation.systemRole !== "MANAGER" ? <InvitationRevoke idempotencyKey={randomUUID()} invitation={invitation} organizationId={organizationId} /> : null}
+                  </div>
                 </div>
               );
             })}
@@ -130,32 +140,37 @@ export async function TeamManagementPage() {
                     </p>
                   </div>
                 </CardHeader>
-                {canEdit && member.systemRole !== "OWNER" ? (
+                {member.status === "ACTIVE" && member.branchIds.length > 0 ? (
                   <CardContent>
-                    {member.branchIds.length > 0 ? (
-                      <Button
-                        asChild
-                        variant="outline"
-                        size="sm"
-                        className="mb-4"
-                      >
-                        <Link
-                          href={`/business/team/${member.id}/availability`}
-                        >
-                          <CalendarClock />
-                          {t("availability")}
-                        </Link>
-                      </Button>
-                    ) : null}
-                    <details>
+                    <Button asChild variant="outline" size="sm" className="mb-4">
+                      <Link href={`/business/team/${member.id}/availability`}><CalendarClock />{t("availability")}</Link>
+                    </Button>
+                    {member.canManage ? <details>
                       <summary className="cursor-pointer text-sm font-medium text-primary outline-none focus-visible:ring-2 focus-visible:ring-ring">
                         {t("edit")}
                       </summary>
                       <div className="mt-5 border-t pt-5">
-                        <TeamMemberForm branches={branches} member={member} />
+                        <TeamMemberForm actorRole={actorRole} idempotencyKey={randomUUID()} member={member} organizationId={organizationId} />
+                        <div className="mt-5 border-t pt-5">
+                          <TeamOperations
+                            actorRole={actorRole}
+                            branches={branches}
+                            keys={{
+                              branchAdd: randomUUID(),
+                              branchRemove: Object.fromEntries(member.assignments.map((assignment) => [assignment.id, randomUUID()])),
+                              lifecycle: randomUUID(),
+                              remove: randomUUID(),
+                              role: randomUUID(),
+                            }}
+                            member={member}
+                            organizationId={organizationId}
+                          />
+                        </div>
                       </div>
-                    </details>
+                    </details> : null}
                   </CardContent>
+                ) : member.canManage ? (
+                  <CardContent><TeamOperations actorRole={actorRole} branches={branches} keys={{ branchAdd: randomUUID(), branchRemove: Object.fromEntries(member.assignments.map((assignment) => [assignment.id, randomUUID()])), lifecycle: randomUUID(), remove: randomUUID(), role: randomUUID() }} member={member} organizationId={organizationId} /></CardContent>
                 ) : null}
               </Card>
             );

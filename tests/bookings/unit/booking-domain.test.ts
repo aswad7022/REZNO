@@ -62,6 +62,7 @@ test("slot policy separates NONE, OPTIONAL automatic, REQUIRED, and specific sta
     selectBookingSlots(slots, "OPTIONAL", null).map((slot) => slot.startsAt),
     ["2026-07-20T07:00:00.000Z", "2026-07-20T08:00:00.000Z", "2026-07-20T09:00:00.000Z"],
   );
+  assert.ok(selectBookingSlots(slots, "OPTIONAL", null).every((slot) => slot.memberId === null));
   assert.deepEqual(selectBookingSlots(slots, "REQUIRED", null), []);
   assert.equal(selectionMatchesSlot(selection, slots[0]!), true);
   assert.equal(selectionMatchesSlot(selection, slots[1]!), false);

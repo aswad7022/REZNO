@@ -53,7 +53,13 @@ export function selectBookingSlots(
 
   const automatic = new Map<string, BookingSlot>();
   for (const slot of sorted) {
-    if (!automatic.has(slot.startsAt)) automatic.set(slot.startsAt, slot);
+    if (!automatic.has(slot.startsAt)) {
+      automatic.set(slot.startsAt, {
+        ...slot,
+        memberId: null,
+        memberName: null,
+      });
+    }
   }
   return [...automatic.values()];
 }

@@ -19,7 +19,7 @@ export async function getPublicOfferings(): Promise<PublicOffering[]> {
   const offerings = await prisma.branchService.findMany({
     where: {
       isAvailable: true,
-      service: { status: "ACTIVE" },
+      service: { deletedAt: null, status: "ACTIVE" },
       branch: {
         deletedAt: null,
         status: "ACTIVE",

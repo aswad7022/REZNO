@@ -5,6 +5,7 @@ import type {
 } from "@prisma/client";
 
 export interface ServiceOfferingDetails {
+  id: string;
   branchId: string;
   branchName: string;
   price: string;
@@ -12,6 +13,7 @@ export interface ServiceOfferingDetails {
   pricingType: PricingType;
   isAvailable: boolean;
   readinessIssue: "HOURS" | "STAFF" | null;
+  version: string;
 }
 
 export interface ServiceDetails {
@@ -24,10 +26,30 @@ export interface ServiceDetails {
   status: ServiceStatus;
   staffSelectionMode: StaffSelectionMode;
   assignedMemberIds: string[];
+  staffAssignments: Array<{ id: string; memberId: string; version: string }>;
   offerings: ServiceOfferingDetails[];
+  version: string;
 }
 
-export interface ServiceCatalogData {
+interface ServiceCatalogBase {
+  organizationId: string;
+  organizationName: string;
+}
+
+export interface ReadOnlyServiceDetails {
+  name: string;
+  description: string;
+  imageUrl: string;
+  offerings: Array<{
+    branchName: string;
+    price: string;
+    durationMinutes: number;
+  }>;
+}
+
+export interface ManagementServiceCatalogData extends ServiceCatalogBase {
+  scope: "MANAGEMENT";
+  canEdit: true;
   services: ServiceDetails[];
   branches: Array<{
     id: string;
@@ -36,8 +58,25 @@ export interface ServiceCatalogData {
   }>;
   categories: Array<{ id: string; slug: string; name: string }>;
   members: Array<{ id: string; name: string }>;
-  canEdit: boolean;
 }
+
+export interface ReceptionistServiceCatalogData extends ServiceCatalogBase {
+  scope: "RECEPTIONIST";
+  canEdit: false;
+  services: ReadOnlyServiceDetails[];
+}
+
+export interface StaffServiceCatalogData extends ServiceCatalogBase {
+  scope: "STAFF";
+  canEdit: false;
+  scheduleMemberId: string | null;
+  services: ReadOnlyServiceDetails[];
+}
+
+export type ServiceCatalogData =
+  | ManagementServiceCatalogData
+  | ReceptionistServiceCatalogData
+  | StaffServiceCatalogData;
 
 export type ServiceField =
   | "name"
@@ -56,6 +95,10 @@ export interface ServiceActionState {
   status: "idle" | "success" | "error";
   message?: string;
   fieldErrors?: Partial<Record<ServiceField, string>>;
+  code?: string;
+  replayed?: boolean;
+  version?: string;
+  nextIdempotencyKey?: string;
 }
 
 export const initialServiceActionState: ServiceActionState = {

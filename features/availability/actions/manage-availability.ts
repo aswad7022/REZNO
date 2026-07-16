@@ -1,58 +1,50 @@
 "use server";
 
-import { TZDate } from "@date-fns/tz";
+import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { getTranslations } from "next-intl/server";
-import { z } from "zod";
 
-import { canManageOrganization } from "@/features/business/policies/access";
-import { requireBusinessIdentity } from "@/features/identity/server";
-import { prisma } from "@/lib/db/prisma";
-import { logServerError } from "@/lib/logging/server";
-import { createWorkingHoursSchema } from "@/features/working-hours/schemas/working-hours";
 import type {
   AvailabilityActionState,
   BlockedTimeActionState,
 } from "@/features/availability/types";
+import { BusinessOperationsError } from "@/features/business-operations/domain/errors";
+import {
+  createOperationEnvelopeSchema,
+  operationEnvelopeSchema,
+} from "@/features/business-operations/domain/validation";
+import { currentBusinessOperationReference } from "@/features/business-operations/services/identity-adapter";
+import {
+  createOperationalMemberBlock,
+  deleteOperationalMemberBlock,
+  updateOperationalMemberBlock,
+} from "@/features/business-operations/services/member-blocks";
+import { updateOperationalStaffSchedule } from "@/features/business-operations/services/staff-schedules";
+import { logServerError } from "@/lib/logging/server";
 
-function localDateTimeToDate(value: string, timezone: string): Date | null {
-  const match =
-    /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value);
-  if (!match) return null;
-  const [, year, month, day, hour, minute] = match;
-  return new Date(
-    new TZDate(
-      Number(year),
-      Number(month) - 1,
-      Number(day),
-      Number(hour),
-      Number(minute),
-      timezone,
-    ),
-  );
+function exactFields(formData: FormData, fields: readonly string[]) {
+  const allowed = new Set(fields);
+  return [...formData.keys()].every((key) => key.startsWith("$ACTION_") || allowed.has(key));
 }
 
-async function requireScheduleContext(memberId: string, branchId: string) {
-  const identity = await requireBusinessIdentity();
-  const organizationId = identity.membership.organizationId;
-  const assignment = await prisma.branchAssignment.findFirst({
-    where: {
-      memberId,
-      branchId,
-      member: { organizationId },
-      branch: { organizationId, deletedAt: null },
-    },
-    include: { branch: true },
-  });
+function refresh(memberId: string) {
+  revalidatePath(`/business/team/${memberId}/availability`);
+  revalidatePath("/business/services");
+  revalidatePath("/business/calendar");
+}
 
-  return {
-    identity,
-    assignment,
-    canEdit:
-      canManageOrganization(identity.membership.role.systemRole) ||
-      (identity.membership.role.systemRole === "STAFF" &&
-        identity.membership.id === memberId),
-  };
+async function availabilityError(error: unknown): Promise<AvailabilityActionState> {
+  const t = await getTranslations("Availability.messages");
+  if (error instanceof BusinessOperationsError) return { code: error.code, message: error.message, status: "error" };
+  logServerError("businessOperations.staffSchedule", error);
+  return { message: t("failure"), status: "error" };
+}
+
+async function blockError(error: unknown): Promise<BlockedTimeActionState> {
+  const t = await getTranslations("BlockedTime.messages");
+  if (error instanceof BusinessOperationsError) return { code: error.code, message: error.message, status: "error" };
+  logServerError("businessOperations.memberBlock", error);
+  return { message: t("failure"), status: "error" };
 }
 
 export async function updateMemberAvailability(
@@ -61,161 +53,130 @@ export async function updateMemberAvailability(
   _previousState: AvailabilityActionState,
   formData: FormData,
 ): Promise<AvailabilityActionState> {
-  const [context, tMessages, tValidation] = await Promise.all([
-    requireScheduleContext(memberId, branchId),
-    getTranslations("Availability.messages"),
-    getTranslations("Validation"),
-  ]);
-
-  if (!context.canEdit) {
-    return { status: "error", message: tMessages("forbidden") };
-  }
-  if (!context.assignment) {
-    return { status: "error", message: tMessages("notFound") };
-  }
-
-  const schema = createWorkingHoursSchema((key) => tValidation(key));
-  const parsed = schema.safeParse({
-    days: Array.from({ length: 7 }, (_, dayOfWeek) => ({
-      dayOfWeek,
-      isOpen: formData.get(`day-${dayOfWeek}-isOpen`) === "on",
-      openTime: formData.get(`day-${dayOfWeek}-openTime`),
-      closeTime: formData.get(`day-${dayOfWeek}-closeTime`),
-    })),
+  const envelope = operationEnvelopeSchema.safeParse({
+    contextOrganizationId: formData.get("contextOrganizationId"),
+    expectedVersion: formData.get("expectedVersion"),
+    idempotencyKey: formData.get("idempotencyKey"),
   });
-
-  if (!parsed.success) {
-    const dayErrors: NonNullable<AvailabilityActionState["dayErrors"]> = {};
-    for (const issue of parsed.error.issues) {
-      const dayIndex = issue.path[1];
-      if (typeof dayIndex === "number") dayErrors[dayIndex] ??= issue.message;
-    }
-    return {
-      status: "error",
-      message: tMessages("invalid"),
-      dayErrors,
-    };
-  }
-
+  const dayFields = Array.from({ length: 7 }, (_, day) => [
+    `day-${day}-isOpen`, `day-${day}-openTime`, `day-${day}-closeTime`,
+  ]).flat();
+  if (!envelope.success || !exactFields(formData, [
+    "confirmFutureBookings", "contextOrganizationId", "expectedVersion", "idempotencyKey", ...dayFields,
+  ])) return { code: "INVALID_REQUEST", message: "Invalid staff schedule request.", status: "error" };
   try {
-    await prisma.$transaction(async (transaction) => {
-      await transaction.availability.deleteMany({
-        where: { memberId, branchId },
-      });
-      const openDays = parsed.data.days.filter((day) => day.isOpen);
-      if (openDays.length > 0) {
-        await transaction.availability.createMany({
-          data: openDays.map((day) => ({
-            memberId,
-            branchId,
-            dayOfWeek: day.dayOfWeek,
-            startTime: day.openTime,
-            endTime: day.closeTime,
-          })),
-        });
-      }
+    const result = await updateOperationalStaffSchedule({
+      actor: await currentBusinessOperationReference(),
+      branchId,
+      confirmFutureBookings: formData.get("confirmFutureBookings") === "on",
+      memberId,
+      schedule: {
+        days: Array.from({ length: 7 }, (_, dayOfWeek) => ({
+          closeTime: formData.get(`day-${dayOfWeek}-closeTime`),
+          dayOfWeek,
+          isOpen: formData.get(`day-${dayOfWeek}-isOpen`) === "on",
+          openTime: formData.get(`day-${dayOfWeek}-openTime`),
+        })),
+      },
+      ...envelope.data,
     });
+    refresh(memberId);
+    return { message: "Staff schedule saved.", nextIdempotencyKey: randomUUID(), replayed: result.replayed, status: "success", version: result.version };
   } catch (error) {
-    logServerError("availability.update", error, { memberId, branchId });
-    return { status: "error", message: tMessages("failure") };
+    return availabilityError(error);
   }
-
-  revalidatePath(`/business/team/${memberId}/availability`);
-  return { status: "success", message: tMessages("success") };
 }
+
+function blockInput(formData: FormData) {
+  return {
+    branchId: formData.get("branchId"),
+    endsAt: formData.get("endsAt"),
+    reason: formData.get("reason") ?? "",
+    startsAt: formData.get("startsAt"),
+  };
+}
+
+const blockFields = [
+  "branchId", "confirmFutureBookings", "contextOrganizationId", "endsAt", "expectedVersion", "idempotencyKey", "reason", "startsAt",
+] as const;
 
 export async function createBlockedTime(
   memberId: string,
   _previousState: BlockedTimeActionState,
   formData: FormData,
 ): Promise<BlockedTimeActionState> {
-  const [tMessages, tValidation] = await Promise.all([
-    getTranslations("BlockedTime.messages"),
-    getTranslations("Validation"),
-  ]);
-  const input = z
-    .object({
-      branchId: z.string().uuid(tValidation("branchSelectionInvalid")),
-      startsAt: z.string().min(1, tValidation("dateTimeInvalid")),
-      endsAt: z.string().min(1, tValidation("dateTimeInvalid")),
-      reason: z.string().trim().max(500).transform((value) => value || null),
-    })
-    .safeParse({
-      branchId: formData.get("branchId"),
-      startsAt: formData.get("startsAt"),
-      endsAt: formData.get("endsAt"),
-      reason: formData.get("reason") ?? "",
-    });
-
-  if (!input.success) {
-    const errors = input.error.flatten().fieldErrors;
-    return {
-      status: "error",
-      message: tMessages("invalid"),
-      fieldErrors: {
-        branchId: errors.branchId?.[0],
-        startsAt: errors.startsAt?.[0],
-        endsAt: errors.endsAt?.[0],
-        reason: errors.reason?.[0],
-      },
-    };
-  }
-
-  const context = await requireScheduleContext(memberId, input.data.branchId);
-  if (!context.canEdit) {
-    return { status: "error", message: tMessages("forbidden") };
-  }
-  if (!context.assignment) {
-    return { status: "error", message: tMessages("notFound") };
-  }
-
-  const startsAt = localDateTimeToDate(
-    input.data.startsAt,
-    context.assignment.branch.timezone,
-  );
-  const endsAt = localDateTimeToDate(
-    input.data.endsAt,
-    context.assignment.branch.timezone,
-  );
-  if (!startsAt || !endsAt || startsAt >= endsAt) {
-    return { status: "error", message: tMessages("rangeInvalid") };
-  }
-
+  const envelope = createOperationEnvelopeSchema.safeParse({
+    contextOrganizationId: formData.get("contextOrganizationId"),
+    idempotencyKey: formData.get("idempotencyKey"),
+  });
+  if (!envelope.success || !exactFields(formData, blockFields)) return { code: "INVALID_REQUEST", message: "Invalid member leave request.", status: "error" };
   try {
-    await prisma.blockedTime.create({
-      data: {
-        memberId,
-        branchId: input.data.branchId,
-        startsAt,
-        endsAt,
-        reason: input.data.reason,
-      },
-    });
-  } catch (error) {
-    logServerError("blockedTime.create", error, {
+    const result = await createOperationalMemberBlock({
+      actor: await currentBusinessOperationReference(),
+      block: blockInput(formData),
+      confirmFutureBookings: formData.get("confirmFutureBookings") === "on",
       memberId,
-      branchId: input.data.branchId,
+      ...envelope.data,
     });
-    return { status: "error", message: tMessages("failure") };
+    refresh(memberId);
+    return { message: "Member leave created.", nextIdempotencyKey: randomUUID(), replayed: result.replayed, status: "success", version: result.version };
+  } catch (error) {
+    return blockError(error);
   }
+}
 
-  revalidatePath(`/business/team/${memberId}/availability`);
-  return { status: "success", message: tMessages("success") };
+export async function updateBlockedTime(
+  memberId: string,
+  blockedTimeId: string,
+  _previousState: BlockedTimeActionState,
+  formData: FormData,
+): Promise<BlockedTimeActionState> {
+  const envelope = operationEnvelopeSchema.safeParse({
+    contextOrganizationId: formData.get("contextOrganizationId"),
+    expectedVersion: formData.get("expectedVersion"),
+    idempotencyKey: formData.get("idempotencyKey"),
+  });
+  if (!envelope.success || !exactFields(formData, blockFields)) return { code: "INVALID_REQUEST", message: "Invalid member leave request.", status: "error" };
+  try {
+    const result = await updateOperationalMemberBlock({
+      actor: await currentBusinessOperationReference(),
+      block: blockInput(formData),
+      blockId: blockedTimeId,
+      confirmFutureBookings: formData.get("confirmFutureBookings") === "on",
+      memberId,
+      ...envelope.data,
+    });
+    refresh(memberId);
+    return { message: "Member leave updated.", nextIdempotencyKey: randomUUID(), replayed: result.replayed, status: "success", version: result.version };
+  } catch (error) {
+    return blockError(error);
+  }
 }
 
 export async function deleteBlockedTime(
   memberId: string,
   blockedTimeId: string,
-): Promise<void> {
-  const identity = await requireBusinessIdentity();
-  if (!canManageOrganization(identity.membership.role.systemRole)) return;
-
-  await prisma.blockedTime.deleteMany({
-    where: {
-      id: blockedTimeId,
-      memberId,
-      member: { organizationId: identity.membership.organizationId },
-    },
+  _previousState: BlockedTimeActionState,
+  formData: FormData,
+): Promise<BlockedTimeActionState> {
+  const envelope = operationEnvelopeSchema.safeParse({
+    contextOrganizationId: formData.get("contextOrganizationId"),
+    expectedVersion: formData.get("expectedVersion"),
+    idempotencyKey: formData.get("idempotencyKey"),
   });
-  revalidatePath(`/business/team/${memberId}/availability`);
+  if (!envelope.success || !exactFields(formData, ["contextOrganizationId", "expectedVersion", "idempotencyKey"])) {
+    return { code: "INVALID_REQUEST", message: "Invalid member leave deletion request.", status: "error" };
+  }
+  try {
+    const result = await deleteOperationalMemberBlock({
+      actor: await currentBusinessOperationReference(),
+      blockId: blockedTimeId,
+      memberId,
+      ...envelope.data,
+    });
+    refresh(memberId);
+    return { message: "Member leave removed.", nextIdempotencyKey: randomUUID(), replayed: result.replayed, status: "success", version: result.version };
+  } catch (error) {
+    return blockError(error);
+  }
 }

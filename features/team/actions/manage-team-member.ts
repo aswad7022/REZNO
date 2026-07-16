@@ -1,384 +1,287 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { getTranslations } from "next-intl/server";
 
-import { canManageOrganization } from "@/features/business/policies/access";
-import { requireBusinessIdentity } from "@/features/identity/server";
+import { BusinessOperationsError } from "@/features/business-operations/domain/errors";
 import {
-  createTeamMemberSchema,
-  createTeamMemberUpdateSchema,
-} from "@/features/team/schemas/team-member";
-import type {
-  AssignableSystemRole,
-  TeamMemberActionState,
-} from "@/features/team/types";
-import { prisma } from "@/lib/db/prisma";
+  createOperationEnvelopeSchema,
+  operationEnvelopeSchema,
+} from "@/features/business-operations/domain/validation";
+import {
+  addOperationalBranchAssignment,
+  removeOperationalBranchAssignment,
+} from "@/features/business-operations/services/assignments";
+import { currentBusinessOperationReference } from "@/features/business-operations/services/identity-adapter";
+import {
+  createOperationalInvitation,
+  revokeOperationalInvitation,
+} from "@/features/business-operations/services/invitations";
+import {
+  removeOperationalMembership,
+  setOperationalMembershipActive,
+  updateOperationalMemberProfile,
+  updateOperationalMemberRole,
+} from "@/features/business-operations/services/workforce";
+import type { TeamMemberActionState } from "@/features/team/types";
 import { logServerError } from "@/lib/logging/server";
 
-const roleNames: Record<AssignableSystemRole, string> = {
-  MANAGER: "Manager",
-  RECEPTIONIST: "Receptionist",
-  STAFF: "Staff",
-};
-
-function normalizeEmail(email: string): string {
-  return email.trim().toLowerCase();
+function exactFields(formData: FormData, fields: readonly string[]) {
+  const allowed = new Set(fields);
+  return [...formData.keys()].every((key) => key.startsWith("$ACTION_") || allowed.has(key));
 }
 
-async function getTeamActionContext() {
-  const [identity, tMessages, tValidation] = await Promise.all([
-    requireBusinessIdentity(),
-    getTranslations("Team.messages"),
-    getTranslations("Validation"),
-  ]);
-
+function state(result: { replayed: boolean; version: string }, message?: string): TeamMemberActionState {
   return {
-    identity,
-    canEdit: canManageOrganization(identity.membership.role.systemRole),
-    tMessages,
-    tValidation,
+    message,
+    nextIdempotencyKey: randomUUID(),
+    replayed: result.replayed,
+    status: "success",
+    version: result.version,
   };
 }
 
-async function branchesBelongToOrganization(
-  branchIds: string[],
-  organizationId: string,
-): Promise<boolean> {
-  if (branchIds.length === 0) {
-    return true;
+async function actionError(error: unknown): Promise<TeamMemberActionState> {
+  const t = await getTranslations("Team.messages");
+  if (error instanceof BusinessOperationsError) {
+    return { code: error.code, message: error.message, status: "error" };
   }
+  logServerError("businessOperations.workforce", error);
+  return { message: t("failure"), status: "error" };
+}
 
-  const count = await prisma.branch.count({
-    where: {
-      id: { in: branchIds },
-      organizationId,
-      deletedAt: null,
-      status: "ACTIVE",
-    },
-  });
-
-  return count === branchIds.length;
+function refresh(memberId?: string) {
+  revalidatePath("/business/team");
+  if (memberId) revalidatePath(`/business/team/${memberId}/availability`);
+  revalidatePath("/business/services");
+  revalidatePath("/business/public-profile");
 }
 
 export async function addTeamMember(
-  _previousState: TeamMemberActionState,
+  _previous: TeamMemberActionState,
   formData: FormData,
 ): Promise<TeamMemberActionState> {
-  const context = await getTeamActionContext();
-
-  if (!context.canEdit) {
-    return { status: "error", message: context.tMessages("forbidden") };
-  }
-
-  const schema = createTeamMemberSchema((key) => context.tValidation(key));
-  const parsed = schema.safeParse({
-    email: formData.get("email"),
-    systemRole: formData.get("systemRole"),
-    branchIds: formData.getAll("branchIds"),
-    photoUrl: formData.get("photoUrl") ?? "",
-    bio: formData.get("bio") ?? "",
-    specialties: formData.get("specialties") ?? "",
-    publicSlug: "",
-    isPublicProfessional: false,
+  const envelope = createOperationEnvelopeSchema.safeParse({
+    contextOrganizationId: formData.get("contextOrganizationId"),
+    idempotencyKey: formData.get("idempotencyKey"),
   });
-
-  if (!parsed.success) {
-    const errors = parsed.error.flatten().fieldErrors;
-    return {
-      status: "error",
-      message: context.tMessages("invalid"),
-      fieldErrors: {
-        email: errors.email?.[0],
-        systemRole: errors.systemRole?.[0],
-        branchIds: errors.branchIds?.[0],
-        photoUrl: errors.photoUrl?.[0],
-        bio: errors.bio?.[0],
-        specialties: errors.specialties?.[0],
-        publicSlug: errors.publicSlug?.[0],
-        isPublicProfessional: errors.isPublicProfessional?.[0],
-      },
-    };
-  }
-
-  const { email, systemRole } = parsed.data;
-  const normalizedEmail = normalizeEmail(email);
-  const organizationId = context.identity.membership.organizationId;
-
-  if (normalizedEmail === normalizeEmail(context.identity.session.user.email)) {
-    return { status: "error", message: context.tMessages("selfInvite") };
-  }
-
-  const user = await prisma.user.findFirst({
-    where: { email: { equals: email, mode: "insensitive" } },
-    select: { id: true },
-  });
-  const recipientPerson = user
-    ? await prisma.person.findUnique({
-        where: { authUserId: user.id },
-        select: { id: true, deletedAt: true, status: true },
-      })
-    : null;
-
-  const [existingMember, existingPendingInvitation] = await Promise.all([
-    recipientPerson
-      ? prisma.organizationMember.findUnique({
-          where: {
-            personId_organizationId: {
-              personId: recipientPerson.id,
-              organizationId,
-            },
-          },
-          select: { id: true },
-        })
-      : Promise.resolve(null),
-    prisma.organizationInvitation.findFirst({
-      where: {
-        organizationId,
-        normalizedEmail,
-        status: "PENDING",
-      },
-      select: { id: true },
-    }),
-  ]);
-
-  if (
-    recipientPerson &&
-    (recipientPerson.deletedAt || recipientPerson.status !== "ACTIVE")
-  ) {
-    return { status: "error", message: context.tMessages("recipientInactive") };
-  }
-
-  if (existingMember) {
-    return { status: "error", message: context.tMessages("alreadyMember") };
-  }
-
-  if (existingPendingInvitation) {
-    return { status: "error", message: context.tMessages("alreadyInvited") };
-  }
-
+  const rawExpiration = formData.get("expiresAt");
+  const expiration = typeof rawExpiration === "string" ? new Date(rawExpiration) : null;
+  if (!envelope.success || !expiration || Number.isNaN(expiration.getTime()) || !exactFields(formData, [
+    "contextOrganizationId", "email", "expiresAt", "idempotencyKey", "systemRole",
+  ])) return { code: "INVALID_REQUEST", message: "Invalid invitation request.", status: "error" };
   try {
-    await prisma.$transaction(async (transaction) => {
-      const roleName = roleNames[systemRole];
-      const role = await transaction.role.upsert({
-        where: {
-          organizationId_name: { organizationId, name: roleName },
-        },
-        create: {
-          organizationId,
-          name: roleName,
-          systemRole,
-          isSystem: true,
-        },
-        update: {
-          systemRole,
-          isSystem: true,
-        },
-      });
-
-      await transaction.organizationInvitation.create({
-        data: {
-          organizationId,
-          email,
-          normalizedEmail,
-          roleId: role.id,
-          invitedByPersonId: context.identity.person.id,
-          recipientPersonId: recipientPerson?.id,
-        },
-      });
-
-      if (recipientPerson) {
-        await transaction.notification.create({
-          data: {
-            title: context.tMessages("workInviteNotificationTitle"),
-            body: context.tMessages("workInviteNotificationBody", {
-              business: context.identity.membership.organization.name,
-            }),
-            audience: "USER",
-            priority: "IMPORTANT",
-            recipientPersonId: recipientPerson.id,
-            businessId: organizationId,
-            createdByUserId: context.identity.session.user.id,
-          },
-        });
-      }
+    const result = await createOperationalInvitation({
+      actor: await currentBusinessOperationReference(),
+      invitation: {
+        email: formData.get("email"),
+        expiresAt: expiration.toISOString(),
+        systemRole: formData.get("systemRole"),
+      },
+      ...envelope.data,
     });
+    refresh();
+    return state(result, "Invitation created.");
   } catch (error) {
-    logServerError("team.inviteMember", error, { organizationId });
-    return { status: "error", message: context.tMessages("failure") };
+    return actionError(error);
   }
-
-  revalidatePath("/business/team");
-  return { status: "success", message: context.tMessages("invited") };
 }
 
 export async function updateTeamMember(
   memberId: string,
-  _previousState: TeamMemberActionState,
+  _previous: TeamMemberActionState,
   formData: FormData,
 ): Promise<TeamMemberActionState> {
-  const context = await getTeamActionContext();
-
-  if (!context.canEdit) {
-    return { status: "error", message: context.tMessages("forbidden") };
-  }
-
-  const schema = createTeamMemberUpdateSchema((key) =>
-    context.tValidation(key),
-  );
-  const parsed = schema.safeParse({
-    systemRole: formData.get("systemRole"),
-    branchIds: formData.getAll("branchIds"),
-    photoUrl: formData.get("photoUrl") ?? "",
-    bio: formData.get("bio") ?? "",
-    specialties: formData.get("specialties") ?? "",
-    publicSlug: formData.get("publicSlug") ?? "",
-    isPublicProfessional: formData.get("isPublicProfessional") ?? false,
+  const envelope = operationEnvelopeSchema.safeParse({
+    contextOrganizationId: formData.get("contextOrganizationId"),
+    expectedVersion: formData.get("expectedVersion"),
+    idempotencyKey: formData.get("idempotencyKey"),
   });
-
-  if (!parsed.success) {
-    const errors = parsed.error.flatten().fieldErrors;
-    return {
-      status: "error",
-      message: context.tMessages("invalid"),
-      fieldErrors: {
-        systemRole: errors.systemRole?.[0],
-        branchIds: errors.branchIds?.[0],
-        photoUrl: errors.photoUrl?.[0],
-        bio: errors.bio?.[0],
-        specialties: errors.specialties?.[0],
-        publicSlug: errors.publicSlug?.[0],
-        isPublicProfessional: errors.isPublicProfessional?.[0],
-      },
-    };
-  }
-
-  const {
-    systemRole,
-    branchIds,
-    photoUrl,
-    bio,
-    specialties,
-    publicSlug,
-    isPublicProfessional,
-  } = parsed.data;
-  const organizationId = context.identity.membership.organizationId;
-  const [member, validBranches] = await Promise.all([
-    prisma.organizationMember.findFirst({
-      where: { id: memberId, organizationId },
-      include: {
-        role: true,
-        person: { select: { deletedAt: true, status: true } },
-        organization: { select: { slug: true } },
-      },
-    }),
-    branchesBelongToOrganization(branchIds, organizationId),
-  ]);
-
-  if (!member) {
-    return { status: "error", message: context.tMessages("notFound") };
-  }
-
-  if (member.role.systemRole === "OWNER") {
-    return { status: "error", message: context.tMessages("ownerProtected") };
-  }
-
-  if (
-    isPublicProfessional &&
-    (member.person.deletedAt || member.person.status !== "ACTIVE")
-  ) {
-    return { status: "error", message: context.tMessages("recipientInactive") };
-  }
-
-  if (isPublicProfessional && !publicSlug) {
-    return {
-      status: "error",
-      message: context.tMessages("invalid"),
-      fieldErrors: { publicSlug: context.tMessages("publicSlugRequired") },
-    };
-  }
-
-  if (!validBranches) {
-    return { status: "error", message: context.tMessages("invalidBranches") };
-  }
-
-  const normalizedPublicSlug = isPublicProfessional ? publicSlug : null;
-  if (normalizedPublicSlug) {
-    const slugOwner = await prisma.organizationMember.findFirst({
-      where: {
-        organizationId,
-        publicSlug: normalizedPublicSlug,
-        id: { not: member.id },
-      },
-      select: { id: true },
-    });
-
-    if (slugOwner) {
-      return {
-        status: "error",
-        message: context.tMessages("invalid"),
-        fieldErrors: { publicSlug: context.tMessages("publicSlugTaken") },
-      };
-    }
-  }
-
+  if (!envelope.success || !exactFields(formData, [
+    "bio", "contextOrganizationId", "expectedVersion", "idempotencyKey", "isPublicProfessional", "photoUrl", "publicSlug", "specialties",
+  ])) return { code: "INVALID_REQUEST", message: "Invalid workforce profile request.", status: "error" };
+  const slug = String(formData.get("publicSlug") ?? "").trim();
   try {
-    await prisma.$transaction(async (transaction) => {
-      const roleName = roleNames[systemRole];
-      const role = await transaction.role.upsert({
-        where: {
-          organizationId_name: { organizationId, name: roleName },
-        },
-        create: {
-          organizationId,
-          name: roleName,
-          systemRole,
-          isSystem: true,
-        },
-        update: {
-          systemRole,
-          isSystem: true,
-        },
-      });
-
-      await transaction.organizationMember.update({
-        where: { id: member.id },
-        data: {
-          roleId: role.id,
-          photoUrl,
-          bio,
-          specialties,
-          publicSlug: normalizedPublicSlug,
-          isPublicProfessional,
-        },
-      });
-      await transaction.branchAssignment.deleteMany({
-        where: { memberId: member.id },
-      });
-      if (branchIds.length > 0) {
-        await transaction.branchAssignment.createMany({
-          data: branchIds.map((branchId) => ({
-            memberId: member.id,
-            branchId,
-          })),
-        });
-      }
+    const result = await updateOperationalMemberProfile({
+      actor: await currentBusinessOperationReference(),
+      memberId,
+      profile: {
+        bio: formData.get("bio") ?? "",
+        isPublicProfessional: formData.get("isPublicProfessional") === "on",
+        photoUrl: formData.get("photoUrl") ?? "",
+        publicSlug: slug || null,
+        specialties: String(formData.get("specialties") ?? "").split(",").map((item) => item.trim()).filter(Boolean),
+      },
+      ...envelope.data,
     });
+    refresh(memberId);
+    return state(result, "Workforce profile updated.");
   } catch (error) {
-    logServerError("team.updateMember", error, {
-      memberId: member.id,
-      organizationId,
-    });
-    return { status: "error", message: context.tMessages("failure") };
+    return actionError(error);
   }
+}
 
-  revalidatePath("/business/team");
-  revalidatePath(`/${member.organization.slug}`);
-  if (member.publicSlug) {
-    revalidatePath(`/${member.organization.slug}/staff/${member.publicSlug}`);
+export async function revokeInvitation(
+  invitationId: string,
+  _previous: TeamMemberActionState,
+  formData: FormData,
+): Promise<TeamMemberActionState> {
+  const envelope = operationEnvelopeSchema.safeParse({
+    contextOrganizationId: formData.get("contextOrganizationId"),
+    expectedVersion: formData.get("expectedVersion"),
+    idempotencyKey: formData.get("idempotencyKey"),
+  });
+  if (!envelope.success || !exactFields(formData, ["contextOrganizationId", "expectedVersion", "idempotencyKey"])) {
+    return { code: "INVALID_REQUEST", message: "Invalid invitation revocation request.", status: "error" };
   }
-  if (normalizedPublicSlug) {
-    revalidatePath(`/${member.organization.slug}/staff/${normalizedPublicSlug}`);
+  try {
+    const result = await revokeOperationalInvitation({
+      actor: await currentBusinessOperationReference(),
+      invitationId,
+      ...envelope.data,
+    });
+    refresh();
+    return state(result, "Invitation revoked.");
+  } catch (error) {
+    return actionError(error);
   }
-  return { status: "success", message: context.tMessages("updated") };
+}
+
+export async function updateMemberRole(
+  memberId: string,
+  _previous: TeamMemberActionState,
+  formData: FormData,
+): Promise<TeamMemberActionState> {
+  const envelope = operationEnvelopeSchema.safeParse({
+    contextOrganizationId: formData.get("contextOrganizationId"),
+    expectedVersion: formData.get("expectedVersion"),
+    idempotencyKey: formData.get("idempotencyKey"),
+  });
+  const role = formData.get("systemRole");
+  if (!envelope.success || !["MANAGER", "RECEPTIONIST", "STAFF"].includes(String(role)) || !exactFields(formData, [
+    "contextOrganizationId", "expectedVersion", "idempotencyKey", "systemRole",
+  ])) return { code: "INVALID_REQUEST", message: "Invalid role request.", status: "error" };
+  try {
+    const result = await updateOperationalMemberRole({
+      actor: await currentBusinessOperationReference(),
+      memberId,
+      systemRole: role as "MANAGER" | "RECEPTIONIST" | "STAFF",
+      ...envelope.data,
+    });
+    refresh(memberId);
+    return state(result, "Role updated.");
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function setMemberActive(
+  memberId: string,
+  active: boolean,
+  _previous: TeamMemberActionState,
+  formData: FormData,
+): Promise<TeamMemberActionState> {
+  const envelope = operationEnvelopeSchema.safeParse({
+    contextOrganizationId: formData.get("contextOrganizationId"),
+    expectedVersion: formData.get("expectedVersion"),
+    idempotencyKey: formData.get("idempotencyKey"),
+  });
+  if (!envelope.success || !exactFields(formData, ["confirmFutureBookings", "contextOrganizationId", "expectedVersion", "idempotencyKey"])) {
+    return { code: "INVALID_REQUEST", message: "Invalid membership lifecycle request.", status: "error" };
+  }
+  try {
+    const result = await setOperationalMembershipActive({
+      active,
+      actor: await currentBusinessOperationReference(),
+      confirmFutureBookings: formData.get("confirmFutureBookings") === "on",
+      memberId,
+      ...envelope.data,
+    });
+    refresh(memberId);
+    return state(result, active ? "Membership activated." : "Membership deactivated.");
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function removeMember(
+  memberId: string,
+  _previous: TeamMemberActionState,
+  formData: FormData,
+): Promise<TeamMemberActionState> {
+  const envelope = operationEnvelopeSchema.safeParse({
+    contextOrganizationId: formData.get("contextOrganizationId"),
+    expectedVersion: formData.get("expectedVersion"),
+    idempotencyKey: formData.get("idempotencyKey"),
+  });
+  if (!envelope.success || !exactFields(formData, ["confirmFutureBookings", "contextOrganizationId", "expectedVersion", "idempotencyKey"])) {
+    return { code: "INVALID_REQUEST", message: "Invalid membership removal request.", status: "error" };
+  }
+  try {
+    const result = await removeOperationalMembership({
+      actor: await currentBusinessOperationReference(),
+      confirmFutureBookings: formData.get("confirmFutureBookings") === "on",
+      memberId,
+      ...envelope.data,
+    });
+    refresh(memberId);
+    return state(result, "Membership removed.");
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function addBranchAssignment(
+  memberId: string,
+  _previous: TeamMemberActionState,
+  formData: FormData,
+): Promise<TeamMemberActionState> {
+  const envelope = createOperationEnvelopeSchema.safeParse({
+    contextOrganizationId: formData.get("contextOrganizationId"),
+    idempotencyKey: formData.get("idempotencyKey"),
+  });
+  const branchId = formData.get("branchId");
+  if (!envelope.success || typeof branchId !== "string" || !exactFields(formData, ["branchId", "contextOrganizationId", "idempotencyKey"])) {
+    return { code: "INVALID_REQUEST", message: "Invalid Branch assignment request.", status: "error" };
+  }
+  try {
+    const result = await addOperationalBranchAssignment({
+      actor: await currentBusinessOperationReference(),
+      branchId,
+      memberId,
+      ...envelope.data,
+    });
+    refresh(memberId);
+    return state(result, "Branch assignment added.");
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function removeBranchAssignment(
+  assignmentId: string,
+  _previous: TeamMemberActionState,
+  formData: FormData,
+): Promise<TeamMemberActionState> {
+  const envelope = operationEnvelopeSchema.safeParse({
+    contextOrganizationId: formData.get("contextOrganizationId"),
+    expectedVersion: formData.get("expectedVersion"),
+    idempotencyKey: formData.get("idempotencyKey"),
+  });
+  if (!envelope.success || !exactFields(formData, ["confirmFutureBookings", "contextOrganizationId", "expectedVersion", "idempotencyKey"])) {
+    return { code: "INVALID_REQUEST", message: "Invalid Branch assignment removal request.", status: "error" };
+  }
+  try {
+    const result = await removeOperationalBranchAssignment({
+      actor: await currentBusinessOperationReference(),
+      assignmentId,
+      confirmFutureBookings: formData.get("confirmFutureBookings") === "on",
+      ...envelope.data,
+    });
+    refresh();
+    return state(result, "Branch assignment removed.");
+  } catch (error) {
+    return actionError(error);
+  }
 }

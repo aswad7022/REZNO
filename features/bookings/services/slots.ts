@@ -98,7 +98,7 @@ export async function getBookingSlotResult(
   if (offering.service.organizationId !== offering.branch.organizationId) {
     return { slots: [], reason: "OFFERING_UNAVAILABLE" };
   }
-  if (!offering.isAvailable || offering.service.status !== "ACTIVE") {
+  if (!offering.isAvailable || offering.service.deletedAt || offering.service.status !== "ACTIVE") {
     return { slots: [], reason: "SERVICE_INACTIVE" };
   }
   if (
@@ -176,12 +176,9 @@ export async function getBookingSlotResult(
     availabilities: [],
   } as const;
   const staffMode = offering.service.staffSelectionMode;
-  const configuredMembers =
-    assignedMemberIds.size > 0
-      ? branchMembers.filter((member) =>
-          serviceStaffPolicyAllowsMember(assignedMemberIds, member.id),
-        )
-      : branchMembers;
+  const configuredMembers = branchMembers.filter((member) =>
+    serviceStaffPolicyAllowsMember(assignedMemberIds, member.id),
+  );
   const candidates =
     staffMode === "NONE"
       ? [unassignedCandidate]
