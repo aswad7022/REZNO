@@ -1,6 +1,6 @@
 # Stage 2 Business Operations Closure
 
-Status: implementation and exact-head staging validation in progress. This document must not be read as a declaration that Stage 2 is complete until the PR review and merge gates have passed.
+Status: implementation and real-staging closure are ready for review. This document must not be read as a declaration that Stage 2 is merged or released until the PR review and merge gates have passed.
 
 ## Pre-implementation closure audit
 
@@ -240,7 +240,10 @@ Advanced BI, revenue recognition, CSV/PDF export, background analytics, email/SM
 - Final local regression evidence on the implementation tree: 183/183 unit tests, 142/142 PostgreSQL integration tests, and 35/35 production HTTP/RSC/Server Action tests. The focused Gate 2D command additionally passed 11/11 domain/fixture tests and 3/3 PostgreSQL scenario groups.
 - Lint, non-incremental TypeScript, Prisma format/validate/generate, the 51-page Next production build, mobile TypeScript, Expo dependency validation, Expo Doctor (20/20), and Android/iOS static exports passed. The generated native/export output was kept outside the repository.
 - The existing Prisma 7.8 `@prisma/adapter-pg` nested-write path emits the documented `pg` 8 deprecation warning about concurrent `client.query()` calls in some concurrency regressions. REZNO code does not call `pg` clients directly, all invariants pass, and this is not a Gate 2D correctness or data-isolation failure; it must be rechecked before adopting `pg` 9.
-- Exact PR-head preview, real-staging fixture runs, dedicated-role HTTP/RSC smokes, CI/Vercel, and cleanup are evidence gates that must be filled before the PR is marked Ready.
+- Real `rezno-staging` remained at 30/30 migrations; no migration was pending or applied. The deterministic fixture was executed twice and both runs produced the identical sanitized fingerprint `rezno-qa-business-operations-stage2d-closure:4:11:2:2`.
+- The exact PR-head staging preview passed 28/28 authenticated HTTP/RSC checks using dedicated Better Auth identities for Owner, Manager, Receptionist, Staff, and a foreign Owner. Evidence covered role-specific metrics and navigation, Staff structural privacy, multi-timezone Branch-local days, readiness complete/incomplete states, Notification/Review definitions, generic/Restaurant separation, analytics zero/error states, direct-route policy, active-Business switching, stale context, tenant isolation, inactive membership, deleted Person, and absence of raw database errors or customer PII.
+- The staging smoke restored every fixture membership/Person binding and removed its temporary Better Auth users and dependent sessions/accounts transactionally. A separate post-smoke database check confirmed 30 applied migrations, all expected fixture identities active and restored, and zero `stage2d-smoke-*` users.
+- Exact-head GitHub Actions and Vercel checks are required to remain green when the PR is marked Ready. No P1/P2 application defect was found by the local or real-staging closure matrix.
 
 ## Known limitations and completion conditions
 
@@ -250,4 +253,4 @@ Advanced BI, revenue recognition, CSV/PDF export, background analytics, email/SM
 - No physical-device QA is claimed by this Web closure.
 - PR review and merge are external completion gates. This document does not declare Stage 2 merged or released.
 
-Stage 2 may be declared implementation-complete for review only when the complete local validation matrix is green, the exact PR-head Vercel deployment is Ready, the real staging fixture runs twice identically, Owner/Manager/Receptionist/Staff/foreign-tenant smokes pass, temporary identities/sessions/probes are cleaned, exact-head GitHub Actions and Vercel pass, no P1/P2 remains, PR #100 is still untouched, and this PR is marked Ready without merging it.
+Stage 2 is implementation-complete for review only while the complete local validation matrix stays green, the exact PR-head Vercel deployment is Ready, the real staging fixture runs twice identically, Owner/Manager/Receptionist/Staff/foreign-tenant smokes pass, temporary identities/sessions/probes are cleaned, exact-head GitHub Actions and Vercel pass, no P1/P2 remains, PR #100 is still untouched, and this PR is Ready without being merged. Review approval and merge remain external completion gates.
