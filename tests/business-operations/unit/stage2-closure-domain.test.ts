@@ -17,6 +17,10 @@ import {
   businessOperationCapabilities,
   canPerformBusinessOperation,
 } from "../../../features/business-operations/domain/policy";
+import {
+  deferredBusinessRouteRegistry,
+  getFeatureDefinition,
+} from "../../../features/dashboard/feature-placeholder";
 import { getDashboardNavigation } from "../../../features/dashboard/navigation";
 import { businessNotificationWhere } from "../../../features/notifications/domain/business-notification-policy";
 import { isSafePublicImageUrl } from "../../../lib/security/public-image-url";
@@ -48,6 +52,26 @@ test("Stage 2D closure domain keeps role scopes and routes fail-closed", () => {
   assert.equal(canAccessStage2Route("STAFF", "BEAUTY", "/business/notifications"), true);
   assert.equal(canAccessStage2Route("OWNER", "BEAUTY", "/business/not-a-stage2-route"), false);
   assert.equal(new Set(STAGE2_ROUTE_POLICIES.map((item) => item.path)).size, STAGE2_ROUTE_POLICIES.length);
+});
+
+test("Deferred Business routes preserve the locked pre-AI stage ownership", () => {
+  assert.deepEqual(deferredBusinessRouteRegistry, {
+    "/business/commerce": "Stage 3 Commerce Merchant and Admin operations",
+    "/business/communications": "Stage 4 Notifications and Messaging closure",
+    "/business/media": "Stage 5 Media, Storage and Payments Foundation",
+    "/business/payments": "Stage 5 Media, Storage and Payments Foundation",
+    "/business/platform": "Stage 6 Admin and Platform Operations",
+    "/business/release": "Stage 7 Release QA",
+    "/business/visual": "Stage 8 Final Visual Polish",
+  });
+  for (const path of Object.keys(deferredBusinessRouteRegistry)) {
+    assert.equal(
+      getFeatureDefinition("business", path.split("/").slice(2)),
+      undefined,
+      `${path} must remain a safe 404 until its owning stage implements it`,
+    );
+  }
+  assert.equal(getFeatureDefinition("business", ["unknown"]), undefined);
 });
 
 test("Branch-local day ranges preserve independent timezones and completed periods", () => {

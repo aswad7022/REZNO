@@ -7,6 +7,7 @@ import {
   createBusinessOperationsFixture,
   resetBusinessOperationsTestData,
 } from "../helpers/business-operations-fixture";
+import { deferredBusinessRouteRegistry } from "../../../features/dashboard/feature-placeholder";
 
 const baseUrl = process.env.COMMERCE_HTTP_BASE_URL;
 
@@ -267,6 +268,14 @@ test(
       for (const path of ["/business/reservations", "/business/tables", "/business/menu"]) {
         const result = await body(path, cookies.owner);
         assert.match(result.text, /NEXT_HTTP_ERROR_FALLBACK;404/);
+      }
+      for (const path of Object.keys(deferredBusinessRouteRegistry)) {
+        const result = await body(path, cookies.owner);
+        assert.match(
+          result.text,
+          /NEXT_HTTP_ERROR_FALLBACK;404/,
+          `${path} must remain unavailable until its owning stage`,
+        );
       }
       const malformed = await body("/business/analytics?period=999", cookies.owner);
       assert.match(malformed.text, /NEXT_HTTP_ERROR_FALLBACK;404/);

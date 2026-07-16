@@ -202,7 +202,7 @@ Stage 2 mutations retain the Gate 2A–2C controls: strict input schemas/allowli
 
 Public-profile read and update services now require `SETTINGS_READ` before reading Organization/profile/Service data. Receptionist and Staff cannot render the management form. Existing actions retain strict field allowlists, tenant derivation, validation, and audit behavior; there is no mass assignment of Organization IDs.
 
-Business-managed image fields (profile logo/cover/OG/gallery, Services, workforce photo, and Restaurant menu item) now accept only bounded HTTPS URLs with no credentials, no literal IP host, no localhost, and no common private hostname suffix. Next Image's global HTTP wildcard was removed; only HTTPS remote sources remain, in addition to its resolved-address safety. Uploads, malware scanning, object storage, transformation, and a curated media-host allowlist remain Stage 5 work.
+Business-managed image fields (profile logo/cover/OG/gallery, Services, workforce photo, and Restaurant menu item) now accept only bounded HTTPS URLs with no credentials, no literal IP host, no localhost, and no common private hostname suffix. Next Image's global HTTP wildcard was removed; only HTTPS remote sources remain, in addition to its resolved-address safety. Uploads, malware scanning, object storage, transformation, and a curated media-host allowlist remain part of Stage 5 Media, Storage and Payments Foundation.
 
 ## Performance and error review
 
@@ -220,12 +220,14 @@ Concrete Business routes are no longer registered in the Business catch-all. Unk
 
 | Stage | Deferred ownership |
 | --- | --- |
-| 3 | Commerce merchant/admin, fulfillment, inventory, Order operations |
-| 4 | Notification center/read state/delivery and Messaging closure |
-| 5 | Media upload/storage/scanning/transformation |
-| 6 | Payments, refunds, settlement, financial reporting |
-| 7 | Admin/platform operations |
-| 8 | Release QA, final visual polish, physical-device certification, AI |
+| 3 | Commerce Merchant & Admin: merchant store, product/catalog, inventory, merchant Orders, fulfillment, and Commerce administration |
+| 4 | Notifications & Messaging: notification center, read/unread state, messaging, assigned outbound delivery foundations, and communication UX |
+| 5 | Media, Storage & Payments Foundation: managed media, object storage, scanning/transformation, payment foundations/state, refunds, settlement foundations, and payment security integration |
+| 6 | Admin & Platform Operations: Super Admin/platform operations, moderation, support operations, platform reporting/controls, and owned background operational foundations |
+| 7 | Release QA: complete regression closure, physical-device QA, iOS/Android readiness, deployment, and operational release verification |
+| 8 | Final Visual Polish: Web/Mobile polish, RTL/LTR closure, accessibility visual pass, consistency, and production design closure |
+
+REZNO AI Foundation is explicitly **after Stage 8**, not part of Stage 8. AI may begin only after Stages 1 through 8 are fully reviewed, merged, and declared complete.
 
 Advanced BI, revenue recognition, CSV/PDF export, background analytics, email/SMS/push delivery, and Redis jobs are also outside Gate 2D.
 
@@ -249,7 +251,7 @@ Advanced BI, revenue recognition, CSV/PDF export, background analytics, email/SM
 
 - The Notification schema has no Business read state; Stage 4 owns that model and delivery redesign.
 - Analytics is operational, not financial, and intentionally has no export.
-- Business images remain externally hosted HTTPS URLs until Stage 5 supplies managed media.
+- Business images remain externally hosted HTTPS URLs until Stage 5 Media, Storage and Payments Foundation supplies managed media.
 - No physical-device QA is claimed by this Web closure.
 - PR review and merge are external completion gates. This document does not declare Stage 2 merged or released.
 

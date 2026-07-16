@@ -61,12 +61,13 @@ const customerFeatures: Readonly<Record<string, FeatureDefinition>> = {
 };
 
 export const deferredBusinessRouteRegistry = {
-  "/business/commerce": "Stage 3 Commerce merchant and admin operations",
+  "/business/commerce": "Stage 3 Commerce Merchant and Admin operations",
   "/business/communications": "Stage 4 Notifications and Messaging closure",
-  "/business/media": "Stage 5 Media and storage",
-  "/business/payments": "Stage 6 Payments and financial operations",
-  "/business/platform": "Stage 7 Admin and platform operations",
-  "/business/release": "Stage 8 Release QA and final visual polish",
+  "/business/media": "Stage 5 Media, Storage and Payments Foundation",
+  "/business/payments": "Stage 5 Media, Storage and Payments Foundation",
+  "/business/platform": "Stage 6 Admin and Platform Operations",
+  "/business/release": "Stage 7 Release QA",
+  "/business/visual": "Stage 8 Final Visual Polish",
 } as const;
 
 export function getFeatureDefinition(
