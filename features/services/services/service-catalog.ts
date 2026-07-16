@@ -9,8 +9,28 @@ import type { ServiceCatalogData } from "@/features/services/types";
 export async function getCurrentServiceCatalog(): Promise<ServiceCatalogData> {
   const reference = await currentBusinessOperationReference("SERVICE_READ");
   const catalog = await listOperationalServices(reference);
-  const { canWrite, organizationId } = catalog;
-  const [branches, categories, members] = canWrite ? await Promise.all([
+  if (catalog.scope === "RECEPTIONIST") {
+    return {
+      canEdit: false,
+      organizationId: catalog.organizationId,
+      organizationName: catalog.organizationName,
+      scope: catalog.scope,
+      services: catalog.services,
+    };
+  }
+  if (catalog.scope === "STAFF") {
+    return {
+      canEdit: false,
+      organizationId: catalog.organizationId,
+      organizationName: catalog.organizationName,
+      scheduleMemberId: catalog.scheduleMemberId,
+      scope: catalog.scope,
+      services: catalog.services,
+    };
+  }
+
+  const { organizationId } = catalog;
+  const [branches, categories, members] = await Promise.all([
     prisma.branch.findMany({
       where: {
         organizationId,
@@ -40,12 +60,13 @@ export async function getCurrentServiceCatalog(): Promise<ServiceCatalogData> {
       },
       orderBy: { person: { firstName: "asc" } },
     }),
-  ]) : [[], [], []];
+  ]);
 
   return {
-    canEdit: canWrite,
+    canEdit: true,
     organizationId,
     organizationName: catalog.organizationName,
+    scope: catalog.scope,
     branches: branches.map((branch) => ({
       id: branch.id,
       name: branch.name,

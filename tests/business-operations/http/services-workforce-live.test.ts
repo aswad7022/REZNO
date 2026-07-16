@@ -62,6 +62,17 @@ async function page(path: string, cookie?: string) {
   return fetch(`${baseUrl}${path}`, { headers: cookie ? { cookie } : undefined, redirect: "manual" });
 }
 
+async function rscPage(path: string, cookie: string) {
+  return fetch(`${baseUrl}${path}`, {
+    headers: {
+      accept: "text/x-component",
+      cookie,
+      rsc: "1",
+    },
+    redirect: "manual",
+  });
+}
+
 async function submit(path: string, form: string, mutate: (parameters: URLSearchParams) => void, cookie: string) {
   const parameters = formParams(form);
   mutate(parameters);
@@ -145,6 +156,78 @@ test("Stage 2B live Business Web pages and Server Actions enforce real role and 
       form = forms(html).find((candidate) => candidate.includes('name="name"') && !candidate.includes('name="expectedVersion"'));
       assert.equal(form, undefined);
     }
+    await prisma.organizationMember.update({ where: { id: fixture.owner.membership.id }, data: { roleId: fixture.owner.membership.roleId } });
+  });
+
+  await t.test("production HTML and RSC responses contain only the role-scoped Service catalog DTO", async () => {
+    const suffix = randomUUID().slice(0, 8);
+    const staffBranchName = `HTTP_STAFF_BRANCH_${suffix}`;
+    const unassignedBranchName = `HTTP_UNASSIGNED_BRANCH_${suffix}`;
+    const inactiveBranchName = `HTTP_INACTIVE_BRANCH_${suffix}`;
+    const deletedBranchName = `HTTP_DELETED_BRANCH_${suffix}`;
+    const unavailableBranchName = `HTTP_UNAVAILABLE_BRANCH_${suffix}`;
+    const foreignBranchName = `HTTP_FOREIGN_BRANCH_${suffix}`;
+    const [staffBranch, unassignedBranch, deletedBranch, unavailableBranch] = await Promise.all([
+      prisma.branch.create({ data: { name: staffBranchName, organizationId: fixture.organizationA.id, slug: `http-staff-${suffix}`, status: "ACTIVE" } }),
+      prisma.branch.create({ data: { name: unassignedBranchName, organizationId: fixture.organizationA.id, slug: `http-unassigned-${suffix}`, status: "ACTIVE" } }),
+      prisma.branch.create({ data: { deletedAt: new Date(), name: deletedBranchName, organizationId: fixture.organizationA.id, slug: `http-deleted-${suffix}`, status: "ACTIVE" } }),
+      prisma.branch.create({ data: { name: unavailableBranchName, organizationId: fixture.organizationA.id, slug: `http-unavailable-${suffix}`, status: "ACTIVE" } }),
+    ]);
+    await prisma.branch.update({ where: { id: fixture.inactiveBranch.id }, data: { name: inactiveBranchName } });
+    await prisma.branch.update({ where: { id: fixture.branchB.id }, data: { name: foreignBranchName } });
+    const offerings = await Promise.all([
+      prisma.branchService.create({ data: { branchId: staffBranch.id, durationMinutes: 51, price: "51001", serviceId: fixture.service.id } }),
+      prisma.branchService.create({ data: { branchId: unassignedBranch.id, durationMinutes: 52, price: "52002", serviceId: fixture.service.id } }),
+      prisma.branchService.create({ data: { branchId: fixture.inactiveBranch.id, durationMinutes: 53, price: "53003", serviceId: fixture.service.id } }),
+      prisma.branchService.create({ data: { branchId: deletedBranch.id, durationMinutes: 54, price: "54004", serviceId: fixture.service.id } }),
+      prisma.branchService.create({ data: { branchId: unavailableBranch.id, durationMinutes: 55, isAvailable: false, price: "55005", serviceId: fixture.service.id } }),
+      prisma.branchService.create({ data: { branchId: fixture.branchB.id, durationMinutes: 56, price: "56006", serviceId: fixture.service.id } }),
+    ]);
+    await prisma.branchAssignment.create({ data: { branchId: staffBranch.id, memberId: fixture.owner.membership.id } });
+    const [selfAssignment, coworkerAssignment] = await Promise.all([
+      prisma.serviceStaffAssignment.create({ data: { memberId: fixture.owner.membership.id, serviceId: fixture.service.id } }),
+      prisma.serviceStaffAssignment.create({ data: { memberId: fixture.manager.membership.id, serviceId: fixture.service.id } }),
+    ]);
+
+    const ownerHtml = await (await page("/business/services", ownerCookie)).text();
+    assert.match(ownerHtml, new RegExp(staffBranchName));
+    assert.match(ownerHtml, new RegExp(coworkerAssignment.id));
+    assert.match(ownerHtml, /business\/manage\/locations/);
+
+    const assertResponseExcludes = (body: string, excluded: string[]) => {
+      for (const sentinel of excluded) assert.equal(body.includes(sentinel), false, `Response leaked ${sentinel}`);
+    };
+    const managementIdentifiers = [coworkerAssignment.id, selfAssignment.id, fixture.manager.membership.id, ...offerings.map((offering) => offering.id)];
+    const receptionistExclusions = [inactiveBranchName, deletedBranchName, unavailableBranchName, foreignBranchName, ...managementIdentifiers];
+    await prisma.organizationMember.update({ where: { id: fixture.owner.membership.id }, data: { roleId: fixture.receptionist.membership.roleId } });
+    const receptionistHtml = await (await page("/business/services", ownerCookie)).text();
+    assert.match(receptionistHtml, new RegExp(staffBranchName));
+    assert.match(receptionistHtml, new RegExp(unassignedBranchName));
+    assertResponseExcludes(receptionistHtml, receptionistExclusions);
+    assert.equal(receptionistHtml.includes("/business/manage/locations/"), false);
+    assert.equal(receptionistHtml.includes("/business/team/"), false);
+    const receptionistRscResponse = await rscPage("/business/services", ownerCookie);
+    assert.equal(receptionistRscResponse.status, 200);
+    assert.match(receptionistRscResponse.headers.get("content-type") ?? "", /text\/x-component/);
+    const receptionistRsc = await receptionistRscResponse.text();
+    assert.match(receptionistRsc, new RegExp(staffBranchName));
+    assertResponseExcludes(receptionistRsc, receptionistExclusions);
+
+    await prisma.organizationMember.update({ where: { id: fixture.owner.membership.id }, data: { roleId: fixture.staff.membership.roleId } });
+    const staffHtml = await (await page("/business/services", ownerCookie)).text();
+    assert.match(staffHtml, new RegExp(staffBranchName));
+    assert.match(staffHtml, new RegExp(`/business/team/${fixture.owner.membership.id}/availability`));
+    const staffExclusions = [unassignedBranchName, unassignedBranch.id, "52002", "52,002", inactiveBranchName, deletedBranchName, unavailableBranchName, foreignBranchName, ...managementIdentifiers];
+    assertResponseExcludes(staffHtml, staffExclusions);
+    assert.equal(staffHtml.includes("/business/services?edit="), false);
+    const staffRscResponse = await rscPage("/business/services", ownerCookie);
+    assert.equal(staffRscResponse.status, 200);
+    assert.match(staffRscResponse.headers.get("content-type") ?? "", /text\/x-component/);
+    const staffRsc = await staffRscResponse.text();
+    assert.match(staffRsc, new RegExp(staffBranchName));
+    assert.match(staffRsc, new RegExp(fixture.owner.membership.id));
+    assertResponseExcludes(staffRsc, staffExclusions);
+    assert.equal(staffRsc.includes("/business/services?edit="), false);
     await prisma.organizationMember.update({ where: { id: fixture.owner.membership.id }, data: { roleId: fixture.owner.membership.roleId } });
   });
 

@@ -31,7 +31,25 @@ export interface ServiceDetails {
   version: string;
 }
 
-export interface ServiceCatalogData {
+interface ServiceCatalogBase {
+  organizationId: string;
+  organizationName: string;
+}
+
+export interface ReadOnlyServiceDetails {
+  name: string;
+  description: string;
+  imageUrl: string;
+  offerings: Array<{
+    branchName: string;
+    price: string;
+    durationMinutes: number;
+  }>;
+}
+
+export interface ManagementServiceCatalogData extends ServiceCatalogBase {
+  scope: "MANAGEMENT";
+  canEdit: true;
   services: ServiceDetails[];
   branches: Array<{
     id: string;
@@ -40,10 +58,25 @@ export interface ServiceCatalogData {
   }>;
   categories: Array<{ id: string; slug: string; name: string }>;
   members: Array<{ id: string; name: string }>;
-  canEdit: boolean;
-  organizationId: string;
-  organizationName: string;
 }
+
+export interface ReceptionistServiceCatalogData extends ServiceCatalogBase {
+  scope: "RECEPTIONIST";
+  canEdit: false;
+  services: ReadOnlyServiceDetails[];
+}
+
+export interface StaffServiceCatalogData extends ServiceCatalogBase {
+  scope: "STAFF";
+  canEdit: false;
+  scheduleMemberId: string | null;
+  services: ReadOnlyServiceDetails[];
+}
+
+export type ServiceCatalogData =
+  | ManagementServiceCatalogData
+  | ReceptionistServiceCatalogData
+  | StaffServiceCatalogData;
 
 export type ServiceField =
   | "name"

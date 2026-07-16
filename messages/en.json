@@ -351,7 +351,8 @@
       "branchBased": "This service uses branch working hours and the availability of its selected providers.",
       "editBranch": "{branch} hours",
       "editEmployee": "Edit employee availability",
-      "editBranches": "Edit service locations"
+      "editBranches": "Edit service locations",
+      "viewOwn": "View my availability"
     },
     "edit": {
       "title": "Edit service",

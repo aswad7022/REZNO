@@ -31,6 +31,7 @@ import {
 import {
   archiveOperationalService,
   createOperationalService,
+  listOperationalServices,
   setOperationalServiceActive,
   updateOperationalService,
 } from "../../../features/business-operations/services/service-catalog";
@@ -199,6 +200,107 @@ test("Stage 2B Services and Workforce operations are tenant-safe, replay-safe, a
     assert.ok((await prisma.service.findUniqueOrThrow({ where: { id: inactive.id } })).deletedAt);
     const linked = await prisma.service.create({ data: { categoryId: fixture.category.id, name: "Linked", organizationId: fixture.organizationA.id, status: "INACTIVE", branchServices: { create: { branchId: fixture.activeBranch.id, durationMinutes: 30, price: "10" } } } });
     await assert.rejects(archiveOperationalService({ actor: fixture.owner.reference, contextOrganizationId: fixture.organizationA.id, expectedVersion: linked.updatedAt.toISOString(), idempotencyKey: randomUUID(), serviceId: linked.id }), hasCode("SERVICE_ARCHIVE_CONFLICT"));
+  });
+
+  await t.test("Service catalog reads use structurally distinct role DTOs and query-scoped branch and workforce data", async () => {
+    await resetBusinessOperationsTestData();
+    const fixture = await createBusinessOperationsFixture("stage2b-catalog-scope");
+    const suffix = randomUUID().slice(0, 8);
+    const visibleBranchName = `VISIBLE_STAFF_BRANCH_${suffix}`;
+    const unassignedBranchName = `HIDDEN_FROM_STAFF_BRANCH_${suffix}`;
+    const inactiveBranchName = `INACTIVE_BRANCH_SENTINEL_${suffix}`;
+    const deletedBranchName = `DELETED_BRANCH_SENTINEL_${suffix}`;
+    const unavailableBranchName = `UNAVAILABLE_BRANCH_SENTINEL_${suffix}`;
+    const foreignBranchName = `FOREIGN_BRANCH_SENTINEL_${suffix}`;
+
+    await prisma.branch.update({ where: { id: fixture.activeBranch.id }, data: { name: visibleBranchName } });
+    await prisma.branch.update({ where: { id: fixture.inactiveBranch.id }, data: { name: inactiveBranchName } });
+    await prisma.branch.update({ where: { id: fixture.branchB.id }, data: { name: foreignBranchName } });
+    const [unassignedBranch, deletedBranch, unavailableBranch] = await Promise.all([
+      prisma.branch.create({ data: { name: unassignedBranchName, organizationId: fixture.organizationA.id, slug: `unassigned-${suffix}`, status: "ACTIVE" } }),
+      prisma.branch.create({ data: { deletedAt: new Date(), name: deletedBranchName, organizationId: fixture.organizationA.id, slug: `deleted-${suffix}`, status: "ACTIVE" } }),
+      prisma.branch.create({ data: { name: unavailableBranchName, organizationId: fixture.organizationA.id, slug: `unavailable-${suffix}`, status: "ACTIVE" } }),
+    ]);
+    const extraOfferings = await Promise.all([
+      prisma.branchService.create({ data: { branchId: unassignedBranch.id, durationMinutes: 41, price: "41001", serviceId: fixture.service.id } }),
+      prisma.branchService.create({ data: { branchId: fixture.inactiveBranch.id, durationMinutes: 42, price: "42002", serviceId: fixture.service.id } }),
+      prisma.branchService.create({ data: { branchId: deletedBranch.id, durationMinutes: 43, price: "43003", serviceId: fixture.service.id } }),
+      prisma.branchService.create({ data: { branchId: unavailableBranch.id, durationMinutes: 44, isAvailable: false, price: "44004", serviceId: fixture.service.id } }),
+      prisma.branchService.create({ data: { branchId: fixture.branchB.id, durationMinutes: 45, price: "45005", serviceId: fixture.service.id } }),
+    ]);
+    const staffBranchAssignment = await prisma.branchAssignment.create({ data: { branchId: fixture.activeBranch.id, memberId: fixture.staff.membership.id } });
+    const [staffAssignment, receptionistAssignment, managerAssignment, ownerAssignment] = await Promise.all([
+      prisma.serviceStaffAssignment.create({ data: { memberId: fixture.staff.membership.id, serviceId: fixture.service.id } }),
+      prisma.serviceStaffAssignment.create({ data: { memberId: fixture.receptionist.membership.id, serviceId: fixture.service.id } }),
+      prisma.serviceStaffAssignment.create({ data: { memberId: fixture.manager.membership.id, serviceId: fixture.service.id } }),
+      prisma.serviceStaffAssignment.create({ data: { memberId: fixture.owner.membership.id, serviceId: fixture.service.id } }),
+    ]);
+    const coworkerOnlyService = await prisma.service.create({
+      data: {
+        categoryId: fixture.category.id,
+        name: `COWORKER_ONLY_SERVICE_${suffix}`,
+        organizationId: fixture.organizationA.id,
+        staffAssignments: { create: { memberId: fixture.manager.membership.id } },
+      },
+    });
+    await prisma.branchService.create({ data: { branchId: fixture.activeBranch.id, durationMinutes: 50, price: "50006", serviceId: coworkerOnlyService.id } });
+
+    const management = await listOperationalServices(fixture.owner.reference);
+    assert.equal(management.scope, "MANAGEMENT");
+    assert.equal(management.canWrite, true);
+    if (management.scope !== "MANAGEMENT") assert.fail("Expected management catalog");
+    const managedService = management.services.find((service) => service.id === fixture.service.id);
+    assert.ok(managedService);
+    assert.deepEqual(new Set(managedService.assignedMemberIds), new Set([fixture.manager.membership.id, fixture.receptionist.membership.id, fixture.staff.membership.id]));
+    assert.equal(managedService.assignedMemberIds.includes(fixture.owner.membership.id), false);
+    assert.equal(managedService.staffAssignments.some((assignment) => assignment.id === ownerAssignment.id), false);
+    assert.equal(managedService.staffAssignments.some((assignment) => assignment.id === staffAssignment.id), true);
+    assert.equal(managedService.staffAssignments.some((assignment) => assignment.id === receptionistAssignment.id), true);
+    assert.equal(managedService.staffAssignments.some((assignment) => assignment.id === managerAssignment.id), true);
+    assert.equal(managedService.offerings.length, 5);
+    assert.equal(managedService.offerings.some((offering) => offering.branchName === foreignBranchName), false);
+
+    const managerCatalog = await listOperationalServices(fixture.manager.reference);
+    if (managerCatalog.scope !== "MANAGEMENT") assert.fail("Expected Manager management catalog");
+    const managerService = managerCatalog.services.find((service) => service.id === fixture.service.id);
+    assert.ok(managerService);
+    assert.deepEqual(new Set(managerService.assignedMemberIds), new Set([fixture.receptionist.membership.id, fixture.staff.membership.id]));
+    assert.equal(managerService.assignedMemberIds.includes(fixture.manager.membership.id), false);
+    assert.equal(managerService.assignedMemberIds.includes(fixture.owner.membership.id), false);
+
+    const receptionist = await listOperationalServices(fixture.receptionist.reference);
+    assert.equal(receptionist.scope, "RECEPTIONIST");
+    if (receptionist.scope !== "RECEPTIONIST") assert.fail("Expected receptionist catalog");
+    const receptionistService = receptionist.services.find((service) => service.name === fixture.service.name);
+    assert.ok(receptionistService);
+    assert.deepEqual(new Set(receptionistService.offerings.map((offering) => offering.branchName)), new Set([visibleBranchName, unassignedBranchName]));
+    const receptionistPayload = JSON.stringify(receptionist);
+    for (const excluded of [inactiveBranchName, fixture.inactiveBranch.id, "42002", deletedBranchName, deletedBranch.id, "43003", unavailableBranchName, unavailableBranch.id, "44004", foreignBranchName, fixture.branchB.id, "45005", fixture.owner.membership.id, fixture.manager.membership.id, fixture.staff.membership.id, ownerAssignment.id, ...extraOfferings.map((offering) => offering.id)]) {
+      assert.equal(receptionistPayload.includes(excluded), false, `Receptionist payload leaked ${excluded}`);
+    }
+    assert.equal("version" in receptionistService, false);
+    assert.equal("id" in receptionistService, false);
+    assert.equal("branchId" in receptionistService.offerings[0]!, false);
+
+    const staff = await listOperationalServices(fixture.staff.reference);
+    assert.equal(staff.scope, "STAFF");
+    if (staff.scope !== "STAFF") assert.fail("Expected staff catalog");
+    assert.equal(staff.scheduleMemberId, fixture.staff.membership.id);
+    assert.deepEqual(staff.services.map((service) => service.name), [fixture.service.name]);
+    assert.deepEqual(staff.services[0]?.offerings.map((offering) => offering.branchName), [visibleBranchName]);
+    const staffPayload = JSON.stringify(staff);
+    for (const excluded of [unassignedBranchName, unassignedBranch.id, "41001", inactiveBranchName, fixture.inactiveBranch.id, "42002", deletedBranchName, deletedBranch.id, "43003", unavailableBranchName, unavailableBranch.id, "44004", foreignBranchName, fixture.branchB.id, "45005", coworkerOnlyService.name, fixture.owner.membership.id, fixture.manager.membership.id, ownerAssignment.id, managerAssignment.id, ...extraOfferings.map((offering) => offering.id)]) {
+      assert.equal(staffPayload.includes(excluded), false, `Staff payload leaked ${excluded}`);
+    }
+    assert.equal("version" in staff.services[0]!, false);
+    assert.equal("id" in staff.services[0]!, false);
+    assert.equal("branchId" in staff.services[0]!.offerings[0]!, false);
+
+    await prisma.branchAssignment.delete({ where: { id: staffBranchAssignment.id } });
+    const staffWithoutActiveBranch = await listOperationalServices(fixture.staff.reference);
+    if (staffWithoutActiveBranch.scope !== "STAFF") assert.fail("Expected staff catalog");
+    assert.equal(staffWithoutActiveBranch.scheduleMemberId, null);
+    assert.deepEqual(staffWithoutActiveBranch.services[0]?.offerings, []);
   });
 
   await t.test("Branch offerings validate relationships and preserve historical price and duration snapshots", async () => {

@@ -38,38 +38,39 @@ export async function ServiceManagementPage({
 }: {
   editId?: string;
 }) {
-  const [{ services, branches, categories, members, canEdit, organizationId, organizationName }, t, format] =
-    await Promise.all([
-      getCurrentServiceCatalog(),
-      getTranslations("Services"),
-      getFormatter(),
-    ]);
+  const [catalog, t, format] = await Promise.all([
+    getCurrentServiceCatalog(),
+    getTranslations("Services"),
+    getFormatter(),
+  ]);
 
-  const editableService = editId
-    ? services.find((service) => service.id === editId)
+  const editableService = editId && catalog.scope === "MANAGEMENT"
+    ? catalog.services.find((service) => service.id === editId)
     : undefined;
 
   return (
     <DashboardShell>
       <DashboardPageHeader title={t("title")} description={t("description")} />
-      <p className="text-sm text-muted-foreground">{t("activeOrganization", { organization: organizationName })}</p>
+      <p className="text-sm text-muted-foreground">
+        {t("activeOrganization", { organization: catalog.organizationName })}
+      </p>
 
-      {canEdit && !editableService ? (
+      {catalog.scope === "MANAGEMENT" && !editableService ? (
         <Card>
           <CardHeader>
             <CardTitle>{t("add")}</CardTitle>
           </CardHeader>
           <CardContent>
             <CreateServiceForm
-              categories={categories}
+              categories={catalog.categories}
               idempotencyKey={randomUUID()}
-              organizationId={organizationId}
+              organizationId={catalog.organizationId}
             />
           </CardContent>
         </Card>
       ) : null}
 
-      {canEdit && editableService ? (
+      {catalog.scope === "MANAGEMENT" && editableService ? (
         <Card id="service-edit">
           <CardHeader>
             <CardTitle>{t("edit.title")}</CardTitle>
@@ -77,73 +78,79 @@ export async function ServiceManagementPage({
           </CardHeader>
           <CardContent>
             <CreateServiceForm
-              categories={categories}
+              categories={catalog.categories}
               idempotencyKey={randomUUID()}
-              organizationId={organizationId}
+              organizationId={catalog.organizationId}
               service={editableService}
             />
           </CardContent>
         </Card>
       ) : null}
 
-      {services.length === 0 ? (
+      {catalog.scope === "STAFF" && catalog.scheduleMemberId ? (
+        <Button asChild variant="outline" className="w-fit">
+          <Link href={`/business/team/${catalog.scheduleMemberId}/availability`}>
+            <CalendarClock />
+            {t("availability.viewOwn")}
+          </Link>
+        </Button>
+      ) : null}
+
+      {catalog.services.length === 0 ? (
         <DashboardEmpty
           icon={Sparkles}
           title={t("emptyTitle")}
           description={t("emptyDescription")}
         />
       ) : (
-        <div className="grid gap-4 md:grid-cols-2">
-          {services.map((service) => (
-            <Card key={service.id} className="overflow-hidden">
-              <div className="relative flex aspect-[16/6] items-center justify-center overflow-hidden bg-gradient-to-br from-primary/15 via-accent/20 to-secondary">
-                {service.imageUrl ? (
-                  <Image
-                    src={service.imageUrl}
-                    alt={service.name}
-                    fill
-                    sizes="(max-width: 768px) 100vw, 50vw"
-                    className="object-cover"
-                  />
-                ) : null}
-                {!service.imageUrl ? (
-                  <ImageIcon className="size-8 text-primary/40" />
-                ) : null}
-              </div>
-              <CardHeader className="flex-row items-start justify-between gap-4">
-                <div>
-                  <CardTitle>{service.name}</CardTitle>
-                  <CardDescription className="mt-1">
-                    {service.description}
-                  </CardDescription>
+        catalog.scope === "MANAGEMENT" ? (
+          <div className="grid gap-4 md:grid-cols-2">
+            {catalog.services.map((service) => (
+              <Card key={service.id} className="overflow-hidden">
+                <div className="relative flex aspect-[16/6] items-center justify-center overflow-hidden bg-gradient-to-br from-primary/15 via-accent/20 to-secondary">
+                  {service.imageUrl ? (
+                    <Image
+                      src={service.imageUrl}
+                      alt={service.name}
+                      fill
+                      sizes="(max-width: 768px) 100vw, 50vw"
+                      className="object-cover"
+                    />
+                  ) : (
+                    <ImageIcon className="size-8 text-primary/40" />
+                  )}
                 </div>
-                <Badge
-                  variant={
-                    service.status === "ACTIVE" ? "default" : "secondary"
-                  }
-                >
-                  {t(`statuses.${service.status}`)}
-                </Badge>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {canEdit && service.status !== "ARCHIVED" ? (
-                  <ServiceOperations
-                    branches={branches}
-                    keys={{
-                      archive: randomUUID(),
-                      assignmentAdd: randomUUID(),
-                      assignmentRemove: Object.fromEntries(service.staffAssignments.map((assignment) => [assignment.id, randomUUID()])),
-                      lifecycle: randomUUID(),
-                      offeringCreate: randomUUID(),
-                      offeringRemove: Object.fromEntries(service.offerings.map((offering) => [offering.id, randomUUID()])),
-                      offeringUpdate: Object.fromEntries(service.offerings.map((offering) => [offering.id, randomUUID()])),
-                    }}
-                    members={members}
-                    organizationId={organizationId}
-                    service={service}
-                  />
-                ) : null}
-                {canEdit ? (
+                <CardHeader className="flex-row items-start justify-between gap-4">
+                  <div>
+                    <CardTitle>{service.name}</CardTitle>
+                    <CardDescription className="mt-1">
+                      {service.description}
+                    </CardDescription>
+                  </div>
+                  <Badge
+                    variant={service.status === "ACTIVE" ? "default" : "secondary"}
+                  >
+                    {t(`statuses.${service.status}`)}
+                  </Badge>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {service.status !== "ARCHIVED" ? (
+                    <ServiceOperations
+                      branches={catalog.branches}
+                      keys={{
+                        archive: randomUUID(),
+                        assignmentAdd: randomUUID(),
+                        assignmentRemove: Object.fromEntries(service.staffAssignments.map((assignment) => [assignment.id, randomUUID()])),
+                        lifecycle: randomUUID(),
+                        offeringCreate: randomUUID(),
+                        offeringRemove: Object.fromEntries(service.offerings.map((offering) => [offering.id, randomUUID()])),
+                        offeringUpdate: Object.fromEntries(service.offerings.map((offering) => [offering.id, randomUUID()])),
+                      }}
+                      members={catalog.members}
+                      organizationId={catalog.organizationId}
+                      service={service}
+                    />
+                  ) : null}
                   <div className="flex flex-wrap gap-2 border-b pb-3">
                     <Button asChild variant="outline" size="sm">
                       <Link href={`/business/services?edit=${service.id}#service-edit`}>
@@ -170,103 +177,118 @@ export async function ServiceManagementPage({
                       </Link>
                     </Button>
                   </div>
-                ) : null}
-                {service.offerings.map((offering) => (
-                  <div
-                    key={offering.branchId}
-                    className="rounded-lg border p-3 text-sm"
-                  >
-                    <div className="flex items-center justify-between gap-4">
-                      <span className="font-medium">{offering.branchName}</span>
-                      <span className="text-muted-foreground">
-                        {t("offering", {
-                          price: format.number(Number(offering.price), {
-                            maximumFractionDigits: 0,
-                          }),
-                          duration: offering.durationMinutes,
-                        })}
-                      </span>
-                    </div>
-                    {offering.readinessIssue ? (
-                      <div className="mt-3 flex flex-col gap-2 rounded-lg bg-amber-500/10 p-3 text-amber-800 dark:text-amber-200 sm:flex-row sm:items-center sm:justify-between">
-                        <p className="flex items-start gap-2">
-                          <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-                          {t(
-                            `readiness.${offering.readinessIssue}.description`,
-                          )}
-                        </p>
-                        <Button
-                          asChild
-                          variant="outline"
-                          size="sm"
-                          className="shrink-0"
-                        >
-                          <Link
-                            href={
-                              offering.readinessIssue === "HOURS"
-                                ? `/business/manage/locations/${offering.branchId}/hours`
-                                : "/business/team"
-                            }
-                          >
-                            {t(
-                              `readiness.${offering.readinessIssue}.action`,
-                            )}
-                          </Link>
-                        </Button>
+                  {service.offerings.map((offering) => (
+                    <div key={offering.branchId} className="rounded-lg border p-3 text-sm">
+                      <div className="flex items-center justify-between gap-4">
+                        <span className="font-medium">{offering.branchName}</span>
+                        <span className="text-muted-foreground">
+                          {t("offering", {
+                            price: format.number(Number(offering.price), {
+                              maximumFractionDigits: 0,
+                            }),
+                            duration: offering.durationMinutes,
+                          })}
+                        </span>
                       </div>
-                    ) : null}
-                  </div>
-                ))}
-                <div
-                  id={`service-availability-${service.id}`}
-                  className="scroll-mt-24 rounded-xl border border-primary/15 bg-primary/5 p-4"
-                >
-                  <p className="font-medium">{t("availability.title")}</p>
-                  <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                    {t("availability.branchBased")}
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {service.offerings
-                      .filter((offering) => offering.isAvailable)
-                      .map((offering) => (
-                        <Button
-                          key={offering.branchId}
-                          asChild
-                          size="sm"
-                          variant="outline"
-                        >
-                          <Link
-                            href={`/business/manage/locations/${offering.branchId}/hours`}
-                          >
-                            {t("availability.editBranch", {
-                              branch: offering.branchName,
-                            })}
+                      {offering.readinessIssue ? (
+                        <div className="mt-3 flex flex-col gap-2 rounded-lg bg-amber-500/10 p-3 text-amber-800 dark:text-amber-200 sm:flex-row sm:items-center sm:justify-between">
+                          <p className="flex items-start gap-2">
+                            <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+                            {t(`readiness.${offering.readinessIssue}.description`)}
+                          </p>
+                          <Button asChild variant="outline" size="sm" className="shrink-0">
+                            <Link
+                              href={
+                                offering.readinessIssue === "HOURS"
+                                  ? `/business/manage/locations/${offering.branchId}/hours`
+                                  : "/business/team"
+                              }
+                            >
+                              {t(`readiness.${offering.readinessIssue}.action`)}
+                            </Link>
+                          </Button>
+                        </div>
+                      ) : null}
+                    </div>
+                  ))}
+                  <div
+                    id={`service-availability-${service.id}`}
+                    className="scroll-mt-24 rounded-xl border border-primary/15 bg-primary/5 p-4"
+                  >
+                    <p className="font-medium">{t("availability.title")}</p>
+                    <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                      {t("availability.branchBased")}
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {service.offerings.filter((offering) => offering.isAvailable).map((offering) => (
+                        <Button key={offering.branchId} asChild size="sm" variant="outline">
+                          <Link href={`/business/manage/locations/${offering.branchId}/hours`}>
+                            {t("availability.editBranch", { branch: offering.branchName })}
                           </Link>
                         </Button>
                       ))}
-                    {service.assignedMemberIds.map((memberId) => (
-                      <Button
-                        key={memberId}
-                        asChild
-                        size="sm"
-                        variant="outline"
-                      >
-                        <Link href={`/business/team/${memberId}/availability`}>
-                          {t("availability.editEmployee")}
+                      {service.assignedMemberIds.map((memberId) => (
+                        <Button key={memberId} asChild size="sm" variant="outline">
+                          <Link href={`/business/team/${memberId}/availability`}>
+                            {t("availability.editEmployee")}
+                          </Link>
+                        </Button>
+                      ))}
+                      <Button asChild size="sm" variant="outline">
+                        <Link href={`/business/services?edit=${service.id}#service-branches`}>
+                          {t("availability.editBranches")}
                         </Link>
                       </Button>
-                    ))}
-                    <Button asChild size="sm" variant="outline">
-                      <Link href={`/business/services?edit=${service.id}#service-branches`}>
-                        {t("availability.editBranches")}
-                      </Link>
-                    </Button>
+                    </div>
                   </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2">
+            {catalog.services.map((service) => (
+              <Card key={service.name} className="overflow-hidden">
+                <div className="relative flex aspect-[16/6] items-center justify-center overflow-hidden bg-gradient-to-br from-primary/15 via-accent/20 to-secondary">
+                  {service.imageUrl ? (
+                    <Image
+                      src={service.imageUrl}
+                      alt={service.name}
+                      fill
+                      sizes="(max-width: 768px) 100vw, 50vw"
+                      className="object-cover"
+                    />
+                  ) : (
+                    <ImageIcon className="size-8 text-primary/40" />
+                  )}
                 </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                <CardHeader>
+                  <CardTitle>{service.name}</CardTitle>
+                  <CardDescription className="mt-1">
+                    {service.description}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {service.offerings.map((offering) => (
+                    <div key={offering.branchName} className="rounded-lg border p-3 text-sm">
+                      <div className="flex items-center justify-between gap-4">
+                        <span className="font-medium">{offering.branchName}</span>
+                        <span className="text-muted-foreground">
+                          {t("offering", {
+                            price: format.number(Number(offering.price), {
+                              maximumFractionDigits: 0,
+                            }),
+                            duration: offering.durationMinutes,
+                          })}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )
       )}
     </DashboardShell>
   );

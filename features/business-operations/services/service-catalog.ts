@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { Prisma, ServiceStatus } from "@prisma/client";
+import type { Prisma, ServiceStatus, SystemRole } from "@prisma/client";
 
 import { businessOperationsError } from "@/features/business-operations/domain/errors";
 import { canPerformBusinessOperation } from "@/features/business-operations/domain/policy";
@@ -123,43 +123,47 @@ export async function listOperationalServices(
 ) {
   const actor = await resolveBusinessOperationActor(reference, "SERVICE_READ");
   const canWrite = canPerformBusinessOperation(actor.role, "SERVICE_WRITE");
+  if (canWrite) return listManagementServiceCatalog(actor);
+  if (actor.role === "STAFF") return listStaffServiceCatalog(actor);
+  return listReceptionistServiceCatalog(actor);
+}
+
+const managementServiceAssignmentRoles = {
+  MANAGER: ["RECEPTIONIST", "STAFF"],
+  OWNER: ["MANAGER", "RECEPTIONIST", "STAFF"],
+} as const satisfies Record<"MANAGER" | "OWNER", readonly SystemRole[]>;
+
+async function listManagementServiceCatalog(actor: BusinessOperationActor) {
+  const manageableRoles = actor.role === "OWNER"
+    ? managementServiceAssignmentRoles.OWNER
+    : managementServiceAssignmentRoles.MANAGER;
   const services = await prisma.service.findMany({
-    where: {
-      organizationId: actor.organizationId,
-      ...(canWrite
-        ? {}
-        : actor.role === "STAFF"
-          ? {
-            deletedAt: null,
-            status: "ACTIVE",
-            staffAssignments: {
-              some: {
-                memberId: actor.membershipId,
-                member: {
-                  deletedAt: null,
-                  status: "ACTIVE",
-                  person: { deletedAt: null, status: "ACTIVE" },
-                },
-              },
-            },
-          }
-          : { deletedAt: null, status: "ACTIVE" }),
-    },
+    where: { organizationId: actor.organizationId },
     include: {
       category: { select: { id: true, name: true, slug: true } },
       branchServices: {
+        where: { branch: { organizationId: actor.organizationId } },
         include: { branch: { select: { id: true, name: true, status: true, deletedAt: true } } },
         orderBy: { branch: { name: "asc" } },
       },
-      staffAssignments: { select: { createdAt: true, id: true, memberId: true } },
+      staffAssignments: {
+        where: {
+          member: {
+            organizationId: actor.organizationId,
+            role: { systemRole: { in: [...manageableRoles] } },
+          },
+        },
+        select: { createdAt: true, id: true, memberId: true },
+      },
     },
     orderBy: [{ status: "asc" }, { createdAt: "asc" }, { id: "asc" }],
   });
   return {
-    canWrite,
+    canWrite: true as const,
     organizationId: actor.organizationId,
     organizationName: actor.organizationName,
     role: actor.role,
+    scope: "MANAGEMENT" as const,
     services: services.map((service) => ({
       ...serviceSnapshot(service),
       assignedMemberIds: service.staffAssignments.map((assignment) => assignment.memberId),
@@ -183,6 +187,132 @@ export async function listOperationalServices(
       })),
       version: service.updatedAt.toISOString(),
     })),
+  };
+}
+
+function readOnlyService(service: {
+  branchServices: Array<{
+    branch: { name: string };
+    durationMinutes: number;
+    price: { toString(): string };
+  }>;
+  description: string | null;
+  imageUrl: string | null;
+  name: string;
+}) {
+  return {
+    description: service.description ?? "",
+    imageUrl: service.imageUrl ?? "",
+    name: service.name,
+    offerings: service.branchServices.map((offering) => ({
+      branchName: offering.branch.name,
+      durationMinutes: offering.durationMinutes,
+      price: offering.price.toString(),
+    })),
+  };
+}
+
+async function listReceptionistServiceCatalog(actor: BusinessOperationActor) {
+  const services = await prisma.service.findMany({
+    where: {
+      deletedAt: null,
+      organizationId: actor.organizationId,
+      status: "ACTIVE",
+    },
+    select: {
+      branchServices: {
+        where: {
+          branch: {
+            deletedAt: null,
+            organizationId: actor.organizationId,
+            status: "ACTIVE",
+          },
+          isAvailable: true,
+        },
+        select: {
+          branch: { select: { name: true } },
+          durationMinutes: true,
+          price: true,
+        },
+        orderBy: { branch: { name: "asc" } },
+      },
+      description: true,
+      imageUrl: true,
+      name: true,
+    },
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+  });
+  return {
+    canWrite: false as const,
+    organizationId: actor.organizationId,
+    organizationName: actor.organizationName,
+    role: actor.role,
+    scope: "RECEPTIONIST" as const,
+    services: services.map(readOnlyService),
+  };
+}
+
+async function listStaffServiceCatalog(actor: BusinessOperationActor) {
+  const activeSelf = {
+    deletedAt: null,
+    id: actor.membershipId,
+    organizationId: actor.organizationId,
+    person: { deletedAt: null, status: "ACTIVE" as const },
+    status: "ACTIVE" as const,
+  };
+  const [services, activeBranchAssignment] = await Promise.all([
+    prisma.service.findMany({
+      where: {
+        deletedAt: null,
+        organizationId: actor.organizationId,
+        staffAssignments: { some: { member: activeSelf, memberId: actor.membershipId } },
+        status: "ACTIVE",
+      },
+      select: {
+        branchServices: {
+          where: {
+            branch: {
+              assignments: { some: { member: activeSelf, memberId: actor.membershipId } },
+              deletedAt: null,
+              organizationId: actor.organizationId,
+              status: "ACTIVE",
+            },
+            isAvailable: true,
+          },
+          select: {
+            branch: { select: { name: true } },
+            durationMinutes: true,
+            price: true,
+          },
+          orderBy: { branch: { name: "asc" } },
+        },
+        description: true,
+        imageUrl: true,
+        name: true,
+      },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    }),
+    prisma.branchAssignment.findFirst({
+      where: {
+        branch: {
+          deletedAt: null,
+          organizationId: actor.organizationId,
+          status: "ACTIVE",
+        },
+        member: activeSelf,
+        memberId: actor.membershipId,
+      },
+      select: { id: true },
+    }),
+  ]);
+  return {
+    canWrite: false as const,
+    organizationId: actor.organizationId,
+    organizationName: actor.organizationName,
+    role: actor.role,
+    scheduleMemberId: activeBranchAssignment ? actor.membershipId : null,
+    scope: "STAFF" as const,
+    services: services.map(readOnlyService),
   };
 }
 
