@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { isSafePublicImageUrl } from "@/lib/security/public-image-url";
+
 type Translate = (
   key:
     | "firstNameMin"
@@ -38,7 +40,12 @@ export const createProfileSchema = (t: Translate) => {
       .string()
       .trim()
       .transform((value) => value || null)
-      .pipe(z.string().url(t("imageUrlInvalid")).nullable()),
+      .pipe(
+        z
+          .string()
+          .refine(isSafePublicImageUrl, t("imageUrlInvalid"))
+          .nullable(),
+      ),
   });
 };
 

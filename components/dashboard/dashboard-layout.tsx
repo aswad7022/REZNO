@@ -2,7 +2,7 @@
 
 import { type ReactNode, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
-import type { BusinessVertical } from "@prisma/client";
+import type { BusinessVertical, SystemRole } from "@prisma/client";
 
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar";
@@ -33,6 +33,8 @@ export function DashboardLayout({
   canAccessMessages = true,
   publicSlug,
   vertical,
+  systemRole,
+  membershipId,
   activeBusinessId,
   businesses = [],
 }: {
@@ -50,6 +52,8 @@ export function DashboardLayout({
   canAccessMessages?: boolean;
   publicSlug?: string;
   vertical?: BusinessVertical;
+  systemRole?: SystemRole | null;
+  membershipId?: string;
   activeBusinessId?: string;
   businesses?: Array<{ id: string; name: string }>;
 }) {
@@ -86,10 +90,19 @@ export function DashboardLayout({
 
   return (
     <div className="rezno-premium-surface min-h-screen">
-      <DashboardCommandPalette role={role} publicSlug={publicSlug} />
+      <DashboardCommandPalette
+        role={role}
+        publicSlug={publicSlug}
+        vertical={vertical}
+        systemRole={systemRole}
+        membershipId={membershipId}
+        canAccessMessages={canAccessMessages}
+      />
       <DashboardSidebar
         role={role}
         vertical={vertical}
+        systemRole={systemRole}
+        membershipId={membershipId}
         canAccessAdmin={canAccessAdmin}
         canAccessCustomerDashboard={canAccessCustomerDashboard}
         canAccessBusinessDashboard={canAccessBusinessDashboard}
@@ -106,6 +119,8 @@ export function DashboardLayout({
         <DashboardHeader
           role={role}
           vertical={vertical}
+          systemRole={systemRole}
+          membershipId={membershipId}
           user={user}
           notifications={notifications}
           messagesHref={messagesHref}

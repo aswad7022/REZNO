@@ -5,15 +5,18 @@ import { useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
 import {
   Bell,
+  Armchair,
   Building2,
   CalendarDays,
   CalendarPlus,
+  ChartNoAxesCombined,
   ClipboardCopy,
   Clock3,
   ExternalLink,
   Heart,
   LayoutDashboard,
   Map,
+  Menu,
   PanelsTopLeft,
   Plus,
   Settings,
@@ -21,6 +24,7 @@ import {
   UserPlus,
   UsersRound,
 } from "lucide-react";
+import type { BusinessVertical, SystemRole } from "@prisma/client";
 import { useTranslations } from "next-intl";
 
 import {
@@ -35,6 +39,7 @@ import {
   CommandShortcut,
 } from "@/components/ui/command";
 import type { DashboardRole } from "@/types/dashboard";
+import { getDashboardNavigation } from "@/features/dashboard/navigation";
 
 const RECENT_KEY = "rezno-command-palette-recent";
 
@@ -44,6 +49,12 @@ type CommandDefinition = {
     | "business.dashboard"
     | "business.bookings"
     | "business.calendar"
+    | "business.reservations"
+    | "business.tables"
+    | "business.menu"
+    | "business.analytics"
+    | "business.audit"
+    | "business.availability"
     | "business.services"
     | "business.team"
     | "business.publicProfile"
@@ -86,9 +97,17 @@ function HighlightMatch({ text, query }: { text: string; query: string }) {
 export default function DashboardCommandPalette({
   role,
   publicSlug,
+  vertical,
+  systemRole,
+  membershipId,
+  canAccessMessages = true,
 }: {
   role: DashboardRole;
   publicSlug?: string;
+  vertical?: BusinessVertical;
+  systemRole?: SystemRole | null;
+  membershipId?: string;
+  canAccessMessages?: boolean;
 }) {
   const t = useTranslations("CommandPalette");
   const router = useRouter();
@@ -109,18 +128,45 @@ export default function DashboardCommandPalette({
 
   const commands = useMemo<CommandDefinition[]>(() => {
     if (role === "business") {
-      return [
+      const allowedHrefs = new Set(
+        getDashboardNavigation(
+          role,
+          vertical,
+          systemRole,
+          membershipId,
+          canAccessMessages,
+        ).flatMap((group) =>
+          group.items.flatMap((item) => [
+            item.href,
+            ...(item.children ?? []).map((child) => child.href),
+          ]),
+        ),
+      );
+      const management = systemRole === "OWNER" || systemRole === "MANAGER";
+      const candidates: CommandDefinition[] = [
         { id: "business-dashboard", labelKey: "business.dashboard", group: "navigation", href: "/business", icon: LayoutDashboard },
         { id: "business-bookings", labelKey: "business.bookings", group: "navigation", href: "/business/bookings", icon: CalendarDays },
         { id: "business-calendar", labelKey: "business.calendar", group: "navigation", href: "/business/calendar", icon: Clock3 },
+        { id: "business-reservations", labelKey: "business.reservations", group: "navigation", href: "/business/reservations", icon: Armchair },
+        { id: "business-tables", labelKey: "business.tables", group: "navigation", href: "/business/tables", icon: Armchair },
+        { id: "business-menu", labelKey: "business.menu", group: "navigation", href: "/business/menu", icon: Menu },
+        { id: "business-analytics", labelKey: "business.analytics", group: "navigation", href: "/business/analytics", icon: ChartNoAxesCombined },
+        { id: "business-audit", labelKey: "business.audit", group: "navigation", href: "/business/manage/audit", icon: Settings },
+        ...(membershipId
+          ? [{ id: "business-availability", labelKey: "business.availability" as const, group: "navigation" as const, href: `/business/team/${membershipId}/availability`, icon: Clock3 }]
+          : []),
         { id: "business-services", labelKey: "business.services", group: "navigation", href: "/business/services", icon: Sparkles },
         { id: "business-team", labelKey: "business.team", group: "navigation", href: "/business/team", icon: UsersRound },
         { id: "business-public-profile", labelKey: "business.publicProfile", group: "navigation", href: "/business/public-profile", icon: PanelsTopLeft },
         { id: "business-profile", labelKey: "business.profile", group: "navigation", href: "/business/manage", icon: Building2 },
         { id: "business-notifications", labelKey: "business.notifications", group: "navigation", href: "/business/notifications", icon: Bell },
         { id: "business-settings", labelKey: "business.settings", group: "navigation", href: "/business/manage/settings", icon: Settings },
-        { id: "add-service", labelKey: "actions.addService", group: "actions", href: "/business/services", icon: Plus },
-        { id: "add-employee", labelKey: "actions.addEmployee", group: "actions", href: "/business/team", icon: UserPlus },
+        ...(management
+          ? [
+              { id: "add-service", labelKey: "actions.addService" as const, group: "actions" as const, href: "/business/services", icon: Plus },
+              { id: "add-employee", labelKey: "actions.addEmployee" as const, group: "actions" as const, href: "/business/team", icon: UserPlus },
+            ]
+          : []),
         ...(publicSlug
           ? [
               { id: "open-public", labelKey: "actions.openPublic" as const, group: "actions" as const, action: "open-public" as const, icon: ExternalLink },
@@ -128,6 +174,9 @@ export default function DashboardCommandPalette({
             ]
           : []),
       ];
+      return candidates.filter(
+        (command) => !command.href || allowedHrefs.has(command.href),
+      );
     }
     return [
       { id: "customer-dashboard", labelKey: "customer.dashboard", group: "navigation", href: "/customer", icon: LayoutDashboard },
@@ -137,7 +186,14 @@ export default function DashboardCommandPalette({
       { id: "customer-notifications", labelKey: "customer.notifications", group: "navigation", href: "/customer/notifications", icon: Bell },
       { id: "create-booking", labelKey: "actions.createBooking", group: "actions", href: "/customer/bookings/new", icon: CalendarPlus },
     ];
-  }, [publicSlug, role]);
+  }, [
+    canAccessMessages,
+    membershipId,
+    publicSlug,
+    role,
+    systemRole,
+    vertical,
+  ]);
 
   useEffect(() => {
     function keyboard(event: KeyboardEvent) {

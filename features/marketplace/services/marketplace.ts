@@ -20,6 +20,7 @@ import {
   normalizeNearbyInput,
 } from "@/features/location/services/nearby-businesses";
 import { prisma } from "@/lib/db/prisma";
+import { safePublicImageUrlOrNull } from "@/lib/security/public-image-url";
 import {
   getPublicMemberReviewAggregate,
   getPublicOrganizationReviewAggregates,
@@ -219,8 +220,8 @@ export async function searchMarketplace(options?: {
         slug: organization.slug,
         name: organization.name,
         description: organization.profile?.description ?? null,
-        logoUrl: organization.profile?.logoUrl ?? null,
-        coverImageUrl: organization.profile?.coverImageUrl ?? null,
+        logoUrl: safePublicImageUrlOrNull(organization.profile?.logoUrl),
+        coverImageUrl: safePublicImageUrlOrNull(organization.profile?.coverImageUrl),
         city:
           displayBranch?.city ??
           organization.branches.find((branch) => branch.city)?.city ??
@@ -474,8 +475,8 @@ export const getPublicBusiness = cache(
       slug: organization.slug,
       name: organization.name,
       description: organization.profile?.description ?? null,
-      logoUrl: organization.profile?.logoUrl ?? null,
-      coverImageUrl: organization.profile?.coverImageUrl ?? null,
+      logoUrl: safePublicImageUrlOrNull(organization.profile?.logoUrl),
+      coverImageUrl: safePublicImageUrlOrNull(organization.profile?.coverImageUrl),
       businessType: organization.businessType,
       vertical: organization.vertical,
       categoryName:
@@ -520,13 +521,15 @@ export const getPublicBusiness = cache(
         null,
       googleMapsUrl: organization.profile?.googleMapsUrl ?? null,
       bookingPolicy: organization.profile?.bookingPolicy ?? null,
-      galleryUrls: organization.profile?.galleryUrls ?? [],
+      galleryUrls: (organization.profile?.galleryUrls ?? []).filter(
+        (url) => safePublicImageUrlOrNull(url) !== null,
+      ),
       faqItems: parseFaqItems(organization.profile?.faqItems),
       facebookUrl: organization.profile?.facebookUrl ?? null,
       instagramUrl: organization.profile?.instagramUrl ?? null,
       seoTitle: organization.profile?.seoTitle ?? null,
       seoDescription: organization.profile?.seoDescription ?? null,
-      ogImageUrl: organization.profile?.ogImageUrl ?? null,
+      ogImageUrl: safePublicImageUrlOrNull(organization.profile?.ogImageUrl),
       menuCategories: organization.menuCategories.map((category) => ({
         id: category.id,
         name: category.name,
@@ -537,7 +540,7 @@ export const getPublicBusiness = cache(
           description: item.description,
           price: item.price.toString(),
           currency: item.currency,
-          imageUrl: item.imageUrl,
+          imageUrl: safePublicImageUrlOrNull(item.imageUrl),
           isAvailable: item.isAvailable,
           preparationMinutes: item.preparationMinutes,
         })),
@@ -595,7 +598,7 @@ export const getPublicBusiness = cache(
             id: offering.id,
             serviceName: offering.service.name,
             description: offering.service.description,
-            imageUrl: offering.service.imageUrl,
+            imageUrl: safePublicImageUrlOrNull(offering.service.imageUrl),
             categoryName: offering.service.category.name,
             branchName: branch.name,
             price: offering.price.toString(),
@@ -624,7 +627,9 @@ export const getPublicBusiness = cache(
               .filter(Boolean)
               .join(" "),
           publicSlug: member.publicSlug ?? "",
-          photoUrl: member.photoUrl ?? member.person.avatarUrl,
+          photoUrl: safePublicImageUrlOrNull(
+            member.photoUrl ?? member.person.avatarUrl,
+          ),
           bio: member.bio,
           specialties: member.specialties,
         })),
@@ -703,7 +708,7 @@ export const getPublicProfessionalProfile = cache(
         id: offering.id,
         name: assignment.service.name,
         description: assignment.service.description,
-        imageUrl: assignment.service.imageUrl,
+        imageUrl: safePublicImageUrlOrNull(assignment.service.imageUrl),
         categoryName: assignment.service.category.name,
         branchName: offering.branch.name,
         price: offering.price.toString(),
@@ -726,7 +731,9 @@ export const getPublicProfessionalProfile = cache(
         [member.person.firstName, member.person.lastName]
           .filter(Boolean)
           .join(" "),
-      photoUrl: member.photoUrl ?? member.person.avatarUrl,
+      photoUrl: safePublicImageUrlOrNull(
+        member.photoUrl ?? member.person.avatarUrl,
+      ),
       bio: member.bio,
       specialties: member.specialties,
       averageRating: reviewAggregate.averageRating,
@@ -735,7 +742,9 @@ export const getPublicProfessionalProfile = cache(
         id: member.organization.id,
         name: member.organization.name,
         slug: member.organization.slug,
-        logoUrl: member.organization.profile?.logoUrl ?? null,
+        logoUrl: safePublicImageUrlOrNull(
+          member.organization.profile?.logoUrl,
+        ),
         categoryName: member.organization.profile?.businessCategory ?? null,
         vertical: member.organization.vertical,
       },

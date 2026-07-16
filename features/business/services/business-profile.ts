@@ -1,11 +1,14 @@
 import "server-only";
 
 import { canManageOrganization } from "@/features/business/policies/access";
+import { currentBusinessOperationReference } from "@/features/business-operations/services/identity-adapter";
 import { requireBusinessIdentity } from "@/features/identity/server";
 import { prisma } from "@/lib/db/prisma";
+import { safePublicImageUrlOrNull } from "@/lib/security/public-image-url";
 import type { BusinessProfileDetails } from "@/features/business/types";
 
 export async function getCurrentBusinessProfile(): Promise<BusinessProfileDetails> {
+  await currentBusinessOperationReference("SETTINGS_READ");
   const { membership } = await requireBusinessIdentity();
   const [profile, settings] = await Promise.all([
     prisma.businessProfile.findUnique({
@@ -40,18 +43,20 @@ export async function getCurrentBusinessProfile(): Promise<BusinessProfileDetail
     legalName: profile?.legalName ?? "",
     description: profile?.description ?? "",
     website: profile?.website ?? "",
-    logoUrl: profile?.logoUrl ?? "",
-    coverImageUrl: profile?.coverImageUrl ?? "",
+    logoUrl: safePublicImageUrlOrNull(profile?.logoUrl) ?? "",
+    coverImageUrl: safePublicImageUrlOrNull(profile?.coverImageUrl) ?? "",
     businessEmail: profile?.businessEmail ?? "",
     businessPhone: profile?.businessPhone ?? "",
     whatsappPhone: profile?.whatsappPhone ?? "",
     googleMapsUrl: profile?.googleMapsUrl ?? "",
     bookingPolicy: profile?.bookingPolicy ?? "",
-    galleryUrls: profile?.galleryUrls ?? [],
+    galleryUrls: (profile?.galleryUrls ?? []).filter(
+      (url) => safePublicImageUrlOrNull(url) !== null,
+    ),
     faqItems,
     seoTitle: profile?.seoTitle ?? "",
     seoDescription: profile?.seoDescription ?? "",
-    ogImageUrl: profile?.ogImageUrl ?? "",
+    ogImageUrl: safePublicImageUrlOrNull(profile?.ogImageUrl) ?? "",
     visibility: settings?.marketplaceVisible ? "PUBLISHED" : "HIDDEN",
     facebookUrl: profile?.facebookUrl ?? "",
     instagramUrl: profile?.instagramUrl ?? "",

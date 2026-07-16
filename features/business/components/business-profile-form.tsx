@@ -30,6 +30,7 @@ import {
   type BusinessProfileDetails,
   type BusinessProfileField,
 } from "@/features/business/types";
+import { safePublicImageUrlOrNull } from "@/lib/security/public-image-url";
 
 function FormField({
   children,
@@ -77,14 +78,7 @@ export function BusinessProfileForm({
   });
 
   function previewUrl(value: string): string | null {
-    try {
-      const url = new URL(value);
-      return url.protocol === "http:" || url.protocol === "https:"
-        ? value
-        : null;
-    } catch {
-      return null;
-    }
+    return safePublicImageUrlOrNull(value);
   }
 
   function updatePreview(event: FormEvent<HTMLFormElement>) {

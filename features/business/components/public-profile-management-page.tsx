@@ -25,7 +25,7 @@ import { PublicProfileActions } from "@/features/marketplace/components/public-p
 import { PublicProfileSection } from "@/features/marketplace/components/public-profile-motion";
 
 export async function PublicProfileManagementPage() {
-  await currentBusinessOperationReference("BRANCH_READ");
+  await currentBusinessOperationReference("SETTINGS_READ");
   const [profile, data, t, hoursT, format, headerList] = await Promise.all([
     getCurrentBusinessProfile(),
     getPublicProfileManagementData(),

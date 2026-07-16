@@ -9,7 +9,7 @@ import {
   ChevronsRight,
   ShieldCheck,
 } from "lucide-react";
-import type { BusinessVertical } from "@prisma/client";
+import type { BusinessVertical, SystemRole } from "@prisma/client";
 import { usePathname } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 
@@ -82,6 +82,8 @@ export function DashboardSidebar({
   onCollapsedChange,
   role,
   vertical,
+  systemRole,
+  membershipId,
   canAccessAdmin = false,
   canAccessCustomerDashboard = false,
   canAccessBusinessDashboard = false,
@@ -91,6 +93,8 @@ export function DashboardSidebar({
   onCollapsedChange: (collapsed: boolean) => void;
   role: DashboardRole;
   vertical?: BusinessVertical;
+  systemRole?: SystemRole | null;
+  membershipId?: string;
   canAccessAdmin?: boolean;
   canAccessCustomerDashboard?: boolean;
   canAccessBusinessDashboard?: boolean;
@@ -99,12 +103,13 @@ export function DashboardSidebar({
   const pathname = usePathname();
   const locale = useLocale();
   const t = useTranslations("Dashboard");
-  const groups = getDashboardNavigation(role, vertical).map((group) => ({
-    ...group,
-    items: canAccessMessages
-      ? group.items
-      : group.items.filter((item) => item.href !== "/business/messages"),
-  }));
+  const groups = getDashboardNavigation(
+    role,
+    vertical,
+    systemRole,
+    membershipId,
+    canAccessMessages,
+  );
 
   return (
     <aside

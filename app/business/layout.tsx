@@ -10,6 +10,7 @@ import {
   getUnreadMessageCount,
 } from "@/features/messages/services/messages";
 import { getDashboardNotifications } from "@/features/notifications/services/notifications";
+import { canPerformBusinessOperation } from "@/features/business-operations/domain/policy";
 
 export default async function BusinessDashboardLayout({
   children,
@@ -59,8 +60,14 @@ export default async function BusinessDashboardLayout({
       canAccessAdmin={canAccessAdmin}
       canAccessCustomerDashboard
       canAccessMessages={canViewAdminMessages || canViewBusinessMessages}
-      publicSlug={membership.organization.slug}
+      publicSlug={
+        canPerformBusinessOperation(membership.role.systemRole, "SETTINGS_READ")
+          ? membership.organization.slug
+          : undefined
+      }
       vertical={membership.organization.vertical}
+      systemRole={membership.role.systemRole}
+      membershipId={membership.id}
       activeBusinessId={membership.organizationId}
       businesses={identity.accessibleBusinesses}
     >
