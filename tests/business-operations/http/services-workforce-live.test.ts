@@ -99,6 +99,10 @@ test("Stage 2B live Business Web pages and Server Actions enforce real role and 
     await prisma.$disconnect();
   });
   const fixture = await createBusinessOperationsFixture("stage2b-http");
+  await prisma.organization.updateMany({
+    where: { id: { in: [fixture.organizationA.id, fixture.organizationB.id] } },
+    data: { vertical: "BEAUTY" },
+  });
   const session = await signUp("owner");
   await prisma.organizationMember.updateMany({
     where: { id: { in: [fixture.owner.membership.id, fixture.ownerB.membership.id] } },
