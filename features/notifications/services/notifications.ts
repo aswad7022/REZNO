@@ -7,6 +7,7 @@ import {
   requireCustomerIdentity,
 } from "@/features/identity/server";
 import { isRestaurantVertical } from "@/features/businesses/config/verticals";
+import { businessNotificationWhere } from "@/features/notifications/domain/business-notification-policy";
 import { prisma } from "@/lib/db/prisma";
 
 export async function getDashboardNotifications(
@@ -17,6 +18,7 @@ export async function getDashboardNotifications(
   let memberId: string | undefined;
   let personId: string;
   let includeRestaurantNotifications = false;
+  let businessRole: "OWNER" | "MANAGER" | "RECEPTIONIST" | "STAFF" | null = null;
   if (role === "business") {
     const identity = await requireBusinessIdentity();
     organizationId = identity.membership.organizationId;
@@ -25,6 +27,7 @@ export async function getDashboardNotifications(
         ? identity.membership.id
         : undefined;
     personId = identity.person.id;
+    businessRole = identity.membership.role.systemRole;
     includeRestaurantNotifications = isRestaurantVertical(
       identity.membership.organization.vertical,
     );
@@ -35,19 +38,12 @@ export async function getDashboardNotifications(
 
   const notificationWhere =
     role === "business"
-      ? {
-          OR: [
-            { audience: "ALL" as const },
-            { audience: "BUSINESS_OWNERS" as const },
-            ...(includeRestaurantNotifications
-              ? [{ audience: "RESTAURANTS" as const }]
-              : []),
-            ...(organizationId
-              ? [{ audience: "BUSINESS" as const, businessId: organizationId }]
-              : []),
-            { audience: "USER" as const, recipientPersonId: personId },
-          ],
-        }
+      ? businessNotificationWhere({
+          organizationId: organizationId!,
+          personId,
+          restaurant: includeRestaurantNotifications,
+          role: businessRole,
+        })
       : {
           OR: [
             { audience: "ALL" as const },
