@@ -1,13 +1,16 @@
+import { randomUUID } from "node:crypto";
 import Link from "next/link";
 import { Phone, Star } from "lucide-react";
 
 import { getAvailableTransitions } from "@/features/bookings/policies/booking-lifecycle";
 import {
   cancelCustomerBooking,
-  respondToCustomerBookingChange,
-  transitionBusinessBooking,
   respondToBookingChange,
 } from "@/features/bookings/actions/manage-bookings";
+import {
+  BookingTransitionForm,
+  CustomerChangeRequestResponseForm,
+} from "@/features/business-operations/components/daily-operation-forms";
 import { openBookingConversation } from "@/features/messages/actions/messages";
 import type { BookingListItem } from "@/features/bookings/types";
 import { Badge } from "@/components/ui/badge";
@@ -151,16 +154,24 @@ export function BookingCard({
             <p className="font-semibold">{labels.changeRequested}</p>
             <p>{formattedPendingChange}</p>
             <div className="flex flex-wrap gap-2">
-              <form action={respondToCustomerBookingChange.bind(null, booking.pendingChange.id)}>
-                <input type="hidden" name="decision" value="accept" />
-                <Button size="sm" type="submit">{labels.acceptChange}</Button>
-              </form>
-              <form action={respondToCustomerBookingChange.bind(null, booking.pendingChange.id)}>
-                <input type="hidden" name="decision" value="reject" />
-                <Button size="sm" type="submit" variant="outline">
-                  {labels.rejectChange}
-                </Button>
-              </form>
+              <CustomerChangeRequestResponseForm
+                contextOrganizationId={booking.organizationId}
+                decision="accept"
+                expectedBookingVersion={booking.version}
+                expectedRequestCreatedAt={booking.pendingChange.createdAt}
+                idempotencyKey={randomUUID()}
+                label={labels.acceptChange}
+                requestId={booking.pendingChange.id}
+              />
+              <CustomerChangeRequestResponseForm
+                contextOrganizationId={booking.organizationId}
+                decision="reject"
+                expectedBookingVersion={booking.version}
+                expectedRequestCreatedAt={booking.pendingChange.createdAt}
+                idempotencyKey={randomUUID()}
+                label={labels.rejectChange}
+                requestId={booking.pendingChange.id}
+              />
             </div>
           </div>
         ) : null}
@@ -267,19 +278,15 @@ export function BookingCard({
               </Link>
             </Button>
             {transitions.map((status) => (
-              <form
+              <BookingTransitionForm
                 key={status}
-                action={transitionBusinessBooking.bind(null, booking.id)}
-              >
-                <input type="hidden" name="status" value={status} />
-                <Button
-                  type="submit"
-                  size="sm"
-                  variant={status === "CANCELLED" ? "destructive" : "outline"}
-                >
-                  {labels.transitions[status]}
-                </Button>
-              </form>
+                bookingId={booking.id}
+                contextOrganizationId={booking.organizationId}
+                expectedVersion={booking.version}
+                idempotencyKey={randomUUID()}
+                label={labels.transitions[status]}
+                nextStatus={status}
+              />
             ))}
           </div>
         ) : null}

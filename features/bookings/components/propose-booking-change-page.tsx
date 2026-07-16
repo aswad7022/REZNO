@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { CalendarClock } from "lucide-react";
 import { getFormatter, getTranslations } from "next-intl/server";
 import { notFound } from "next/navigation";
@@ -10,14 +11,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { proposeBookingChange } from "@/features/bookings/actions/manage-bookings";
+import { BusinessBookingProposalForm } from "@/features/business-operations/components/daily-operation-forms";
 import { BookingEmployeeSelect } from "@/features/bookings/components/booking-employee-select";
 import { getBusinessBookingForChange } from "@/features/bookings/services/bookings";
 import { getBookingSlotResult } from "@/features/bookings/services/slots";
 
-function todayInBaghdad(): string {
+function todayInTimezone(timeZone: string): string {
   return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Baghdad",
+    timeZone,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -42,7 +43,7 @@ export async function ProposeBookingChangePage({
   ]);
   if (!booking) notFound();
 
-  const today = todayInBaghdad();
+  const today = todayInTimezone(booking.timezone);
   const selectedDate = date && date >= today ? date : today;
   const result = await getBookingSlotResult(
     booking.branchServiceId,
@@ -112,6 +113,15 @@ export async function ProposeBookingChangePage({
           {t(`rescheduleErrors.${error}`)}
         </p>
       ) : null}
+      {booking.pendingChangeDirection === "CUSTOMER_TO_BUSINESS" ? (
+        <DashboardEmpty
+          icon={CalendarClock}
+          title="يوجد طلب تغيير من العميل"
+          description="عالج طلب العميل المعلّق من صفحة تفاصيل الحجز قبل إنشاء اقتراح جديد. لن يُستبدل طلب العميل تلقائيًا."
+        />
+      ) : null}
+      {booking.pendingChangeDirection !== "CUSTOMER_TO_BUSINESS" ? (
+        <>
       {booking.staffSelectionMode !== "NONE" &&
       employees.length > 0 &&
       !fixedMemberId ? (
@@ -138,15 +148,10 @@ export async function ProposeBookingChangePage({
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {visibleSlots.map((slot) => (
-            <form
+            <div
               key={`${slot.startsAt}-${slot.memberId ?? "none"}`}
-              action={proposeBookingChange.bind(null, booking.id)}
               className="rounded-xl border bg-card p-4 shadow-sm"
             >
-              <input type="hidden" name="branchServiceId" value={booking.branchServiceId} />
-              <input type="hidden" name="date" value={selectedDate} />
-              <input type="hidden" name="startsAt" value={slot.startsAt} />
-              <input type="hidden" name="memberId" value={slot.memberId ?? ""} />
               <p className="font-medium">
                 {format.dateTime(new Date(slot.startsAt), {
                   timeZone: booking.timezone,
@@ -158,13 +163,27 @@ export async function ProposeBookingChangePage({
               <p className="mt-1 text-xs text-muted-foreground">
                 {slot.memberName ?? t("automaticStaff")}
               </p>
-              <Button type="submit" className="mt-3 w-full">
-                {t("changeRequest.propose")}
-              </Button>
-            </form>
+              <div className="mt-3">
+                <BusinessBookingProposalForm
+                  bookingId={booking.id}
+                  contextOrganizationId={booking.organizationId}
+                  date={selectedDate}
+                  expectedBookingVersion={booking.version}
+                  idempotencyKey={randomUUID()}
+                  label={t("changeRequest.propose")}
+                  memberId={slot.memberId}
+                  startsAt={slot.startsAt}
+                  supersedeAvailable={
+                    booking.pendingChangeDirection === "BUSINESS_TO_CUSTOMER"
+                  }
+                />
+              </div>
+            </div>
           ))}
         </div>
       )}
+        </>
+      ) : null}
     </DashboardShell>
   );
 }

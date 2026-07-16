@@ -186,6 +186,8 @@ export interface BookingListItem {
   status: BookingStatus;
   price: string;
   timezone: string;
+  organizationId: string;
+  version: string;
   restaurantReservation?: {
     guestCount: number;
     tableName: string;
@@ -205,6 +207,7 @@ export interface BookingListItem {
     businessReply: string | null;
   } | null;
   pendingChange?: {
+    createdAt: string;
     id: string;
     startsAt: Date;
     endsAt: Date;

@@ -1559,6 +1559,7 @@
     "todayView": "Today view",
     "previousDay": "Previous day",
     "nextDay": "Next day",
+    "nextPage": "Next page",
     "selectedDateLabel": "Selected date",
     "selectedDate": "Selected date: {date}",
     "bookingsToday": "Bookings today",

@@ -1559,6 +1559,7 @@
     "todayView": "عرض اليوم",
     "previousDay": "اليوم السابق",
     "nextDay": "اليوم التالي",
+    "nextPage": "الصفحة التالية",
     "selectedDateLabel": "التاريخ المحدد",
     "selectedDate": "التاريخ المحدد: {date}",
     "bookingsToday": "حجوزات اليوم",

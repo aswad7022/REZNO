@@ -580,7 +580,7 @@ export async function requestCustomerBookingChange(input: {
           "Requested booking time and staff are unchanged.",
         );
       }
-      await assertChangeSlotAvailable(transaction, current, {
+      await assertGenericBookingChangeSlotAvailable(transaction, current, {
         date: input.date,
         memberId: input.memberId,
         startsAt: proposedStartsAt,
@@ -717,7 +717,7 @@ export async function respondToCustomerBookingChange(input: {
       request.proposedStartsAt,
       request.booking.branch.timezone,
     );
-    await assertChangeSlotAvailable(transaction, request.booking, {
+    await assertGenericBookingChangeSlotAvailable(transaction, request.booking, {
       date,
       memberId: request.proposedMemberId,
       startsAt: request.proposedStartsAt,
@@ -765,7 +765,180 @@ export async function respondToCustomerBookingChange(input: {
   });
 }
 
-async function assertChangeSlotAvailable(
+export async function respondToBusinessBookingProposal(input: {
+  customerId: string;
+  decision: "accept" | "reject";
+  requestId: string;
+}) {
+  const target = await prisma.bookingChangeRequest.findFirst({
+    where: {
+      id: input.requestId,
+      requestedByPersonId: { not: input.customerId },
+      booking: { customerId: input.customerId },
+    },
+    select: {
+      booking: { select: { organizationId: true } },
+      bookingId: true,
+    },
+  });
+  if (!target) {
+    bookingDomainError(
+      "CHANGE_REQUEST_NOT_RESPONDABLE",
+      "Business proposal was not found.",
+    );
+  }
+  return serializableMutation(async (transaction) => {
+    await transaction.$queryRaw`
+      SELECT "id" FROM "Booking"
+      WHERE "id" = ${target.bookingId}::uuid
+        AND "organizationId" = ${target.booking.organizationId}::uuid
+      FOR UPDATE
+    `;
+    await transaction.$queryRaw`
+      SELECT "id" FROM "BookingChangeRequest"
+      WHERE "id" = ${input.requestId}::uuid
+      FOR UPDATE
+    `;
+    const request = await transaction.bookingChangeRequest.findFirst({
+      where: {
+        id: input.requestId,
+        requestedByPersonId: { not: input.customerId },
+        booking: {
+          customerId: input.customerId,
+          branchServiceId: { not: null },
+          restaurantReservation: { is: null },
+        },
+      },
+      include: {
+        booking: {
+          include: {
+            branch: { include: { businessHours: true, organization: true } },
+            branchService: {
+              include: {
+                service: {
+                  include: {
+                    staffAssignments: {
+                      where: activeServiceStaffAssignmentWhere,
+                      select: serviceStaffAssignmentPolicySelect,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!request?.booking.branchService) {
+      bookingDomainError(
+        "CHANGE_REQUEST_NOT_RESPONDABLE",
+        "Business proposal was not found.",
+      );
+    }
+    const expectedStatus = input.decision === "accept" ? "ACCEPTED" : "REJECTED";
+    if (request.status !== "PENDING") {
+      if (request.status !== expectedStatus) {
+        bookingDomainError(
+          "BOOKING_STATE_CONFLICT",
+          "Business proposal already received another response.",
+        );
+      }
+      if (
+        request.status === "ACCEPTED" &&
+        (request.booking.startsAt.getTime() !== request.proposedStartsAt.getTime() ||
+          request.booking.endsAt.getTime() !== request.proposedEndsAt.getTime() ||
+          request.booking.memberId !== request.proposedMemberId)
+      ) {
+        bookingDomainError(
+          "BOOKING_STATE_CONFLICT",
+          "A later Booking change superseded this response replay.",
+        );
+      }
+      return {
+        bookingId: request.bookingId,
+        bookingVersion: request.booking.updatedAt.toISOString(),
+        replayed: true,
+        requestId: request.id,
+        status: request.status,
+      };
+    }
+    if (
+      !ACTIVE_BOOKING_STATUSES.includes(
+        request.booking.status as (typeof ACTIVE_BOOKING_STATUSES)[number],
+      ) ||
+      !request.bookingUpdatedAtSnapshot ||
+      request.bookingUpdatedAtSnapshot.getTime() !== request.booking.updatedAt.getTime()
+    ) {
+      bookingDomainError(
+        "BOOKING_STATE_CONFLICT",
+        "Booking changed after the Business proposal was created.",
+      );
+    }
+    const respondedAt = new Date();
+    if (input.decision === "accept") {
+      await assertGenericBookingChangeSlotAvailable(transaction, request.booking, {
+        date: localDateForInstant(
+          request.proposedStartsAt,
+          request.booking.branch.timezone,
+        ),
+        endsAt: request.proposedEndsAt,
+        memberId: request.proposedMemberId,
+        startsAt: request.proposedStartsAt,
+      });
+      const bookingChanged = await transaction.booking.updateMany({
+        where: {
+          customerId: input.customerId,
+          id: request.booking.id,
+          status: request.booking.status,
+          updatedAt: request.bookingUpdatedAtSnapshot,
+        },
+        data: {
+          endsAt: request.proposedEndsAt,
+          memberId: request.proposedMemberId,
+          startsAt: request.proposedStartsAt,
+          updatedAt: respondedAt,
+        },
+      });
+      if (bookingChanged.count !== 1) {
+        bookingDomainError(
+          "BOOKING_STATE_CONFLICT",
+          "Booking changed while the proposal was accepted.",
+        );
+      }
+      await transaction.bookingStatusHistory.create({
+        data: {
+          bookingId: request.booking.id,
+          changedByPersonId: input.customerId,
+          fromStatus: request.booking.status,
+          note: "GENERIC_CHANGE_ACCEPTED",
+          toStatus: request.booking.status,
+        },
+      });
+    }
+    const requestChanged = await transaction.bookingChangeRequest.updateMany({
+      where: { id: request.id, status: "PENDING" },
+      data: { respondedAt, status: expectedStatus },
+    });
+    if (requestChanged.count !== 1) {
+      bookingDomainError(
+        "BOOKING_STATE_CONFLICT",
+        "Business proposal was answered concurrently.",
+      );
+    }
+    return {
+      bookingId: request.booking.id,
+      bookingVersion:
+        input.decision === "accept"
+          ? respondedAt.toISOString()
+          : request.booking.updatedAt.toISOString(),
+      replayed: false,
+      requestId: request.id,
+      status: expectedStatus,
+    };
+  });
+}
+
+export async function assertGenericBookingChangeSlotAvailable(
   transaction: Prisma.TransactionClient,
   booking: {
     id: string;
@@ -791,10 +964,12 @@ async function assertChangeSlotAvailable(
       };
     };
     branchService: {
+      branchId: string;
       id: string;
       isAvailable: boolean;
       durationMinutes: number;
       service: {
+        deletedAt: Date | null;
         id: string;
         organizationId: string;
         status: string;
@@ -823,7 +998,9 @@ async function assertChangeSlotAvailable(
     branch.organization.vertical === "RESTAURANT" ||
     branch.organization.vertical === "CAFE" ||
     !branchService.isAvailable ||
+    branchService.branchId !== booking.branchId ||
     branchService.id !== booking.branchServiceId ||
+    branchService.service.deletedAt ||
     branchService.service.status !== "ACTIVE" ||
     branchService.service.organizationId !== booking.organizationId
   ) {
@@ -907,8 +1084,7 @@ async function assertChangeSlotAvailable(
       );
     }
   }
-  const [conflict, blocked] = await Promise.all([
-    transaction.booking.findFirst({
+  const conflict = await transaction.booking.findFirst({
       where: {
         id: { not: booking.id },
         branchId: booking.branchId,
@@ -918,8 +1094,8 @@ async function assertChangeSlotAvailable(
         endsAt: { gt: proposed.startsAt },
       },
       select: { id: true },
-    }),
-    transaction.blockedTime.findFirst({
+    });
+  const blocked = await transaction.blockedTime.findFirst({
       where: {
         branchId: booking.branchId,
         OR: [
@@ -930,8 +1106,7 @@ async function assertChangeSlotAvailable(
         endsAt: { gt: proposed.startsAt },
       },
       select: { id: true },
-    }),
-  ]);
+    });
   if (conflict || blocked) {
     bookingDomainError(
       "SLOT_CONFLICT",
@@ -948,6 +1123,8 @@ async function serializableMutation<T>(
     try {
       return await prisma.$transaction(operation, {
         isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        maxWait: 10_000,
+        timeout: 30_000,
       });
     } catch (error) {
       lastError = error;

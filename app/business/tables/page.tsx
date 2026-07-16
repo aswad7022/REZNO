@@ -6,6 +6,16 @@ export const metadata: Metadata = {
   title: "الطاولات | REZNO",
 };
 
-export default function BusinessTablesRoute() {
-  return <RestaurantTablesPage />;
+export default async function BusinessTablesRoute({
+  searchParams,
+}: {
+  searchParams: Promise<{ create?: string; edit?: string }>;
+}) {
+  const { create, edit } = await searchParams;
+  return (
+    <RestaurantTablesPage
+      editTableId={edit}
+      showCreateForm={create === "table"}
+    />
+  );
 }

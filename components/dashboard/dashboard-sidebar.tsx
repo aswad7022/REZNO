@@ -85,6 +85,7 @@ export function DashboardSidebar({
   canAccessAdmin = false,
   canAccessCustomerDashboard = false,
   canAccessBusinessDashboard = false,
+  canAccessMessages = true,
 }: {
   collapsed: boolean;
   onCollapsedChange: (collapsed: boolean) => void;
@@ -93,11 +94,17 @@ export function DashboardSidebar({
   canAccessAdmin?: boolean;
   canAccessCustomerDashboard?: boolean;
   canAccessBusinessDashboard?: boolean;
+  canAccessMessages?: boolean;
 }) {
   const pathname = usePathname();
   const locale = useLocale();
   const t = useTranslations("Dashboard");
-  const groups = getDashboardNavigation(role, vertical);
+  const groups = getDashboardNavigation(role, vertical).map((group) => ({
+    ...group,
+    items: canAccessMessages
+      ? group.items
+      : group.items.filter((item) => item.href !== "/business/messages"),
+  }));
 
   return (
     <aside
