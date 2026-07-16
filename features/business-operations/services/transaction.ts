@@ -22,6 +22,8 @@ export async function runBusinessOperationTransaction<T>(
     try {
       return await prisma.$transaction(operation, {
         isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        maxWait: 10_000,
+        timeout: 30_000,
       });
     } catch (error) {
       lastError = error;
@@ -67,6 +69,80 @@ export async function lockMembership(
 ) {
   await transaction.$queryRaw(
     Prisma.sql`SELECT "id" FROM "OrganizationMember" WHERE "id" = CAST(${membershipId} AS uuid) AND "organizationId" = CAST(${organizationId} AS uuid) FOR UPDATE`,
+  );
+}
+
+export async function lockBooking(
+  transaction: Prisma.TransactionClient,
+  bookingId: string,
+  organizationId: string,
+) {
+  await transaction.$queryRaw(
+    Prisma.sql`SELECT "id" FROM "Booking" WHERE "id" = CAST(${bookingId} AS uuid) AND "organizationId" = CAST(${organizationId} AS uuid) FOR UPDATE`,
+  );
+}
+
+export async function lockBookingChangeRequest(
+  transaction: Prisma.TransactionClient,
+  requestId: string,
+) {
+  await transaction.$queryRaw(
+    Prisma.sql`SELECT "id" FROM "BookingChangeRequest" WHERE "id" = CAST(${requestId} AS uuid) FOR UPDATE`,
+  );
+}
+
+export async function lockRestaurantReservationDetails(
+  transaction: Prisma.TransactionClient,
+  bookingId: string,
+) {
+  await transaction.$queryRaw(
+    Prisma.sql`SELECT "id" FROM "RestaurantReservationDetails" WHERE "bookingId" = CAST(${bookingId} AS uuid) FOR UPDATE`,
+  );
+}
+
+export async function lockRestaurantTable(
+  transaction: Prisma.TransactionClient,
+  tableId: string,
+  organizationId: string,
+) {
+  await transaction.$queryRaw(
+    Prisma.sql`SELECT "id" FROM "RestaurantTable" WHERE "id" = CAST(${tableId} AS uuid) AND "businessId" = CAST(${organizationId} AS uuid) FOR UPDATE`,
+  );
+}
+
+export async function lockMenuCategory(
+  transaction: Prisma.TransactionClient,
+  categoryId: string,
+  organizationId: string,
+) {
+  await transaction.$queryRaw(
+    Prisma.sql`SELECT "id" FROM "MenuCategory" WHERE "id" = CAST(${categoryId} AS uuid) AND "businessId" = CAST(${organizationId} AS uuid) FOR UPDATE`,
+  );
+}
+
+export async function lockMenuItem(
+  transaction: Prisma.TransactionClient,
+  itemId: string,
+  organizationId: string,
+) {
+  await transaction.$queryRaw(
+    Prisma.sql`SELECT "id" FROM "MenuItem" WHERE "id" = CAST(${itemId} AS uuid) AND "businessId" = CAST(${organizationId} AS uuid) FOR UPDATE`,
+  );
+}
+
+export async function lockRestaurantBranchAllocation(
+  transaction: Prisma.TransactionClient,
+  branchId: string,
+) {
+  await transaction.$queryRaw(
+    Prisma.sql`
+      SELECT 1::int AS "locked"
+      FROM (
+        SELECT pg_advisory_xact_lock(
+          hashtextextended(${`restaurant-reservation:${branchId}`}, 0)
+        )
+      ) AS "reservationLock"
+    `,
   );
 }
 

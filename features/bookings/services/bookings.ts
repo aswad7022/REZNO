@@ -3,13 +3,11 @@ import "server-only";
 import {
   canCustomerCancelBooking,
   canCustomerRequestBookingChange,
-  canOperateBookings,
 } from "@/features/bookings/policies/booking-lifecycle";
-import {
-  requireBusinessIdentity,
-  requireCustomerIdentity,
-} from "@/features/identity/server";
+import { requireCustomerIdentity } from "@/features/identity/server";
 import { prisma } from "@/lib/db/prisma";
+import { getOperationalBookingProposalTarget } from "@/features/business-operations/services/booking-operations";
+import { currentBusinessOperationReference } from "@/features/business-operations/services/identity-adapter";
 import type {
   BookingListItem,
   PublicOffering,
@@ -57,6 +55,7 @@ export async function getPublicOfferings(): Promise<PublicOffering[]> {
 function toListItem(booking: {
   id: string;
   customerId: string;
+  updatedAt: Date;
   serviceNameSnapshot: string;
   customerNameSnapshot: string;
   startsAt: Date;
@@ -65,6 +64,7 @@ function toListItem(booking: {
   priceSnapshot: { toString(): string };
   branch: { name: string; timezone: string; phone: string | null };
   organization: {
+    id: string;
     name: string;
     vertical: "BARBER" | "BEAUTY" | "CAFE" | "CLINIC" | "CONSULTANT" | "DENTIST" | "GYM" | "OTHER" | "RESTAURANT" | "SPA";
     profile?: { businessPhone: string | null } | null;
@@ -87,6 +87,7 @@ function toListItem(booking: {
     }>;
   } | null;
   changeRequests?: Array<{
+    createdAt: Date;
     id: string;
     requestedByPersonId: string;
     proposedStartsAt: Date;
@@ -110,6 +111,8 @@ function toListItem(booking: {
     status: booking.status,
     price: booking.priceSnapshot.toString(),
     timezone: booking.branch.timezone,
+    organizationId: booking.organization.id,
+    version: booking.updatedAt.toISOString(),
     review: booking.review ?? null,
     restaurantReservation: booking.restaurantReservation
       ? {
@@ -124,6 +127,7 @@ function toListItem(booking: {
       : null,
     pendingChange: booking.changeRequests?.[0]
       ? {
+          createdAt: booking.changeRequests[0].createdAt.toISOString(),
           id: booking.changeRequests[0].id,
           startsAt: booking.changeRequests[0].proposedStartsAt,
           endsAt: booking.changeRequests[0].proposedEndsAt,
@@ -266,51 +270,6 @@ export async function getCustomerBookingDetails(
   return withCustomerPermissions(toListItem(booking), booking);
 }
 
-export async function getBusinessBookings(options?: {
-  calendar?: boolean;
-}): Promise<{ bookings: BookingListItem[]; canOperate: boolean }> {
-  const { membership } = await requireBusinessIdentity();
-  const now = new Date();
-  const calendarRange = options?.calendar
-    ? {
-        gte: new Date(now.getTime() - 86_400_000),
-        lt: new Date(now.getTime() + 31 * 86_400_000),
-      }
-    : undefined;
-  const bookings = await prisma.booking.findMany({
-    where: {
-      organizationId: membership.organizationId,
-      ...(membership.role.systemRole === "STAFF"
-        ? { memberId: membership.id }
-        : {}),
-      startsAt: calendarRange,
-    },
-    include: {
-      branch: true,
-      member: { include: { person: true } },
-      organization: { include: { profile: true } },
-      review: true,
-      restaurantReservation: {
-        include: {
-          table: true,
-          items: { include: { menuItem: true } },
-        },
-      },
-      changeRequests: {
-        where: { status: "PENDING" },
-        include: { proposedMember: { include: { person: true } } },
-        orderBy: { createdAt: "desc" },
-        take: 1,
-      },
-    },
-    orderBy: { startsAt: options?.calendar ? "asc" : "desc" },
-  });
-  return {
-    bookings: bookings.map(toListItem),
-    canOperate: canOperateBookings(membership.role.systemRole),
-  };
-}
-
 export async function getCustomerBookingForReschedule(bookingId: string) {
   const { person } = await requireCustomerIdentity();
   const booking = await prisma.booking.findFirst({
@@ -347,31 +306,8 @@ export async function getCustomerBookingForReschedule(bookingId: string) {
 }
 
 export async function getBusinessBookingForChange(bookingId: string) {
-  const { membership } = await requireBusinessIdentity();
-  if (!canOperateBookings(membership.role.systemRole)) return null;
-
-  const booking = await prisma.booking.findFirst({
-    where: {
-      id: bookingId,
-      organizationId: membership.organizationId,
-      branchServiceId: { not: null },
-      restaurantReservation: null,
-      status: { in: ["PENDING", "CONFIRMED"] },
-    },
-    include: {
-      branch: true,
-      branchService: { include: { service: true } },
-    },
-  });
-  if (!booking || !booking.branchService || !booking.branchServiceId) return null;
-
-  return {
-    id: booking.id,
-    branchServiceId: booking.branchServiceId,
-    serviceName: booking.serviceNameSnapshot,
-    customerName: booking.customerNameSnapshot,
-    branchName: booking.branch.name,
-    timezone: booking.branch.timezone,
-    staffSelectionMode: booking.branchService.service.staffSelectionMode,
-  };
+  return getOperationalBookingProposalTarget(
+    await currentBusinessOperationReference("BOOKING_CHANGE_PROPOSE"),
+    bookingId,
+  );
 }
