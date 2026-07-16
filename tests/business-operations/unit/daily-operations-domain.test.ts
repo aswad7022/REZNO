@@ -13,7 +13,8 @@ import {
   operationalMenuCategorySchema,
   operationalMenuItemSchema,
   operationalRestaurantRescheduleSchema,
-  operationalRestaurantTableSchema,
+  operationalRestaurantTableCreateSchema,
+  operationalRestaurantTableUpdateSchema,
   safeOperationalActivity,
 } from "../../../features/business-operations/domain/daily-operations";
 import { BusinessOperationsError } from "../../../features/business-operations/domain/errors";
@@ -169,11 +170,21 @@ test("safe activity mapping exposes only canonical status and same-status event 
   assert.equal(safeOperationalActivity({ fromStatus: "CONFIRMED", note: "private internal note", toStatus: "CONFIRMED" }), null);
 });
 
-test("Restaurant table, reschedule and menu category schemas are strict and bounded", () => {
+test("Restaurant table create and update schemas keep Branch immutable and capacity bounded", () => {
   const table = { area: "Main", branchId: organizationId, capacity: 4, code: "T4", floor: "1", name: "Table 4", positionLabel: "Window" };
-  assert.equal(operationalRestaurantTableSchema.safeParse(table).success, true);
-  assert.equal(operationalRestaurantTableSchema.safeParse({ ...table, capacity: 0 }).success, false);
-  assert.equal(operationalRestaurantTableSchema.safeParse({ ...table, businessId: organizationId }).success, false);
+  assert.equal(operationalRestaurantTableCreateSchema.safeParse(table).success, true);
+  assert.equal(operationalRestaurantTableCreateSchema.safeParse({ ...table, branchId: "invalid" }).success, false);
+  const update = { area: table.area, capacity: table.capacity, code: table.code, floor: table.floor, name: table.name, positionLabel: table.positionLabel };
+  assert.equal(operationalRestaurantTableUpdateSchema.safeParse(update).success, true);
+  assert.equal(operationalRestaurantTableUpdateSchema.safeParse({ ...update, branchId: organizationId }).success, false);
+  assert.equal(operationalRestaurantTableUpdateSchema.safeParse({ ...update, unknownBranch: organizationId }).success, false);
+  assert.equal(operationalRestaurantTableUpdateSchema.safeParse({ ...update, capacity: 5 }).success, true);
+  assert.equal(operationalRestaurantTableUpdateSchema.safeParse({ ...update, capacity: 3 }).success, true);
+  assert.equal(operationalRestaurantTableCreateSchema.safeParse({ ...table, capacity: 0 }).success, false);
+  assert.equal(operationalRestaurantTableCreateSchema.safeParse({ ...table, businessId: organizationId }).success, false);
+});
+
+test("Restaurant reschedule and menu category schemas are strict and bounded", () => {
   const reschedule = { customerNote: "Window", date: "2026-07-20", guestCount: 4, seatingArea: "Main", tableId: bookingId, time: "12:30" };
   assert.equal(operationalRestaurantRescheduleSchema.safeParse(reschedule).success, true);
   assert.equal(operationalRestaurantRescheduleSchema.safeParse({ ...reschedule, time: "12:15" }).success, true);
@@ -186,7 +197,8 @@ test("menu item price, currency, preparation, URL, mass assignment and normaliza
   const item = { currency: "iqd", description: "Dish", imageUrl: "https://example.test/dish.jpg", menuCategoryId: organizationId, name: "Dish", preparationMinutes: 20, price: "25000.00", sortOrder: 1 };
   const parsed = operationalMenuItemSchema.parse(item);
   assert.equal(parsed.currency, "IQD");
-  for (const price of ["0", "-1", ".5", "1.234", "1e3", "NaN"]) {
+  assert.equal(operationalMenuItemSchema.safeParse({ ...item, price: "99999999.99" }).success, true);
+  for (const price of ["0", "-1", ".5", "1.234", "1e3", "NaN", "Infinity", "100000000", "999999999.99"]) {
     assert.equal(operationalMenuItemSchema.safeParse({ ...item, price }).success, false);
   }
   assert.equal(operationalMenuItemSchema.safeParse({ ...item, currency: "IQDD" }).success, false);

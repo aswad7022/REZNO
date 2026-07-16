@@ -24,12 +24,15 @@ import {
 import { getRestaurantTables } from "@/features/restaurants/services/restaurant-management";
 
 export async function RestaurantTablesPage({
+  editTableId,
   showCreateForm = false,
 }: {
+  editTableId?: string;
   showCreateForm?: boolean;
 }) {
   const { tables, branches, canEdit, organizationId, organizationName } =
     await getRestaurantTables();
+  const editTable = tables.find((table) => table.id === editTableId);
 
   return (
     <DashboardShell>
@@ -77,6 +80,25 @@ export async function RestaurantTablesPage({
               branches={branches}
               contextOrganizationId={organizationId}
               idempotencyKey={randomUUID()}
+            />
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {canEdit && editTable ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>تعديل الطاولة</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              الفرع ثابت بعد الإنشاء؛ تحقّق من السعة قبل حفظ التغيير.
+            </p>
+            <RestaurantTableForm
+              branches={branches}
+              contextOrganizationId={organizationId}
+              idempotencyKey={randomUUID()}
+              table={editTable}
             />
           </CardContent>
         </Card>
@@ -160,7 +182,7 @@ export async function RestaurantTablesPage({
                       <DialogHeader>
                         <DialogTitle>تعديل الطاولة</DialogTitle>
                         <DialogDescription>
-                          تحقّق من الفرع والسعة قبل حفظ التغيير.
+                          الفرع ثابت بعد الإنشاء؛ تحقّق من السعة قبل حفظ التغيير.
                         </DialogDescription>
                       </DialogHeader>
                       <RestaurantTableForm

@@ -5,7 +5,8 @@ import { Prisma } from "@prisma/client";
 import {
   operationalMenuCategorySchema,
   operationalMenuItemSchema,
-  operationalRestaurantTableSchema,
+  operationalRestaurantTableCreateSchema,
+  operationalRestaurantTableUpdateSchema,
 } from "@/features/business-operations/domain/daily-operations";
 import { businessOperationsError } from "@/features/business-operations/domain/errors";
 import { canPerformBusinessOperation } from "@/features/business-operations/domain/policy";
@@ -25,6 +26,7 @@ import {
   lockMenuCategory,
   lockMenuItem,
   lockOrganization,
+  lockRestaurantBranchAllocation,
   lockRestaurantTable,
   resolveMutationReplay,
   runBusinessOperationTransaction,
@@ -177,7 +179,7 @@ export async function createOperationalRestaurantTable(input: {
   table: unknown;
 }) {
   assertUuid(input.idempotencyKey, "idempotencyKey");
-  const parsed = operationalRestaurantTableSchema.safeParse(input.table);
+  const parsed = operationalRestaurantTableCreateSchema.safeParse(input.table);
   if (!parsed.success) businessOperationsError("INVALID_REQUEST", "Restaurant table input is invalid.");
   const actor = await resolveBusinessOperationActor(input.actor, "RESTAURANT_TABLE_WRITE");
   assertBusinessOperationMutationRate(actor, "restaurant-table-create");
@@ -229,7 +231,7 @@ export async function updateOperationalRestaurantTable(input: {
 }) {
   assertUuid(input.tableId, "tableId");
   assertUuid(input.idempotencyKey, "idempotencyKey");
-  const parsed = operationalRestaurantTableSchema.safeParse(input.table);
+  const parsed = operationalRestaurantTableUpdateSchema.safeParse(input.table);
   if (!parsed.success) businessOperationsError("INVALID_REQUEST", "Restaurant table input is invalid.");
   const actor = await resolveBusinessOperationActor(input.actor, "RESTAURANT_TABLE_WRITE");
   assertBusinessOperationMutationRate(actor, "restaurant-table-update");
@@ -242,23 +244,47 @@ export async function updateOperationalRestaurantTable(input: {
   });
   return runBusinessOperationTransaction(async (transaction) => {
     await lockRestaurantTable(transaction, input.tableId, actor.organizationId);
-    await lockBranch(transaction, parsed.data.branchId, actor.organizationId);
+    const table = await transaction.restaurantTable.findFirst({
+      where: { businessId: actor.organizationId, id: input.tableId },
+      include: { branch: true },
+    });
+    if (!table) businessOperationsError("TABLE_NOT_FOUND", "Restaurant table was not found.");
+    if (
+      !table.branchId ||
+      !table.branch ||
+      table.branch.deletedAt ||
+      table.branch.status !== "ACTIVE"
+    ) {
+      businessOperationsError("BRANCH_NOT_FOUND", "Active Restaurant Branch was not found.");
+    }
+    await lockBranch(transaction, table.branchId, actor.organizationId);
+    await lockRestaurantBranchAllocation(transaction, table.branchId);
     await assertBusinessOperationActorCurrent(transaction, actor, "RESTAURANT_TABLE_WRITE");
     await assertRestaurantOrganization(transaction, actor);
     const replay = await replayMutable(transaction, actor, { idempotencyKey: input.idempotencyKey, requestHash }, (targetId) =>
       transaction.restaurantTable.findFirst({ where: { businessId: actor.organizationId, id: targetId } }),
     );
     if (replay) return { ...replay, tableId: replay.id };
-    const table = await transaction.restaurantTable.findFirst({
-      where: { businessId: actor.organizationId, id: input.tableId },
-    });
-    const branch = await transaction.branch.findFirst({
-      where: { deletedAt: null, id: parsed.data.branchId, organizationId: actor.organizationId, status: "ACTIVE" },
-      select: { id: true },
-    });
-    if (!table) businessOperationsError("TABLE_NOT_FOUND", "Restaurant table was not found.");
-    if (!branch) businessOperationsError("BRANCH_NOT_FOUND", "Active Restaurant Branch was not found.");
     assertExpectedVersion(table.updatedAt, input.expectedVersion);
+    if (parsed.data.capacity < table.capacity) {
+      const affectedReservations = await transaction.restaurantReservationDetails.count({
+        where: {
+          guestCount: { gt: parsed.data.capacity },
+          tableId: table.id,
+          booking: {
+            startsAt: { gt: new Date() },
+            status: { in: ["PENDING", "CONFIRMED"] },
+          },
+        },
+      });
+      if (affectedReservations > 0) {
+        businessOperationsError(
+          "TABLE_RESERVATION_CONFLICT",
+          "Increase table capacity or reassign affected future reservations first.",
+          { affectedReservations },
+        );
+      }
+    }
     const changedAt = new Date();
     const changed = await transaction.restaurantTable.updateMany({
       where: { businessId: actor.organizationId, id: table.id, updatedAt: table.updatedAt },
@@ -268,7 +294,7 @@ export async function updateOperationalRestaurantTable(input: {
     await recordBusinessOperation(transaction, {
       action: "RESTAURANT_TABLE_UPDATE",
       actor,
-      after: { ...parsed.data, isActive: table.isActive },
+      after: { ...tableSnapshot(table), ...parsed.data },
       before: tableSnapshot(table),
       idempotencyKey: input.idempotencyKey,
       requestHash,
@@ -313,6 +339,9 @@ export async function setOperationalRestaurantTableActive(input: {
     });
     if (!table) businessOperationsError("TABLE_NOT_FOUND", "Restaurant table was not found.");
     assertExpectedVersion(table.updatedAt, input.expectedVersion);
+    if (table.branchId) {
+      await lockRestaurantBranchAllocation(transaction, table.branchId);
+    }
     if (input.active && (!table.branch || table.branch.deletedAt || table.branch.status !== "ACTIVE")) {
       businessOperationsError("BRANCH_NOT_FOUND", "Table requires an active Restaurant Branch.");
     }

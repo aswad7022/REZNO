@@ -27,6 +27,7 @@ const initialRestaurantActionState: RestaurantActionState = {
 
 export interface RestaurantTableFormValue {
   area: string | null;
+  branch: { id: string; name: string } | null;
   branchId: string | null;
   capacity: number;
   code: string | null;
@@ -100,22 +101,34 @@ export function RestaurantTableForm({
         defaultValue={table?.capacity ?? 2}
         required
       />
-      <div className="space-y-2">
-        <Label htmlFor={`branch-${table?.id ?? "new"}`}>الفرع</Label>
-        <select
-          id={`branch-${table?.id ?? "new"}`}
-          name="branchId"
-          defaultValue={table?.branchId ?? branches[0]?.id}
-          className="h-10 w-full rounded-xl border bg-background px-3 text-sm"
-          required
-        >
-          {branches.map((branch) => (
-            <option key={branch.id} value={branch.id}>
-              {branch.name}
-            </option>
-          ))}
-        </select>
-      </div>
+      {table ? (
+        <div className="space-y-2">
+          <Label>الفرع</Label>
+          <p className="flex h-10 items-center rounded-xl border bg-muted/50 px-3 text-sm">
+            {table.branch?.name ?? "غير محدد"}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            لا يمكن نقل الطاولة إلى فرع آخر بعد إنشائها.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <Label htmlFor="branch-new">الفرع</Label>
+          <select
+            id="branch-new"
+            name="branchId"
+            defaultValue={branches[0]?.id}
+            className="h-10 w-full rounded-xl border bg-background px-3 text-sm"
+            required
+          >
+            {branches.map((branch) => (
+              <option key={branch.id} value={branch.id}>
+                {branch.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
       <Field name="area" label="المنطقة" defaultValue={table?.area ?? ""} maxLength={120} />
       <Field name="floor" label="الطابق" defaultValue={table?.floor ?? ""} maxLength={80} />
       <Field
@@ -216,7 +229,7 @@ export function MenuItemForm({
         name="price"
         label="السعر"
         inputMode="decimal"
-        pattern="^(0|[1-9][0-9]{0,9})(\\.[0-9]{1,2})?$"
+        pattern="^[0-9]{1,8}(\\.[0-9]{1,2})?$"
         defaultValue={item?.price ?? ""}
         required
       />

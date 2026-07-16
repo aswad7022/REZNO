@@ -206,15 +206,23 @@ const optionalUrl = z
   })
   .transform((value) => value || null);
 
-export const operationalRestaurantTableSchema = z.object({
+const operationalRestaurantTableFields = {
   area: nullableText(120),
-  branchId: z.string().uuid(),
   capacity: z.number().int().min(1).max(100),
   code: nullableText(40),
   floor: nullableText(80),
   name: z.string().trim().min(1).max(120),
   positionLabel: nullableText(120),
+};
+
+export const operationalRestaurantTableCreateSchema = z.object({
+  ...operationalRestaurantTableFields,
+  branchId: z.string().uuid(),
 }).strict();
+
+export const operationalRestaurantTableUpdateSchema = z.object(
+  operationalRestaurantTableFields,
+).strict();
 
 export const operationalMenuCategorySchema = z.object({
   description: nullableText(500),
@@ -225,7 +233,7 @@ export const operationalMenuCategorySchema = z.object({
 const decimalPrice = z
   .string()
   .trim()
-  .regex(/^\d{1,9}(?:\.\d{1,2})?$/)
+  .regex(/^\d{1,8}(?:\.\d{1,2})?$/)
   .refine((value) => Number(value) > 0);
 
 export const operationalMenuItemSchema = z.object({

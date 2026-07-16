@@ -75,6 +75,7 @@ async function submit(
   form: string,
   mutate: (parameters: URLSearchParams) => void,
   cookie: string,
+  readBody = false,
 ) {
   const parameters = formParams(form);
   mutate(parameters);
@@ -87,7 +88,25 @@ async function submit(
     redirect: "manual",
   });
   assert.ok([200, 303].includes(response.status), `Unexpected action status ${response.status}`);
-  await response.body?.cancel();
+  let responseBody = "";
+  if (readBody && response.body) {
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    while (true) {
+      const result = await Promise.race([
+        reader.read(),
+        new Promise<{ done: true; value?: undefined }>((resolve) =>
+          setTimeout(() => resolve({ done: true }), 500),
+        ),
+      ]);
+      if (result.done) break;
+      responseBody += decoder.decode(result.value, { stream: true });
+    }
+    await reader.cancel();
+  } else {
+    await response.body?.cancel();
+  }
+  return { body: responseBody, status: response.status };
 }
 
 function instant(days: number, hour: number, minute = 0) {
@@ -338,16 +357,152 @@ test("Stage 2C production Business Web HTML, RSC and Server Actions enforce dail
     const tablesHtml = await (await page(tablesPath, ownerCookie)).text();
     const tableCreate = forms(tablesHtml).find((form) => form.includes('name="capacity"') && !form.includes('name="expectedVersion"'));
     assert.ok(tableCreate);
+    assert.equal(tableCreate.includes('name="branchId"'), true);
     await submit(tablesPath, tableCreate, (parameters) => {
       parameters.set("name", "HTTP Table");
       parameters.set("code", "HT1");
-      parameters.set("capacity", "4");
+      parameters.set("capacity", "6");
       parameters.set("branchId", fixture.activeBranch.id);
       parameters.set("area", "Main");
       parameters.set("floor", "1");
       parameters.set("positionLabel", "Door");
     }, ownerCookie);
     assert.equal(await prisma.restaurantTable.count({ where: { businessId: fixture.organizationA.id, name: "HTTP Table" } }), 1);
+    const httpTable = await prisma.restaurantTable.findFirstOrThrow({
+      where: { businessId: fixture.organizationA.id, name: "HTTP Table" },
+    });
+    const branchB = await prisma.branch.create({
+      data: {
+        name: "HTTP Second Restaurant Branch",
+        organizationId: fixture.organizationA.id,
+        slug: "http-second-restaurant",
+        status: "ACTIVE",
+        timezone: "UTC",
+      },
+    });
+    const protectedStartsAt = instant(10, 16);
+    const protectedReservation = await prisma.booking.create({
+      data: {
+        branchId: fixture.activeBranch.id,
+        customerId: fixture.customer.id,
+        customerNameSnapshot: "HTTP Table Integrity Customer",
+        endsAt: new Date(protectedStartsAt.getTime() + 90 * 60_000),
+        organizationId: fixture.organizationA.id,
+        priceSnapshot: "0",
+        restaurantReservation: {
+          create: {
+            branchId: fixture.activeBranch.id,
+            businessId: fixture.organizationA.id,
+            durationMinutes: 90,
+            guestCount: 5,
+            reservationDateTime: protectedStartsAt,
+            tableId: httpTable.id,
+          },
+        },
+        serviceNameSnapshot: "HTTP protected reservation",
+        startsAt: protectedStartsAt,
+        status: "CONFIRMED",
+      },
+      include: { restaurantReservation: true },
+    });
+    const tableEditPath = `/business/tables?edit=${httpTable.id}`;
+    const freshTablesHtml = await (await page(tableEditPath, ownerCookie)).text();
+    const tableEdit = forms(freshTablesHtml).find(
+      (form) => form.includes('name="expectedVersion"') && form.includes('value="HTTP Table"'),
+    );
+    assert.ok(tableEdit);
+    assert.equal(tableEdit.includes('name="branchId"'), false);
+    assert.equal(tableEdit.includes("لا يمكن نقل الطاولة إلى فرع آخر بعد إنشائها"), true);
+    const deniedAuditCount = await prisma.businessAuditLog.count({
+      where: { organizationId: fixture.organizationA.id },
+    });
+    const deniedMutationCount = await prisma.businessOperationMutation.count({
+      where: { organizationId: fixture.organizationA.id },
+    });
+    const forgedBranchResult = await submit(tableEditPath, tableEdit, (parameters) => {
+      parameters.set("branchId", branchB.id);
+      parameters.set("idempotencyKey", randomUUID());
+    }, ownerCookie, true);
+    assert.match(forgedBranchResult.body, /INVALID_REQUEST|بيانات الطاولة غير صالحة/);
+    assert.doesNotMatch(forgedBranchResult.body, /Prisma|PostgreSQL|numeric field overflow/i);
+    const insufficientCapacityResult = await submit(tableEditPath, tableEdit, (parameters) => {
+      parameters.set("capacity", "4");
+      parameters.set("idempotencyKey", randomUUID());
+    }, ownerCookie, true);
+    assert.match(insufficientCapacityResult.body, /TABLE_RESERVATION_CONFLICT|Increase table capacity/);
+    assert.doesNotMatch(insufficientCapacityResult.body, /Prisma|PostgreSQL|numeric field overflow/i);
+    const afterDeniedTable = await prisma.restaurantTable.findUniqueOrThrow({ where: { id: httpTable.id } });
+    const afterDeniedReservation = await prisma.booking.findUniqueOrThrow({
+      where: { id: protectedReservation.id },
+      include: { restaurantReservation: true },
+    });
+    assert.equal(afterDeniedTable.branchId, fixture.activeBranch.id);
+    assert.equal(afterDeniedTable.capacity, 6);
+    assert.equal(afterDeniedReservation.branchId, fixture.activeBranch.id);
+    assert.equal(afterDeniedReservation.restaurantReservation?.branchId, fixture.activeBranch.id);
+    assert.equal(afterDeniedReservation.restaurantReservation?.tableId, httpTable.id);
+    assert.equal(await prisma.businessAuditLog.count({ where: { organizationId: fixture.organizationA.id } }), deniedAuditCount);
+    assert.equal(await prisma.businessOperationMutation.count({ where: { organizationId: fixture.organizationA.id } }), deniedMutationCount);
+    const detailAfterDenied = await page(`/business/reservations/${protectedReservation.id}`, ownerCookie);
+    assert.equal(detailAfterDenied.status, 200);
+    assert.match(await detailAfterDenied.text(), /HTTP Table/);
+
+    await submit(tableEditPath, tableEdit, (parameters) => {
+      parameters.set("capacity", "7");
+      parameters.set("idempotencyKey", randomUUID());
+      parameters.set("name", "HTTP Table Owner Updated");
+    }, ownerCookie);
+    assert.deepEqual(
+      await prisma.restaurantTable.findUniqueOrThrow({
+        where: { id: httpTable.id },
+        select: { capacity: true, name: true },
+      }),
+      { capacity: 7, name: "HTTP Table Owner Updated" },
+    );
+    const managerTablesHtml = await (await page(tableEditPath, ownerCookie)).text();
+    const managerEdit = forms(managerTablesHtml).find(
+      (form) => form.includes('name="expectedVersion"') && form.includes('value="HTTP Table Owner Updated"'),
+    );
+    assert.ok(managerEdit);
+    await prisma.organizationMember.update({
+      where: { id: fixture.owner.membership.id },
+      data: { roleId: fixture.manager.membership.roleId },
+    });
+    await submit(tableEditPath, managerEdit, (parameters) => {
+      parameters.set("capacity", "8");
+      parameters.set("idempotencyKey", randomUUID());
+      parameters.set("name", "HTTP Table Manager Updated");
+    }, ownerCookie);
+    assert.deepEqual(
+      await prisma.restaurantTable.findUniqueOrThrow({
+        where: { id: httpTable.id },
+        select: { capacity: true, name: true },
+      }),
+      { capacity: 8, name: "HTTP Table Manager Updated" },
+    );
+    const receptionistFormHtml = await (await page(tableEditPath, ownerCookie)).text();
+    const receptionistForgedEdit = forms(receptionistFormHtml).find(
+      (form) => form.includes('name="expectedVersion"') && form.includes('value="HTTP Table Manager Updated"'),
+    );
+    assert.ok(receptionistForgedEdit);
+    await prisma.organizationMember.update({
+      where: { id: fixture.owner.membership.id },
+      data: { roleId: fixture.receptionist.membership.roleId },
+    });
+    const beforeReceptionist = await prisma.restaurantTable.findUniqueOrThrow({ where: { id: httpTable.id } });
+    const receptionistResult = await submit(tableEditPath, receptionistForgedEdit, (parameters) => {
+      parameters.set("capacity", "9");
+      parameters.set("idempotencyKey", randomUUID());
+    }, ownerCookie, true);
+    assert.match(receptionistResult.body, /FORBIDDEN|cannot perform/i);
+    assert.equal(
+      (await prisma.restaurantTable.findUniqueOrThrow({ where: { id: httpTable.id } })).updatedAt.getTime(),
+      beforeReceptionist.updatedAt.getTime(),
+    );
+    await prisma.organizationMember.update({
+      where: { id: fixture.owner.membership.id },
+      data: { roleId: fixture.owner.membership.roleId },
+    });
 
     const menuPath = "/business/menu?create=category";
     const menuHtml = await (await page(menuPath, ownerCookie)).text();
@@ -359,5 +514,46 @@ test("Stage 2C production Business Web HTML, RSC and Server Actions enforce dail
       parameters.set("sortOrder", "5");
     }, ownerCookie);
     assert.equal(await prisma.menuCategory.count({ where: { businessId: fixture.organizationA.id, name: "HTTP Category" } }), 1);
+    const itemMenuPath = "/business/menu?create=item";
+    const itemMenuHtml = await (await page(itemMenuPath, ownerCookie)).text();
+    const itemCreate = forms(itemMenuHtml).find(
+      (form) => form.includes('name="menuCategoryId"') && form.includes('name="price"') && !form.includes('name="expectedVersion"'),
+    );
+    assert.ok(itemCreate);
+    const httpCategory = await prisma.menuCategory.findFirstOrThrow({
+      where: { businessId: fixture.organizationA.id, name: "HTTP Category" },
+    });
+    await submit(itemMenuPath, itemCreate, (parameters) => {
+      parameters.set("currency", "IQD");
+      parameters.set("description", "Maximum valid Decimal");
+      parameters.set("imageUrl", "");
+      parameters.set("menuCategoryId", httpCategory.id);
+      parameters.set("name", "HTTP Maximum Price");
+      parameters.set("preparationMinutes", "");
+      parameters.set("price", "99999999.99");
+      parameters.set("sortOrder", "1");
+    }, ownerCookie);
+    assert.equal(
+      (await prisma.menuItem.findFirstOrThrow({ where: { name: "HTTP Maximum Price" } })).price.toString(),
+      "99999999.99",
+    );
+    const overflowLedgerCount = await prisma.businessOperationMutation.count({
+      where: { organizationId: fixture.organizationA.id },
+    });
+    const overflowResult = await submit(itemMenuPath, itemCreate, (parameters) => {
+      parameters.set("currency", "IQD");
+      parameters.set("description", "Overflow must fail validation");
+      parameters.set("idempotencyKey", randomUUID());
+      parameters.set("imageUrl", "");
+      parameters.set("menuCategoryId", httpCategory.id);
+      parameters.set("name", "HTTP Overflow Price");
+      parameters.set("preparationMinutes", "");
+      parameters.set("price", "100000000");
+      parameters.set("sortOrder", "2");
+    }, ownerCookie, true);
+    assert.match(overflowResult.body, /INVALID_REQUEST|بيانات الصنف غير صالحة/);
+    assert.doesNotMatch(overflowResult.body, /Prisma|PostgreSQL|numeric field overflow/i);
+    assert.equal(await prisma.menuItem.count({ where: { name: "HTTP Overflow Price" } }), 0);
+    assert.equal(await prisma.businessOperationMutation.count({ where: { organizationId: fixture.organizationA.id } }), overflowLedgerCount);
   });
 });

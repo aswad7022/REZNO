@@ -794,6 +794,14 @@ test(
         table: { area: "Patio", branchId: fixture.activeBranch.id, capacity: 4, code: "P4", floor: "1", name: "Patio 4", positionLabel: "North" },
       };
       const createdTable = await createOperationalRestaurantTable(createTableInput);
+      const tableUpdateInput = {
+        area: createTableInput.table.area,
+        capacity: createTableInput.table.capacity,
+        code: createTableInput.table.code,
+        floor: createTableInput.table.floor,
+        name: createTableInput.table.name,
+        positionLabel: createTableInput.table.positionLabel,
+      };
       assert.equal((await createOperationalRestaurantTable(createTableInput)).replayed, true);
       await assert.rejects(
         createOperationalRestaurantTable({ ...createTableInput, table: { ...createTableInput.table, name: "Changed" } }),
@@ -804,12 +812,12 @@ test(
         contextOrganizationId: fixture.organizationA.id,
         expectedVersion: createdTable.version,
         idempotencyKey: randomUUID(),
-        table: { ...createTableInput.table, capacity: 5, name: "Patio Five" },
+        table: { ...tableUpdateInput, capacity: 5, name: "Patio Five" },
         tableId: createdTable.tableId,
       });
       assert.equal((await prisma.restaurantTable.findUniqueOrThrow({ where: { id: createdTable.tableId } })).capacity, 5);
       await assert.rejects(
-        updateOperationalRestaurantTable({ actor: fixture.owner.reference, contextOrganizationId: fixture.organizationA.id, expectedVersion: createdTable.version, idempotencyKey: randomUUID(), table: createTableInput.table, tableId: createdTable.tableId }),
+        updateOperationalRestaurantTable({ actor: fixture.owner.reference, contextOrganizationId: fixture.organizationA.id, expectedVersion: createdTable.version, idempotencyKey: randomUUID(), table: tableUpdateInput, tableId: createdTable.tableId }),
         hasCode("STALE_VERSION"),
       );
       await assert.rejects(
@@ -845,6 +853,15 @@ test(
       const category = await createOperationalMenuCategory({ actor: fixture.owner.reference, category: { description: "Hot dishes", name: "Mains", sortOrder: 10 }, contextOrganizationId: fixture.organizationA.id, idempotencyKey: categoryKey });
       assert.equal((await createOperationalMenuCategory({ actor: fixture.owner.reference, category: { description: "Hot dishes", name: "Mains", sortOrder: 10 }, contextOrganizationId: fixture.organizationA.id, idempotencyKey: categoryKey })).replayed, true);
       const categoryUpdated = await updateOperationalMenuCategory({ actor: fixture.manager.reference, category: { description: "Updated", name: "Main dishes", sortOrder: 20 }, categoryId: category.categoryId, contextOrganizationId: fixture.organizationA.id, expectedVersion: category.version, idempotencyKey: randomUUID() });
+      const maximumPriceItem = await createOperationalMenuItem({ actor: fixture.owner.reference, contextOrganizationId: fixture.organizationA.id, idempotencyKey: randomUUID(), item: { currency: "IQD", description: "Decimal boundary", imageUrl: "", menuCategoryId: category.categoryId, name: "Maximum price", preparationMinutes: null, price: "99999999.99", sortOrder: 0 } });
+      assert.equal((await prisma.menuItem.findUniqueOrThrow({ where: { id: maximumPriceItem.itemId } })).price.toString(), "99999999.99");
+      const overflowMutationCount = await prisma.businessOperationMutation.count({ where: { organizationId: fixture.organizationA.id } });
+      await assert.rejects(
+        createOperationalMenuItem({ actor: fixture.owner.reference, contextOrganizationId: fixture.organizationA.id, idempotencyKey: randomUUID(), item: { currency: "IQD", description: "Overflow", imageUrl: "", menuCategoryId: category.categoryId, name: "Overflow price", preparationMinutes: null, price: "100000000", sortOrder: 0 } }),
+        hasCode("INVALID_REQUEST"),
+      );
+      assert.equal(await prisma.menuItem.count({ where: { businessId: fixture.organizationA.id, name: "Overflow price" } }), 0);
+      assert.equal(await prisma.businessOperationMutation.count({ where: { organizationId: fixture.organizationA.id } }), overflowMutationCount);
       const item = await createOperationalMenuItem({ actor: fixture.owner.reference, contextOrganizationId: fixture.organizationA.id, idempotencyKey: randomUUID(), item: { currency: "iqd", description: "Dish", imageUrl: "https://example.test/item.jpg", menuCategoryId: category.categoryId, name: "Dish", preparationMinutes: 15, price: "10000", sortOrder: 1 } });
       const reservation = await createFutureRestaurantBooking(fixture, localDate(instant(7, 0)));
       await prisma.restaurantReservationItem.create({ data: { currencySnapshot: "IQD", itemNameSnapshot: "Dish Snapshot", menuItemId: item.itemId, quantity: 1, restaurantReservationDetailsId: reservation.restaurantReservation!.id, unitPrice: "10000" } });
@@ -874,7 +891,7 @@ test(
       assert.equal(receptionistMenu.categories.flatMap((entry) => entry.items).every((entry) => entry.isAvailable && entry.version === undefined), true);
       const foreignTable = await prisma.restaurantTable.create({ data: { branchId: fixture.branchB.id, businessId: fixture.organizationB.id, capacity: 4, name: "Foreign" } });
       await assert.rejects(
-        updateOperationalRestaurantTable({ actor: fixture.owner.reference, contextOrganizationId: fixture.organizationA.id, expectedVersion: foreignTable.updatedAt.toISOString(), idempotencyKey: randomUUID(), table: createTableInput.table, tableId: foreignTable.id }),
+        updateOperationalRestaurantTable({ actor: fixture.owner.reference, contextOrganizationId: fixture.organizationA.id, expectedVersion: foreignTable.updatedAt.toISOString(), idempotencyKey: randomUUID(), table: tableUpdateInput, tableId: foreignTable.id }),
         hasCode("TABLE_NOT_FOUND"),
       );
       assert.ok(categoryUpdated.version);
@@ -889,6 +906,299 @@ test(
         false,
       );
       assert.equal(await prisma.restaurantReservationItem.count({ where: { menuItemId: item.itemId } }), 1);
+    });
+
+    await t.test("Restaurant table Branch and capacity updates preserve every reservation relationship", async () => {
+      await resetBusinessOperationsTestData();
+      const fixture = await createBusinessOperationsFixture("stage2c-table-integrity");
+      const branchB = await prisma.branch.create({
+        data: {
+          name: "Second Restaurant Branch",
+          organizationId: fixture.organizationA.id,
+          slug: "second-restaurant",
+          status: "ACTIVE",
+          timezone: "UTC",
+        },
+      });
+      const table = await prisma.restaurantTable.create({
+        data: {
+          area: "Main",
+          branchId: fixture.activeBranch.id,
+          businessId: fixture.organizationA.id,
+          capacity: 6,
+          code: "INTEGRITY-6",
+          floor: "1",
+          name: "Integrity Table",
+          positionLabel: "Window",
+        },
+      });
+      const createReservation = async (
+        status: "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED",
+        startsAt: Date,
+        guestCount: number,
+      ) => prisma.booking.create({
+        data: {
+          branchId: fixture.activeBranch.id,
+          customerId: fixture.customer.id,
+          customerNameSnapshot: `${status} integrity customer`,
+          endsAt: new Date(startsAt.getTime() + 90 * 60_000),
+          organizationId: fixture.organizationA.id,
+          priceSnapshot: "0",
+          restaurantReservation: {
+            create: {
+              branchId: fixture.activeBranch.id,
+              businessId: fixture.organizationA.id,
+              durationMinutes: 90,
+              guestCount,
+              reservationDateTime: startsAt,
+              tableId: table.id,
+            },
+          },
+          serviceNameSnapshot: "Integrity reservation",
+          startsAt,
+          status,
+        },
+        include: { restaurantReservation: true },
+      });
+      const future = await createReservation("CONFIRMED", instant(6, 12), 5);
+      const completed = await createReservation("COMPLETED", instant(-4, 12), 3);
+      const cancelled = await createReservation("CANCELLED", instant(-3, 12), 4);
+      const historicalBefore = await prisma.booking.findMany({
+        where: { id: { in: [completed.id, cancelled.id] } },
+        include: { restaurantReservation: true },
+        orderBy: { id: "asc" },
+      });
+      const updateInput = {
+        area: table.area,
+        capacity: table.capacity,
+        code: table.code,
+        floor: table.floor,
+        name: "Integrity Table Renamed",
+        positionLabel: table.positionLabel,
+      };
+      const renamed = await updateOperationalRestaurantTable({
+        actor: fixture.owner.reference,
+        contextOrganizationId: fixture.organizationA.id,
+        expectedVersion: table.updatedAt.toISOString(),
+        idempotencyKey: randomUUID(),
+        table: updateInput,
+        tableId: table.id,
+      });
+      assert.equal((await prisma.restaurantTable.findUniqueOrThrow({ where: { id: table.id } })).name, updateInput.name);
+
+      const deniedAuditCount = await prisma.businessAuditLog.count({
+        where: { organizationId: fixture.organizationA.id },
+      });
+      const deniedMutationCount = await prisma.businessOperationMutation.count({
+        where: { organizationId: fixture.organizationA.id },
+      });
+      await assert.rejects(
+        updateOperationalRestaurantTable({
+          actor: fixture.owner.reference,
+          contextOrganizationId: fixture.organizationA.id,
+          expectedVersion: renamed.version,
+          idempotencyKey: randomUUID(),
+          table: { ...updateInput, branchId: branchB.id },
+          tableId: table.id,
+        }),
+        hasCode("INVALID_REQUEST"),
+      );
+      const afterForgedBranch = await prisma.restaurantTable.findUniqueOrThrow({ where: { id: table.id } });
+      assert.equal(afterForgedBranch.branchId, fixture.activeBranch.id);
+      for (const booking of [future, completed, cancelled]) {
+        const current = await prisma.booking.findUniqueOrThrow({
+          where: { id: booking.id },
+          include: { restaurantReservation: true },
+        });
+        assert.equal(current.branchId, fixture.activeBranch.id);
+        assert.equal(current.restaurantReservation?.branchId, fixture.activeBranch.id);
+        assert.equal(current.restaurantReservation?.tableId, table.id);
+      }
+      await assert.rejects(
+        updateOperationalRestaurantTable({
+          actor: fixture.owner.reference,
+          contextOrganizationId: fixture.organizationA.id,
+          expectedVersion: renamed.version,
+          idempotencyKey: randomUUID(),
+          table: { ...updateInput, capacity: 4 },
+          tableId: table.id,
+        }),
+        (error: unknown) =>
+          error instanceof BusinessOperationsError &&
+          error.code === "TABLE_RESERVATION_CONFLICT" &&
+          error.details?.affectedReservations === 1,
+      );
+      assert.equal((await prisma.restaurantTable.findUniqueOrThrow({ where: { id: table.id } })).capacity, 6);
+      assert.equal(await prisma.businessAuditLog.count({ where: { organizationId: fixture.organizationA.id } }), deniedAuditCount);
+      assert.equal(await prisma.businessOperationMutation.count({ where: { organizationId: fixture.organizationA.id } }), deniedMutationCount);
+      assert.ok(await getOperationalRestaurantReservationDetail(fixture.owner.reference, completed.id));
+      assert.ok(await getOperationalRestaurantReservationDetail(fixture.owner.reference, cancelled.id));
+
+      const increaseKey = randomUUID();
+      const increasedInput = { ...updateInput, capacity: 7 };
+      const increased = await updateOperationalRestaurantTable({
+        actor: fixture.manager.reference,
+        contextOrganizationId: fixture.organizationA.id,
+        expectedVersion: renamed.version,
+        idempotencyKey: increaseKey,
+        table: increasedInput,
+        tableId: table.id,
+      });
+      assert.equal((await updateOperationalRestaurantTable({
+        actor: fixture.manager.reference,
+        contextOrganizationId: fixture.organizationA.id,
+        expectedVersion: renamed.version,
+        idempotencyKey: increaseKey,
+        table: increasedInput,
+        tableId: table.id,
+      })).replayed, true);
+      await assert.rejects(
+        updateOperationalRestaurantTable({
+          actor: fixture.manager.reference,
+          contextOrganizationId: fixture.organizationA.id,
+          expectedVersion: renamed.version,
+          idempotencyKey: increaseKey,
+          table: { ...increasedInput, capacity: 8 },
+          tableId: table.id,
+        }),
+        hasCode("IDEMPOTENCY_CONFLICT"),
+      );
+      await assert.rejects(
+        updateOperationalRestaurantTable({
+          actor: fixture.owner.reference,
+          contextOrganizationId: fixture.organizationA.id,
+          expectedVersion: renamed.version,
+          idempotencyKey: randomUUID(),
+          table: { ...increasedInput, capacity: 8 },
+          tableId: table.id,
+        }),
+        hasCode("STALE_VERSION"),
+      );
+      const foreignTable = await prisma.restaurantTable.create({
+        data: { branchId: fixture.branchB.id, businessId: fixture.organizationB.id, capacity: 9, name: "Foreign Integrity" },
+      });
+      await assert.rejects(
+        updateOperationalRestaurantTable({
+          actor: fixture.owner.reference,
+          contextOrganizationId: fixture.organizationA.id,
+          expectedVersion: foreignTable.updatedAt.toISOString(),
+          idempotencyKey: randomUUID(),
+          table: { ...increasedInput, capacity: 9 },
+          tableId: foreignTable.id,
+        }),
+        hasCode("TABLE_NOT_FOUND"),
+      );
+      await prisma.booking.update({ where: { id: future.id }, data: { status: "CANCELLED" } });
+      const reduced = await updateOperationalRestaurantTable({
+        actor: fixture.owner.reference,
+        contextOrganizationId: fixture.organizationA.id,
+        expectedVersion: increased.version,
+        idempotencyKey: randomUUID(),
+        table: { ...updateInput, capacity: 4 },
+        tableId: table.id,
+      });
+      assert.ok(reduced.version);
+      assert.equal((await prisma.restaurantTable.findUniqueOrThrow({ where: { id: table.id } })).capacity, 4);
+      const historicalAfter = await prisma.booking.findMany({
+        where: { id: { in: [completed.id, cancelled.id] } },
+        include: { restaurantReservation: true },
+        orderBy: { id: "asc" },
+      });
+      assert.deepEqual(historicalAfter, historicalBefore);
+      assert.ok(await getOperationalRestaurantReservationDetail(fixture.owner.reference, completed.id));
+      assert.ok(await getOperationalRestaurantReservationDetail(fixture.owner.reference, cancelled.id));
+    });
+
+    await t.test("capacity reductions and Restaurant reschedules serialize without an invalid final assignment", async () => {
+      await resetBusinessOperationsTestData();
+      const fixture = await createBusinessOperationsFixture("stage2c-table-races");
+      const table = await prisma.restaurantTable.update({
+        where: { id: fixture.table.id },
+        data: { capacity: 6 },
+      });
+      const reservation = await createFutureRestaurantBooking(
+        fixture,
+        localDate(instant(6, 0)),
+      );
+      const detail = await getOperationalRestaurantReservationDetail(
+        fixture.owner.reference,
+        reservation.id,
+      );
+      assert.ok(detail);
+      const updateInput = {
+        area: table.area,
+        capacity: 4,
+        code: table.code,
+        floor: table.floor,
+        name: table.name,
+        positionLabel: table.positionLabel,
+      };
+      const raceResults = await Promise.allSettled([
+        updateOperationalRestaurantTable({
+          actor: fixture.owner.reference,
+          contextOrganizationId: fixture.organizationA.id,
+          expectedVersion: table.updatedAt.toISOString(),
+          idempotencyKey: randomUUID(),
+          table: updateInput,
+          tableId: table.id,
+        }),
+        rescheduleOperationalRestaurantReservation({
+          actor: fixture.manager.reference,
+          bookingId: reservation.id,
+          contextOrganizationId: fixture.organizationA.id,
+          expectedBookingVersion: detail.bookingVersion,
+          expectedReservationVersion: detail.reservationVersion,
+          idempotencyKey: randomUUID(),
+          reservation: {
+            customerNote: null,
+            date: localDate(reservation.startsAt),
+            guestCount: 5,
+            seatingArea: null,
+            tableId: table.id,
+            time: "14:00",
+          },
+        }),
+      ]);
+      assert.equal(raceResults.filter((result) => result.status === "fulfilled").length, 1);
+      const afterRaceTable = await prisma.restaurantTable.findUniqueOrThrow({ where: { id: table.id } });
+      const afterRaceDetails = await prisma.restaurantReservationDetails.findUniqueOrThrow({ where: { bookingId: reservation.id } });
+      assert.equal(afterRaceDetails.guestCount <= afterRaceTable.capacity, true);
+      assert.equal(await prisma.businessAuditLog.count({ where: { organizationId: fixture.organizationA.id } }), 1);
+      assert.equal(await prisma.businessOperationMutation.count({ where: { organizationId: fixture.organizationA.id } }), 1);
+
+      const firstCapacityKey = randomUUID();
+      const secondCapacityKey = randomUUID();
+      const capacityResults = await Promise.allSettled([
+        updateOperationalRestaurantTable({
+          actor: fixture.owner.reference,
+          contextOrganizationId: fixture.organizationA.id,
+          expectedVersion: afterRaceTable.updatedAt.toISOString(),
+          idempotencyKey: firstCapacityKey,
+          table: { ...updateInput, capacity: 7 },
+          tableId: table.id,
+        }),
+        updateOperationalRestaurantTable({
+          actor: fixture.manager.reference,
+          contextOrganizationId: fixture.organizationA.id,
+          expectedVersion: afterRaceTable.updatedAt.toISOString(),
+          idempotencyKey: secondCapacityKey,
+          table: { ...updateInput, capacity: 8 },
+          tableId: table.id,
+        }),
+      ]);
+      assert.equal(capacityResults.filter((result) => result.status === "fulfilled").length, 1);
+      const finalTable = await prisma.restaurantTable.findUniqueOrThrow({ where: { id: table.id } });
+      const finalDetails = await prisma.restaurantReservationDetails.findUniqueOrThrow({ where: { bookingId: reservation.id } });
+      assert.equal([7, 8].includes(finalTable.capacity), true);
+      assert.equal(finalDetails.guestCount <= finalTable.capacity, true);
+      assert.equal(await prisma.businessAuditLog.count({ where: { organizationId: fixture.organizationA.id } }), 2);
+      assert.equal(await prisma.businessOperationMutation.count({ where: { organizationId: fixture.organizationA.id } }), 2);
+      assert.equal(
+        await prisma.businessOperationMutation.count({
+          where: { idempotencyKey: { in: [firstCapacityKey, secondCapacityKey] } },
+        }),
+        1,
+      );
     });
   },
 );

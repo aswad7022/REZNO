@@ -12,5 +12,10 @@ export default async function BusinessMenuRoute({
   searchParams: Promise<{ create?: string }>;
 }) {
   const { create } = await searchParams;
-  return <RestaurantMenuPage showCreateForm={create === "category"} />;
+  return (
+    <RestaurantMenuPage
+      showCreateForm={create === "category"}
+      showCreateItemForm={create === "item"}
+    />
+  );
 }

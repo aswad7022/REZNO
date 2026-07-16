@@ -9,8 +9,13 @@ export const metadata: Metadata = {
 export default async function BusinessTablesRoute({
   searchParams,
 }: {
-  searchParams: Promise<{ create?: string }>;
+  searchParams: Promise<{ create?: string; edit?: string }>;
 }) {
-  const { create } = await searchParams;
-  return <RestaurantTablesPage showCreateForm={create === "table"} />;
+  const { create, edit } = await searchParams;
+  return (
+    <RestaurantTablesPage
+      editTableId={edit}
+      showCreateForm={create === "table"}
+    />
+  );
 }

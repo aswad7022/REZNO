@@ -26,8 +26,10 @@ import { getRestaurantMenu } from "@/features/restaurants/services/restaurant-ma
 
 export async function RestaurantMenuPage({
   showCreateForm = false,
+  showCreateItemForm = false,
 }: {
   showCreateForm?: boolean;
+  showCreateItemForm?: boolean;
 }) {
   const { categories, canEdit, organizationId, organizationName } =
     await getRestaurantMenu();
@@ -71,6 +73,21 @@ export async function RestaurantMenuPage({
           </CardHeader>
           <CardContent>
             <MenuCategoryForm
+              contextOrganizationId={organizationId}
+              idempotencyKey={randomUUID()}
+            />
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {canEdit && showCreateItemForm && categoryOptions.length > 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>إضافة صنف للقائمة</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <MenuItemForm
+              categories={categoryOptions}
               contextOrganizationId={organizationId}
               idempotencyKey={randomUUID()}
             />

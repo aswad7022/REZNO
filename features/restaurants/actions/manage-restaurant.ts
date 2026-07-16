@@ -43,7 +43,16 @@ const tableFields = [
   "name",
   "positionLabel",
 ] as const;
-const tableUpdateFields = [...tableFields, "expectedVersion"] as const;
+const tableUpdateFields = [
+  ...operationFields,
+  "area",
+  "capacity",
+  "code",
+  "expectedVersion",
+  "floor",
+  "name",
+  "positionLabel",
+] as const;
 const categoryFields = [
   ...operationFields,
   "description",
@@ -95,10 +104,21 @@ function parseVersionedOperation(formData: FormData) {
   });
 }
 
-function tableInput(formData: FormData) {
+function tableCreateInput(formData: FormData) {
   return {
     area: formData.get("area"),
     branchId: formData.get("branchId"),
+    capacity: Number(formData.get("capacity")),
+    code: formData.get("code"),
+    floor: formData.get("floor"),
+    name: formData.get("name"),
+    positionLabel: formData.get("positionLabel"),
+  };
+}
+
+function tableUpdateInput(formData: FormData) {
+  return {
+    area: formData.get("area"),
     capacity: Number(formData.get("capacity")),
     code: formData.get("code"),
     floor: formData.get("floor"),
@@ -171,7 +191,7 @@ export async function createRestaurantTable(
     const result = await createOperationalRestaurantTable({
       actor: await currentBusinessOperationReference(),
       ...envelope.data,
-      table: tableInput(formData),
+      table: tableCreateInput(formData),
     });
     refreshTables();
     return success(result);
@@ -193,7 +213,7 @@ export async function updateRestaurantTable(
     const result = await updateOperationalRestaurantTable({
       actor: await currentBusinessOperationReference(),
       ...envelope.data,
-      table: tableInput(formData),
+      table: tableUpdateInput(formData),
       tableId,
     });
     refreshTables();
