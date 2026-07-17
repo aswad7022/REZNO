@@ -32,6 +32,43 @@ export function assertCommerceProductsInventoryStage3bSmokeSafety(input: {
   }
 }
 
+export function parseCommerceProductsInventoryStage3bForm(form: string) {
+  const parameters = new URLSearchParams();
+  for (const input of form.match(/<input\b[^>]*>/g) ?? []) {
+    const name = attribute(input, "name");
+    if (!name || disabled(input)) continue;
+    if (input.includes('type="checkbox"') && !/\schecked(?:=""|(?=\s|>))/.test(input)) continue;
+    parameters.append(name, input.includes('type="checkbox"') ? attribute(input, "value") || "on" : attribute(input, "value"));
+  }
+  for (const textarea of form.match(/<textarea\b[^>]*>[\s\S]*?<\/textarea>/g) ?? []) {
+    const name = attribute(textarea, "name");
+    if (name && !disabled(textarea)) {
+      parameters.append(name, decodeHtml(textarea.replace(/^<textarea\b[^>]*>/, "").replace(/<\/textarea>$/, "")));
+    }
+  }
+  for (const select of form.match(/<select\b[^>]*>[\s\S]*?<\/select>/g) ?? []) {
+    const name = attribute(select, "name");
+    if (!name || disabled(select)) continue;
+    const options = select.match(/<option\b[^>]*>[\s\S]*?<\/option>/g) ?? [];
+    const option = options.find((candidate) => /\sselected(?:=""|(?=\s|>))/.test(candidate) && !disabled(candidate))
+      ?? options.find((candidate) => !disabled(candidate));
+    if (option) parameters.append(name, attribute(option, "value") || decodeHtml(option.replace(/^<option\b[^>]*>/, "").replace(/<\/option>$/, "")));
+  }
+  return parameters;
+}
+
+function disabled(element: string) {
+  return /\sdisabled(?:=""|(?=\s|>))/.test(element);
+}
+
+function decodeHtml(value: string) {
+  return value.replaceAll("&quot;", '"').replaceAll("&#x27;", "'").replaceAll("&lt;", "<").replaceAll("&gt;", ">").replaceAll("&amp;", "&");
+}
+
+function attribute(element: string, name: string) {
+  return decodeHtml(element.match(new RegExp(`\\b${name}="([^"]*)"`))?.[1] ?? "");
+}
+
 function safeUrl(value: string, label: string) {
   try {
     return new URL(value);

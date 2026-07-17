@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   assertCommerceProductsInventoryStage3bSmokeSafety,
   COMMERCE_PRODUCTS_INVENTORY_STAGE3B_SMOKE_CONFIRMATION,
+  parseCommerceProductsInventoryStage3bForm,
 } from "../../../scripts/staging/commerce-products-inventory-stage3b-smoke-safety";
 
 const valid = {
@@ -30,4 +31,23 @@ test("Stage 3B staging smoke safety rejects production, aliases, and unrelated d
   ]) {
     assert.throws(() => assertCommerceProductsInventoryStage3bSmokeSafety({ ...valid, ...override }));
   }
+});
+
+test("Stage 3B staging form parsing preserves browser select semantics", () => {
+  const parameters = parseCommerceProductsInventoryStage3bForm(`
+    <form>
+      <input name="mode" value="update" />
+      <input name="ignored" value="no" disabled="" />
+      <textarea name="description">Updated &amp; safe</textarea>
+      <select name="categoryId">
+        <option value="">Choose</option>
+        <option value="category-active" selected="">Active</option>
+      </select>
+    </form>
+  `);
+  assert.deepEqual(Object.fromEntries(parameters), {
+    categoryId: "category-active",
+    description: "Updated & safe",
+    mode: "update",
+  });
 });

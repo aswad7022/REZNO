@@ -30,6 +30,7 @@ import { prisma } from "../../lib/db/prisma";
 import {
   assertCommerceProductsInventoryStage3bSmokeSafety,
   COMMERCE_PRODUCTS_INVENTORY_STAGE3B_SMOKE_CONFIRMATION,
+  parseCommerceProductsInventoryStage3bForm,
 } from "./commerce-products-inventory-stage3b-smoke-safety";
 
 type Session = { cookie: string; personId: string; userId: string };
@@ -703,7 +704,7 @@ async function body(path: string, cookie?: string, rsc = false) {
 }
 
 async function submit(path: string, form: string, mutate: (parameters: URLSearchParams) => void, cookie: string) {
-  const parameters = formParams(form);
+  const parameters = parseCommerceProductsInventoryStage3bForm(form);
   mutate(parameters);
   const requestBody = new FormData();
   for (const [key, value] of parameters) requestBody.append(key, value);
@@ -761,32 +762,9 @@ function requestHeaders(initial: Record<string, string>) {
   return headers;
 }
 
-function decodeHtml(value: string) {
-  return value.replaceAll("&quot;", '"').replaceAll("&#x27;", "'").replaceAll("&lt;", "<").replaceAll("&gt;", ">").replaceAll("&amp;", "&");
-}
-
-function attribute(element: string, name: string) {
-  return decodeHtml(element.match(new RegExp(`\\b${name}="([^"]*)"`))?.[1] ?? "");
-}
-
-function formParams(form: string) {
-  const parameters = new URLSearchParams();
-  for (const input of form.match(/<input\b[^>]*>/g) ?? []) {
-    const name = attribute(input, "name");
-    if (!name || /\sdisabled(?:=""|(?=\s|>))/.test(input)) continue;
-    if (input.includes('type="checkbox"') && !input.includes(" checked")) continue;
-    parameters.append(name, input.includes('type="checkbox"') ? attribute(input, "value") || "on" : attribute(input, "value"));
-  }
-  for (const textarea of form.match(/<textarea\b[^>]*>[\s\S]*?<\/textarea>/g) ?? []) {
-    const name = attribute(textarea, "name");
-    if (name) parameters.append(name, decodeHtml(textarea.replace(/^<textarea\b[^>]*>/, "").replace(/<\/textarea>$/, "")));
-  }
-  return parameters;
-}
-
 function findForm(html: string, expected: Record<string, string>) {
   const form = (html.match(/<form\b[\s\S]*?<\/form>/g) ?? []).find((candidate) => {
-    const parameters = formParams(candidate);
+    const parameters = parseCommerceProductsInventoryStage3bForm(candidate);
     return Object.entries(expected).every(([key, value]) => parameters.get(key) === value);
   });
   assert.ok(form, `Expected staging form ${JSON.stringify(Object.keys(expected).sort())}.`);
