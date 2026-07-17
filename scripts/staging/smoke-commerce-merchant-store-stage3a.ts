@@ -17,6 +17,7 @@ type Session = {
 };
 
 type Resources = {
+  cartIds: string[];
   inventoryItemIds: string[];
   inventoryReservationIds: string[];
   marketplaceCategoryIds: string[];
@@ -34,7 +35,9 @@ const authBaseUrl = process.env.BETTER_AUTH_URL?.replace(/\/$/, "") ?? "";
 const bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET ?? "";
 const runId = randomUUID().replaceAll("-", "").slice(0, 16);
 const checks = new Set<number>();
+let smokePhase = "staging-safety";
 const resources: Resources = {
+  cartIds: [],
   inventoryItemIds: [],
   inventoryReservationIds: [],
   marketplaceCategoryIds: [],
@@ -58,6 +61,7 @@ async function main() {
   });
   assert.ok(bypass, "Vercel preview protection bypass is required.");
 
+  smokePhase = "identity-setup";
   const sessions = {
     owner: await signUp("owner", 1),
     managerAllowed: await signUp("manager-allowed", 2),
@@ -160,6 +164,7 @@ async function main() {
     expiredAdmin: sessions.expiredAdmin.cookie,
   };
 
+  smokePhase = "baseline-role-and-lifecycle-contracts";
   const ownerHub = await body("/business/commerce", cookies.owner);
   assert.equal(ownerHub.response.status, 200);
   assert.match(routeText(ownerHub.text), /\/business\/commerce\/store/);
@@ -173,16 +178,17 @@ async function main() {
   }, cookies.collisionOwner);
   assert.equal(await prisma.store.count({ where: { organizationId: organizations.collision.id } }), 0);
 
+  smokePhase = "store-money-capacity";
   const moneyPage = await body("/business/commerce/store", cookies.moneyOwner);
   let moneyForm = findForm(moneyPage.text, { mode: "update", storeId: directStores.money.id });
   await submit("/business/commerce/store", moneyForm, (parameters) => {
     parameters.set("deliveryFee", "999999999999999");
+    parameters.set("minimumOrderValue", "999999999999999");
     parameters.set("idempotencyKey", randomUUID());
   }, cookies.moneyOwner);
-  assert.equal(
-    (await prisma.store.findUniqueOrThrow({ where: { id: directStores.money.id } })).deliveryFee.toFixed(0),
-    "999999999999999",
-  );
+  const maximumMoney = await prisma.store.findUniqueOrThrow({ where: { id: directStores.money.id } });
+  assert.equal(maximumMoney.deliveryFee.toFixed(0), "999999999999999");
+  assert.equal(maximumMoney.minimumOrderValue.toFixed(0), "999999999999999");
   moneyForm = findForm(
     (await body("/business/commerce/store", cookies.moneyOwner)).text,
     { mode: "update", storeId: directStores.money.id },
@@ -193,10 +199,9 @@ async function main() {
     parameters.set("deliveryFee", "1000000000000000");
     parameters.set("idempotencyKey", randomUUID());
   }, cookies.moneyOwner);
-  assert.equal(
-    (await prisma.store.findUniqueOrThrow({ where: { id: directStores.money.id } })).deliveryFee.toFixed(0),
-    "999999999999999",
-  );
+  const afterMoneyOverflow = await prisma.store.findUniqueOrThrow({ where: { id: directStores.money.id } });
+  assert.equal(afterMoneyOverflow.deliveryFee.toFixed(0), "999999999999999");
+  assert.equal(afterMoneyOverflow.minimumOrderValue.toFixed(0), "999999999999999");
   assert.equal(await prisma.businessAuditLog.count({ where: { targetId: directStores.money.id } }), moneyAuditBefore);
   assert.equal(await prisma.businessOperationMutation.count({ where: { targetId: directStores.money.id } }), moneyLedgerBefore);
   moneyForm = findForm(
@@ -210,10 +215,14 @@ async function main() {
     parameters.set("idempotencyKey", moneyReplayKey);
   };
   await submit("/business/commerce/store", moneyForm, (parameters) => canonicalMoney(parameters, "1"), cookies.moneyOwner);
+  await submit("/business/commerce/store", moneyForm, (parameters) => canonicalMoney(parameters, "01"), cookies.moneyOwner);
   await submit("/business/commerce/store", moneyForm, (parameters) => canonicalMoney(parameters, "0001"), cookies.moneyOwner);
   assert.equal(await prisma.businessOperationMutation.count({ where: { organizationId: organizations.money.id, idempotencyKey: moneyReplayKey } }), 1);
+  assert.equal(await prisma.businessAuditLog.count({ where: { targetId: directStores.money.id } }), moneyAuditBefore + 1);
   checks.add(31);
+  checks.add(34);
 
+  smokePhase = "merchant-store-lifecycle";
   const createPage = await body("/business/commerce/store", cookies.owner);
   const createForm = findForm(createPage.text, { mode: "create" });
   const primarySlug = `stage3a-smoke-${runId}`;
@@ -253,6 +262,10 @@ async function main() {
     parameters.set("deliveryCity", "Baghdad");
     parameters.set("deliveryArea", "Karrada");
     parameters.set("deliveryEstimateMinutes", "45");
+    parameters.set("pickupEnabled", "on");
+    parameters.set("pickupCity", "Baghdad");
+    parameters.set("pickupArea", "Karrada");
+    parameters.set("pickupStreet", "Stage 3A Street");
   }, cookies.owner);
   persisted = await prisma.store.findUniqueOrThrow({ where: { id: primaryStore.id } });
   assert.equal(persisted.deliveryEnabled, true);
@@ -384,12 +397,14 @@ async function main() {
   assert.equal((await prisma.store.findUniqueOrThrow({ where: { id: primaryStore.id } })).status, "ACTIVE");
   checks.add(14);
 
+  smokePhase = "legacy-store-media-serialization";
   assert.equal((await publicStore(primarySlug)).status, 200);
   const unsafeSentinel = `https://127.0.0.1/${runId}-legacy-store.png`;
+  const unsafeCoverSentinel = `https://user:password@private.example/${runId}-legacy-cover.png`;
   const beforeLegacyClear = await prisma.store.update({
     where: { id: primaryStore.id },
     data: {
-      coverImageUrl: `https://cdn.example.com/${runId}-safe-cover.png`,
+      coverImageUrl: unsafeCoverSentinel,
       logoUrl: unsafeSentinel,
     },
   });
@@ -433,21 +448,49 @@ async function main() {
 
   for (const rsc of [false, true]) {
     const merchantSafety = await body("/business/commerce/store", cookies.owner, rsc);
+    assert.equal(merchantSafety.response.status, 200);
     assert.equal(merchantSafety.text.includes(unsafeSentinel), false);
+    assert.equal(merchantSafety.text.includes(unsafeCoverSentinel), false);
     const adminSafety = await body(`/admin/commerce/stores/${primaryStore.id}`, cookies.reviewer, rsc);
+    assert.equal(adminSafety.response.status, 200);
     assert.equal(adminSafety.text.includes(unsafeSentinel), false);
+    assert.equal(adminSafety.text.includes(unsafeCoverSentinel), false);
   }
+  const storeListSafety = await page("/api/commerce/public/stores?limit=50", undefined, false, "REZNO-Expo-Mobile-Gate3A-Safety");
+  const storeListSafetyText = await storeListSafety.text();
+  assert.equal(storeListSafety.status, 200);
+  assert.equal(storeListSafetyText.includes(unsafeSentinel), false);
+  assert.equal(storeListSafetyText.includes(unsafeCoverSentinel), false);
+  const listedSafetyStore = (JSON.parse(storeListSafetyText) as {
+    data: Array<{ coverImageUrl: string | null; logoUrl: string | null; slug: string }>;
+  }).data.find((store) => store.slug === primarySlug);
+  assert.ok(listedSafetyStore);
+  assert.equal(listedSafetyStore.logoUrl, null);
+  assert.equal(listedSafetyStore.coverImageUrl, null);
   const publicSafety = await page(`/api/commerce/public/stores/${primarySlug}`, undefined, false, "REZNO-Expo-Mobile-Gate3A-Safety");
   const publicSafetyText = await publicSafety.text();
   assert.equal(publicSafety.status, 200);
   assert.equal(publicSafetyText.includes(unsafeSentinel), false);
-  assert.equal((JSON.parse(publicSafetyText) as { data: { logoUrl: string | null } }).data.logoUrl, null);
+  assert.equal(publicSafetyText.includes(unsafeCoverSentinel), false);
+  const publicSafetyStore = (JSON.parse(publicSafetyText) as { data: { coverImageUrl: string | null; logoUrl: string | null } }).data;
+  assert.equal(publicSafetyStore.logoUrl, null);
+  assert.equal(publicSafetyStore.coverImageUrl, null);
   const productSafety = await page(`/api/commerce/public/stores/${primarySlug}/products/${safetyProduct.slug}`, undefined, false, "REZNO-Expo-Mobile-Gate3A-Safety");
   const productSafetyText = await productSafety.text();
   assert.equal(productSafety.status, 200);
   assert.equal(productSafetyText.includes(unsafeSentinel), false);
-  assert.equal((JSON.parse(productSafetyText) as { data: { store: { logoUrl: string | null } } }).data.store.logoUrl, null);
+  assert.equal(productSafetyText.includes(unsafeCoverSentinel), false);
+  const nestedSafetyStore = (JSON.parse(productSafetyText) as { data: { store: { coverImageUrl: string | null; logoUrl: string | null } } }).data.store;
+  assert.equal(nestedSafetyStore.logoUrl, null);
+  assert.equal(nestedSafetyStore.coverImageUrl, null);
+  checks.add(35);
 
+  await prisma.store.update({
+    where: { id: primaryStore.id },
+    data: { coverImageUrl: `https://cdn.example.com/${runId}-safe-cover.png` },
+  });
+
+  smokePhase = "owner-store-media-remediation";
   const remediationPage = await body("/business/commerce/store", cookies.owner);
   const remediationForm = findForm(remediationPage.text, { action: "clearUnsafeImages", storeId: primaryStore.id });
   await submit("/business/commerce/store", remediationForm, () => undefined, cookies.owner);
@@ -460,10 +503,78 @@ async function main() {
   assert.equal(await prisma.businessAuditLog.count({ where: { action: "commerce.store.images.clear-unsafe", targetId: primaryStore.id } }), 1);
   assert.equal(await prisma.businessOperationMutation.count({ where: { action: "commerce.store.images.clear-unsafe", targetId: primaryStore.id } }), 1);
 
+  const foreignBeforeChangedReplay = await prisma.store.findUniqueOrThrow({ where: { id: directStores.foreign.id } });
+  await submit("/business/commerce/store", remediationForm, (parameters) => {
+    parameters.set("expectedVersion", foreignBeforeChangedReplay.updatedAt.toISOString());
+    parameters.set("storeId", directStores.foreign.id);
+  }, cookies.owner);
+  assert.equal((await prisma.store.findUniqueOrThrow({ where: { id: directStores.foreign.id } })).updatedAt.toISOString(), foreignBeforeChangedReplay.updatedAt.toISOString());
+
+  const staleUnsafe = `https://localhost/${runId}-stale-legacy.png`;
+  await prisma.store.update({ where: { id: primaryStore.id }, data: { logoUrl: staleUnsafe } });
+  const staleRemediationForm = findForm((await body("/business/commerce/store", cookies.owner)).text, {
+    action: "clearUnsafeImages",
+    storeId: primaryStore.id,
+  });
+  const preservedCover = `https://cdn.example.com/${runId}-preserved-cover.png`;
+  await prisma.store.update({ where: { id: primaryStore.id }, data: { coverImageUrl: preservedCover } });
+  const remediationAuditBeforeDenied = await prisma.businessAuditLog.count({ where: { action: "commerce.store.images.clear-unsafe", targetId: primaryStore.id } });
+  const remediationLedgerBeforeDenied = await prisma.businessOperationMutation.count({ where: { action: "commerce.store.images.clear-unsafe", targetId: primaryStore.id } });
+  await submit("/business/commerce/store", staleRemediationForm, () => undefined, cookies.owner);
+
+  const deniedRemediationForm = findForm((await body("/business/commerce/store", cookies.owner)).text, {
+    action: "clearUnsafeImages",
+    storeId: primaryStore.id,
+  });
+  const deniedKeys: string[] = [];
+  for (const cookie of [cookies.managerAllowed, cookies.receptionist, cookies.staffAllowed]) {
+    const key = randomUUID();
+    deniedKeys.push(key);
+    await submit("/business/commerce/store", deniedRemediationForm, (parameters) => parameters.set("idempotencyKey", key), cookie);
+  }
+
+  const foreignKey = randomUUID();
+  await submit("/business/commerce/store", deniedRemediationForm, (parameters) => {
+    parameters.set("expectedVersion", foreignBeforeChangedReplay.updatedAt.toISOString());
+    parameters.set("idempotencyKey", foreignKey);
+    parameters.set("storeId", directStores.foreign.id);
+  }, cookies.owner);
+
+  const noOpKey = randomUUID();
+  await submit("/business/commerce/store", deniedRemediationForm, (parameters) => {
+    parameters.set("contextOrganizationId", organizations.foreign.id);
+    parameters.set("expectedVersion", foreignBeforeChangedReplay.updatedAt.toISOString());
+    parameters.set("idempotencyKey", noOpKey);
+    parameters.set("storeId", directStores.foreign.id);
+  }, cookies.foreignOwner);
+
+  const beforeConcurrency = await prisma.store.findUniqueOrThrow({ where: { id: primaryStore.id } });
+  assert.equal(beforeConcurrency.logoUrl, staleUnsafe);
+  assert.equal(beforeConcurrency.coverImageUrl, preservedCover);
+  const concurrentRemediationForm = findForm((await body("/business/commerce/store", cookies.owner)).text, {
+    action: "clearUnsafeImages",
+    storeId: primaryStore.id,
+  });
+  await Promise.all([
+    submit("/business/commerce/store", concurrentRemediationForm, () => undefined, cookies.owner),
+    submit("/business/commerce/store", concurrentRemediationForm, () => undefined, cookies.owner),
+  ]);
+  const afterConcurrency = await prisma.store.findUniqueOrThrow({ where: { id: primaryStore.id } });
+  assert.equal(afterConcurrency.logoUrl, null);
+  assert.equal(afterConcurrency.coverImageUrl, preservedCover);
+  assert.equal(afterConcurrency.status, "ACTIVE");
+  assert.equal(afterConcurrency.publishedAt?.toISOString(), beforeLegacyClear.publishedAt?.toISOString());
+  assert.equal(await prisma.businessAuditLog.count({ where: { action: "commerce.store.images.clear-unsafe", targetId: primaryStore.id } }), remediationAuditBeforeDenied + 1);
+  assert.equal(await prisma.businessOperationMutation.count({ where: { action: "commerce.store.images.clear-unsafe", targetId: primaryStore.id } }), remediationLedgerBeforeDenied + 1);
+  assert.equal(await prisma.businessOperationMutation.count({ where: { idempotencyKey: { in: [...deniedKeys, foreignKey, noOpKey] } } }), 0);
+  assert.equal(await prisma.businessAuditLog.count({ where: { action: "commerce.store.images.clear-unsafe", targetId: directStores.foreign.id } }), 0);
+  checks.add(36);
+
+  smokePhase = "suspended-store-media-remediation";
   const suspendedUnsafe = `javascript:${runId}-legacy-suspended`;
   const suspendedBefore = await prisma.store.update({
     where: { id: directStores.safetySuspended.id },
-    data: { logoUrl: suspendedUnsafe },
+    data: { coverImageUrl: `https://cdn.example.com/${runId}-suspended-safe-cover.png`, logoUrl: suspendedUnsafe },
   });
   const suspendedSafetyPage = await body("/business/commerce/store", cookies.safetySuspendedOwner);
   assert.equal(suspendedSafetyPage.text.includes(suspendedUnsafe), false);
@@ -472,19 +583,29 @@ async function main() {
     storeId: directStores.safetySuspended.id,
   });
   await submit("/business/commerce/store", suspendedRemediation, () => undefined, cookies.safetySuspendedOwner);
+  await submit("/business/commerce/store", suspendedRemediation, () => undefined, cookies.safetySuspendedOwner);
   const suspendedAfter = await prisma.store.findUniqueOrThrow({ where: { id: directStores.safetySuspended.id } });
   assert.equal(suspendedAfter.logoUrl, null);
+  assert.equal(suspendedAfter.coverImageUrl, `https://cdn.example.com/${runId}-suspended-safe-cover.png`);
   assert.equal(suspendedAfter.status, "SUSPENDED");
   assert.equal(suspendedAfter.publishedAt?.toISOString(), suspendedBefore.publishedAt?.toISOString());
+  assert.equal((await publicStore(directStores.safetySuspended.slug)).status, 404);
+  assert.equal(await prisma.businessAuditLog.count({ where: { action: "commerce.store.images.clear-unsafe", targetId: directStores.safetySuspended.id } }), 1);
+  assert.equal(await prisma.businessOperationMutation.count({ where: { action: "commerce.store.images.clear-unsafe", targetId: directStores.safetySuspended.id } }), 1);
   checks.add(32);
+  checks.add(37);
 
-  const added = await commerceRequest("/api/commerce/customer/cart/items", {
-    body: { quantity: 2, variantId: safetyVariant.id },
-    cookie: sessions.reviewer.cookie,
-    method: "POST",
+  smokePhase = "checkout-overflow-rollback";
+  const overflowCart = await prisma.cart.create({
+    data: {
+      customerId: sessions.reviewer.personId,
+      items: { create: { productVariantId: safetyVariant.id, quantity: 2, unitPriceSnapshot: "999999999999999" } },
+      storeId: primaryStore.id,
+    },
   });
-  assert.equal(added.response.status, 200);
-  const overflowCart = (added.body as { data: { id: string; version: number } }).data;
+  remember(resources.cartIds, overflowCart.id);
+  const overflowNotificationBefore = await prisma.notification.count({ where: { recipientPersonId: { in: [sessions.owner.personId, sessions.reviewer.personId] } } });
+  const overflowInventoryBefore = await prisma.inventoryItem.findUniqueOrThrow({ where: { id: safetyInventory.id } });
   const overflowKey = randomUUID();
   const overflowCheckout = await commerceRequest("/api/commerce/customer/checkout", {
     body: {
@@ -499,12 +620,59 @@ async function main() {
   assert.equal(overflowCheckout.response.status, 400);
   assert.equal((overflowCheckout.body as { error: { code: string } }).error.code, "INVALID_REQUEST");
   assert.equal(await prisma.order.count({ where: { customerId: sessions.reviewer.personId, storeId: primaryStore.id } }), 0);
+  assert.equal(await prisma.payment.count({ where: { order: { customerId: sessions.reviewer.personId, storeId: primaryStore.id } } }), 0);
   assert.equal(await prisma.checkoutIdempotency.count({ where: { customerId: sessions.reviewer.personId, key: overflowKey } }), 0);
-  assert.equal((await prisma.inventoryItem.findUniqueOrThrow({ where: { id: safetyInventory.id } })).reserved, 0);
+  const overflowInventoryAfter = await prisma.inventoryItem.findUniqueOrThrow({ where: { id: safetyInventory.id } });
+  assert.equal(overflowInventoryAfter.onHand, overflowInventoryBefore.onHand);
+  assert.equal(overflowInventoryAfter.reserved, overflowInventoryBefore.reserved);
+  assert.equal(overflowInventoryAfter.version, overflowInventoryBefore.version);
   assert.equal(await prisma.inventoryReservation.count({ where: { productVariantId: safetyVariant.id } }), 0);
+  assert.equal(await prisma.stockMovement.count({ where: { inventoryItemId: safetyInventory.id } }), 0);
+  assert.equal(await prisma.notification.count({ where: { recipientPersonId: { in: [sessions.owner.personId, sessions.reviewer.personId] } } }), overflowNotificationBefore);
+  const overflowCartAfter = await prisma.cart.findUniqueOrThrow({ where: { id: overflowCart.id } });
+  assert.equal(overflowCartAfter.status, "ACTIVE");
+  assert.equal(overflowCartAfter.version, overflowCart.version);
   await prisma.cart.delete({ where: { id: overflowCart.id } });
   checks.add(33);
+  checks.add(38);
 
+  smokePhase = "checkout-maximum-boundary";
+  const maximumCart = await prisma.cart.create({
+    data: {
+      customerId: sessions.reviewer.personId,
+      items: { create: { productVariantId: safetyVariant.id, quantity: 1, unitPriceSnapshot: "999999999999999" } },
+      storeId: primaryStore.id,
+    },
+  });
+  remember(resources.cartIds, maximumCart.id);
+  const maximumCheckoutKey = randomUUID();
+  const maximumCheckout = await commerceRequest("/api/commerce/customer/checkout", {
+    body: { cartId: maximumCart.id, cartVersion: maximumCart.version, fulfillmentMethod: "CUSTOMER_PICKUP" },
+    cookie: sessions.reviewer.cookie,
+    headers: { "idempotency-key": maximumCheckoutKey },
+    method: "POST",
+  });
+  assert.equal(maximumCheckout.response.status, 201);
+  const maximumReceipt = (maximumCheckout.body as { data: { grandTotal: string; id: string; subtotal: string } }).data;
+  assert.equal(maximumReceipt.subtotal, "999999999999999.000");
+  assert.equal(maximumReceipt.grandTotal, "999999999999999.000");
+  remember(resources.orderIds, maximumReceipt.id);
+  const maximumOrder = await prisma.order.findUniqueOrThrow({
+    where: { id: maximumReceipt.id },
+    include: { checkoutIdempotency: true, items: true, payment: true, reservations: true, stockMovements: true },
+  });
+  assert.equal(maximumOrder.subtotal.toFixed(0), "999999999999999");
+  assert.equal(maximumOrder.grandTotal.toFixed(0), "999999999999999");
+  assert.equal(maximumOrder.items.length, 1);
+  assert.equal(maximumOrder.payment?.amount.toFixed(0), "999999999999999");
+  assert.equal(maximumOrder.reservations.length, 1);
+  assert.equal(maximumOrder.stockMovements.length, 1);
+  assert.equal(maximumOrder.checkoutIdempotency?.status, "COMPLETED");
+  assert.equal(await prisma.notification.count({ where: { eventKey: { contains: maximumReceipt.id } } }), 2);
+  assert.equal((await prisma.cart.findUniqueOrThrow({ where: { id: maximumCart.id } })).status, "CONVERTED");
+  checks.add(39);
+
+  smokePhase = "post-probe-regressions";
   const activeDetail = await body(`/admin/commerce/stores/${primaryStore.id}`, cookies.reviewer);
   const suspendForm = findForm(activeDetail.text, { action: "suspend", storeId: primaryStore.id });
   await submit(`/admin/commerce/stores/${primaryStore.id}`, suspendForm, (parameters) => {
@@ -683,8 +851,8 @@ async function main() {
   );
   checks.add(22);
 
-  assert.equal(await prisma.businessOperationMutation.count({ where: { targetId: primaryStore.id } }), 7);
-  assert.equal(await prisma.businessAuditLog.count({ where: { targetId: primaryStore.id } }), 7);
+  assert.equal(await prisma.businessOperationMutation.count({ where: { targetId: primaryStore.id } }), 8);
+  assert.equal(await prisma.businessAuditLog.count({ where: { targetId: primaryStore.id } }), 8);
   assert.equal(await prisma.adminAuditLog.count({ where: { targetId: primaryStore.id } }), 4);
   checks.add(23);
 
@@ -727,7 +895,7 @@ async function main() {
   checks.add(27);
 
   checks.add(29);
-  assert.equal(checks.size, 32);
+  assert.equal(checks.size, 38);
 }
 
 async function signUp(label: string, phoneSuffix: number): Promise<Session> {
@@ -1012,6 +1180,7 @@ function remember(values: string[], value: string) {
 
 async function cleanup() {
   const storeEvents = resources.storeIds.map((storeId) => ({ eventKey: { contains: storeId } }));
+  const orderEvents = resources.orderIds.map((orderId) => ({ eventKey: { contains: orderId } }));
   await prisma.$transaction(async (transaction) => {
     await transaction.notification.deleteMany({
       where: {
@@ -1019,6 +1188,7 @@ async function cleanup() {
           { businessId: { in: resources.organizationIds } },
           { recipientPersonId: { in: resources.personIds } },
           ...storeEvents,
+          ...orderEvents,
         ],
       },
     });
@@ -1031,6 +1201,9 @@ async function cleanup() {
       },
     });
     await transaction.adminAccess.deleteMany({ where: { userId: { in: resources.userIds } } });
+    await transaction.stockMovement.deleteMany({
+      where: { OR: [{ inventoryItemId: { in: resources.inventoryItemIds } }, { orderId: { in: resources.orderIds } }, { reservationId: { in: resources.inventoryReservationIds } }] },
+    });
     await transaction.inventoryReservation.deleteMany({
       where: {
         OR: [
@@ -1039,8 +1212,18 @@ async function cleanup() {
         ],
       },
     });
+    await transaction.checkoutIdempotency.deleteMany({
+      where: { OR: [{ customerId: { in: resources.personIds } }, { orderId: { in: resources.orderIds } }] },
+    });
+    await transaction.payment.deleteMany({ where: { orderId: { in: resources.orderIds } } });
+    await transaction.orderStatusHistory.deleteMany({ where: { orderId: { in: resources.orderIds } } });
+    await transaction.orderAddress.deleteMany({ where: { orderId: { in: resources.orderIds } } });
     await transaction.orderItem.deleteMany({ where: { orderId: { in: resources.orderIds } } });
     await transaction.order.deleteMany({ where: { id: { in: resources.orderIds } } });
+    await transaction.cart.deleteMany({ where: { id: { in: resources.cartIds } } });
+    await transaction.customerFavoriteProduct.deleteMany({ where: { OR: [{ customerId: { in: resources.personIds } }, { productId: { in: resources.productIds } }] } });
+    await transaction.customerFavoriteStore.deleteMany({ where: { OR: [{ customerId: { in: resources.personIds } }, { storeId: { in: resources.storeIds } }] } });
+    await transaction.productMedia.deleteMany({ where: { productId: { in: resources.productIds } } });
     await transaction.inventoryItem.deleteMany({ where: { id: { in: resources.inventoryItemIds } } });
     await transaction.productVariant.deleteMany({ where: { id: { in: resources.productVariantIds } } });
     await transaction.product.deleteMany({ where: { id: { in: resources.productIds } } });
@@ -1056,45 +1239,67 @@ async function cleanup() {
       where: { organizationId: { in: resources.organizationIds } },
     });
     await transaction.role.deleteMany({ where: { organizationId: { in: resources.organizationIds } } });
+    await transaction.organizationSettings.deleteMany({ where: { organizationId: { in: resources.organizationIds } } });
     await transaction.organization.deleteMany({ where: { id: { in: resources.organizationIds } } });
+    await transaction.account.deleteMany({ where: { userId: { in: resources.userIds } } });
+    await transaction.session.deleteMany({ where: { userId: { in: resources.userIds } } });
     await transaction.person.deleteMany({ where: { id: { in: resources.personIds } } });
     await transaction.user.deleteMany({ where: { id: { in: resources.userIds } } });
-  }, { timeout: 30_000 });
+  }, { timeout: 120_000 });
 
-  const [users, people, organizations, stores] = await Promise.all([
-    prisma.user.count({ where: { id: { in: resources.userIds } } }),
-    prisma.person.count({ where: { id: { in: resources.personIds } } }),
+  const [accounts, carts, mutations, orders, organizations, people, sessions, stores, users] = await Promise.all([
+    prisma.account.count({ where: { userId: { in: resources.userIds } } }),
+    prisma.cart.count({ where: { id: { in: resources.cartIds } } }),
+    prisma.businessOperationMutation.count({ where: { organizationId: { in: resources.organizationIds } } }),
+    prisma.order.count({ where: { id: { in: resources.orderIds } } }),
     prisma.organization.count({ where: { id: { in: resources.organizationIds } } }),
+    prisma.person.count({ where: { id: { in: resources.personIds } } }),
+    prisma.session.count({ where: { userId: { in: resources.userIds } } }),
     prisma.store.count({ where: { id: { in: resources.storeIds } } }),
+    prisma.user.count({ where: { id: { in: resources.userIds } } }),
   ]);
-  assert.deepEqual({ organizations, people, stores, users }, { organizations: 0, people: 0, stores: 0, users: 0 });
+  assert.deepEqual(
+    { accounts, carts, mutations, orders, organizations, people, sessions, stores, users },
+    { accounts: 0, carts: 0, mutations: 0, orders: 0, organizations: 0, people: 0, sessions: 0, stores: 0, users: 0 },
+  );
 }
 
 async function runSmoke() {
   let failure: unknown;
+  let failedPhase = "";
+  let cleanupFailure: unknown;
   try {
     await main();
   } catch (error) {
     failure = error;
+    failedPhase = smokePhase;
   }
 
   try {
     await cleanup();
     if (!failure) checks.add(30);
   } catch (error) {
-    failure ??= error;
+    cleanupFailure = error;
   }
 
   await prisma.$disconnect();
 
-  if (failure) {
-    const message = failure instanceof Error ? failure.message : "unknown staging smoke failure";
-    console.error(`Stage 3A authenticated staging smoke failed: ${safeFailure(message)}`);
+  if (failure || cleanupFailure) {
+    const messages = [];
+    if (failure) {
+      const message = failure instanceof Error ? failure.message : "unknown staging smoke failure";
+      messages.push(`phase=${failedPhase || "unknown"} ${message}`);
+    }
+    if (cleanupFailure) {
+      const message = cleanupFailure instanceof Error ? cleanupFailure.message : "unknown cleanup failure";
+      messages.push(`cleanup=${message}`);
+    }
+    console.error(`Stage 3A authenticated staging smoke failed: ${safeFailure(messages.join("; "))}`);
     process.exitCode = 1;
     return;
   }
 
-  assert.equal(checks.size, 33);
+  assert.equal(checks.size, 39);
   console.log(
     `Stage 3A authenticated staging smoke passed. identities=10 checks=${checks.size} cleanup=verified confirmation=${COMMERCE_STAGE3A_SMOKE_CONFIRMATION.length}`,
   );
