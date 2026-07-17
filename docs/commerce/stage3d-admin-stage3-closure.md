@@ -557,7 +557,9 @@ credential files, production mock fallback, and legacy exported writes.
 
 No P1 or P2 finding remains locally. Process-local rate limiting remains an
 explicit deployment limitation: it is safe per process but is not a distributed
-global quota and belongs to Stage 6 platform operations. No credentials or
-temporary environment files were created, and no physical-device QA is claimed.
+global quota and belongs to Stage 6 platform operations. Vercel linking
+transiently created `.env.local`; it was deleted immediately without being read
+or committed, `.gitignore` was restored, and no environment file remains. No
+credential was printed or exposed, and no physical-device QA is claimed.
 The staging-origin blocker was fixed with exact suffix validation and no broader
 trust. No P1 or P2 remains. No physical-device QA is claimed.
