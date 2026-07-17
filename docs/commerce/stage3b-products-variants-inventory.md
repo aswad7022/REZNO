@@ -304,7 +304,8 @@ gate.
   Inventory IDs use tenant-safe not-found behavior.
 - Strict allowlists prevent mass assignment and ownership forgery.
 - Unique constraints plus serializable Product/Inventory locks protect slug,
-  SKU, option and Default races.
+  SKU, option and Default races. Commerce transactions retain bounded retries
+  and a bounded 15-second remote-database timeout.
 - Cursor fingerprints bind actor, tenant, filters, target and snapshot.
 - All adapters suppress raw Prisma/PostgreSQL/JavaScript errors.
 - Existing same-site session/Origin protections and exact Server Action
