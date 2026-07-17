@@ -64,6 +64,7 @@ type ProductDto = {
 const baseUrl = process.env.COMMERCE_STAGING_BASE_URL?.replace(/\/$/, "") ?? "";
 const authBaseUrl = process.env.BETTER_AUTH_URL?.replace(/\/$/, "") ?? "";
 const bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET ?? "";
+const oidcToken = process.env.VERCEL_OIDC_TOKEN ?? "";
 const runId = randomUUID().replaceAll("-", "").slice(0, 16);
 const checks = new Set<number>();
 const resources = {
@@ -84,7 +85,7 @@ async function main() {
     database: database[0]?.database ?? "",
     vercelEnvironment: process.env.VERCEL_ENV,
   });
-  assert.ok(bypass, "Vercel preview protection bypass is required.");
+  assert.ok(bypass || oidcToken, "Vercel preview protection authentication is required.");
 
   smokePhase = "authenticated-identities";
   const sessions = {
@@ -752,7 +753,11 @@ async function commerceRequest(
 
 function requestHeaders(initial: Record<string, string>) {
   const headers = new Headers(initial);
-  headers.set("x-vercel-protection-bypass", bypass);
+  if (bypass) {
+    headers.set("x-vercel-protection-bypass", bypass);
+  } else {
+    headers.set("x-vercel-trusted-oidc-idp-token", oidcToken);
+  }
   return headers;
 }
 
