@@ -52,7 +52,7 @@ export function serializeCart(cart: CartApiRecord | null) {
       currency: "IQD" as const,
       inStock: available > 0,
       isAvailable: operationallyAvailable && available >= item.quantity,
-      primaryMediaUrl: product.media[0]?.url ?? null,
+      primaryMediaUrl: safePublicImageUrlOrNull(product.media[0]?.url),
       priceChanged: !item.unitPriceSnapshot.equals(variant.price),
       productId: product.id,
       productName: product.name,
@@ -158,7 +158,7 @@ export function serializeCheckoutReceipt(order: CheckoutReceiptRecord) {
     items: order.items.map((item) => ({
       compareAtPrice: item.compareAtPrice ? decimalString(item.compareAtPrice) : null,
       currency: "IQD" as const,
-      imageUrl: item.imageUrlSnapshot,
+      imageUrl: safePublicImageUrlOrNull(item.imageUrlSnapshot),
       lineDiscount: decimalString(item.lineDiscount),
       lineSubtotal: decimalString(item.lineSubtotal),
       lineTotal: decimalString(item.lineTotal),
@@ -186,22 +186,37 @@ export function serializeCheckoutReceipt(order: CheckoutReceiptRecord) {
 
 export function serializeMerchantInventory(item: {
   id: string;
+  lowStockThreshold?: number | null;
   onHand: number;
   reserved: number;
   updatedAt: Date;
+  version?: number;
   variant: {
     archivedAt: Date | null;
     id: string;
     optionValues: unknown;
     sku: string;
     status: string;
-    product: { archivedAt: Date | null; id: string; name: string; status: string };
+    title?: string;
+    product: {
+      archivedAt: Date | null;
+      id: string;
+      media?: Array<{ url: string }>;
+      name: string;
+      status: string;
+    };
   };
 }) {
+  const availableQuantity = item.onHand - item.reserved;
   return {
-    availableQuantity: item.onHand - item.reserved,
+    availableQuantity,
     inventoryItemId: item.id,
+    lowStock: item.lowStockThreshold !== null && item.lowStockThreshold !== undefined
+      ? availableQuantity <= item.lowStockThreshold
+      : false,
+    lowStockThreshold: item.lowStockThreshold ?? null,
     onHandQuantity: item.onHand,
+    primaryMediaUrl: safePublicImageUrlOrNull(item.variant.product.media?.[0]?.url),
     product: {
       id: item.variant.product.id,
       name: item.variant.product.name,
@@ -215,7 +230,9 @@ export function serializeMerchantInventory(item: {
       operationallyAvailable: item.variant.status === "ACTIVE" && !item.variant.archivedAt,
       optionValues: item.variant.optionValues,
       sku: item.variant.sku,
+      title: item.variant.title ?? null,
     },
+    version: item.version ?? null,
   };
 }
 
@@ -235,7 +252,7 @@ export function serializeCustomerOrderSummary(order: CustomerOrderRecord) {
     paymentStatus: order.paymentStatus,
     primaryItem: primaryItem
       ? {
-          imageUrl: primaryItem.imageUrlSnapshot,
+          imageUrl: safePublicImageUrlOrNull(primaryItem.imageUrlSnapshot),
           productName: primaryItem.productNameSnapshot,
           quantity: primaryItem.quantity,
           variantTitle: primaryItem.variantTitleSnapshot,
@@ -284,7 +301,7 @@ export function serializeCustomerOrderDetail(order: CustomerOrderRecord) {
     items: order.items.map((item) => ({
       compareAtPrice: item.compareAtPrice ? decimalString(item.compareAtPrice) : null,
       currency: item.currency,
-      imageUrl: item.imageUrlSnapshot,
+      imageUrl: safePublicImageUrlOrNull(item.imageUrlSnapshot),
       lineDiscount: decimalString(item.lineDiscount),
       lineSubtotal: decimalString(item.lineSubtotal),
       lineTotal: decimalString(item.lineTotal),

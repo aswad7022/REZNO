@@ -65,6 +65,8 @@ type CommandDefinition = {
     | "business.commerce"
     | "business.commerceStore"
     | "business.commerceAccess"
+    | "business.commerceProducts"
+    | "business.commerceInventory"
     | "customer.dashboard"
     | "customer.marketplace"
     | "customer.bookings"
@@ -171,6 +173,8 @@ export default function DashboardCommandPalette({
         { id: "business-commerce", labelKey: "business.commerce", group: "navigation", href: "/business/commerce", icon: ShoppingBag },
         { id: "business-commerce-store", labelKey: "business.commerceStore", group: "navigation", href: "/business/commerce/store", icon: ShoppingBag },
         { id: "business-commerce-access", labelKey: "business.commerceAccess", group: "navigation", href: "/business/commerce/access", icon: Settings },
+        { id: "business-commerce-products", labelKey: "business.commerceProducts", group: "navigation", href: "/business/commerce/products", icon: ShoppingBag },
+        { id: "business-commerce-inventory", labelKey: "business.commerceInventory", group: "navigation", href: "/business/commerce/inventory", icon: ShoppingBag },
         ...(management
           ? [
               { id: "add-service", labelKey: "actions.addService" as const, group: "actions" as const, href: "/business/services", icon: Plus },

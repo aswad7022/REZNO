@@ -148,6 +148,12 @@ function businessNavigation(input: {
             ...(input.commercePermissions.includes("STORE_VIEW")
               ? [{ title: "commerceStore" as const, href: "/business/commerce/store", icon: ShoppingBag }]
               : []),
+            ...(input.commercePermissions.includes("PRODUCT_VIEW")
+              ? [{ title: "commerceProducts" as const, href: "/business/commerce/products", icon: ShoppingBag }]
+              : []),
+            ...(input.commercePermissions.includes("INVENTORY_VIEW")
+              ? [{ title: "commerceInventory" as const, href: "/business/commerce/inventory", icon: ShoppingBag }]
+              : []),
             ...(input.role === "OWNER"
               ? [{ title: "commerceAccess" as const, href: "/business/commerce/access", icon: ShieldCheck }]
               : []),
@@ -243,4 +249,6 @@ export const dashboardRouteLabels: Readonly<
   commerce: "commerce",
   store: "commerceStore",
   access: "commerceAccess",
+  products: "commerceProducts",
+  inventory: "commerceInventory",
 };

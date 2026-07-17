@@ -31,7 +31,20 @@ export default async function BusinessCommercePage() {
       icon: ShieldCheck,
       title: t("access"),
     },
-    { active: false, description: t("gate3b"), icon: Package, title: t("productsInventory") },
+    {
+      active: actor.permissions.includes("PRODUCT_VIEW"),
+      description: t("productsDescription"),
+      href: "/business/commerce/products",
+      icon: Package,
+      title: t("productsTitle"),
+    },
+    {
+      active: actor.permissions.includes("INVENTORY_VIEW"),
+      description: t("inventoryDescription"),
+      href: "/business/commerce/inventory",
+      icon: Package,
+      title: t("inventoryTitle"),
+    },
     { active: false, description: t("gate3c"), icon: ClipboardList, title: t("ordersFulfillment") },
   ];
   return (

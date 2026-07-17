@@ -9,12 +9,9 @@ export const MANAGER_ASSIGNABLE_COMMERCE_PERMISSIONS = COMMERCE_PERMISSIONS.filt
 );
 
 export const STAFF_ASSIGNABLE_COMMERCE_PERMISSIONS = [
-  "STORE_VIEW",
   "PRODUCT_VIEW",
   "INVENTORY_VIEW",
   "INVENTORY_ADJUST",
-  "ORDER_VIEW",
-  "ORDER_MANAGE",
 ] as const satisfies readonly CommercePermission[];
 
 export function assignableCommercePermissions(

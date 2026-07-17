@@ -235,7 +235,9 @@ export function parseIdempotencyKey(request: Request) {
 }
 
 export function parseMerchantInventoryQuery(params: URLSearchParams): MerchantInventoryQuery {
-  const supported = new Set(["q", "cursor", "limit", "availability"]);
+  const supported = new Set([
+    "q", "cursor", "limit", "availability", "lowStock", "productStatus", "variantStatus",
+  ]);
   for (const key of params.keys()) {
     if (!supported.has(key) || params.getAll(key).length !== 1) {
       commerceApiError("INVALID_REQUEST", 400, `Unsupported or duplicate query parameter: ${key}.`);
@@ -255,22 +257,46 @@ export function parseMerchantInventoryQuery(params: URLSearchParams): MerchantIn
   const cursor = params.get("cursor")?.trim() || undefined;
   if (cursor && cursor.length > 2048) commerceApiError("INVALID_REQUEST", 400, "cursor is too long.");
   const normalizedQuery = query?.toLocaleLowerCase() || undefined;
+  const lowStockValue = params.get("lowStock");
+  if (lowStockValue !== null && lowStockValue !== "true" && lowStockValue !== "false") {
+    commerceApiError("INVALID_REQUEST", 400, "lowStock is invalid.");
+  }
+  const productStatus = optionalEnum(params.get("productStatus"), "productStatus", [
+    "DRAFT", "PUBLISHED", "SUSPENDED", "ARCHIVED",
+  ] as const);
+  const variantStatus = optionalEnum(params.get("variantStatus"), "variantStatus", [
+    "ACTIVE", "INACTIVE", "ARCHIVED",
+  ] as const);
   return {
     availability,
     cursor,
-    fingerprint: publicQueryFingerprint({ availability, q: normalizedQuery, scope: "merchant-inventory" }),
+    fingerprint: publicQueryFingerprint({
+      availability,
+      lowStock: lowStockValue ?? undefined,
+      productStatus,
+      q: normalizedQuery,
+      scope: "merchant-inventory",
+      variantStatus,
+    }),
     limit,
+    lowStock: lowStockValue === null ? undefined : lowStockValue === "true",
+    productStatus,
     query: normalizedQuery,
+    variantStatus,
   };
 }
 
 export async function parseInventoryAdjustment(request: Request) {
-  const body = await readJsonObject(request, ["delta", "reason", "operationKey"]);
-  if (!Number.isInteger(body.delta) || body.delta === 0 || Math.abs(body.delta as number) > 1_000_000) {
+  const body = await readJsonObject(request, ["delta", "expectedVersion", "reason", "operationKey"]);
+  if (!Number.isSafeInteger(body.delta) || body.delta === 0 || Math.abs(body.delta as number) > 2_147_483_647) {
     commerceApiError("INVALID_REQUEST", 400, "delta must be a bounded nonzero integer.");
+  }
+  if (!Number.isInteger(body.expectedVersion) || (body.expectedVersion as number) < 0 || (body.expectedVersion as number) > 2_147_483_647) {
+    commerceApiError("INVALID_REQUEST", 400, "expectedVersion must be a bounded nonnegative integer.");
   }
   return {
     delta: body.delta as number,
+    expectedVersion: body.expectedVersion as number,
     operationKey: parseUuid(body.operationKey, "operationKey"),
     reason: requiredString(body.reason, "reason", 500, 2).replace(/\s+/g, " "),
   };
