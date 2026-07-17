@@ -255,7 +255,7 @@ async function main() {
   assert.equal((await api("/api/commerce/merchant/orders?queue=all&limit=10", cookies.manager)).response.status, 403);
   await prisma.organizationMember.update({ where: { id: membership.manager.id }, data: { status: "ACTIVE" } });
   await prisma.person.update({ where: { id: sessions.manager.personId }, data: { deletedAt: new Date() } });
-  assert.equal((await api("/api/commerce/merchant/orders?queue=all&limit=10", cookies.manager)).response.status, 403);
+  assert.equal((await api("/api/commerce/merchant/orders?queue=all&limit=10", cookies.manager)).response.status, 401);
   await prisma.person.update({ where: { id: sessions.manager.personId }, data: { deletedAt: null } });
   evidence.checks.add("revocation-deleted-person");
 
