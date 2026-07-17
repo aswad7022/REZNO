@@ -383,6 +383,13 @@ async function main() {
   const lowStock = await listMerchantInventory(primary.reference, { limit: 20, lowStock: true });
   assert.equal(lowStock.data.some((item) => item.id === inventory.id), true);
   checks.add(24);
+  const [inStockProducts, outOfStockProducts] = await Promise.all([
+    listMerchantProducts(primary.reference, { limit: 100, stock: "in_stock" }),
+    listMerchantProducts(primary.reference, { limit: 100, stock: "out_of_stock" }),
+  ]);
+  assert.equal(inStockProducts.data.some((item) => item.id === product.id), true);
+  assert.equal(outOfStockProducts.data.some((item) => item.id === product.id), false);
+  assert.equal(inStockProducts.data.some((item) => outOfStockProducts.data.some((other) => other.id === item.id)), false);
   const inventoryPage = await listMerchantInventory(primary.reference, { limit: 1 });
   assert.equal(inventoryPage.data.length, 1);
   assert.ok(inventoryPage.pageInfo.nextCursor);
@@ -532,9 +539,63 @@ async function main() {
   checks.add(39);
 
   smokePhase = "archive-and-audit-counts";
-  let archiveProduct = asProduct(await createMerchantProduct(primary.reference, createInput(primary, category.id, 99)));
-  archiveProduct = asProduct(await archiveMerchantProduct(primary.reference, envelope(primary, archiveProduct)));
-  assert.equal(archiveProduct.status, "ARCHIVED");
+  product = asProduct(await unpublishMerchantProduct(primary.reference, envelope(primary, product)));
+  const archiveInput = envelope(primary, product, { idempotencyKey: randomUUID() });
+  const archivedResult = await archiveMerchantProduct(primary.reference, archiveInput);
+  const archivedRow = await prisma.product.findUniqueOrThrow({ where: { id: product.id } });
+  const archivedInventory = await prisma.inventoryItem.findUniqueOrThrow({ where: { id: inventory.id } });
+  const countsAfterArchive = {
+    audits: await prisma.businessAuditLog.count({ where: { organizationId: primary.organizationId } }),
+    movements: await prisma.stockMovement.count({ where: { inventoryItem: { variant: { storeId: primary.storeId } }, actorType: "MERCHANT" } }),
+    mutations: await prisma.businessOperationMutation.count({ where: { organizationId: primary.organizationId } }),
+  };
+  assert.deepEqual(await archiveMerchantProduct(primary.reference, archiveInput), archivedResult);
+  await assert.rejects(archiveMerchantProduct(primary.reference, {
+    ...archiveInput,
+    expectedVersion: archivedRow.updatedAt.toISOString(),
+  }), domainCode("IDEMPOTENCY_CONFLICT"));
+  await assert.rejects(archiveMerchantProduct(primary.reference, {
+    ...archiveInput,
+    expectedVersion: archivedRow.updatedAt.toISOString(),
+    idempotencyKey: randomUUID(),
+  }), domainCode("INVALID_TRANSITION"));
+  await assert.rejects(updateMerchantProduct(primary.reference, {
+    categoryId: category.id,
+    contextOrganizationId: primary.organizationId,
+    description: "Denied archived staging update",
+    expectedVersion: archivedRow.updatedAt.toISOString(),
+    idempotencyKey: randomUUID(),
+    name: product.name,
+    productId: product.id,
+    slug: product.slug,
+  }), domainCode("INVALID_TRANSITION"));
+  await assert.rejects(adjustInventory(primary.reference, {
+    expectedVersion: archivedInventory.version,
+    idempotencyKey: randomUUID(),
+    inventoryItemId: inventory.id,
+    quantityDelta: 1,
+    reason: "Denied archived staging adjustment",
+  }), domainCode("INVALID_TRANSITION"));
+  const archivedView = (await getMerchantProduct(primary.reference, product.id)).product as Record<string, unknown> & {
+    permittedActions: Record<string, boolean>;
+    unsafeMediaIds: string[];
+  };
+  assert.equal("expectedVersion" in archivedView, false);
+  assert.equal(Object.values(archivedView.permittedActions).some(Boolean), false);
+  assert.deepEqual(archivedView.unsafeMediaIds, []);
+  assert.deepEqual((await getMerchantInventoryDetail(primary.reference, inventory.id, { limit: 20 })).permittedActions, {
+    adjust: false,
+    threshold: false,
+  });
+  const archivedHtml = await body(`/business/commerce/products/${product.id}`, cookies.owner);
+  const archivedInventoryHtml = await body(`/business/commerce/inventory/${inventory.id}`, cookies.owner);
+  assert.doesNotMatch(archivedHtml.text, /name="idempotencyKey"|name="operation"|name="mode"/);
+  assert.doesNotMatch(archivedInventoryHtml.text, /name="idempotencyKey"|name="operation"/);
+  assert.deepEqual({
+    audits: await prisma.businessAuditLog.count({ where: { organizationId: primary.organizationId } }),
+    movements: await prisma.stockMovement.count({ where: { inventoryItem: { variant: { storeId: primary.storeId } }, actorType: "MERCHANT" } }),
+    mutations: await prisma.businessOperationMutation.count({ where: { organizationId: primary.organizationId } }),
+  }, countsAfterArchive);
   checks.add(7);
   const [mutations, audits, movementsCount, adjustmentAudits] = await Promise.all([
     prisma.businessOperationMutation.count({ where: { organizationId: primary.organizationId } }),

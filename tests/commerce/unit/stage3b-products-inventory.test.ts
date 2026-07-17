@@ -33,6 +33,10 @@ import {
   checkedInventoryResult,
   POSTGRES_INT_MAX,
 } from "../../../features/commerce/domain/inventory";
+import {
+  serializeMerchantProduct,
+  type MerchantProductRecord,
+} from "../../../features/commerce/domain/product-dto";
 import { getDashboardNavigation } from "../../../features/dashboard/navigation";
 
 const organizationId = randomUUID();
@@ -162,6 +166,54 @@ test("Gate 3B serializers suppress historical unsafe Product and Order media", (
   assert.equal(JSON.stringify(serialized).includes("javascript:legacy"), false);
 });
 
+test("Archived Product management DTO is structurally read-only while mutable lifecycle DTOs are unchanged", () => {
+  const archived = serializeMerchantProduct(
+    merchantProduct("ARCHIVED", new Date("2026-07-17T10:00:00.000Z")),
+    ["PRODUCT_UPDATE", "PRODUCT_ARCHIVE"],
+    "management",
+  ) as unknown as ManagementProductDto;
+  assert.equal("expectedVersion" in archived, false);
+  assert.deepEqual(archived.permittedActions, {
+    addMedia: false,
+    archive: false,
+    createVariant: false,
+    publish: false,
+    unpublish: false,
+    update: false,
+  });
+  assert.deepEqual(archived.unsafeMediaIds, []);
+  assert.equal(archived.variants.length, 1);
+  assert.deepEqual(archived.media.map((item) => item.url), ["https://cdn.example.com/safe.jpg"]);
+
+  for (const status of ["DRAFT", "PUBLISHED", "SUSPENDED"] as const) {
+    const mutable = serializeMerchantProduct(
+      merchantProduct(status, null),
+      ["PRODUCT_UPDATE", "PRODUCT_ARCHIVE"],
+      "management",
+    ) as unknown as ManagementProductDto;
+    assert.equal("expectedVersion" in mutable, true, status);
+    assert.equal(mutable.permittedActions.update, true, status);
+    assert.equal(mutable.permittedActions.archive, true, status);
+    assert.equal(mutable.permittedActions.publish, status === "DRAFT", status);
+    assert.equal(mutable.permittedActions.unpublish, status === "PUBLISHED", status);
+  }
+});
+
+interface ManagementProductDto {
+  expectedVersion?: string;
+  media: Array<{ url: string }>;
+  permittedActions: {
+    addMedia: boolean;
+    archive: boolean;
+    createVariant: boolean;
+    publish: boolean;
+    unpublish: boolean;
+    update: boolean;
+  };
+  unsafeMediaIds: string[];
+  variants: unknown[];
+}
+
 test("Gate 3B Inventory arithmetic is bounded and preserves the reserved floor", () => {
   assert.equal(assertInventoryInteger(POSTGRES_INT_MAX, "onHand"), POSTGRES_INT_MAX);
   assert.throws(() => assertInventoryInteger(-1, "onHand"));
@@ -286,4 +338,62 @@ function publicProduct(): PublicProductRecord {
       title: "Default",
     }],
   };
+}
+
+function merchantProduct(
+  status: "DRAFT" | "PUBLISHED" | "SUSPENDED" | "ARCHIVED",
+  archivedAt: Date | null,
+): MerchantProductRecord {
+  const now = new Date("2026-07-17T09:00:00.000Z");
+  return {
+    archivedAt,
+    category: { id: randomUUID(), name: "Category", slug: "category", status: "ACTIVE" },
+    categoryId: randomUUID(),
+    createdAt: now,
+    description: "Production Product",
+    id: productId,
+    media: [
+      ...(archivedAt ? [{ altText: null, id: randomUUID(), mediaType: "IMAGE" as const, sortOrder: 0, url: "javascript:unsafe", variantId: null }] : []),
+      { altText: "Safe", id: randomUUID(), mediaType: "IMAGE", sortOrder: archivedAt ? 1 : 0, url: "https://cdn.example.com/safe.jpg", variantId: null },
+    ],
+    name: "Product",
+    normalizedSearchText: "product production product",
+    publishedAt: status === "PUBLISHED" || status === "SUSPENDED" || status === "ARCHIVED" ? now : null,
+    slug: "product",
+    status,
+    store: {
+      archivedAt: null,
+      id: randomUUID(),
+      organization: { deletedAt: null, isActive: true, status: "ACTIVE" },
+      publishedAt: now,
+      status: "ACTIVE",
+    },
+    storeId: randomUUID(),
+    updatedAt: now,
+    variants: [{
+      archivedAt: null,
+      compareAtPrice: new Prisma.Decimal(1200),
+      createdAt: now,
+      currency: "IQD",
+      id: randomUUID(),
+      inventory: {
+        id: randomUUID(),
+        lowStockThreshold: 1,
+        onHand: 5,
+        reserved: 1,
+        updatedAt: now,
+        version: 1,
+      },
+      isDefault: true,
+      optionKey: "default",
+      optionValues: {},
+      price: new Prisma.Decimal(1000),
+      productId,
+      sku: "SKU",
+      status: "ACTIVE",
+      storeId: randomUUID(),
+      title: "Default",
+      updatedAt: now,
+    }],
+  } as MerchantProductRecord;
 }

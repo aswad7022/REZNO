@@ -4,6 +4,7 @@ import test from "node:test";
 
 import type { CommercePermission, SystemRole } from "@prisma/client";
 
+import { serializeCustomerOrderDetail } from "../../../features/commerce/api/dto";
 import { CommerceDomainError } from "../../../features/commerce/domain/errors";
 import { POSTGRES_INT_MAX } from "../../../features/commerce/domain/inventory";
 import { getPublicProduct } from "../../../features/commerce/public/catalog-service";
@@ -29,6 +30,7 @@ import {
   updateMerchantVariant,
 } from "../../../features/commerce/services/merchant-product-service";
 import { OWNER_DEFAULT_COMMERCE_PERMISSIONS } from "../../../features/identity/policies/authorization";
+import { customerOrderInclude } from "../../../features/commerce/services/customer-order-query-service";
 import { prisma } from "../../../lib/db/prisma";
 
 interface ProductDto {
@@ -42,9 +44,11 @@ interface ProductDto {
   unsafeMediaIds: string[];
   variants: Array<{
     archivedAt: string | null;
+    compareAtPrice: string | null;
     id: string;
     inventory: { id: string; onHand: number; reserved: number; version: number } | null;
     isDefault: boolean;
+    optionValues: unknown;
     price: string;
     sku: string;
     status: string;
@@ -211,6 +215,39 @@ test("Gate 3B Products, Variants and Inventory PostgreSQL end-to-end", { concurr
     const second = await listMerchantProducts(owner.reference, { cursor: first.pageInfo.nextCursor!, limit: 2 });
     assert.equal(first.data.some((item) => second.data.some((next) => next.id === item.id)), false);
     await assert.rejects(listMerchantProducts(owner.reference, { cursor: first.pageInfo.nextCursor!, limit: 2, status: "DRAFT" }), code("INVALID_CURSOR"));
+  });
+
+  await t.test("Product stock filters are mutually exclusive for mixed Variant availability and preserve pagination", async () => {
+    let mixed = asProduct(await createMerchantProduct(owner.reference, createInput(owner, category.id, {
+      name: "Mixed Stock Product",
+      slug: `mixed-stock-${randomUUID().slice(0, 8)}`,
+    })));
+    mixed = asProduct(await createMerchantVariant(owner.reference, {
+      ...envelope(owner, mixed),
+      compareAtPrice: "",
+      optionValues: { Size: "Second" },
+      price: "10000",
+      sku: `MIXED-${randomUUID().slice(0, 8)}`,
+      title: "Unavailable Variant",
+    }));
+    const availableInventory = mixed.variants.find((item) => item.isDefault)!.inventory!;
+    await prisma.inventoryItem.update({ where: { id: availableInventory.id }, data: { onHand: 5 } });
+
+    const collect = async (stock: "in_stock" | "out_of_stock") => {
+      const ids: string[] = [];
+      let cursor: string | undefined;
+      do {
+        const page = await listMerchantProducts(owner.reference, { cursor, limit: 1, stock });
+        ids.push(...page.data.map((item) => item.id));
+        cursor = page.pageInfo.nextCursor ?? undefined;
+      } while (cursor);
+      return ids;
+    };
+    const [inStock, outOfStock] = await Promise.all([collect("in_stock"), collect("out_of_stock")]);
+    assert.equal(inStock.includes(mixed.id), true);
+    assert.equal(outOfStock.includes(mixed.id), false);
+    assert.equal(outOfStock.includes(product.id), true);
+    assert.equal(inStock.some((id) => outOfStock.includes(id)), false);
   });
 
   await t.test("10-20 Product versioning, readiness, public lifecycle, and history are safe", async () => {
@@ -424,6 +461,172 @@ test("Gate 3B Products, Variants and Inventory PostgreSQL end-to-end", { concurr
     await prisma.inventoryItem.update({ where: { id: inventory.id }, data: { version: 1 } });
   });
 
+  await t.test("Archived Product is a terminal aggregate while replay and historical relationships remain readable", async () => {
+    const archivedVariant = aggregate.variants.find((item) => item.status === "ARCHIVED")!;
+    const archivedVariantInventory = await prisma.inventoryItem.findUniqueOrThrow({ where: { variantId: archivedVariant.id } });
+    await assert.rejects(adjustInventory(owner.reference, {
+      expectedVersion: archivedVariantInventory.version,
+      idempotencyKey: randomUUID(),
+      inventoryItemId: archivedVariantInventory.id,
+      quantityDelta: 1,
+      reason: "Archived Variant denial",
+    }), code("INVALID_TRANSITION"));
+
+    aggregate = asProduct(await unpublishMerchantProduct(owner.reference, envelope(owner, aggregate)));
+    const activeVariant = aggregate.variants.find((item) => item.status === "ACTIVE" && item.isDefault)!;
+    const inventory = await prisma.inventoryItem.findUniqueOrThrow({ where: { id: activeVariant.inventory!.id } });
+    const customer = await createPerson("archived-aggregate-history");
+    const cart = await prisma.cart.create({ data: {
+      customerId: customer.id,
+      storeId: store.id,
+      items: { create: {
+        productVariantId: activeVariant.id,
+        quantity: 1,
+        unitPriceSnapshot: activeVariant.price,
+      } },
+    } });
+    const order = await prisma.order.create({ data: {
+      currency: "IQD",
+      customerId: customer.id,
+      customerNameSnapshot: "Archived History Customer",
+      customerPhoneSnapshot: "+9647500000000",
+      fulfillmentMethod: "CUSTOMER_PICKUP",
+      grandTotal: activeVariant.price,
+      orderNumber: `STAGE3B-ARCHIVED-${randomUUID()}`,
+      paymentMethod: "PAY_AT_PICKUP",
+      reservationExpiresAt: new Date("2026-07-18T12:00:00.000Z"),
+      status: "CANCELLED",
+      storeId: store.id,
+      storeNameSnapshot: store.name,
+      storeSlugSnapshot: store.slug,
+      subtotal: activeVariant.price,
+      items: { create: {
+        currency: "IQD",
+        imageUrlSnapshot: "javascript:historical-snapshot",
+        lineSubtotal: activeVariant.price,
+        lineTotal: activeVariant.price,
+        optionValuesSnapshot: activeVariant.optionValues as object,
+        productId: aggregate.id,
+        productNameSnapshot: "Archived Aggregate Product",
+        productVariantId: activeVariant.id,
+        quantity: 1,
+        skuSnapshot: activeVariant.sku,
+        unitPrice: activeVariant.price,
+        variantTitleSnapshot: activeVariant.title,
+      } },
+    } });
+
+    const archiveInput = envelope(owner, aggregate, { idempotencyKey: randomUUID() });
+    const archivedResult = await archiveMerchantProduct(owner.reference, archiveInput);
+    const afterArchive = await prisma.product.findUniqueOrThrow({ where: { id: aggregate.id } });
+    const archiveCounts = {
+      audits: await prisma.businessAuditLog.count({ where: { organizationId: owner.organization.id } }),
+      movements: await prisma.stockMovement.count({ where: { inventoryItemId: inventory.id } }),
+      mutations: await prisma.businessOperationMutation.count({ where: { organizationId: owner.organization.id } }),
+    };
+    assert.deepEqual(await archiveMerchantProduct(owner.reference, archiveInput), archivedResult);
+    assert.deepEqual({
+      audits: await prisma.businessAuditLog.count({ where: { organizationId: owner.organization.id } }),
+      movements: await prisma.stockMovement.count({ where: { inventoryItemId: inventory.id } }),
+      mutations: await prisma.businessOperationMutation.count({ where: { organizationId: owner.organization.id } }),
+    }, archiveCounts);
+    await assert.rejects(archiveMerchantProduct(owner.reference, {
+      ...archiveInput,
+      expectedVersion: afterArchive.updatedAt.toISOString(),
+    }), code("IDEMPOTENCY_CONFLICT"));
+
+    const archivedView = (await getMerchantProduct(owner.reference, aggregate.id)).product as Record<string, unknown> & {
+      media: Array<{ id: string }>;
+      permittedActions: Record<string, boolean>;
+      unsafeMediaIds: string[];
+      variants: ProductDto["variants"];
+    };
+    assert.equal("expectedVersion" in archivedView, false);
+    assert.equal(Object.values(archivedView.permittedActions).some(Boolean), false);
+    assert.deepEqual(archivedView.unsafeMediaIds, []);
+    assert.equal(archivedView.variants.length, aggregate.variants.length);
+    const inventoryView = await getMerchantInventoryDetail(owner.reference, inventory.id, { limit: 20 });
+    assert.deepEqual(inventoryView.permittedActions, { adjust: false, threshold: false });
+    assert.ok(inventoryView.movements.data.length > 0);
+    assert.equal((await listMerchantProducts(owner.reference, { limit: 100, status: "ARCHIVED" })).data.some((item) => item.id === aggregate.id), true);
+    assert.equal((await listMerchantInventory(owner.reference, { limit: 100, productStatus: "ARCHIVED" })).data.some((item) => item.id === inventory.id), true);
+
+    const version = afterArchive.updatedAt.toISOString();
+    const immutableSnapshot = JSON.stringify(await prisma.product.findUniqueOrThrow({
+      where: { id: aggregate.id },
+      include: {
+        media: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] },
+        variants: { include: { inventory: true }, orderBy: { id: "asc" } },
+      },
+    }));
+    const active = aggregate.variants.find((item) => item.status === "ACTIVE")!;
+    const archived = aggregate.variants.find((item) => item.status === "ARCHIVED")!;
+    const media = aggregate.media;
+    const aggregateInput = (overrides: Record<string, unknown> = {}) => ({
+      contextOrganizationId: owner.organization.id,
+      expectedVersion: version,
+      idempotencyKey: randomUUID(),
+      productId: aggregate.id,
+      ...overrides,
+    });
+    const denied: Array<() => Promise<unknown>> = [
+      () => updateMerchantProduct(owner.reference, aggregateInput({ categoryId: category.id, description: "Denied", name: "Denied Product", slug: aggregate.slug })),
+      () => publishMerchantProduct(owner.reference, aggregateInput()),
+      () => unpublishMerchantProduct(owner.reference, aggregateInput()),
+      () => archiveMerchantProduct(owner.reference, aggregateInput()),
+      () => createMerchantVariant(owner.reference, aggregateInput({ compareAtPrice: "", optionValues: { Size: "Denied" }, price: "10000", sku: `DENIED-${randomUUID()}`, title: "Denied" })),
+      () => updateMerchantVariant(owner.reference, aggregateInput({ compareAtPrice: "", optionValues: { Denied: "Update" }, price: "10000", sku: `DENIED-UPDATE-${randomUUID()}`, title: "Denied", variantId: active.id })),
+      () => setMerchantDefaultVariant(owner.reference, aggregateInput({ variantId: active.id })),
+      () => archiveMerchantVariant(owner.reference, aggregateInput({ replacementVariantId: null, variantId: active.id })),
+      () => restoreMerchantVariant(owner.reference, aggregateInput({ makeDefault: false, variantId: archived.id })),
+      () => addMerchantProductMedia(owner.reference, aggregateInput({ altText: "Denied", url: "https://cdn.example.com/denied.jpg", variantId: null })),
+      () => updateMerchantProductMedia(owner.reference, aggregateInput({ altText: "Denied", mediaId: media[0]!.id })),
+      () => reorderMerchantProductMedia(owner.reference, aggregateInput({ mediaIds: media.map((item) => item.id).reverse() })),
+      () => removeMerchantProductMedia(owner.reference, aggregateInput({ mediaId: media[0]!.id })),
+      () => adjustInventory(owner.reference, { expectedVersion: inventory.version, idempotencyKey: randomUUID(), inventoryItemId: inventory.id, quantityDelta: 1, reason: "Denied archived Product adjustment" }),
+      () => updateInventoryThreshold(owner.reference, { contextOrganizationId: owner.organization.id, expectedVersion: inventory.version, idempotencyKey: randomUUID(), inventoryItemId: inventory.id, lowStockThreshold: 4 }),
+    ];
+    for (const operation of denied) await assert.rejects(operation, code("INVALID_TRANSITION"));
+
+    const persisted = await prisma.product.findUniqueOrThrow({
+      where: { id: aggregate.id },
+      include: {
+        media: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] },
+        variants: { include: { inventory: true }, orderBy: { id: "asc" } },
+      },
+    });
+    assert.equal(persisted.updatedAt.toISOString(), version);
+    assert.equal(JSON.stringify(persisted), immutableSnapshot);
+    assert.deepEqual({
+      audits: await prisma.businessAuditLog.count({ where: { organizationId: owner.organization.id } }),
+      movements: await prisma.stockMovement.count({ where: { inventoryItemId: inventory.id } }),
+      mutations: await prisma.businessOperationMutation.count({ where: { organizationId: owner.organization.id } }),
+    }, archiveCounts);
+    assert.equal(await prisma.cartItem.count({ where: { cartId: cart.id, productVariantId: activeVariant.id } }), 1);
+    const historicalOrder = await prisma.order.findUniqueOrThrow({ where: { id: order.id }, include: customerOrderInclude });
+    const historicalItem = historicalOrder.items[0]!;
+    assert.deepEqual({
+      image: historicalItem.imageUrlSnapshot,
+      name: historicalItem.productNameSnapshot,
+      options: historicalItem.optionValuesSnapshot,
+      price: historicalItem.unitPrice.toString(),
+      sku: historicalItem.skuSnapshot,
+      variant: historicalItem.variantTitleSnapshot,
+    }, {
+      image: "javascript:historical-snapshot",
+      name: "Archived Aggregate Product",
+      options: activeVariant.optionValues,
+      price: activeVariant.price.replace(/\.0+$/, ""),
+      sku: activeVariant.sku,
+      variant: activeVariant.title,
+    });
+    assert.equal(serializeCustomerOrderDetail(historicalOrder).items[0]!.imageUrl, null);
+    const foreign = await createActor("archived-product-foreign");
+    await createActiveStore(foreign.organization.id, "archived-product-foreign");
+    await assert.rejects(getMerchantProduct(foreign.reference, aggregate.id), code("NOT_FOUND"));
+    await assert.rejects(getMerchantInventoryDetail(foreign.reference, inventory.id, { limit: 20 }), code("NOT_FOUND"));
+  });
+
   await t.test("54-60 active Business, revoked identity, Store states, audits, and rollback stay safe", async () => {
     const alternate = await createActor("alternate");
     await createActiveStore(alternate.organization.id, "alternate");
@@ -436,9 +639,12 @@ test("Gate 3B Products, Variants and Inventory PostgreSQL end-to-end", { concurr
     await prisma.person.update({ where: { id: revoked.person.id }, data: { deletedAt: new Date() } });
     await assert.rejects(getMerchantProduct(revoked.reference, aggregate.id), code("FORBIDDEN"));
 
+    const maintenance = asProduct(await createMerchantProduct(owner.reference, createInput(owner, category.id, {
+      slug: `maintenance-${randomUUID().slice(0, 8)}`,
+    })));
     await prisma.store.update({ where: { id: store.id }, data: { status: "SUSPENDED" } });
-    const suspended = asProduct((await getMerchantProduct(owner.reference, aggregate.id)).product);
-    await assert.rejects(publishMerchantProduct(owner.reference, envelope(owner, suspended)), code("INVALID_TRANSITION"));
+    const suspended = asProduct((await getMerchantProduct(owner.reference, maintenance.id)).product);
+    await assert.rejects(publishMerchantProduct(owner.reference, envelope(owner, suspended)), code("STORE_UNAVAILABLE"));
     const suspendedInventory = suspended.variants.find((item) => item.isDefault)!.inventory!;
     await adjustInventory(owner.reference, {
       expectedVersion: suspendedInventory.version,
@@ -449,7 +655,7 @@ test("Gate 3B Products, Variants and Inventory PostgreSQL end-to-end", { concurr
     });
 
     await prisma.store.update({ where: { id: store.id }, data: { archivedAt: new Date(), status: "ARCHIVED" } });
-    const archived = asProduct((await getMerchantProduct(owner.reference, aggregate.id)).product);
+    const archived = asProduct((await getMerchantProduct(owner.reference, maintenance.id)).product);
     const audits = await prisma.businessAuditLog.count({ where: { organizationId: owner.organization.id } });
     await assert.rejects(updateMerchantProduct(owner.reference, {
       ...envelope(owner, archived), categoryId: category.id, description: "Denied", name: "Denied", slug: archived.slug,

@@ -176,6 +176,13 @@ mutation locks Product, checks the expected version, transactionally revalidates
 the actor, updates Product `updatedAt`, writes exactly one mutation/audit pair and
 returns the authoritative management DTO.
 
+ARCHIVED is terminal for the complete Product aggregate. Exact idempotent replay
+is resolved first; every new Product, Variant or media mutation is then rejected
+centrally after the scoped lock, version check and actor revalidation. Archived
+management DTOs retain safe read/history data but omit the expected mutation
+version, expose every mutation action as false and omit unsafe-media remediation
+IDs and controls.
+
 Structurally distinct DTOs are:
 
 - `MERCHANT_PRODUCT_SUMMARY`: bounded identity/status/readiness, safe primary
@@ -248,6 +255,9 @@ unrelated tenants, internal credentials or Admin moderation internals.
 - Threshold is null or a bounded nonnegative Int and uses
   BusinessOperationMutation plus BusinessAuditLog with version/replay/stale
   protection.
+- Inventory linked to an ARCHIVED Product or ARCHIVED Variant is readable, but
+  adjustment and threshold mutation are terminally denied after exact replay,
+  row lock, version check and actor revalidation.
 - Low stock means threshold is non-null and available stock
   (`onHand - reserved`) is at or below threshold. Out of stock means available
   stock is zero.
@@ -257,6 +267,11 @@ unrelated tenants, internal credentials or Admin moderation internals.
 - Product list cursor binds membership actor, Organization, Store, search,
   lifecycle/category/publish/stock/readiness filters, sort and snapshot. Order is
   `updatedAt DESC, id DESC`.
+- Product `in_stock` means at least one ACTIVE, non-archived Variant with an
+  InventoryItem has positive availability. Product `out_of_stock` means at least
+  one such Variant has Inventory and none has positive availability. Products
+  with mixed positive/zero availability therefore match only `in_stock`; those
+  without an eligible Variant/Inventory match neither filter.
 - Inventory cursor binds the same actor/tenant scope plus inventory filters and
   snapshot. Order is `updatedAt DESC, id DESC`.
 - Movement cursor binds actor/tenant and exact Inventory target plus snapshot.

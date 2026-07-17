@@ -53,11 +53,17 @@ async function submit(path: string, form: string, mutate: (parameters: URLSearch
     redirect: "manual",
   });
   assert.ok([200, 303].includes(response.status), `Unexpected Server Action status ${response.status}`);
+  let text = "";
   if (response.body) {
     const reader = response.body.getReader();
-    await Promise.race([reader.read(), new Promise((resolve) => setTimeout(resolve, 500))]);
+    const chunk = await Promise.race([
+      reader.read(),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 500)),
+    ]);
+    if (chunk?.value) text = new TextDecoder().decode(chunk.value);
     await reader.cancel();
   }
+  return { status: response.status, text };
 }
 
 async function signUp() {
@@ -157,7 +163,7 @@ test("Gate 3B production HTML, RSC and Server Actions enforce Product and Invent
     inventory: { create: { onHand: 7 } }, isDefault: true, optionKey: "default", optionValues: {}, price: "10000",
     productId: product.id, sku: "OWNER-SKU", storeId: owner.store.id, title: "Default",
   }, include: { inventory: true } });
-  await prisma.productMedia.create({ data: { productId: product.id, sortOrder: 0, url: "javascript:UNSAFE-URL-SENTINEL" } });
+  const unsafeMedia = await prisma.productMedia.create({ data: { productId: product.id, sortOrder: 0, url: "javascript:UNSAFE-URL-SENTINEL" } });
   await prisma.product.create({ data: {
     categoryId: category.id, description: "FOREIGN-PRODUCT-SENTINEL", name: "Foreign Product",
     normalizedSearchText: "foreign product", slug: "foreign-product", storeId: foreign.store.id,
@@ -257,5 +263,70 @@ test("Gate 3B production HTML, RSC and Server Actions enforce Product and Invent
     assert.equal(inventory.onHand, 9);
     assert.equal(await prisma.stockMovement.count({ where: { inventoryItemId: inventory.id } }), 1);
     assertForbidden((await get(detailPath, cookies.denied)).text);
+  });
+
+  await t.test("Archived Product and Inventory HTML, RSC, and forged Server Actions are read-only", async () => {
+    const productPath = `/business/commerce/products/${product.id}`;
+    const inventoryPath = `/business/commerce/inventory/${variant.inventory!.id}`;
+    const mutableProduct = await get(productPath, cookies.owner);
+    const mutableInventory = await get(inventoryPath, cookies.owner);
+    const forged = {
+      inventoryAdjust: findForm(mutableInventory.text, { operation: "adjust" }),
+      inventoryThreshold: findForm(mutableInventory.text, { operation: "threshold" }),
+      media: findForm(mutableProduct.text, { mediaId: unsafeMedia.id, operation: "remove" }),
+      product: findForm(mutableProduct.text, { mode: "update" }),
+      variant: findForm(mutableProduct.text, { operation: "update", variantId: variant.id }),
+    };
+    const archivedRow = await prisma.product.update({
+      where: { id: product.id },
+      data: { archivedAt: new Date(), publishedAt: null, status: "ARCHIVED" },
+    });
+    const before = {
+      audits: await prisma.businessAuditLog.count({ where: { organizationId: owner.organization.id } }),
+      inventory: await prisma.inventoryItem.findUniqueOrThrow({ where: { id: variant.inventory!.id } }),
+      media: await prisma.productMedia.findMany({ where: { productId: product.id }, orderBy: { id: "asc" } }),
+      movements: await prisma.stockMovement.count({ where: { inventoryItemId: variant.inventory!.id } }),
+      mutations: await prisma.businessOperationMutation.count({ where: { organizationId: owner.organization.id } }),
+      variants: await prisma.productVariant.findMany({ where: { productId: product.id }, orderBy: { id: "asc" } }),
+    };
+
+    for (const rsc of [false, true]) {
+      const [archivedProduct, archivedInventory] = await Promise.all([
+        get(productPath, cookies.owner, rsc),
+        get(inventoryPath, cookies.owner, rsc),
+      ]);
+      assert.equal(archivedProduct.response.status, 200);
+      assert.equal(archivedInventory.response.status, 200);
+      assert.match(archivedProduct.text, /Owner Product|OWNER-SKU/);
+      assert.match(archivedInventory.text, /Owner Product|OWNER-SKU/);
+      for (const content of [archivedProduct.text, archivedInventory.text]) {
+        assert.doesNotMatch(content, /name=\"idempotencyKey\"|idempotencyKey|saveMerchantProductAction|merchantProductLifecycleAction|merchantVariantAction|merchantProductMediaAction|merchantInventoryAction/);
+        assert.doesNotMatch(content, /PrismaClient|PostgreSQL|Invalid `prisma\./);
+      }
+      assert.doesNotMatch(archivedProduct.text, /name=\"mode\"|name=\"operation\"|name=\"mediaId\"|name=\"variantId\"/);
+      assert.doesNotMatch(archivedInventory.text, /name=\"quantityDelta\"|name=\"lowStockThreshold\"|name=\"operation\"/);
+    }
+
+    const responses = await Promise.all([
+      submit(productPath, forged.product, (parameters) => parameters.set("expectedVersion", archivedRow.updatedAt.toISOString()), cookies.owner),
+      submit(productPath, forged.variant, (parameters) => parameters.set("expectedVersion", archivedRow.updatedAt.toISOString()), cookies.owner),
+      submit(productPath, forged.media, (parameters) => parameters.set("expectedVersion", archivedRow.updatedAt.toISOString()), cookies.owner),
+      submit(inventoryPath, forged.inventoryAdjust, (parameters) => {
+        parameters.set("quantityDelta", "1");
+        parameters.set("reason", "Forged archived Product adjustment");
+      }, cookies.owner),
+      submit(inventoryPath, forged.inventoryThreshold, (parameters) => parameters.set("lowStockThreshold", "4"), cookies.owner),
+    ]);
+    for (const response of responses) {
+      assert.doesNotMatch(response.text, /PrismaClient|PostgreSQL|Invalid `prisma\./);
+    }
+    assert.deepEqual({
+      audits: await prisma.businessAuditLog.count({ where: { organizationId: owner.organization.id } }),
+      inventory: await prisma.inventoryItem.findUniqueOrThrow({ where: { id: variant.inventory!.id } }),
+      media: await prisma.productMedia.findMany({ where: { productId: product.id }, orderBy: { id: "asc" } }),
+      movements: await prisma.stockMovement.count({ where: { inventoryItemId: variant.inventory!.id } }),
+      mutations: await prisma.businessOperationMutation.count({ where: { organizationId: owner.organization.id } }),
+      variants: await prisma.productVariant.findMany({ where: { productId: product.id }, orderBy: { id: "asc" } }),
+    }, before);
   });
 });
