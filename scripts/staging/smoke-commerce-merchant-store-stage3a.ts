@@ -560,16 +560,29 @@ async function main() {
 }
 
 async function signUp(label: string, phoneSuffix: number): Promise<Session> {
-  const response = await fetch(`${authBaseUrl}/api/auth/sign-up/email`, {
-    body: JSON.stringify({
-      email: `stage3a-${runId}-${label}@rezno.invalid`,
-      name: `Stage 3A ${label}`,
-      password: `Rz!${randomUUID()}${randomUUID()}`,
-    }),
-    headers: requestHeaders({ "content-type": "application/json", origin: authBaseUrl }),
-    method: "POST",
-    redirect: "manual",
-  });
+  const request = {
+    email: `stage3a-${runId}-${label}@rezno.invalid`,
+    name: `Stage 3A ${label}`,
+    password: `Rz!${randomUUID()}${randomUUID()}`,
+  };
+  let response: Response | undefined;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    response = await fetch(`${authBaseUrl}/api/auth/sign-up/email`, {
+      body: JSON.stringify(request),
+      headers: requestHeaders({
+        "content-type": "application/json",
+        origin: authBaseUrl,
+        "user-agent": `rezno-stage3a-${runId}-${label}`,
+      }),
+      method: "POST",
+      redirect: "manual",
+    });
+    if (response.status !== 429) break;
+    const retryAfter = Number(response.headers.get("retry-after") ?? "1");
+    assert.ok(Number.isSafeInteger(retryAfter) && retryAfter >= 1 && retryAfter <= 60);
+    await new Promise((resolve) => setTimeout(resolve, retryAfter * 1_000 + 250));
+  }
+  assert.ok(response);
   assert.equal(response.status, 200, `Authentication failed for ${label} with status ${response.status}.`);
   const payload = await response.json() as { user: { id: string } };
   const cookie = response.headers.getSetCookie().find((value) => value.includes("session_token="));
