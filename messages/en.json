@@ -1270,7 +1270,8 @@
       "commerceAccess": "Commerce access",
       "commerceProducts": "Products",
       "commerceInventory": "Inventory",
-      "commerceOrders": "Orders"
+      "commerceOrders": "Orders",
+      "commerceReports": "Operational reports"
     },
     "customer": {
       "dashboard": "Dashboard",
@@ -1330,7 +1331,8 @@
         "commerceAccess": "Commerce access",
         "commerceProducts": "Products",
         "commerceInventory": "Inventory",
-        "commerceOrders": "Orders"
+        "commerceOrders": "Orders",
+        "commerceReports": "Operational reports"
       }
     },
     "openMenu": "Open navigation menu",
@@ -1789,6 +1791,8 @@
   "Commerce": {
     "hubTitle": "Commerce",
     "hubDescription": "Manage the Store foundation and explicit Commerce access for this Business.",
+    "reportsTitle": "Commerce operational reports",
+    "reportsDescription": "Order, fulfillment, product, and inventory indicators without financial or customer data.",
     "currentAccess": "Current Commerce access",
     "storePresent": "Open the Store profile, readiness and lifecycle.",
     "storeAbsent": "Create the single Store owned by this Business.",

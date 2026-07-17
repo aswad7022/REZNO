@@ -35,7 +35,8 @@ export type DashboardNavigationItemKey =
   | "commerceAccess"
   | "commerceProducts"
   | "commerceInventory"
-  | "commerceOrders";
+  | "commerceOrders"
+  | "commerceReports";
 
 export interface DashboardUser {
   id?: string;

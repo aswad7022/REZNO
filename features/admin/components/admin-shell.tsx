@@ -5,6 +5,7 @@ import { getTranslations } from "next-intl/server";
 import { Button } from "@/components/ui/button";
 import { getCurrentAdminAccess } from "@/features/admin/services/admin-auth";
 import type { AdminPermission } from "@/features/admin/config/permissions";
+import { hasAnyCommerceAdminPermission } from "@/features/admin/config/permissions";
 
 const links = [
   ["/admin", "نظرة عامة", "ADMIN_DASHBOARD_VIEW"],
@@ -13,7 +14,7 @@ const links = [
   ["/admin/bookings", "الحجوزات", "ADMIN_DASHBOARD_VIEW"],
   ["/admin/restaurants", "المطاعم والكافيهات", "BUSINESSES_VIEW"],
   ["/admin/reviews", "المراجعات", "BUSINESSES_VIEW"],
-  ["/admin/commerce", "التجارة", "COMMERCE_STORES_VIEW"],
+  ["/admin/commerce", "التجارة", "COMMERCE_ANY"],
   ["/admin/notifications", "الإشعارات", "NOTIFICATIONS_SEND"],
   ["/admin/messages", "الرسائل", "MESSAGES_VIEW"],
   ["/admin/access", "صلاحيات الأدمن", "SUPER_ADMIN"],
@@ -28,6 +29,8 @@ export async function AdminShell({ children }: { children: React.ReactNode }) {
   const visibleLinks = links.filter(([, , permission]) =>
     permission === "SUPER_ADMIN"
       ? access?.isSuperAdmin
+      : permission === "COMMERCE_ANY"
+        ? Boolean(access?.isSuperAdmin || (access && hasAnyCommerceAdminPermission(access.permissions)))
       : access?.isSuperAdmin ||
         access?.permissions.includes(permission as AdminPermission),
   );
