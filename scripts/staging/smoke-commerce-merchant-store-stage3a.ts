@@ -578,8 +578,13 @@ async function signUp(label: string, phoneSuffix: number): Promise<Session> {
       redirect: "manual",
     });
     if (response.status !== 429) break;
-    const retryAfter = Number(response.headers.get("retry-after") ?? "1");
-    assert.ok(Number.isSafeInteger(retryAfter) && retryAfter >= 1 && retryAfter <= 60);
+    const advertisedRetryAfter = Number(response.headers.get("retry-after") ?? "60");
+    assert.ok(
+      Number.isSafeInteger(advertisedRetryAfter) &&
+      advertisedRetryAfter >= 1 &&
+      advertisedRetryAfter <= 60,
+    );
+    const retryAfter = Math.max(60, advertisedRetryAfter);
     await new Promise((resolve) => setTimeout(resolve, retryAfter * 1_000 + 250));
   }
   assert.ok(response);
