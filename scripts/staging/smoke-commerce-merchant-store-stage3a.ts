@@ -864,32 +864,37 @@ async function cleanup() {
   assert.deepEqual({ organizations, people, stores, users }, { organizations: 0, people: 0, stores: 0, users: 0 });
 }
 
-let failure: unknown;
-try {
-  await main();
-} catch (error) {
-  failure = error;
-}
+async function runSmoke() {
+  let failure: unknown;
+  try {
+    await main();
+  } catch (error) {
+    failure = error;
+  }
 
-try {
-  await cleanup();
-  if (!failure) checks.add(30);
-} catch (error) {
-  failure ??= error;
-}
+  try {
+    await cleanup();
+    if (!failure) checks.add(30);
+  } catch (error) {
+    failure ??= error;
+  }
 
-await prisma.$disconnect();
+  await prisma.$disconnect();
 
-if (failure) {
-  const message = failure instanceof Error ? failure.message : "unknown staging smoke failure";
-  console.error(`Stage 3A authenticated staging smoke failed: ${safeFailure(message)}`);
-  process.exitCode = 1;
-} else {
+  if (failure) {
+    const message = failure instanceof Error ? failure.message : "unknown staging smoke failure";
+    console.error(`Stage 3A authenticated staging smoke failed: ${safeFailure(message)}`);
+    process.exitCode = 1;
+    return;
+  }
+
   assert.equal(checks.size, 30);
   console.log(
     `Stage 3A authenticated staging smoke passed. identities=10 checks=${checks.size} cleanup=verified confirmation=${COMMERCE_STAGE3A_SMOKE_CONFIRMATION.length}`,
   );
 }
+
+void runSmoke();
 
 function safeFailure(message: string) {
   return message
