@@ -14,6 +14,7 @@ export interface CustomerApiContext {
 }
 
 export interface MerchantApiContext extends CustomerApiContext {
+  membershipId: string;
   organizationId: string;
   permissions: readonly CommercePermission[];
 }
@@ -50,7 +51,7 @@ export async function resolveMerchantApiContext(
       status: "ACTIVE",
       organization: { deletedAt: null, isActive: true, status: "ACTIVE" },
     },
-    select: { organizationId: true, role: { select: { organizationId: true } } },
+    select: { id: true, organizationId: true, role: { select: { organizationId: true } } },
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],
   });
   const valid = memberships.filter((item) => item.role.organizationId === item.organizationId);
@@ -61,7 +62,11 @@ export async function resolveMerchantApiContext(
       : valid.find((item) => item.organizationId === selected)?.organizationId;
   if (!organizationId) commerceApiError("FORBIDDEN", 403, "An active Organization must be selected.");
   const context = await resolveMerchantCommerceContext(
-    { organizationId, personId: identity.personId },
+    {
+      contextOrganizationId: organizationId,
+      membershipId: valid.find((item) => item.organizationId === organizationId)!.id,
+      personId: identity.personId,
+    },
     permission,
   );
   return { ...identity, ...context };

@@ -7,6 +7,7 @@ export const publicVariantWhere = {
 
 export const publicStoreVisibilityWhere = {
   archivedAt: null,
+  organization: { deletedAt: null, isActive: true, status: "ACTIVE" as const },
   publishedAt: { not: null },
   status: "ACTIVE" as const,
 } satisfies Prisma.StoreWhereInput;

@@ -58,8 +58,8 @@ test("canonical organization and Commerce role defaults fail closed", () => {
       permission: "PRODUCT_CREATE",
       systemRole: "OWNER",
     }),
-    false,
-    "the stored Role permission remains explicit even for an Owner",
+    true,
+    "the fixed Owner baseline cannot drift when a stored Role array is incomplete",
   );
 });
 

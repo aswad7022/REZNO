@@ -7,6 +7,7 @@ import type {
   PublicProductSummaryDto,
   PublicStoreSummaryDto,
 } from "@/features/commerce/public/types";
+import { safePublicImageUrlOrNull } from "@/lib/security/public-image-url";
 
 export interface PublicStoreRecord {
   coverImageUrl: string | null;
@@ -61,7 +62,7 @@ export function serializePublicCategory(value: PublicCategoryDto): PublicCategor
 
 export function serializePublicStore(value: PublicStoreRecord): PublicStoreSummaryDto {
   return {
-    coverImageUrl: value.coverImageUrl,
+    coverImageUrl: safePublicImageUrlOrNull(value.coverImageUrl),
     currency: "IQD",
     delivery: {
       area: value.deliveryArea,
@@ -72,7 +73,7 @@ export function serializePublicStore(value: PublicStoreRecord): PublicStoreSumma
     },
     description: value.description,
     id: value.id,
-    logoUrl: value.logoUrl,
+    logoUrl: safePublicImageUrlOrNull(value.logoUrl),
     minimumOrderValue: decimalString(value.minimumOrderValue),
     name: value.name,
     pickup: {

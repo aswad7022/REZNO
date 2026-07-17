@@ -85,11 +85,16 @@ export function hasCommercePermission({
   permission: CommercePermission;
   systemRole: SystemRole | null;
 }): boolean {
+  if (systemRole === "OWNER") {
+    return OWNER_DEFAULT_COMMERCE_PERMISSIONS.includes(
+      permission as (typeof OWNER_DEFAULT_COMMERCE_PERMISSIONS)[number],
+    );
+  }
+
   if (
     OWNER_ONLY_COMMERCE_PERMISSIONS.includes(
       permission as (typeof OWNER_ONLY_COMMERCE_PERMISSIONS)[number],
-    ) &&
-    systemRole !== "OWNER"
+    )
   ) {
     return false;
   }

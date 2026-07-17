@@ -16,7 +16,11 @@ export function POST(
     const inventoryItemId = parseRouteUuid((await params).inventoryItemId, "inventoryItemId");
     const input = await parseInventoryAdjustment(request);
     await adjustInventory(
-      { organizationId: context.organizationId, personId: context.personId },
+      {
+        contextOrganizationId: context.organizationId,
+        membershipId: context.membershipId,
+        personId: context.personId,
+      },
       {
         idempotencyKey: input.operationKey,
         inventoryItemId,

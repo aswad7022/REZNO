@@ -85,6 +85,13 @@ export async function listPublicStores(query: StoreCollectionQuery) {
     Prisma.sql`s."status" = 'ACTIVE'::"StoreStatus"`,
     Prisma.sql`s."archivedAt" IS NULL`,
     Prisma.sql`s."publishedAt" IS NOT NULL`,
+    Prisma.sql`EXISTS (
+      SELECT 1 FROM "Organization" o
+      WHERE o."id" = s."organizationId"
+        AND o."status" = 'ACTIVE'::"EntityStatus"
+        AND o."isActive" = true
+        AND o."deletedAt" IS NULL
+    )`,
   ];
   if (query.query) conditions.push(searchCondition(storeSearchExpression(), query.query));
   if (query.fulfillment === "delivery") conditions.push(Prisma.sql`s."deliveryEnabled" = true`);
@@ -146,6 +153,13 @@ export async function listPublicProducts(query: ProductCollectionQuery) {
     Prisma.sql`s."status" = 'ACTIVE'::"StoreStatus"`,
     Prisma.sql`s."archivedAt" IS NULL`,
     Prisma.sql`s."publishedAt" IS NOT NULL`,
+    Prisma.sql`EXISTS (
+      SELECT 1 FROM "Organization" o
+      WHERE o."id" = s."organizationId"
+        AND o."status" = 'ACTIVE'::"EntityStatus"
+        AND o."isActive" = true
+        AND o."deletedAt" IS NULL
+    )`,
     Prisma.sql`c."status" = 'ACTIVE'::"MarketplaceCategoryStatus"`,
   ];
   if (query.query) conditions.push(searchCondition(productSearchExpression(), query.query));

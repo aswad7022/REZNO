@@ -1264,7 +1264,10 @@
       "publicProfile": "Public profile",
       "profile": "Business profile",
       "notifications": "Notifications",
-      "settings": "Settings"
+      "settings": "Settings",
+      "commerce": "Commerce",
+      "commerceStore": "Store",
+      "commerceAccess": "Commerce access"
     },
     "customer": {
       "dashboard": "Dashboard",
@@ -1318,7 +1321,10 @@
         "reservations": "Reservations",
         "tables": "Tables",
         "menu": "Menu",
-        "assistant": "Assistant"
+        "assistant": "Assistant",
+        "commerce": "Commerce",
+        "commerceStore": "Store",
+        "commerceAccess": "Commerce access"
       }
     },
     "openMenu": "Open navigation menu",
@@ -1773,5 +1779,57 @@
     "branch": "Branch",
     "selectBranch": "Select branch",
     "chooseBranch": "Choose branch"
+  },
+  "Commerce": {
+    "hubTitle": "Commerce",
+    "hubDescription": "Manage the Store foundation and explicit Commerce access for this Business.",
+    "currentAccess": "Current Commerce access",
+    "storePresent": "Open the Store profile, readiness and lifecycle.",
+    "storeAbsent": "Create the single Store owned by this Business.",
+    "store": "Store",
+    "access": "Commerce access",
+    "accessDescription": "Owner-managed explicit permissions for eligible roles.",
+    "gate3b": "Product and Inventory operations arrive in Gate 3B.",
+    "productsInventory": "Products and Inventory",
+    "gate3c": "Orders and fulfillment operations arrive in Gate 3C.",
+    "ordersFulfillment": "Orders and fulfillment",
+    "open": "Open",
+    "notAvailable": "Not available in Gate 3A",
+    "storeTitle": "Merchant Store",
+    "storeDescription": "Production-connected profile, fulfillment readiness and review lifecycle.",
+    "publicSlug": "Public slug",
+    "readiness": "Readiness",
+    "ready": "Ready",
+    "notReady": "Needs completion",
+    "editStore": "Edit Store settings",
+    "createStore": "Create Store",
+    "readOnly": "Your explicit permission provides a safe read-only Store view.",
+    "lifecycle": "Store lifecycle",
+    "save": "Save Store",
+    "create": "Create Store",
+    "saving": "Saving…",
+    "submit": "Submit for review",
+    "confirmSubmit": "Submit this Store for review now?",
+    "reopen": "Reopen draft",
+    "archive": "Archive Store",
+    "confirmArchive": "Archive this Store? This action cannot be reversed here.",
+    "archiveReason": "Archive reason",
+    "unsafeImagesTitle": "Legacy image safety",
+    "unsafeImagesDescription": "This Store contains a historical image URL that is no longer safe to expose. Clear only the unsafe values without changing the Store lifecycle.",
+    "clearUnsafeImages": "Clear unsafe image URLs",
+    "accessTitle": "Commerce access",
+    "accessPageDescription": "Assign bounded operational permissions without changing System roles.",
+    "fixedRole": "This role is fixed and cannot be edited here.",
+    "saveAccess": "Save permissions",
+    "delivery": { "title": "Delivery", "enabled": "Enable Store delivery" },
+    "pickup": { "title": "Pickup", "enabled": "Enable customer pickup" },
+    "fields": {
+      "name": "Store name", "slug": "Store slug", "description": "Description",
+      "logoUrl": "Logo HTTPS URL", "coverImageUrl": "Cover HTTPS URL",
+      "supportPhone": "Support phone", "preparationEstimate": "Preparation estimate (minutes)",
+      "deliveryEstimate": "Delivery estimate (minutes)", "deliveryFee": "Delivery fee (IQD)",
+      "minimumOrder": "Minimum order (IQD)", "city": "City", "area": "Area",
+      "street": "Street", "details": "Additional details", "instructions": "Pickup instructions"
+    }
   }
 }

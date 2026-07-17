@@ -147,6 +147,56 @@ test("DTOs serialize Decimal money and exclude internal fields", () => {
   assert.equal("sku" in detail.variants[0]!, false);
 });
 
+test("public Store and nested Product DTOs fail closed for historical unsafe image URLs", () => {
+  const record = {
+    coverImageUrl: "https://127.0.0.1/private-cover.png",
+    currency: "IQD",
+    deliveryArea: null,
+    deliveryCity: null,
+    deliveryEnabled: false,
+    deliveryEstimateMinutes: null,
+    deliveryFee: new Prisma.Decimal(0),
+    description: null,
+    id: "store",
+    logoUrl: "https://cdn.example.com/logo.png",
+    minimumOrderValue: new Prisma.Decimal(0),
+    name: "Legacy Store",
+    pickupArea: "Karrada",
+    pickupCity: "Baghdad",
+    pickupEnabled: true,
+    pickupInstructions: null,
+    preparationEstimateMinutes: null,
+    slug: "legacy-store",
+  };
+  const store = serializePublicStore(record);
+  assert.equal(store.coverImageUrl, null);
+  assert.equal(store.logoUrl, "https://cdn.example.com/logo.png");
+
+  const product = serializePublicProductDetail({
+    category: { displayOrder: 1, id: "category", name: "Category", slug: "category" },
+    description: null,
+    id: "product",
+    media: [],
+    name: "Product",
+    slug: "product",
+    store: { ...record, logoUrl: "javascript:alert(1)" },
+    variants: [{
+      compareAtPrice: null,
+      currency: "IQD",
+      id: "variant",
+      inventory: { onHand: 1, reserved: 0 },
+      isDefault: true,
+      optionValues: {},
+      price: new Prisma.Decimal(1),
+      title: "Default",
+    }],
+  });
+  assert.equal(product.store.coverImageUrl, null);
+  assert.equal(product.store.logoUrl, null);
+  assert.equal(JSON.stringify(product).includes("127.0.0.1"), false);
+  assert.equal(JSON.stringify(product).includes("javascript:"), false);
+});
+
 test("unknown errors map to a generic safe public response", () => {
   assert.deepEqual(publicCommerceErrorResponse(new Error("sensitive SQL text")), {
     body: { error: { code: "INTERNAL_ERROR", message: "The Commerce catalog could not be loaded." } },

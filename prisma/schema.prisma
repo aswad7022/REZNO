@@ -707,15 +707,20 @@ model AdminAccess {
 }
 
 model AdminAuditLog {
-  id          String   @id @default(uuid()) @db.Uuid
-  adminUserId String
-  action      String
-  targetType  String?
-  targetId    String?
-  metadata    Json?
-  createdAt   DateTime @default(now()) @db.Timestamptz(6)
-  adminUser   User     @relation("AdminAuditLogUser", fields: [adminUserId], references: [id], onDelete: Cascade)
+  id             String    @id @default(uuid()) @db.Uuid
+  adminUserId    String
+  action         String
+  targetType     String?
+  targetId       String?
+  metadata       Json?
+  idempotencyKey String?   @db.Uuid
+  requestHash    String?   @db.VarChar(64)
+  resultVersion  DateTime? @db.Timestamptz(6)
+  result         Json?
+  createdAt      DateTime  @default(now()) @db.Timestamptz(6)
+  adminUser      User      @relation("AdminAuditLogUser", fields: [adminUserId], references: [id], onDelete: Cascade)
 
+  @@unique([adminUserId, idempotencyKey])
   @@index([adminUserId, createdAt])
   @@index([action, createdAt])
   @@index([targetType, targetId])
@@ -871,6 +876,8 @@ model Store {
 
   @@index([organizationId, status])
   @@index([status, publishedAt])
+  @@index([status, submittedAt, id])
+  @@index([updatedAt, id])
 }
 
 model MarketplaceCategory {

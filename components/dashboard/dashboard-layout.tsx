@@ -2,7 +2,7 @@
 
 import { type ReactNode, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
-import type { BusinessVertical, SystemRole } from "@prisma/client";
+import type { BusinessVertical, CommercePermission, SystemRole } from "@prisma/client";
 
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar";
@@ -37,6 +37,7 @@ export function DashboardLayout({
   membershipId,
   activeBusinessId,
   businesses = [],
+  commercePermissions = [],
 }: {
   children: ReactNode;
   role: DashboardRole;
@@ -56,6 +57,7 @@ export function DashboardLayout({
   membershipId?: string;
   activeBusinessId?: string;
   businesses?: Array<{ id: string; name: string }>;
+  commercePermissions?: readonly CommercePermission[];
 }) {
   const [collapsed, setCollapsed] = useState(false);
 
@@ -97,6 +99,7 @@ export function DashboardLayout({
         systemRole={systemRole}
         membershipId={membershipId}
         canAccessMessages={canAccessMessages}
+        commercePermissions={commercePermissions}
       />
       <DashboardSidebar
         role={role}
@@ -107,6 +110,7 @@ export function DashboardLayout({
         canAccessCustomerDashboard={canAccessCustomerDashboard}
         canAccessBusinessDashboard={canAccessBusinessDashboard}
         canAccessMessages={canAccessMessages}
+        commercePermissions={commercePermissions}
         collapsed={collapsed}
         onCollapsedChange={updateCollapsed}
       />
@@ -131,6 +135,7 @@ export function DashboardLayout({
           canAccessCustomerDashboard={canAccessCustomerDashboard}
           canAccessBusinessDashboard={canAccessBusinessDashboard}
           canAccessMessages={canAccessMessages}
+          commercePermissions={commercePermissions}
           activeBusinessId={activeBusinessId}
           businesses={businesses}
         />

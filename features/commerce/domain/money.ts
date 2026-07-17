@@ -3,7 +3,12 @@ import { Prisma } from "@prisma/client";
 import { commerceError } from "./errors";
 
 export const COMMERCE_CURRENCY = "IQD" as const;
+export const COMMERCE_MONEY_PRECISION = 18;
 export const COMMERCE_MONEY_SCALE = 3;
+export const COMMERCE_MONEY_INTEGER_DIGITS =
+  COMMERCE_MONEY_PRECISION - COMMERCE_MONEY_SCALE;
+export const COMMERCE_MAX_WHOLE_IQD = "999999999999999";
+export const COMMERCE_MAX_DECIMAL_AMOUNT = `${COMMERCE_MAX_WHOLE_IQD}.999`;
 
 export type DecimalInput = Prisma.Decimal.Value;
 
@@ -50,12 +55,34 @@ function decimal(value: DecimalInput, field: string) {
   return result;
 }
 
+export function isCommerceAmountWithinPersistenceCapacity(value: DecimalInput) {
+  try {
+    const result = new Prisma.Decimal(value);
+    return result.isFinite() &&
+      result.decimalPlaces() <= COMMERCE_MONEY_SCALE &&
+      result.abs().lessThanOrEqualTo(COMMERCE_MAX_DECIMAL_AMOUNT);
+  } catch {
+    return false;
+  }
+}
+
+export function assertCommercePersistenceAmount(value: DecimalInput, field: string) {
+  const result = decimal(value, field);
+  if (!isCommerceAmountWithinPersistenceCapacity(result)) {
+    return commerceError(
+      "VALIDATION_ERROR",
+      `${field} exceeds Decimal(${COMMERCE_MONEY_PRECISION},${COMMERCE_MONEY_SCALE}) capacity.`,
+    );
+  }
+  return result;
+}
+
 export function assertIqdAmount(
   value: DecimalInput,
   field: string,
   options: { allowZero?: boolean } = {},
 ) {
-  const result = decimal(value, field);
+  const result = assertCommercePersistenceAmount(value, field);
   const validSign = options.allowZero ? result.greaterThanOrEqualTo(0) : result.greaterThan(0);
 
   if (!validSign) {
@@ -114,11 +141,26 @@ export function calculateCommerceTotals(
       );
     }
 
-    const lineSubtotal = (compareAtPrice ?? unitPrice).times(line.quantity);
-    const lineTotal = unitPrice.times(line.quantity);
-    const lineDiscount = lineSubtotal.minus(lineTotal);
-    subtotal = subtotal.plus(lineSubtotal);
-    discountTotal = discountTotal.plus(lineDiscount);
+    const lineSubtotal = assertCommercePersistenceAmount(
+      (compareAtPrice ?? unitPrice).times(line.quantity),
+      `lines[${index}].lineSubtotal`,
+    );
+    const lineTotal = assertCommercePersistenceAmount(
+      unitPrice.times(line.quantity),
+      `lines[${index}].lineTotal`,
+    );
+    const lineDiscount = assertCommercePersistenceAmount(
+      lineSubtotal.minus(lineTotal),
+      `lines[${index}].lineDiscount`,
+    );
+    subtotal = assertCommercePersistenceAmount(
+      subtotal.plus(lineSubtotal),
+      "subtotal",
+    );
+    discountTotal = assertCommercePersistenceAmount(
+      discountTotal.plus(lineDiscount),
+      "discountTotal",
+    );
 
     return {
       compareAtPrice: compareAtPrice ? decimalString(compareAtPrice) : null,
@@ -130,7 +172,10 @@ export function calculateCommerceTotals(
     };
   });
 
-  const grandTotal = subtotal.minus(discountTotal).plus(deliveryFee);
+  const grandTotal = assertCommercePersistenceAmount(
+    subtotal.minus(discountTotal).plus(deliveryFee),
+    "grandTotal",
+  );
 
   return {
     currency: COMMERCE_CURRENCY,

@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import type { BusinessVertical, SystemRole } from "@prisma/client";
+import type { BusinessVertical, CommercePermission, SystemRole } from "@prisma/client";
 
 import { Separator } from "@/components/ui/separator";
 import { DashboardBreadcrumbs } from "@/components/dashboard/dashboard-breadcrumbs";
@@ -33,6 +33,7 @@ export function DashboardHeader({
   membershipId,
   activeBusinessId,
   businesses = [],
+  commercePermissions = [],
 }: {
   role: DashboardRole;
   user: DashboardUser;
@@ -50,6 +51,7 @@ export function DashboardHeader({
   membershipId?: string;
   activeBusinessId?: string;
   businesses?: Array<{ id: string; name: string }>;
+  commercePermissions?: readonly CommercePermission[];
 }) {
   return (
     <header className="sticky top-0 z-30 border-b border-border/70 bg-background/82 shadow-sm shadow-slate-950/[0.03] backdrop-blur-xl">
@@ -60,6 +62,7 @@ export function DashboardHeader({
           systemRole={systemRole}
           membershipId={membershipId}
           canAccessMessages={canAccessMessages}
+          commercePermissions={commercePermissions}
           canAccessAdmin={canAccessAdmin}
           canAccessCustomerDashboard={canAccessCustomerDashboard}
           canAccessBusinessDashboard={canAccessBusinessDashboard}

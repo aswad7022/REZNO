@@ -72,6 +72,10 @@ async function createOrganizationWithMember({
   systemRole?: "MANAGER" | "OWNER" | "RECEPTIONIST" | "STAFF";
 }) {
   const identity = await createIdentity(`${label}-person`, personStatus);
+  await prisma.person.update({
+    where: { id: identity.person.id },
+    data: { isOnboarded: true },
+  });
   const roleId = randomUUID();
   const organization = await prisma.organization.create({
     data: {
@@ -271,22 +275,23 @@ test("Gate 1A onboarding, tenant RBAC, backfill, and conversation boundaries", {
     const customer = await createIdentity("rbac-customer");
 
     await resolveMerchantCommerceContext(
-      { organizationId: ownerA.organization.id, personId: ownerA.person.id },
+      {
+        contextOrganizationId: ownerA.organization.id,
+        membershipId: ownerA.membership.id,
+        personId: ownerA.person.id,
+      },
       "STORE_MANAGE",
-    );
-    await resolveMerchantCommerceContext(
-      { organizationId: staff.organization.id, personId: staff.person.id },
-      "PRODUCT_CREATE",
     );
 
     for (const [identity, permission] of [
-      [{ organizationId: ownerA.organization.id, personId: customer.person.id }, "STORE_MANAGE"],
-      [{ organizationId: ownerB.organization.id, personId: ownerA.person.id }, "STORE_MANAGE"],
-      [{ organizationId: staff.organization.id, personId: staff.person.id }, "STORE_MANAGE"],
-      [{ organizationId: staff.organization.id, personId: staff.person.id }, "INVENTORY_ADJUST"],
-      [{ organizationId: inactive.organization.id, personId: inactive.person.id }, "PRODUCT_CREATE"],
-      [{ organizationId: deleted.organization.id, personId: deleted.person.id }, "PRODUCT_CREATE"],
-      [{ organizationId: suspended.organization.id, personId: suspended.person.id }, "PRODUCT_CREATE"],
+      [{ contextOrganizationId: ownerA.organization.id, membershipId: ownerA.membership.id, personId: customer.person.id }, "STORE_MANAGE"],
+      [{ contextOrganizationId: ownerB.organization.id, membershipId: ownerB.membership.id, personId: ownerA.person.id }, "STORE_MANAGE"],
+      [{ contextOrganizationId: staff.organization.id, membershipId: staff.membership.id, personId: staff.person.id }, "STORE_MANAGE"],
+      [{ contextOrganizationId: staff.organization.id, membershipId: staff.membership.id, personId: staff.person.id }, "INVENTORY_ADJUST"],
+      [{ contextOrganizationId: staff.organization.id, membershipId: staff.membership.id, personId: staff.person.id }, "PRODUCT_CREATE"],
+      [{ contextOrganizationId: inactive.organization.id, membershipId: inactive.membership.id, personId: inactive.person.id }, "PRODUCT_CREATE"],
+      [{ contextOrganizationId: deleted.organization.id, membershipId: deleted.membership.id, personId: deleted.person.id }, "PRODUCT_CREATE"],
+      [{ contextOrganizationId: suspended.organization.id, membershipId: suspended.membership.id, personId: suspended.person.id }, "PRODUCT_CREATE"],
     ] as const) {
       await assert.rejects(
         resolveMerchantCommerceContext(identity, permission),
