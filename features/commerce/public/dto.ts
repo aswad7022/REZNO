@@ -103,7 +103,7 @@ export function serializePublicProductSummary(value: PublicProductRecord): Publi
     ),
     lowestPrice: decimalString(lowest),
     name: value.name,
-    primaryMediaUrl: value.media[0]?.url ?? null,
+    primaryMediaUrl: value.media.map((item) => safePublicImageUrlOrNull(item.url)).find(Boolean) ?? null,
     productSlug: value.slug,
     slug: value.slug,
     store: serializePublicStore(value.store),
@@ -114,13 +114,16 @@ export function serializePublicProductSummary(value: PublicProductRecord): Publi
 export function serializePublicProductDetail(value: PublicProductRecord): PublicProductDetailDto {
   return {
     ...serializePublicProductSummary(value),
-    media: value.media.map((item) => ({
-      altText: item.altText,
-      id: item.id,
-      mediaType: item.mediaType,
-      sortOrder: item.sortOrder,
-      url: item.url,
-    })),
+    media: value.media.flatMap((item) => {
+      const url = safePublicImageUrlOrNull(item.url);
+      return url ? [{
+        altText: item.altText,
+        id: item.id,
+        mediaType: item.mediaType,
+        sortOrder: item.sortOrder,
+        url,
+      }] : [];
+    }),
     variants: value.variants.map((variant) => ({
       compareAtPrice: variant.compareAtPrice ? decimalString(variant.compareAtPrice) : null,
       currency: "IQD",

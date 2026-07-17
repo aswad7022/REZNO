@@ -4,6 +4,7 @@ import { CommerceDomainError, commerceError } from "@/features/commerce/domain/e
 import { prisma } from "@/lib/db/prisma";
 
 const MAX_SERIALIZABLE_ATTEMPTS = 4;
+const COMMERCE_SERIALIZABLE_TIMEOUT_MS = 15_000;
 
 function isRetryableTransactionError(error: unknown): boolean {
   if (error instanceof CommerceDomainError) return false;
@@ -34,6 +35,7 @@ export async function runCommerceSerializable<T>(
     try {
       return await prisma.$transaction(operation, {
         isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        timeout: COMMERCE_SERIALIZABLE_TIMEOUT_MS,
       });
     } catch (error) {
       lastError = error;
@@ -89,6 +91,15 @@ export async function lockStore(
 ) {
   await transaction.$queryRaw(
     Prisma.sql`SELECT "id" FROM "Store" WHERE "id" = CAST(${storeId} AS uuid) FOR UPDATE`,
+  );
+}
+
+export async function lockProduct(
+  transaction: Prisma.TransactionClient,
+  productId: string,
+) {
+  await transaction.$queryRaw(
+    Prisma.sql`SELECT "id" FROM "Product" WHERE "id" = CAST(${productId} AS uuid) FOR UPDATE`,
   );
 }
 

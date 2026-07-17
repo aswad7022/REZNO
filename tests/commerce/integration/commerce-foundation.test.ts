@@ -225,14 +225,25 @@ async function createStoreAndCatalog(
     storeId: store.id,
   });
   const variant = product.variants[0]!;
-  await adjustInventory(merchant.identity, {
-    idempotencyKey: `test-stock-${variant.id}`,
-    quantityDelta: onHand,
-    reason: "Integration test opening stock",
-    variantId: variant.id,
-  });
+  await adjustVariantStock(merchant.identity, variant.id, onHand, "Integration test opening stock");
   await publishProduct(merchant.identity, product.id);
   return { ...merchant, product, store: activeStore, variant };
+}
+
+async function adjustVariantStock(
+  identity: Parameters<typeof adjustInventory>[0],
+  variantId: string,
+  quantityDelta: number,
+  reason: string,
+) {
+  const inventory = await prisma.inventoryItem.findUniqueOrThrow({ where: { variantId } });
+  return adjustInventory(identity, {
+    expectedVersion: inventory.version,
+    idempotencyKey: randomUUID(),
+    inventoryItemId: inventory.id,
+    quantityDelta,
+    reason,
+  });
 }
 
 async function createPickupCart(customerId: string, variantId: string, quantity = 1) {
@@ -340,12 +351,7 @@ test("Milestone 2A PostgreSQL commerce foundation", { concurrency: false }, asyn
       storeId: primary.store.id,
     });
     const variant = overflowProduct.variants[0]!;
-    await adjustInventory(primary.identity, {
-      idempotencyKey: `test-stock-${variant.id}`,
-      quantityDelta: 2,
-      reason: "Overflow capacity probe stock",
-      variantId: variant.id,
-    });
+    await adjustVariantStock(primary.identity, variant.id, 2, "Overflow capacity probe stock");
     await publishProduct(primary.identity, overflowProduct.id);
     const cart = await createPickupCart(customerC.id, variant.id, 2);
     const key = randomUUID();
@@ -719,12 +725,7 @@ test("Milestone 2A PostgreSQL commerce foundation", { concurrency: false }, asyn
       sku: `SCARCE-${randomUUID().slice(0, 8)}`,
       title: "Scarce",
     });
-    await adjustInventory(primary.identity, {
-      idempotencyKey: `scarce-stock-${scarce.id}`,
-      quantityDelta: 1,
-      reason: "Concurrent integration test stock",
-      variantId: scarce.id,
-    });
+    await adjustVariantStock(primary.identity, scarce.id, 1, "Concurrent integration test stock");
     const [cartB, cartC] = await Promise.all([
       createPickupCart(customerB.id, scarce.id, 1),
       createPickupCart(customerC.id, scarce.id, 1),

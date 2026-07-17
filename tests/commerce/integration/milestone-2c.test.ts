@@ -290,6 +290,7 @@ test("Milestone 2C PostgreSQL customer and merchant API services", { concurrency
     );
     await assert.rejects(
       () => adjustInventory(merchantB.identity, {
+        expectedVersion: catalogA.inventory.version,
         idempotencyKey: randomUUID(),
         inventoryItemId: catalogA.inventory.id,
         quantityDelta: 1,
@@ -300,6 +301,7 @@ test("Milestone 2C PostgreSQL customer and merchant API services", { concurrency
 
     const operationKey = randomUUID();
     const adjusted = await adjustInventory(merchantA.identity, {
+      expectedVersion: catalogA.inventory.version,
       idempotencyKey: operationKey,
       inventoryItemId: catalogA.inventory.id,
       quantityDelta: 5,
@@ -307,6 +309,7 @@ test("Milestone 2C PostgreSQL customer and merchant API services", { concurrency
     });
     assert.equal(adjusted.onHand, 25);
     const replay = await adjustInventory(merchantA.identity, {
+      expectedVersion: catalogA.inventory.version,
       idempotencyKey: operationKey,
       inventoryItemId: catalogA.inventory.id,
       quantityDelta: 5,
@@ -316,6 +319,7 @@ test("Milestone 2C PostgreSQL customer and merchant API services", { concurrency
     assert.equal(await prisma.stockMovement.count({ where: { inventoryItemId: catalogA.inventory.id } }), 1);
     await assert.rejects(
       () => adjustInventory(merchantA.identity, {
+        expectedVersion: catalogA.inventory.version,
         idempotencyKey: operationKey,
         inventoryItemId: catalogA.inventory.id,
         quantityDelta: 4,
@@ -326,12 +330,14 @@ test("Milestone 2C PostgreSQL customer and merchant API services", { concurrency
 
     const concurrent = await Promise.allSettled([
       adjustInventory(merchantA.identity, {
+        expectedVersion: adjusted.version,
         idempotencyKey: randomUUID(),
         inventoryItemId: catalogA.inventory.id,
         quantityDelta: -20,
         reason: "Concurrent reduction A",
       }),
       adjustInventory(merchantA.identity, {
+        expectedVersion: adjusted.version,
         idempotencyKey: randomUUID(),
         inventoryItemId: catalogA.inventory.id,
         quantityDelta: -20,

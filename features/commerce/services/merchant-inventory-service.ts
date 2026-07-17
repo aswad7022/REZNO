@@ -1,62 +1,91 @@
+import "server-only";
+
 import { Prisma } from "@prisma/client";
 
+import { commerceError } from "@/features/commerce/domain/errors";
 import {
-  decodePublicCursor,
-  encodePublicCursor,
-  publicQueryFingerprint,
-} from "@/features/commerce/public/cursor";
+  decodeMerchantCursor,
+  encodeMerchantCursor,
+  merchantCursorFingerprint,
+} from "@/features/commerce/domain/merchant-cursor";
+import {
+  serializeInventorySummary,
+  serializeStockMovement,
+} from "@/features/commerce/domain/product-dto";
 import { resolveMerchantCommerceContext } from "@/features/commerce/services/authorization";
-import type { MerchantIdentityInput } from "@/features/commerce/services/store-service";
+import type { MerchantActorReference } from "@/features/commerce/services/authorization";
+import {
+  merchantInventoryInclude,
+  type MerchantInventoryRecord,
+} from "@/features/commerce/services/inventory-service";
 import { prisma } from "@/lib/db/prisma";
 
 export interface MerchantInventoryQuery {
   availability?: "in_stock" | "out_of_stock";
   cursor?: string;
-  fingerprint: string;
+  fingerprint?: string;
   limit: number;
+  lowStock?: boolean;
+  productStatus?: "DRAFT" | "PUBLISHED" | "SUSPENDED" | "ARCHIVED";
   query?: string;
+  variantStatus?: "ACTIVE" | "INACTIVE" | "ARCHIVED";
 }
 
-const INVENTORY_SORT = "updated_desc";
+export interface MovementQuery {
+  cursor?: string;
+  limit: number;
+}
 
 export async function listMerchantInventory(
-  identity: MerchantIdentityInput,
+  identity: MerchantActorReference,
   query: MerchantInventoryQuery,
 ) {
-  const context = await resolveMerchantCommerceContext(identity, "INVENTORY_VIEW");
-  const scopedFingerprint = publicQueryFingerprint({
-    base: query.fingerprint,
-    organizationId: context.organizationId,
-    scope: "merchant-inventory-organization",
+  const actor = await resolveMerchantCommerceContext(identity, "INVENTORY_VIEW");
+  if (!actor.storeId) return emptyPage<MerchantInventoryRecord>();
+  const filter = merchantCursorFingerprint({
+    availability: query.availability,
+    lowStock: query.lowStock === undefined ? undefined : String(query.lowStock),
+    productStatus: query.productStatus,
+    query: query.query,
+    variantStatus: query.variantStatus,
   });
+  const actorScope = `${actor.membershipId}:${actor.personId}`;
   const cursor = query.cursor
-    ? decodePublicCursor(query.cursor, { fingerprint: scopedFingerprint, sort: INVENTORY_SORT })
+    ? decodeMerchantCursor(query.cursor, {
+        actor: actorScope,
+        filter,
+        kind: "inventory",
+        target: actor.storeId,
+      })
     : null;
+  const snapshot = cursor?.snapshotDate ?? new Date();
   const conditions: Prisma.Sql[] = [
-    Prisma.sql`s."organizationId" = CAST(${context.organizationId} AS uuid)`,
+    Prisma.sql`pv."storeId" = CAST(${actor.storeId} AS uuid)`,
+    Prisma.sql`i."updatedAt" <= ${snapshot}`,
   ];
   if (query.query) {
-    const escaped = query.query.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
+    const escaped = query.query.trim().replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
     conditions.push(Prisma.sql`(
       p."name" ILIKE ${`%${escaped}%`} ESCAPE '\\'
       OR pv."sku" ILIKE ${`%${escaped}%`} ESCAPE '\\'
+      OR pv."title" ILIKE ${`%${escaped}%`} ESCAPE '\\'
       OR pv."optionValues"::text ILIKE ${`%${escaped}%`} ESCAPE '\\'
     )`);
   }
-  if (query.availability === "in_stock") {
-    conditions.push(Prisma.sql`i."onHand" - i."reserved" > 0`);
+  if (query.availability === "in_stock") conditions.push(Prisma.sql`i."onHand" - i."reserved" > 0`);
+  if (query.availability === "out_of_stock") conditions.push(Prisma.sql`i."onHand" - i."reserved" <= 0`);
+  if (query.lowStock === true) {
+    conditions.push(Prisma.sql`i."lowStockThreshold" IS NOT NULL AND i."onHand" - i."reserved" <= i."lowStockThreshold"`);
   }
-  if (query.availability === "out_of_stock") {
-    conditions.push(Prisma.sql`i."onHand" - i."reserved" <= 0`);
+  if (query.lowStock === false) {
+    conditions.push(Prisma.sql`(i."lowStockThreshold" IS NULL OR i."onHand" - i."reserved" > i."lowStockThreshold")`);
   }
+  if (query.productStatus) conditions.push(Prisma.sql`p."status" = CAST(${query.productStatus} AS "ProductStatus")`);
+  if (query.variantStatus) conditions.push(Prisma.sql`pv."status" = CAST(${query.variantStatus} AS "ProductVariantStatus")`);
   if (cursor) {
-    const updatedAt = new Date(cursor.sortValue);
-    if (Number.isNaN(updatedAt.getTime()) || updatedAt.toISOString() !== cursor.sortValue) {
-      throw new Error("Invalid inventory cursor date.");
-    }
     conditions.push(Prisma.sql`(
-      i."updatedAt" < ${updatedAt}
-      OR (i."updatedAt" = ${updatedAt} AND i."id" < CAST(${cursor.id} AS uuid))
+      i."updatedAt" < ${cursor.sortDate}
+      OR (i."updatedAt" = ${cursor.sortDate} AND i."id" < CAST(${cursor.id} AS uuid))
     )`);
   }
   const candidates = await prisma.$queryRaw<Array<{ id: string; updatedAt: Date }>>(Prisma.sql`
@@ -64,7 +93,6 @@ export async function listMerchantInventory(
     FROM "InventoryItem" i
     JOIN "ProductVariant" pv ON pv."id" = i."variantId"
     JOIN "Product" p ON p."id" = pv."productId"
-    JOIN "Store" s ON s."id" = pv."storeId"
     WHERE ${Prisma.join(conditions, " AND ")}
     ORDER BY i."updatedAt" DESC, i."id" DESC
     LIMIT ${query.limit + 1}
@@ -72,24 +100,114 @@ export async function listMerchantInventory(
   const visible = candidates.slice(0, query.limit);
   const records = await prisma.inventoryItem.findMany({
     where: { id: { in: visible.map((item) => item.id) } },
-    include: { variant: { include: { product: true } } },
+    include: merchantInventoryInclude,
   });
   const byId = new Map(records.map((item) => [item.id, item]));
-  const data = visible.flatMap((item) => (byId.has(item.id) ? [byId.get(item.id)!] : []));
+  const data = visible.flatMap((item) => byId.has(item.id) ? [byId.get(item.id)!] : []);
   const last = visible.at(-1);
   return {
     data,
     pageInfo: {
       hasNextPage: candidates.length > query.limit,
-      nextCursor:
-        candidates.length > query.limit && last
-          ? encodePublicCursor({
-              fingerprint: scopedFingerprint,
-              id: last.id,
-              sort: INVENTORY_SORT,
-              sortValue: last.updatedAt.toISOString(),
-            })
-          : null,
+      nextCursor: candidates.length > query.limit && last
+        ? encodeMerchantCursor({
+            actor: actorScope,
+            filter,
+            id: last.id,
+            kind: "inventory",
+            snapshot: snapshot.toISOString(),
+            sortValue: last.updatedAt.toISOString(),
+            target: actor.storeId,
+          })
+        : null,
     },
   };
+}
+
+export async function getMerchantInventoryDetail(
+  identity: MerchantActorReference,
+  inventoryItemId: string,
+  query: MovementQuery,
+) {
+  const actor = await resolveMerchantCommerceContext(identity, "INVENTORY_VIEW");
+  const inventory = await prisma.inventoryItem.findFirst({
+    where: {
+      id: inventoryItemId,
+      variant: { store: { organizationId: actor.organizationId } },
+    },
+    include: merchantInventoryInclude,
+  });
+  if (!inventory) commerceError("NOT_FOUND", "Inventory item was not found.");
+  const movementPage = await listMovementPage(actor, inventory.id, query);
+  const mutable =
+    inventory.variant.status !== "ARCHIVED" &&
+    !inventory.variant.archivedAt &&
+    inventory.variant.product.status !== "ARCHIVED" &&
+    !inventory.variant.product.archivedAt;
+  return {
+    actor,
+    inventory: serializeInventorySummary(inventory),
+    movements: movementPage,
+    permittedActions: {
+      adjust: mutable && actor.permissions.includes("INVENTORY_ADJUST"),
+      threshold: mutable && actor.permissions.includes("INVENTORY_ADJUST"),
+    },
+  };
+}
+
+async function listMovementPage(
+  actor: Awaited<ReturnType<typeof resolveMerchantCommerceContext>>,
+  inventoryItemId: string,
+  query: MovementQuery,
+) {
+  const filter = merchantCursorFingerprint({ inventoryItemId, limit: String(query.limit) });
+  const actorScope = `${actor.membershipId}:${actor.personId}`;
+  const cursor = query.cursor
+    ? decodeMerchantCursor(query.cursor, {
+        actor: actorScope,
+        filter,
+        kind: "movements",
+        target: inventoryItemId,
+      })
+    : null;
+  const snapshot = cursor?.snapshotDate ?? new Date();
+  const records = await prisma.stockMovement.findMany({
+    where: {
+      inventoryItemId,
+      createdAt: { lte: snapshot },
+      ...(cursor
+        ? {
+            OR: [
+              { createdAt: { lt: cursor.sortDate } },
+              { createdAt: cursor.sortDate, id: { lt: cursor.id } },
+            ],
+          }
+        : {}),
+    },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    take: query.limit + 1,
+  });
+  const visible = records.slice(0, query.limit);
+  const last = visible.at(-1);
+  return {
+    data: visible.map(serializeStockMovement),
+    pageInfo: {
+      hasNextPage: records.length > query.limit,
+      nextCursor: records.length > query.limit && last
+        ? encodeMerchantCursor({
+            actor: actorScope,
+            filter,
+            id: last.id,
+            kind: "movements",
+            snapshot: snapshot.toISOString(),
+            sortValue: last.createdAt.toISOString(),
+            target: inventoryItemId,
+          })
+        : null,
+    },
+  };
+}
+
+function emptyPage<T>() {
+  return { data: [] as T[], pageInfo: { hasNextPage: false, nextCursor: null } };
 }

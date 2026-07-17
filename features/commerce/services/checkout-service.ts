@@ -114,6 +114,7 @@ export async function createPendingOrder(input: CreatePendingOrderInput) {
                   inventory: true,
                   product: {
                     include: {
+                      category: { select: { status: true } },
                       media: { orderBy: { sortOrder: "asc" }, take: 1 },
                     },
                   },
@@ -185,6 +186,7 @@ export async function createPendingOrder(input: CreatePendingOrderInput) {
           variant.status !== "ACTIVE" ||
           variant.product.storeId !== cart.storeId ||
           variant.product.status !== "PUBLISHED" ||
+          variant.product.category.status !== "ACTIVE" ||
           !variant.product.publishedAt ||
           variant.product.archivedAt ||
           variant.currency !== COMMERCE_CURRENCY
@@ -244,7 +246,7 @@ export async function createPendingOrder(input: CreatePendingOrderInput) {
           compareAtPrice: line.compareAtPrice,
           currency: COMMERCE_CURRENCY,
           id: randomUUID(),
-          imageUrlSnapshot: variant.product.media[0]?.url ?? null,
+          imageUrlSnapshot: safePublicImageUrlOrNull(variant.product.media[0]?.url),
           lineDiscount: line.lineDiscount,
           lineSubtotal: line.lineSubtotal,
           lineTotal: line.lineTotal,
