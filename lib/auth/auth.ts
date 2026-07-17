@@ -3,15 +3,10 @@ import { expo } from "@better-auth/expo";
 import { prismaAdapter } from "@better-auth/prisma-adapter";
 
 import { provisionPerson } from "@/features/identity/services/provision-person";
+import { buildAuthTrustedOrigins } from "@/lib/auth/trusted-origins";
 import { prisma } from "@/lib/db/prisma";
 
-const trustedOrigins = [
-  process.env.BETTER_AUTH_URL,
-  "rezno://",
-  process.env.NODE_ENV === "development" ? "http://localhost:3000" : undefined,
-  process.env.NODE_ENV === "development" ? "exp://" : undefined,
-  process.env.NODE_ENV === "development" ? "exp://**" : undefined,
-].filter((origin): origin is string => Boolean(origin));
+const trustedOrigins = buildAuthTrustedOrigins(process.env);
 
 export const auth = betterAuth({
   baseURL: process.env.BETTER_AUTH_URL,
