@@ -26,6 +26,11 @@ export async function notifyCustomerCancellation(transaction: Transaction, order
   await notifyEligibleMerchants(transaction, orderId, "order.customer_cancelled");
 }
 
+export async function notifyAdministrativeOrderCancellation(transaction: Transaction, orderId: string) {
+  await notifyCustomer(transaction, orderId, "order.cancelled");
+  await notifyEligibleMerchants(transaction, orderId, "order.admin_cancelled");
+}
+
 export async function notifyOrderExpired(transaction: Transaction, orderId: string) {
   await notifyCustomer(transaction, orderId, "order.expired");
   await notifyEligibleMerchants(transaction, orderId, "order.expired");
@@ -52,7 +57,7 @@ async function notifyCustomer(
 async function notifyEligibleMerchants(
   transaction: Transaction,
   orderId: string,
-  event: "order.new" | "order.customer_cancelled" | "order.expired",
+  event: "order.new" | "order.customer_cancelled" | "order.admin_cancelled" | "order.expired",
 ) {
   const order = await transaction.order.findUniqueOrThrow({
     where: { id: orderId },

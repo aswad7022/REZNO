@@ -8,6 +8,7 @@ import type {
   PaymentStatus,
   Prisma,
 } from "@prisma/client";
+import { z } from "zod";
 
 import { commerceError } from "@/features/commerce/domain/errors";
 import { assertInventoryInteger, POSTGRES_INT_MAX, stockMovementKey } from "@/features/commerce/domain/inventory";
@@ -42,10 +43,18 @@ import {
   type MerchantCommerceContext,
 } from "@/features/commerce/services/authorization";
 import {
+  notifyAdministrativeOrderCancellation,
   notifyCustomerCancellation,
   notifyCustomerOrderEvent,
   notifyOrderExpired,
 } from "@/features/commerce/services/commerce-notification-service";
+import {
+  adminMutationHash,
+  recordAdminMutation,
+  resolveAdminMutationReplay,
+} from "@/features/commerce/services/admin-mutation";
+import type { CommerceAdminContext } from "@/features/commerce/services/authorization";
+import { assertCommerceAdminCurrent } from "@/features/commerce/services/authorization";
 import {
   lockInventoryItems,
   lockOrder,
@@ -61,7 +70,19 @@ type MerchantScope = {
 };
 type CustomerScope = { actorId: string; actorType: "CUSTOMER"; customerId: string };
 type SystemScope = { actorType: "SYSTEM" };
-type ReplayScope = MerchantScope | CustomerScope | SystemScope;
+type AdminScope = { actorId: string; actorType: "ADMIN" };
+type ReplayScope = MerchantScope | CustomerScope | AdminScope | SystemScope;
+
+const adminOrderInterventionSchema = z.object({
+  action: z.enum(["cancel", "expire"]),
+  expectedVersion: z.string().datetime({ offset: true }),
+  idempotencyKey: z.string().uuid(),
+  orderId: z.string().uuid(),
+  reason: z.string().trim().min(2).max(500).transform((value) => value.replace(/\s+/g, " ")),
+  returnedStock: z.boolean(),
+}).strict();
+
+export type AdminOrderInterventionInput = z.input<typeof adminOrderInterventionSchema>;
 
 const mutationOrderInclude = {
   items: {
@@ -376,6 +397,137 @@ export async function cancelCustomerOrder(
       reason: input.reason,
     });
     await notifyCustomerCancellation(transaction, order.id);
+    return result;
+  });
+}
+
+export async function interveneAdminOrder(
+  context: CommerceAdminContext,
+  rawInput: AdminOrderInterventionInput,
+) {
+  const parsed = adminOrderInterventionSchema.safeParse(rawInput);
+  if (!parsed.success) commerceError("VALIDATION_ERROR", "Admin Order intervention input is invalid.");
+  const input = parsed.data;
+  const action = input.action === "expire"
+    ? "commerce.order.admin-expire"
+    : "commerce.order.admin-cancel";
+  const requestHash = adminMutationHash({ ...input, auditAction: action });
+  return runCommerceSerializable(async (transaction) => {
+    const replay = await resolveAdminMutationReplay(transaction, {
+      action,
+      context,
+      idempotencyKey: input.idempotencyKey,
+      permission: "COMMERCE_ORDERS_MANAGE",
+      requestHash,
+      targetId: input.orderId,
+      targetType: "Order",
+      validateResult: replayResult,
+    });
+    if (replay) return replay;
+    await lockOrder(transaction, input.orderId);
+    await assertCommerceAdminCurrent(transaction, context, "COMMERCE_ORDERS_MANAGE");
+    const order = await transaction.order.findUnique({
+      where: { id: input.orderId },
+      include: mutationOrderInclude,
+    });
+    if (!order) commerceError("NOT_FOUND", "Order was not found.");
+    assertExpectedVersion(order, input.expectedVersion);
+    assertOperationalStore(order);
+    assertOrderPaymentConsistency(order);
+    if (order.paymentStatus !== "UNPAID") {
+      commerceError("INVALID_TRANSITION", "Admin intervention cannot cancel a paid Order.");
+    }
+    const now = new Date();
+    const scope: AdminScope = { actorId: context.userId, actorType: "ADMIN" };
+    const historyInput: ReplayEnvelope = {
+      expectedVersion: input.expectedVersion,
+      idempotencyKey: deterministicUuid(`admin-order:${context.userId}:${input.idempotencyKey}`),
+      orderId: input.orderId,
+      requestHash,
+    };
+    const before = auditState(order, input.reason);
+    if (input.action === "expire") {
+      if (input.returnedStock) commerceError("VALIDATION_ERROR", "Expiration must not confirm returned stock.");
+      if (order.status !== "PENDING" || order.reservationExpiresAt > now) {
+        commerceError("INVALID_TRANSITION", "Only an overdue PENDING Order may be administratively expired.");
+      }
+      await releaseReservations(transaction, order, {
+        actorId: context.userId,
+        actorType: "ADMIN",
+        now,
+        reason: input.reason,
+        status: "EXPIRED",
+      });
+      await voidUnpaidPayment(transaction, order, now);
+      await transaction.order.update({
+        where: { id: order.id },
+        data: {
+          cancelledAt: now,
+          cancellationReason: input.reason,
+          fulfillmentStatus: "CANCELLED",
+          paymentStatus: "VOIDED",
+          status: "EXPIRED",
+        },
+      });
+      const result = await loadTransitionResult(transaction, order.id);
+      await createHistory(transaction, order, historyInput, scope, result, {
+        newFulfillmentStatus: "CANCELLED",
+        newOrderStatus: "EXPIRED",
+        newPaymentStatus: "VOIDED",
+        reason: input.reason,
+      });
+      await notifyOrderExpired(transaction, order.id);
+      await recordAdminOrderAudit(transaction, context, input, action, requestHash, before, result);
+      return result;
+    }
+
+    if (order.status !== "PENDING" && order.status !== "CONFIRMED") {
+      commerceError("INVALID_TRANSITION", "Admin may cancel only PENDING or CONFIRMED Orders.");
+    }
+    if (["DELIVERED", "PICKED_UP", "OUT_FOR_DELIVERY"].includes(order.fulfillmentStatus)) {
+      commerceError("INVALID_TRANSITION", "In-transit or completed handoff stock cannot be administratively cancelled.");
+    }
+    if (order.fulfillmentStatus === "DELIVERY_FAILED" && !input.returnedStock) {
+      commerceError("VALIDATION_ERROR", "DELIVERY_FAILED cancellation requires explicit returned-stock confirmation.");
+    }
+    if (order.fulfillmentStatus !== "DELIVERY_FAILED" && input.returnedStock) {
+      commerceError("VALIDATION_ERROR", "Returned-stock confirmation is valid only for DELIVERY_FAILED.");
+    }
+    if (order.status === "PENDING") {
+      await releaseReservations(transaction, order, {
+        actorId: context.userId,
+        actorType: "ADMIN",
+        now,
+        reason: input.reason,
+        status: "RELEASED",
+      });
+    } else {
+      await restockConsumedReservations(transaction, order, {
+        actorId: context.userId,
+        actorType: "ADMIN",
+        reason: input.reason,
+      });
+    }
+    await voidUnpaidPayment(transaction, order, now);
+    await transaction.order.update({
+      where: { id: order.id },
+      data: {
+        cancellationReason: input.reason,
+        cancelledAt: now,
+        fulfillmentStatus: "CANCELLED",
+        paymentStatus: "VOIDED",
+        status: "CANCELLED",
+      },
+    });
+    const result = await loadTransitionResult(transaction, order.id);
+    await createHistory(transaction, order, historyInput, scope, result, {
+      newFulfillmentStatus: "CANCELLED",
+      newOrderStatus: "CANCELLED",
+      newPaymentStatus: "VOIDED",
+      reason: input.reason,
+    });
+    await notifyAdministrativeOrderCancellation(transaction, order.id);
+    await recordAdminOrderAudit(transaction, context, input, action, requestHash, before, result);
     return result;
   });
 }
@@ -725,7 +877,7 @@ async function releaseReservations(
 async function restockConsumedReservations(
   transaction: Transaction,
   order: MutationOrder,
-  input: { actorId: string; actorType: "CUSTOMER" | "MERCHANT"; reason: string },
+  input: { actorId: string; actorType: "ADMIN" | "CUSTOMER" | "MERCHANT"; reason: string },
 ) {
   assertReservationCompleteness(order, "CONSUMED");
   await lockInventoryItems(transaction, order.reservations.map((item) => item.inventoryItemId));
@@ -979,4 +1131,29 @@ function replayResult(value: Prisma.JsonValue | undefined): OrderTransitionRepla
     !Array.isArray(item.reservations)
   ) return null;
   return value as unknown as OrderTransitionReplayResult;
+}
+
+async function recordAdminOrderAudit(
+  transaction: Transaction,
+  context: CommerceAdminContext,
+  input: z.output<typeof adminOrderInterventionSchema>,
+  action: string,
+  requestHash: string,
+  before: ReturnType<typeof auditState>,
+  result: OrderTransitionReplayResult,
+) {
+  await recordAdminMutation(transaction, {
+    action,
+    after: auditState(result, input.reason),
+    before,
+    context,
+    idempotencyKey: input.idempotencyKey,
+    permission: "COMMERCE_ORDERS_MANAGE",
+    reason: input.reason,
+    requestHash,
+    result: result as unknown as Prisma.InputJsonValue,
+    resultVersion: new Date(result.updatedAt),
+    targetId: input.orderId,
+    targetType: "Order",
+  });
 }

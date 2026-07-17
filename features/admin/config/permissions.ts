@@ -32,6 +32,64 @@ export const defaultAdminPermissions: AdminPermission[] = [
   "SETTINGS_VIEW",
 ];
 
+export const commerceAdminPermissions = [
+  "COMMERCE_STORES_VIEW",
+  "COMMERCE_STORES_REVIEW",
+  "COMMERCE_CATALOG_VIEW",
+  "COMMERCE_CATALOG_MODERATE",
+  "COMMERCE_INVENTORY_VIEW",
+  "COMMERCE_INVENTORY_MANAGE",
+  "COMMERCE_ORDERS_VIEW",
+  "COMMERCE_ORDERS_MANAGE",
+  "AUDIT_LOG_VIEW",
+] as const satisfies readonly AdminPermission[];
+
+export const adminPermissionDependencies: Readonly<
+  Partial<Record<AdminPermission, AdminPermission>>
+> = {
+  COMMERCE_CATALOG_MODERATE: "COMMERCE_CATALOG_VIEW",
+  COMMERCE_INVENTORY_MANAGE: "COMMERCE_INVENTORY_VIEW",
+  COMMERCE_ORDERS_MANAGE: "COMMERCE_ORDERS_VIEW",
+  COMMERCE_STORES_REVIEW: "COMMERCE_STORES_VIEW",
+};
+
+export function hasAnyCommerceAdminPermission(
+  permissions: Iterable<AdminPermission>,
+): boolean {
+  const available = new Set(permissions);
+  return commerceAdminPermissions.some((permission) => available.has(permission));
+}
+
+export function firstCommerceAdminPermission(
+  permissions: Iterable<AdminPermission>,
+): AdminPermission | null {
+  const available = new Set(permissions);
+  return commerceAdminPermissions.find((permission) => available.has(permission)) ?? null;
+}
+
+export function invalidAdminPermissionDependencies(
+  permissions: Iterable<AdminPermission>,
+): Array<{ permission: AdminPermission; requires: AdminPermission }> {
+  const available = new Set(permissions);
+  return Object.entries(adminPermissionDependencies).flatMap(
+    ([permission, requires]) =>
+      requires && available.has(permission as AdminPermission) && !available.has(requires)
+        ? [{ permission: permission as AdminPermission, requires }]
+        : [],
+  );
+}
+
+export function effectiveNormalizedAdminPermissions(
+  permissions: Iterable<string>,
+): AdminPermission[] {
+  const normalized = normalizeAdminPermissions(permissions);
+  const available = new Set(normalized);
+  return normalized.filter((permission) => {
+    const dependency = adminPermissionDependencies[permission];
+    return !dependency || available.has(dependency);
+  });
+}
+
 export const adminPermissionLabels: Record<AdminPermission, string> = {
   ADMIN_DASHBOARD_VIEW: "View admin dashboard",
   BUSINESSES_VIEW: "View businesses",

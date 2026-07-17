@@ -41,6 +41,7 @@ export function serializeCart(cart: CartApiRecord | null) {
       variant.status === "ACTIVE" &&
       !variant.archivedAt &&
       product.status === "PUBLISHED" &&
+      product.category.status === "ACTIVE" &&
       !product.archivedAt &&
       Boolean(product.publishedAt);
     const available = variant.inventory

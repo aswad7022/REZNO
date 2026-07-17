@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import {
   adminPermissions,
+  invalidAdminPermissionDependencies,
   normalizeAdminPermissions,
 } from "@/features/admin/config/permissions";
 import { logAdminAuditEvent } from "@/features/admin/services/admin-audit";
@@ -73,6 +74,9 @@ export async function grantAdminAccess(formData: FormData) {
   }
 
   const permissions = normalizeAdminPermissions(parsed.data.permissions);
+  if (invalidAdminPermissionDependencies(permissions).length > 0) {
+    resultRedirect("error");
+  }
 
   try {
     await prisma.adminAccess.upsert({
@@ -111,6 +115,9 @@ export async function grantAdminAccess(formData: FormData) {
 export async function updateAdminAccess(accessId: string, formData: FormData) {
   const admin = await requireSuperAdmin();
   const permissions = normalizeAdminPermissions(getPermissionValues(formData));
+  if (invalidAdminPermissionDependencies(permissions).length > 0) {
+    resultRedirect("error");
+  }
   const access = await prisma.adminAccess.findUnique({
     where: { id: accessId },
     select: { id: true, userId: true, role: true, permissions: true },

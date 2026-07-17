@@ -19,7 +19,12 @@ export const cartApiInclude = {
       productVariant: {
         include: {
           inventory: true,
-          product: { include: { media: { orderBy: { sortOrder: "asc" as const }, take: 1 } } },
+          product: {
+            include: {
+              category: { select: { status: true } },
+              media: { orderBy: { sortOrder: "asc" as const }, take: 1 },
+            },
+          },
         },
       },
     },
