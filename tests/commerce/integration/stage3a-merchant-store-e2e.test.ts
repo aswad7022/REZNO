@@ -4,13 +4,16 @@ import test from "node:test";
 import type { CommercePermission, SystemRole } from "@prisma/client";
 
 import { CommerceDomainError } from "../../../features/commerce/domain/errors";
+import { ownerManagementStoreDto } from "../../../features/commerce/domain/store-dto";
 import { OWNER_DEFAULT_COMMERCE_PERMISSIONS } from "../../../features/identity/policies/authorization";
 import { updateCommerceRolePermissions } from "../../../features/commerce/services/commerce-access-service";
 import { resolveMerchantCommerceContext, type CommerceAdminContext, type MerchantActorReference } from "../../../features/commerce/services/authorization";
 import {
   approveStore,
   archiveStore,
+  clearUnsafeStoreImages,
   createStoreDraft,
+  getMerchantStore,
   reactivateStore,
   rejectStore,
   reopenRejectedStoreDraft,
@@ -570,5 +573,152 @@ test("Gate 3A Merchant Store PostgreSQL end-to-end", { concurrency: false }, asy
     assert.equal(await prisma.store.count({ where: { organizationId: merchant.organization.id } }), 0);
     assert.equal(await prisma.businessOperationMutation.count({ where: { organizationId: merchant.organization.id } }), before);
     assert.equal(await prisma.businessAuditLog.count({ where: { organizationId: merchant.organization.id } }), 0);
+  });
+
+  await t.test("49 historical unsafe Store images serialize as null with structural management flags", async () => {
+    const merchant = await createMerchant("legacy-image-dto");
+    const draft = await createStoreDraft(merchant.reference, storeInput(merchant, {
+      logoUrl: "https://cdn.example.com/safe-logo.png",
+    }));
+    const pending = await submitStoreForReview(merchant.reference, lifecycle(merchant, draft));
+    const active = await approveStore(reviewer.context, adminInput(pending));
+    await prisma.store.update({
+      where: { id: active.id },
+      data: { coverImageUrl: "https://127.0.0.1/private-cover.png" },
+    });
+
+    const management = (await getMerchantStore(merchant.reference)).store as
+      | ReturnType<typeof ownerManagementStoreDto>
+      | null;
+    assert.ok(management);
+    assert.equal(management.coverImageUrl, null);
+    assert.equal(management.logoUrl, "https://cdn.example.com/safe-logo.png");
+    assert.equal(management.unsafeCoverPresent, true);
+    assert.equal(management.unsafeLogoPresent, false);
+    const publicStore = await getPublicStore(active.slug);
+    assert.equal(publicStore.coverImageUrl, null);
+    assert.equal(JSON.stringify({ management, publicStore }).includes("127.0.0.1"), false);
+  });
+
+  await t.test("50 Owner remediation clears only unsafe ACTIVE images and replays exactly", async () => {
+    const merchant = await createMerchant("legacy-active-clear");
+    const draft = await createStoreDraft(merchant.reference, storeInput(merchant, {
+      logoUrl: "https://cdn.example.com/keep-logo.png",
+    }));
+    const pending = await submitStoreForReview(merchant.reference, lifecycle(merchant, draft));
+    const active = await approveStore(reviewer.context, adminInput(pending));
+    const legacy = await prisma.store.update({
+      where: { id: active.id },
+      data: { coverImageUrl: "https://127.0.0.1/active-private.png" },
+    });
+    const key = randomUUID();
+    const input = lifecycle(merchant, {
+      expectedVersion: legacy.updatedAt.toISOString(),
+      id: legacy.id,
+    }, key);
+    const result = await clearUnsafeStoreImages(merchant.reference, input);
+    assert.equal(result.status, "ACTIVE");
+    assert.equal(result.publishedAt, active.publishedAt);
+    assert.equal(result.coverImageUrl, null);
+    assert.equal(result.logoUrl, "https://cdn.example.com/keep-logo.png");
+    assert.equal(result.unsafeCoverPresent, false);
+    assert.deepEqual(await clearUnsafeStoreImages(merchant.reference, input), result);
+    assert.equal(await prisma.businessAuditLog.count({ where: { action: "commerce.store.images.clear-unsafe", targetId: legacy.id } }), 1);
+    assert.equal(await prisma.businessOperationMutation.count({ where: { idempotencyKey: key } }), 1);
+    const [audit, operation] = await Promise.all([
+      prisma.businessAuditLog.findFirstOrThrow({
+        where: {
+          action: "commerce.store.images.clear-unsafe",
+          actorMembershipId: merchant.membership.id,
+          targetId: legacy.id,
+        },
+      }),
+      prisma.businessOperationMutation.findUniqueOrThrow({ where: { organizationId_idempotencyKey: { organizationId: merchant.organization.id, idempotencyKey: key } } }),
+    ]);
+    assert.equal(JSON.stringify({ audit, operation }).includes("127.0.0.1"), false);
+    await assert.rejects(
+      clearUnsafeStoreImages(merchant.reference, { ...input, storeId: randomUUID() }),
+      code("IDEMPOTENCY_CONFLICT"),
+    );
+    await assert.rejects(
+      clearUnsafeStoreImages(merchant.reference, { ...input, idempotencyKey: randomUUID() }),
+      code("STALE_VERSION"),
+    );
+    const persisted = await prisma.store.findUniqueOrThrow({ where: { id: legacy.id } });
+    const auditBefore = await prisma.businessAuditLog.count({ where: { targetId: legacy.id } });
+    const ledgerBefore = await prisma.businessOperationMutation.count({ where: { organizationId: merchant.organization.id } });
+    await assert.rejects(
+      clearUnsafeStoreImages(merchant.reference, lifecycle(merchant, {
+        expectedVersion: persisted.updatedAt.toISOString(),
+        id: persisted.id,
+      })),
+      code("CONFLICT"),
+    );
+    assert.equal(await prisma.businessAuditLog.count({ where: { targetId: legacy.id } }), auditBefore);
+    assert.equal(await prisma.businessOperationMutation.count({ where: { organizationId: merchant.organization.id } }), ledgerBefore);
+  });
+
+  await t.test("51 SUSPENDED remediation preserves lifecycle while role and status policies fail closed", async () => {
+    const merchant = await createMerchant("legacy-suspended-clear");
+    const draft = await createStoreDraft(merchant.reference, storeInput(merchant));
+    const pending = await submitStoreForReview(merchant.reference, lifecycle(merchant, draft));
+    const active = await approveStore(reviewer.context, adminInput(pending));
+    const suspendedStore = await suspendStore(reviewer.context, adminInput(active, "Legacy safety QA"));
+    const legacy = await prisma.store.update({
+      where: { id: active.id },
+      data: { logoUrl: "javascript:legacy-private" },
+    });
+    const manager = await createMerchant("legacy-manager", {
+      organizationId: merchant.organization.id,
+      permissions: ["STORE_VIEW", "STORE_MANAGE"],
+      role: "MANAGER",
+    });
+    const input = lifecycle(merchant, { expectedVersion: legacy.updatedAt.toISOString(), id: legacy.id });
+    const deniedBefore = await prisma.businessOperationMutation.count({ where: { organizationId: merchant.organization.id } });
+    await assert.rejects(clearUnsafeStoreImages(manager.reference, input), code("FORBIDDEN"));
+    assert.equal(await prisma.businessOperationMutation.count({ where: { organizationId: merchant.organization.id } }), deniedBefore);
+    const cleared = await clearUnsafeStoreImages(merchant.reference, input);
+    assert.equal(cleared.status, "SUSPENDED");
+    assert.equal(cleared.publishedAt, suspendedStore.publishedAt);
+    assert.equal(cleared.logoUrl, null);
+
+    const draftMerchant = await createMerchant("legacy-draft-policy");
+    const policyDraft = await createStoreDraft(draftMerchant.reference, storeInput(draftMerchant));
+    const unsafeDraft = await prisma.store.update({
+      where: { id: policyDraft.id },
+      data: { logoUrl: "https://127.0.0.1/draft-private.png" },
+    });
+    await assert.rejects(
+      clearUnsafeStoreImages(draftMerchant.reference, lifecycle(draftMerchant, {
+        expectedVersion: unsafeDraft.updatedAt.toISOString(),
+        id: unsafeDraft.id,
+      })),
+      code("INVALID_TRANSITION"),
+    );
+  });
+
+  await t.test("52 concurrent remediation keys produce one success and one stale conflict", async () => {
+    const merchant = await createMerchant("legacy-clear-race");
+    const draft = await createStoreDraft(merchant.reference, storeInput(merchant));
+    const pending = await submitStoreForReview(merchant.reference, lifecycle(merchant, draft));
+    const active = await approveStore(reviewer.context, adminInput(pending));
+    const legacy = await prisma.store.update({
+      where: { id: active.id },
+      data: {
+        coverImageUrl: "https://127.0.0.1/race-cover.png",
+        logoUrl: "https://127.0.0.1/race-logo.png",
+      },
+    });
+    const base = lifecycle(merchant, { expectedVersion: legacy.updatedAt.toISOString(), id: legacy.id });
+    const results = await Promise.allSettled([
+      clearUnsafeStoreImages(merchant.reference, base),
+      clearUnsafeStoreImages(merchant.reference, { ...base, idempotencyKey: randomUUID() }),
+    ]);
+    assert.equal(results.filter((result) => result.status === "fulfilled").length, 1);
+    assert.equal(results.filter((result) => result.status === "rejected" && code("STALE_VERSION")(result.reason)).length, 1);
+    const persisted = await prisma.store.findUniqueOrThrow({ where: { id: legacy.id } });
+    assert.equal(persisted.logoUrl, null);
+    assert.equal(persisted.coverImageUrl, null);
+    assert.equal(await prisma.businessAuditLog.count({ where: { action: "commerce.store.images.clear-unsafe", targetId: legacy.id } }), 1);
   });
 });

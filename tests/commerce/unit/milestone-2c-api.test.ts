@@ -159,7 +159,7 @@ test("Cart DTO serializes Decimal money and excludes inventory, SKU, Organizatio
       deliveryFee: new Prisma.Decimal(0),
       description: null,
       id: "store",
-      logoUrl: null,
+      logoUrl: "https://127.0.0.1/private-cart-logo.png",
       minimumOrderValue: new Prisma.Decimal(0),
       name: "Store",
       organizationId: "private-organization",
@@ -189,6 +189,7 @@ test("Cart DTO serializes Decimal money and excludes inventory, SKU, Organizatio
   const dto = serializeCart(cart)!;
   assert.equal(dto.items[0]?.unitPrice, "10000.000");
   assert.equal(dto.items[0]?.priceChanged, true);
+  assert.equal(dto.store.logoUrl, null);
   const json = JSON.stringify(dto);
   for (const key of ["onHand", "reserved", "sku", "organizationId", "suspensionReason", "customerId"]) {
     assert.equal(json.includes(key), false, `${key} leaked`);
@@ -213,7 +214,7 @@ test("Checkout and merchant Inventory DTOs serialize safe receipt and operationa
     paymentStatus: "UNPAID",
     reservationExpiresAt: new Date("2026-07-12T12:15:00.000Z"),
     status: "PENDING",
-    storeLogoUrlSnapshot: null,
+    storeLogoUrlSnapshot: "javascript:private-receipt-logo",
     storeNameSnapshot: "Store",
     storeSlugSnapshot: "store",
     subtotal: new Prisma.Decimal(10000),
@@ -221,6 +222,7 @@ test("Checkout and merchant Inventory DTOs serialize safe receipt and operationa
   });
   assert.equal(receipt.grandTotal, "10000.000");
   assert.equal(receipt.paymentMethod, "PAY_AT_PICKUP");
+  assert.equal(receipt.store.logoUrl, null);
 
   const inventory = serializeMerchantInventory({
     id: "inventory",

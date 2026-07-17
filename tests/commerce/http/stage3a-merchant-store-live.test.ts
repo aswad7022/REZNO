@@ -375,6 +375,41 @@ test("Gate 3A production HTML, RSC and Server Actions enforce Merchant Store bou
     assert.match((await prisma.store.findUniqueOrThrow({ where: { id: stores.pending.id } })).description ?? "", /STAGE3A-pending/);
   });
 
+  await t.test("Store Server Action accepts the exact money maximum, canonicalizes replay, and rejects overflow atomically", async () => {
+    let storePage = await body("/business/commerce/store", cookies.owner);
+    let updateForm = findForm(storePage.text, { mode: "update", storeId: merchantStoreId });
+    await submit("/business/commerce/store", updateForm, (parameters) => {
+      parameters.set("deliveryFee", "999999999999999");
+      parameters.set("idempotencyKey", randomUUID());
+    }, cookies.owner);
+    assert.equal((await prisma.store.findUniqueOrThrow({ where: { id: merchantStoreId } })).deliveryFee.toFixed(0), "999999999999999");
+
+    storePage = await body("/business/commerce/store", cookies.owner);
+    updateForm = findForm(storePage.text, { mode: "update", storeId: merchantStoreId });
+    const auditBeforeOverflow = await prisma.businessAuditLog.count({ where: { targetId: merchantStoreId } });
+    const ledgerBeforeOverflow = await prisma.businessOperationMutation.count({ where: { targetId: merchantStoreId } });
+    await submit("/business/commerce/store", updateForm, (parameters) => {
+      parameters.set("deliveryFee", "1000000000000000");
+      parameters.set("idempotencyKey", randomUUID());
+    }, cookies.owner);
+    assert.equal((await prisma.store.findUniqueOrThrow({ where: { id: merchantStoreId } })).deliveryFee.toFixed(0), "999999999999999");
+    assert.equal(await prisma.businessAuditLog.count({ where: { targetId: merchantStoreId } }), auditBeforeOverflow);
+    assert.equal(await prisma.businessOperationMutation.count({ where: { targetId: merchantStoreId } }), ledgerBeforeOverflow);
+
+    storePage = await body("/business/commerce/store", cookies.owner);
+    updateForm = findForm(storePage.text, { mode: "update", storeId: merchantStoreId });
+    const key = randomUUID();
+    const canonicalReplay = (parameters: URLSearchParams, value: string) => {
+      parameters.set("deliveryFee", value);
+      parameters.set("minimumOrderValue", "0000");
+      parameters.set("idempotencyKey", key);
+    };
+    await submit("/business/commerce/store", updateForm, (parameters) => canonicalReplay(parameters, "1"), cookies.owner);
+    await submit("/business/commerce/store", updateForm, (parameters) => canonicalReplay(parameters, "0001"), cookies.owner);
+    assert.equal((await prisma.store.findUniqueOrThrow({ where: { id: merchantStoreId } })).deliveryFee.toFixed(0), "1");
+    assert.equal(await prisma.businessOperationMutation.count({ where: { organizationId: organizations.merchant.id, idempotencyKey: key } }), 1);
+  });
+
   await t.test("Store submission action rechecks readiness and replays exactly once", async () => {
     const storePage = await body("/business/commerce/store", cookies.owner);
     const submitForm = findForm(storePage.text, { action: "submit", storeId: merchantStoreId });
@@ -444,6 +479,92 @@ test("Gate 3A production HTML, RSC and Server Actions enforce Merchant Store bou
     const reactivateForm = findForm(suspendedDetail.text, { action: "reactivate", storeId: stores.suspended.id });
     await submit(`/admin/commerce/stores/${stores.suspended.id}`, reactivateForm, () => undefined, cookies.reviewer);
     assert.equal((await prisma.store.findUniqueOrThrow({ where: { id: stores.suspended.id } })).status, "ACTIVE");
+  });
+
+  await t.test("legacy Store image sentinels never enter HTML, RSC, public/mobile or nested Product DTOs and Owner can clear them", async () => {
+    const before = await prisma.store.findUniqueOrThrow({ where: { id: merchantStoreId } });
+    const unsafeSentinel = "https://127.0.0.1/STAGE3A-PRIVATE-STORE-SENTINEL.png";
+    const legacy = await prisma.store.update({
+      where: { id: merchantStoreId },
+      data: {
+        coverImageUrl: "https://cdn.example.com/safe-cover.png",
+        logoUrl: unsafeSentinel,
+      },
+    });
+    const category = await prisma.marketplaceCategory.create({
+      data: {
+        name: "Stage 3A legacy media",
+        normalizedName: `stage3a-legacy-${randomUUID()}`,
+        slug: `stage3a-legacy-${randomUUID().slice(0, 8)}`,
+      },
+    });
+    const product = await prisma.product.create({
+      data: {
+        categoryId: category.id,
+        name: "Legacy media nested Product",
+        normalizedSearchText: "legacy media nested product",
+        publishedAt: new Date(),
+        slug: `legacy-media-${randomUUID().slice(0, 8)}`,
+        status: "PUBLISHED",
+        storeId: merchantStoreId,
+        variants: {
+          create: {
+            inventory: { create: { onHand: 1 } },
+            isDefault: true,
+            optionKey: "default",
+            optionValues: {},
+            price: "1",
+            sku: `LEGACY-${randomUUID().slice(0, 8)}`,
+            title: "Default",
+          },
+        },
+      },
+    });
+
+    for (const rsc of [false, true]) {
+      const merchantPage = await body("/business/commerce/store", cookies.owner, rsc);
+      assert.equal(merchantPage.response.status, 200);
+      assert.equal(merchantPage.text.includes(unsafeSentinel), false);
+      const adminPage = await body(`/admin/commerce/stores/${merchantStoreId}`, cookies.reviewer, rsc);
+      assert.equal(adminPage.response.status, 200);
+      assert.equal(adminPage.text.includes(unsafeSentinel), false);
+    }
+    const merchantPage = await body("/business/commerce/store", cookies.owner);
+    const remediationForm = findForm(merchantPage.text, {
+      action: "clearUnsafeImages",
+      storeId: merchantStoreId,
+    });
+    assert.equal(merchantPage.text.includes(unsafeSentinel), false);
+    const publicStore = await page(
+      `/api/commerce/public/stores/${legacy.slug}`,
+      undefined,
+      false,
+      "REZNO-Expo-Mobile-Gate3A-Safety",
+    );
+    assert.equal(publicStore.status, 200);
+    const publicStoreBody = await publicStore.text();
+    assert.equal(publicStoreBody.includes(unsafeSentinel), false);
+    assert.equal((JSON.parse(publicStoreBody) as { data: { logoUrl: string | null } }).data.logoUrl, null);
+    const publicProduct = await page(
+      `/api/commerce/public/stores/${legacy.slug}/products/${product.slug}`,
+      undefined,
+      false,
+      "REZNO-Expo-Mobile-Gate3A-Safety",
+    );
+    assert.equal(publicProduct.status, 200);
+    const publicProductBody = await publicProduct.text();
+    assert.equal(publicProductBody.includes(unsafeSentinel), false);
+    assert.equal((JSON.parse(publicProductBody) as { data: { store: { logoUrl: string | null } } }).data.store.logoUrl, null);
+
+    await submit("/business/commerce/store", remediationForm, () => undefined, cookies.owner);
+    await submit("/business/commerce/store", remediationForm, () => undefined, cookies.owner);
+    const cleared = await prisma.store.findUniqueOrThrow({ where: { id: merchantStoreId } });
+    assert.equal(cleared.logoUrl, null);
+    assert.equal(cleared.coverImageUrl, "https://cdn.example.com/safe-cover.png");
+    assert.equal(cleared.status, "ACTIVE");
+    assert.equal(cleared.publishedAt?.toISOString(), before.publishedAt?.toISOString());
+    assert.equal(await prisma.businessAuditLog.count({ where: { action: "commerce.store.images.clear-unsafe", targetId: merchantStoreId } }), 1);
+    assert.equal(await prisma.businessOperationMutation.count({ where: { action: "commerce.store.images.clear-unsafe", targetId: merchantStoreId } }), 1);
   });
 
   await t.test("read-only and expired Admin grants fail closed structurally and transactionally", async () => {

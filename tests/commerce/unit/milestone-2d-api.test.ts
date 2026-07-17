@@ -75,6 +75,7 @@ test("Order DTOs use immutable snapshots, Decimal strings, and no internal ident
   const detail = serializeCustomerOrderDetail(order);
   assert.equal(summary.grandTotal, "11000.000");
   assert.equal(summary.store.name, "Snapshot Store");
+  assert.equal(summary.store.logoUrl, null);
   assert.equal(detail.items[0]?.unitPrice, "10000.000");
   assert.equal(detail.history[0]?.reason, null);
   const json = JSON.stringify(detail);
@@ -224,7 +225,7 @@ function orderFixture() {
     reservationExpiresAt: new Date(now.getTime() + 900_000),
     status: "PENDING",
     storeId: "store-private",
-    storeLogoUrlSnapshot: null,
+    storeLogoUrlSnapshot: "https://127.0.0.1/private-order-logo.png",
     storeNameSnapshot: "Snapshot Store",
     storePhoneSnapshot: null,
     storeSlugSnapshot: "snapshot-store",

@@ -11,6 +11,7 @@ import { COMMERCE_PERMISSIONS } from "@/features/commerce/domain/merchant-access
 import { updateCommerceRolePermissions } from "@/features/commerce/services/commerce-access-service";
 import {
   archiveStore,
+  clearUnsafeStoreImages,
   createStoreDraft,
   reopenRejectedStoreDraft,
   submitStoreForReview,
@@ -98,6 +99,27 @@ export async function merchantStoreLifecycleAction(
     } else return invalidInput();
     revalidateCommerce();
     return { message: "تم تحديث حالة المتجر.", ok: true };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function clearUnsafeStoreImagesAction(
+  _previous: CommerceActionState,
+  formData: FormData,
+): Promise<CommerceActionState> {
+  const allowed = ["action", "contextOrganizationId", "expectedVersion", "idempotencyKey", "storeId"];
+  if (hasUnknownFields(formData, allowed)) return invalidInput();
+  if (text(formData, "action") !== "clearUnsafeImages") return invalidInput();
+  try {
+    await clearUnsafeStoreImages(await currentReference(), {
+      contextOrganizationId: text(formData, "contextOrganizationId"),
+      expectedVersion: text(formData, "expectedVersion"),
+      idempotencyKey: text(formData, "idempotencyKey"),
+      storeId: text(formData, "storeId"),
+    });
+    revalidateCommerce();
+    return { message: "تمت إزالة روابط الصور القديمة غير الآمنة.", ok: true };
   } catch (error) {
     return actionError(error);
   }

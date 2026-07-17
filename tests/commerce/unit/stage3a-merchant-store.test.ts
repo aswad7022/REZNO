@@ -87,6 +87,20 @@ test("Stage 3A Merchant Store domain contracts", async (t) => {
     assert.equal(createStoreSchema.safeParse({ ...baseStore, preparationEstimateMinutes: 10_081 }).success, false);
   });
 
+  await t.test("Store money input canonicalizes leading zeros and enforces Decimal(18,3) capacity", () => {
+    const canonical = createStoreSchema.parse({
+      ...baseStore,
+      deliveryFee: "0001",
+      minimumOrderValue: "000000000000000",
+    });
+    assert.equal(canonical.deliveryFee, "1");
+    assert.equal(canonical.minimumOrderValue, "0");
+    assert.equal(createStoreSchema.safeParse({ ...baseStore, deliveryFee: "999999999999999" }).success, true);
+    for (const deliveryFee of ["1000000000000000", "+1", "1e3", "NaN", "Infinity", "1.0"]) {
+      assert.equal(createStoreSchema.safeParse({ ...baseStore, deliveryFee }).success, false);
+    }
+  });
+
   await t.test("Store update requires exact UUID envelope and timestamp version", () => {
     assert.equal(updateStoreSchema.safeParse({ ...baseStore, expectedVersion: new Date().toISOString(), storeId: randomUUID() }).success, true);
     assert.equal(updateStoreSchema.safeParse({ ...baseStore, expectedVersion: "stale", storeId: randomUUID() }).success, false);
@@ -144,6 +158,33 @@ test("Stage 3A Merchant Store domain contracts", async (t) => {
     });
     assert.equal(result.ready, false);
     assert.deepEqual(result.missing.slice(0, 2), ["organization_active", "lifecycle_valid"]);
+  });
+
+  await t.test("Readiness fails closed when historical money exceeds persistence capacity", () => {
+    const result = evaluateStoreReadiness({
+      organizationActive: true,
+      status: "ACTIVE",
+      name: "Store",
+      slug: "store",
+      description: null,
+      logoUrl: null,
+      coverImageUrl: null,
+      supportPhone: null,
+      currency: "IQD",
+      deliveryFee: new Prisma.Decimal("1000000000000000"),
+      minimumOrderValue: new Prisma.Decimal(0),
+      preparationEstimateMinutes: null,
+      deliveryEstimateMinutes: null,
+      deliveryEnabled: true,
+      deliveryCity: "Baghdad",
+      deliveryArea: "Karrada",
+      pickupEnabled: false,
+      pickupCity: null,
+      pickupArea: null,
+      pickupStreet: null,
+    });
+    assert.equal(result.ready, false);
+    assert.equal(result.missing.includes("money_valid"), true);
   });
 
   await t.test("Admin Store cursor binds actor, filter, sort and snapshot", () => {

@@ -2,6 +2,10 @@ import type { Prisma } from "@prisma/client";
 
 import { decimalString } from "@/features/commerce/domain/money";
 import { evaluateStoreReadiness } from "@/features/commerce/domain/store-readiness";
+import {
+  isSafePublicImageUrl,
+  safePublicImageUrlOrNull,
+} from "@/lib/security/public-image-url";
 
 export const merchantStoreInclude = {
   organization: {
@@ -22,10 +26,12 @@ export function storeReadiness(store: MerchantStoreRecord) {
 }
 
 export function ownerManagementStoreDto(store: MerchantStoreRecord) {
+  const unsafeCoverPresent = Boolean(store.coverImageUrl && !isSafePublicImageUrl(store.coverImageUrl));
+  const unsafeLogoPresent = Boolean(store.logoUrl && !isSafePublicImageUrl(store.logoUrl));
   return {
     archiveReason: store.archiveReason,
     archivedAt: store.archivedAt?.toISOString() ?? null,
-    coverImageUrl: store.coverImageUrl,
+    coverImageUrl: safePublicImageUrlOrNull(store.coverImageUrl),
     createdAt: store.createdAt.toISOString(),
     currency: store.currency,
     deliveryArea: store.deliveryArea,
@@ -36,7 +42,7 @@ export function ownerManagementStoreDto(store: MerchantStoreRecord) {
     description: store.description,
     expectedVersion: store.updatedAt.toISOString(),
     id: store.id,
-    logoUrl: store.logoUrl,
+    logoUrl: safePublicImageUrlOrNull(store.logoUrl),
     minimumOrderValue: store.minimumOrderValue.toFixed(0),
     name: store.name,
     organizationName: store.organization.name,
@@ -57,6 +63,8 @@ export function ownerManagementStoreDto(store: MerchantStoreRecord) {
     supportPhone: store.supportPhone,
     suspendedAt: store.suspendedAt?.toISOString() ?? null,
     suspensionReason: store.suspensionReason,
+    unsafeCoverPresent,
+    unsafeLogoPresent,
   };
 }
 

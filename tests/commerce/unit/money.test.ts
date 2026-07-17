@@ -4,7 +4,9 @@ import test from "node:test";
 import { CommerceDomainError } from "../../../features/commerce/domain/errors";
 import {
   assertIqdAmount,
+  COMMERCE_MAX_WHOLE_IQD,
   calculateCommerceTotals,
+  isCommerceAmountWithinPersistenceCapacity,
 } from "../../../features/commerce/domain/money";
 
 test("commerce totals use Decimal strings and include product reductions", () => {
@@ -62,4 +64,29 @@ test("compare-at price must exceed the selling price", () => {
     (error: unknown) =>
       error instanceof CommerceDomainError && error.code === "VALIDATION_ERROR",
   );
+});
+
+test("Decimal(18,3) accepts the maximum whole IQD value and rejects one digit beyond it", () => {
+  assert.equal(assertIqdAmount(COMMERCE_MAX_WHOLE_IQD, "price").toFixed(0), COMMERCE_MAX_WHOLE_IQD);
+  assert.equal(isCommerceAmountWithinPersistenceCapacity("999999999999999.999"), true);
+  assert.equal(isCommerceAmountWithinPersistenceCapacity("1000000000000000"), false);
+  assert.throws(
+    () => assertIqdAmount("1000000000000000", "price"),
+    (error: unknown) => error instanceof CommerceDomainError && error.code === "VALIDATION_ERROR",
+  );
+});
+
+test("calculated line and aggregate overflow fail as stable validation errors", () => {
+  for (const lines of [
+    [{ quantity: 2, unitPrice: COMMERCE_MAX_WHOLE_IQD }],
+    [
+      { quantity: 1, unitPrice: "500000000000000" },
+      { quantity: 1, unitPrice: "500000000000000" },
+    ],
+  ]) {
+    assert.throws(
+      () => calculateCommerceTotals(lines, "0"),
+      (error: unknown) => error instanceof CommerceDomainError && error.code === "VALIDATION_ERROR",
+    );
+  }
 });

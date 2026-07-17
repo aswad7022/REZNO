@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+import {
+  COMMERCE_MONEY_INTEGER_DIGITS,
+} from "@/features/commerce/domain/money";
 import { isSafePublicImageUrl } from "@/lib/security/public-image-url";
 
 const nullableText = (maximum: number) =>
@@ -19,7 +22,16 @@ const nullablePhone = z.string().trim().max(30).default("").transform((value, co
   return normalized;
 });
 
-const iqdAmount = z.string().trim().regex(/^\d+$/, "IQD amount must be a non-negative whole number.").default("0");
+const iqdAmount = z.string().trim().default("0").superRefine((value, context) => {
+  if (!/^\d+$/.test(value)) {
+    context.addIssue({ code: "custom", message: "IQD amount must be a non-negative whole number." });
+    return;
+  }
+  const canonical = value.replace(/^0+(?=\d)/, "");
+  if (canonical.length > COMMERCE_MONEY_INTEGER_DIGITS) {
+    context.addIssue({ code: "custom", message: "IQD amount exceeds storage capacity." });
+  }
+}).transform((value) => value.replace(/^0+(?=\d)/, ""));
 const estimate = z.number().int().min(1).max(10_080).nullable().default(null);
 
 export const storeProfileSchema = z.object({

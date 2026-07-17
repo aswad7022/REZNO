@@ -4,6 +4,7 @@ import { useActionState, type FormEvent } from "react";
 import { useTranslations } from "next-intl";
 
 import {
+  clearUnsafeStoreImagesAction,
   merchantStoreLifecycleAction,
   saveMerchantStoreAction,
 } from "@/features/commerce/actions/manage-merchant-store";
@@ -39,6 +40,8 @@ export interface StoreFormValue {
   slug: string;
   status: string;
   supportPhone: string | null;
+  unsafeCoverPresent: boolean;
+  unsafeLogoPresent: boolean;
 }
 
 export function MerchantStoreForm({
@@ -82,6 +85,37 @@ export function MerchantStoreForm({
       <FulfillmentSection prefix="pickup" enabled={store?.pickupEnabled} city={store?.pickupCity} area={store?.pickupArea} street={store?.pickupStreet} details={store?.pickupAdditionalDetails} instructions={store?.pickupInstructions} disabled={disabled} />
       <p id="store-form-result" aria-live="polite" className={state.ok ? "text-sm text-emerald-700" : "text-sm text-destructive"}>{state.message}</p>
       <Button type="submit" disabled={pending || disabled}>{pending ? t("saving") : t(store ? "save" : "create")}</Button>
+    </form>
+  );
+}
+
+export function UnsafeStoreImagesRemediationForm({
+  contextOrganizationId,
+  expectedVersion,
+  idempotencyKey,
+  storeId,
+}: {
+  contextOrganizationId: string;
+  expectedVersion: string;
+  idempotencyKey: string;
+  storeId: string;
+}) {
+  const t = useTranslations("Commerce");
+  const [state, action, pending] = useActionState(clearUnsafeStoreImagesAction, INITIAL);
+  return (
+    <form action={action} className="space-y-3">
+      <input type="hidden" name="action" value="clearUnsafeImages" />
+      <input type="hidden" name="contextOrganizationId" value={contextOrganizationId} />
+      <input type="hidden" name="expectedVersion" value={expectedVersion} />
+      <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
+      <input type="hidden" name="storeId" value={storeId} />
+      <p className="text-sm text-muted-foreground">{t("unsafeImagesDescription")}</p>
+      <Button type="submit" variant="destructive" disabled={pending}>
+        {pending ? t("saving") : t("clearUnsafeImages")}
+      </Button>
+      <p aria-live="polite" className={state.ok ? "text-sm text-emerald-700" : "text-sm text-destructive"}>
+        {state.message}
+      </p>
     </form>
   );
 }

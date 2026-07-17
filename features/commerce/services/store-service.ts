@@ -43,6 +43,7 @@ import {
 } from "@/features/commerce/services/transaction";
 import { sanitizeAuditValue } from "@/features/business-operations/domain/validation";
 import { prisma } from "@/lib/db/prisma";
+import { isSafePublicImageUrl } from "@/lib/security/public-image-url";
 
 export type MerchantIdentityInput = MerchantActorReference;
 
@@ -260,6 +261,66 @@ export async function archiveStore(
         commerceError("CONFLICT", "Store with active inventory reservations cannot be archived.");
       }
     },
+  });
+}
+
+export async function clearUnsafeStoreImages(
+  reference: MerchantActorReference,
+  rawInput: StoreLifecycleInput,
+) {
+  const input = parse(storeLifecycleSchema, rawInput);
+  const action = "commerce.store.images.clear-unsafe";
+  const requestHash = hashCheckoutRequest({ action, ...input });
+  return runCommerceSerializable(async (transaction) => {
+    const actor = await resolveMerchantCommerceContext(reference, "STORE_MANAGE", transaction);
+    requireOwner(actor);
+    assertRenderedMerchantOrganization(actor, input.contextOrganizationId);
+    const replay = await resolveMerchantMutationReplay(transaction, {
+      actor,
+      idempotencyKey: input.idempotencyKey,
+      requestHash,
+    });
+    if (replay) return loadReplayStore(transaction, actor, replay, input.storeId);
+
+    const store = await lockAndLoadMerchantStore(transaction, actor, input.storeId);
+    assertCommerceExpectedVersion(store.updatedAt, input.expectedVersion);
+    await assertMerchantCommerceContextCurrent(transaction, actor, "STORE_MANAGE");
+    if (store.status !== "ACTIVE" && store.status !== "SUSPENDED") {
+      commerceError(
+        "INVALID_TRANSITION",
+        "Legacy Store image remediation is only available while ACTIVE or SUSPENDED.",
+      );
+    }
+    const unsafeLogoPresent = Boolean(store.logoUrl && !isSafePublicImageUrl(store.logoUrl));
+    const unsafeCoverPresent = Boolean(
+      store.coverImageUrl && !isSafePublicImageUrl(store.coverImageUrl),
+    );
+    if (!unsafeLogoPresent && !unsafeCoverPresent) {
+      commerceError("CONFLICT", "This Store has no unsafe legacy image URLs to clear.");
+    }
+
+    const updated = await transaction.store.update({
+      where: { id: store.id },
+      data: {
+        ...(unsafeCoverPresent ? { coverImageUrl: null } : {}),
+        ...(unsafeLogoPresent ? { logoUrl: null } : {}),
+      },
+      include: merchantStoreInclude,
+    });
+    const result = ownerManagementStoreDto(updated);
+    await recordMerchantMutation(transaction, {
+      action,
+      actor,
+      after: auditStoreSnapshot(updated),
+      before: auditStoreSnapshot(store),
+      idempotencyKey: input.idempotencyKey,
+      requestHash,
+      result,
+      resultVersion: updated.updatedAt,
+      targetId: updated.id,
+      targetType: "Store",
+    });
+    return result;
   });
 }
 
@@ -572,6 +633,10 @@ function auditStoreSnapshot(store: MerchantStoreRecord) {
     preparationEstimateMinutes: store.preparationEstimateMinutes,
     slug: store.slug,
     status: store.status,
+    unsafeCoverPresent: Boolean(
+      store.coverImageUrl && !isSafePublicImageUrl(store.coverImageUrl),
+    ),
+    unsafeLogoPresent: Boolean(store.logoUrl && !isSafePublicImageUrl(store.logoUrl)),
     version: store.updatedAt.toISOString(),
   };
 }

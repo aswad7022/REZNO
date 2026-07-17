@@ -5,7 +5,12 @@ import { getTranslations } from "next-intl/server";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DashboardPageHeader, DashboardShell } from "@/components/dashboard/dashboard-shell";
-import { MerchantStoreForm, MerchantStoreLifecycleForms, type StoreFormValue } from "@/features/commerce/components/merchant-store-forms";
+import {
+  MerchantStoreForm,
+  MerchantStoreLifecycleForms,
+  UnsafeStoreImagesRemediationForm,
+  type StoreFormValue,
+} from "@/features/commerce/components/merchant-store-forms";
 import { requireAuthenticatedMerchantActor } from "@/features/commerce/services/authenticated-context";
 import { getMerchantStore } from "@/features/commerce/services/store-service";
 
@@ -44,6 +49,17 @@ export default async function MerchantStorePage() {
           expectedVersion={managementStore.expectedVersion}
           idempotencyKeys={{ archive: randomUUID(), reopen: randomUUID(), submit: randomUUID() }}
           status={managementStore.status}
+          storeId={managementStore.id}
+        /></CardContent>
+      </Card> : null}
+      {managementStore &&
+      ["ACTIVE", "SUSPENDED"].includes(managementStore.status) &&
+      (managementStore.unsafeLogoPresent || managementStore.unsafeCoverPresent) ? <Card>
+        <CardHeader><CardTitle>{t("unsafeImagesTitle")}</CardTitle></CardHeader>
+        <CardContent><UnsafeStoreImagesRemediationForm
+          contextOrganizationId={actor.organizationId}
+          expectedVersion={managementStore.expectedVersion}
+          idempotencyKey={randomUUID()}
           storeId={managementStore.id}
         /></CardContent>
       </Card> : null}

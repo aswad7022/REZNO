@@ -3,6 +3,7 @@ import { Prisma, type CustomerAddress } from "@prisma/client";
 import { calculateCommerceTotals, decimalString } from "@/features/commerce/domain/money";
 import type { CartApiRecord } from "@/features/commerce/services/cart-service";
 import type { CustomerOrderRecord } from "@/features/commerce/services/customer-order-query-service";
+import { safePublicImageUrlOrNull } from "@/lib/security/public-image-url";
 
 export function serializeCustomerAddress(address: CustomerAddress) {
   return {
@@ -70,7 +71,12 @@ export function serializeCart(cart: CartApiRecord | null) {
     informationalDiscountTotal: totals?.discountTotal ?? "0.000",
     informationalSubtotal: totals?.subtotal ?? "0.000",
     items,
-    store: { id: cart.store.id, logoUrl: cart.store.logoUrl, name: cart.store.name, slug: cart.store.slug },
+    store: {
+      id: cart.store.id,
+      logoUrl: safePublicImageUrlOrNull(cart.store.logoUrl),
+      name: cart.store.name,
+      slug: cart.store.slug,
+    },
     totalQuantity: items.reduce((total, item) => total + item.quantity, 0),
     updatedAt: cart.updatedAt.toISOString(),
     version: cart.version,
@@ -169,7 +175,7 @@ export function serializeCheckoutReceipt(order: CheckoutReceiptRecord) {
     paymentStatus: order.payment?.status ?? order.paymentStatus,
     status: order.status,
     store: {
-      logoUrl: order.storeLogoUrlSnapshot,
+      logoUrl: safePublicImageUrlOrNull(order.storeLogoUrlSnapshot),
       name: order.storeNameSnapshot,
       slug: order.storeSlugSnapshot,
     },
@@ -237,7 +243,7 @@ export function serializeCustomerOrderSummary(order: CustomerOrderRecord) {
       : null,
     status: order.status,
     store: {
-      logoUrl: order.storeLogoUrlSnapshot,
+      logoUrl: safePublicImageUrlOrNull(order.storeLogoUrlSnapshot),
       name: order.storeNameSnapshot,
       slug: order.storeSlugSnapshot,
     },

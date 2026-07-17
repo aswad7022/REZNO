@@ -327,6 +327,52 @@ test("Milestone 2A PostgreSQL commerce foundation", { concurrency: false }, asyn
   });
   const bookingBaseline = await prisma.booking.findUniqueOrThrow({ where: { id: booking.id } });
 
+  await t.test("Checkout rejects Decimal(18,3) calculated overflow before any mutation", async () => {
+    const overflowProduct = await createProduct(primary.identity, {
+      categoryId: category.id,
+      defaultVariant: {
+        price: "999999999999999",
+        sku: `OVERFLOW-${randomUUID().slice(0, 8)}`,
+        title: "Default",
+      },
+      name: "Overflow capacity probe",
+      slug: `overflow-${randomUUID().slice(0, 8)}`,
+      storeId: primary.store.id,
+    });
+    const variant = overflowProduct.variants[0]!;
+    await adjustInventory(primary.identity, {
+      idempotencyKey: `test-stock-${variant.id}`,
+      quantityDelta: 2,
+      reason: "Overflow capacity probe stock",
+      variantId: variant.id,
+    });
+    await publishProduct(primary.identity, overflowProduct.id);
+    const cart = await createPickupCart(customerC.id, variant.id, 2);
+    const key = randomUUID();
+    const before = await prisma.cart.findUniqueOrThrow({ where: { id: cart.id } });
+    await assert.rejects(
+      createPendingOrder({
+        cartId: cart.id,
+        cartVersion: cart.version,
+        customerId: customerC.id,
+        fulfillmentMethod: "CUSTOMER_PICKUP",
+        idempotencyKey: key,
+      }),
+      expectCommerceCode("VALIDATION_ERROR"),
+    );
+    const [after, inventory] = await Promise.all([
+      prisma.cart.findUniqueOrThrow({ where: { id: cart.id } }),
+      prisma.inventoryItem.findUniqueOrThrow({ where: { variantId: variant.id } }),
+    ]);
+    assert.equal(after.status, "ACTIVE");
+    assert.equal(after.version, before.version);
+    assert.equal(inventory.reserved, 0);
+    assert.equal(await prisma.order.count({ where: { customerId: customerC.id } }), 0);
+    assert.equal(await prisma.checkoutIdempotency.count({ where: { customerId: customerC.id, key } }), 0);
+    assert.equal(await prisma.inventoryReservation.count({ where: { productVariantId: variant.id } }), 0);
+    await prisma.cart.delete({ where: { id: cart.id } });
+  });
+
   await t.test("commerce migration is recorded and Store ownership is unique", async () => {
     const migrations = await prisma.$queryRaw<Array<{ migration_name: string }>>`
       SELECT migration_name FROM "_prisma_migrations"

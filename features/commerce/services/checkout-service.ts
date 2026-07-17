@@ -9,8 +9,10 @@ import {
   resolveIdempotency,
 } from "@/features/commerce/domain/idempotency";
 import {
+  assertCommercePersistenceAmount,
   calculateCommerceTotals,
   COMMERCE_CURRENCY,
+  type CommerceOrderTotals,
 } from "@/features/commerce/domain/money";
 import {
   reservationExpiresAt,
@@ -23,6 +25,7 @@ import {
   runCommerceSerializable,
 } from "@/features/commerce/services/transaction";
 import { prisma } from "@/lib/db/prisma";
+import { safePublicImageUrlOrNull } from "@/lib/security/public-image-url";
 
 export interface CreatePendingOrderInput {
   addressId?: string | null;
@@ -199,6 +202,7 @@ export async function createPendingOrder(input: CreatePendingOrderInput) {
         totalInput,
         input.fulfillmentMethod === "STORE_DELIVERY" ? cart.store.deliveryFee : "0",
       );
+      assertCheckoutPersistenceCapacity(totals);
       const merchandiseTotal = new Prisma.Decimal(totals.subtotal).minus(totals.discountTotal);
       if (merchandiseTotal.lessThan(cart.store.minimumOrderValue)) {
         commerceError("MINIMUM_ORDER_NOT_MET", "Cart does not meet the Store minimum order value.");
@@ -320,7 +324,7 @@ export async function createPendingOrder(input: CreatePendingOrderInput) {
           preparationEstimateMinutes: cart.store.preparationEstimateMinutes,
           reservationExpiresAt: expiresAt,
           storeId: cart.storeId,
-          storeLogoUrlSnapshot: cart.store.logoUrl,
+          storeLogoUrlSnapshot: safePublicImageUrlOrNull(cart.store.logoUrl),
           storeNameSnapshot: cart.store.name,
           storePhoneSnapshot: cart.store.supportPhone,
           storeSlugSnapshot: cart.store.slug,
@@ -393,5 +397,31 @@ export async function createPendingOrder(input: CreatePendingOrderInput) {
       return replayExistingOrder(input.customerId, input.idempotencyKey, requestHash);
     }
     throw error;
+  }
+}
+
+function assertCheckoutPersistenceCapacity(totals: CommerceOrderTotals) {
+  for (const [field, value] of [
+    ["order.subtotal", totals.subtotal],
+    ["order.deliveryFee", totals.deliveryFee],
+    ["order.discountTotal", totals.discountTotal],
+    ["order.taxTotal", totals.taxTotal],
+    ["order.grandTotal", totals.grandTotal],
+    ["payment.amount", totals.grandTotal],
+  ] as const) {
+    assertCommercePersistenceAmount(value, field);
+  }
+  for (const [index, line] of totals.lines.entries()) {
+    for (const [field, value] of [
+      ["compareAtPrice", line.compareAtPrice],
+      ["lineDiscount", line.lineDiscount],
+      ["lineSubtotal", line.lineSubtotal],
+      ["lineTotal", line.lineTotal],
+      ["unitPrice", line.unitPrice],
+    ] as const) {
+      if (value !== null) {
+        assertCommercePersistenceAmount(value, `order.items[${index}].${field}`);
+      }
+    }
   }
 }

@@ -1,6 +1,9 @@
-import type { StoreStatus } from "@prisma/client";
+import type { Prisma, StoreStatus } from "@prisma/client";
 
-import { COMMERCE_CURRENCY } from "@/features/commerce/domain/money";
+import {
+  COMMERCE_CURRENCY,
+  isCommerceAmountWithinPersistenceCapacity,
+} from "@/features/commerce/domain/money";
 import { isSafePublicImageUrl } from "@/lib/security/public-image-url";
 
 export type StoreReadinessCheckKey =
@@ -26,8 +29,8 @@ export interface StoreReadinessInput {
   coverImageUrl: string | null;
   supportPhone: string | null;
   currency: string;
-  deliveryFee: { isInteger(): boolean; isNegative(): boolean };
-  minimumOrderValue: { isInteger(): boolean; isNegative(): boolean };
+  deliveryFee: Prisma.Decimal;
+  minimumOrderValue: Prisma.Decimal;
   preparationEstimateMinutes: number | null;
   deliveryEstimateMinutes: number | null;
   deliveryEnabled: boolean;
@@ -69,7 +72,9 @@ export function evaluateStoreReadiness(store: StoreReadinessInput) {
       key: "money_valid",
       ready:
         !store.deliveryFee.isNegative() && store.deliveryFee.isInteger() &&
-        !store.minimumOrderValue.isNegative() && store.minimumOrderValue.isInteger(),
+        isCommerceAmountWithinPersistenceCapacity(store.deliveryFee) &&
+        !store.minimumOrderValue.isNegative() && store.minimumOrderValue.isInteger() &&
+        isCommerceAmountWithinPersistenceCapacity(store.minimumOrderValue),
     },
     {
       key: "estimates_valid",

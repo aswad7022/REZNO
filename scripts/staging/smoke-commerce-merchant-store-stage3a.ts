@@ -79,6 +79,8 @@ async function main() {
     orderConflict: await createOrganization("order-conflict"),
     reservationConflict: await createOrganization("reservation-conflict"),
     adminProbe: await createOrganization("admin-probe"),
+    money: await createOrganization("money-capacity"),
+    safetySuspended: await createOrganization("legacy-suspended"),
   };
 
   const roles = {
@@ -86,6 +88,8 @@ async function main() {
     collisionOwner: await createRole(organizations.collision.id, "collision-owner", "OWNER", [...OWNER_DEFAULT_COMMERCE_PERMISSIONS]),
     orderOwner: await createRole(organizations.orderConflict.id, "order-owner", "OWNER", [...OWNER_DEFAULT_COMMERCE_PERMISSIONS]),
     reservationOwner: await createRole(organizations.reservationConflict.id, "reservation-owner", "OWNER", [...OWNER_DEFAULT_COMMERCE_PERMISSIONS]),
+    moneyOwner: await createRole(organizations.money.id, "money-owner", "OWNER", [...OWNER_DEFAULT_COMMERCE_PERMISSIONS]),
+    safetySuspendedOwner: await createRole(organizations.safetySuspended.id, "legacy-suspended-owner", "OWNER", [...OWNER_DEFAULT_COMMERCE_PERMISSIONS]),
     foreignOwner: await createRole(organizations.foreign.id, "foreign-owner", "OWNER", [...OWNER_DEFAULT_COMMERCE_PERMISSIONS]),
     managerAllowed: await createRole(organizations.primary.id, "manager-allowed", "MANAGER", ["STORE_VIEW"]),
     managerDenied: await createRole(organizations.primary.id, "manager-denied", "MANAGER", []),
@@ -100,6 +104,8 @@ async function main() {
     collisionOwner: await createMember(organizations.collision.id, sessions.owner.personId, roles.collisionOwner.id),
     orderOwner: await createMember(organizations.orderConflict.id, sessions.owner.personId, roles.orderOwner.id),
     reservationOwner: await createMember(organizations.reservationConflict.id, sessions.owner.personId, roles.reservationOwner.id),
+    moneyOwner: await createMember(organizations.money.id, sessions.owner.personId, roles.moneyOwner.id),
+    safetySuspendedOwner: await createMember(organizations.safetySuspended.id, sessions.owner.personId, roles.safetySuspendedOwner.id),
     foreignOwner: await createMember(organizations.foreign.id, sessions.foreignOwner.personId, roles.foreignOwner.id),
     managerAllowed: await createMember(organizations.primary.id, sessions.managerAllowed.personId, roles.managerAllowed.id),
     managerDenied: await createMember(organizations.primary.id, sessions.managerDenied.personId, roles.managerDenied.id),
@@ -132,6 +138,8 @@ async function main() {
     orderConflict: await createStore(organizations.orderConflict.id, "order-conflict", "DRAFT"),
     reservationConflict: await createStore(organizations.reservationConflict.id, "reservation-conflict", "DRAFT"),
     adminProbe: await createStore(organizations.adminProbe.id, "admin-probe", "PENDING_REVIEW"),
+    money: await createStore(organizations.money.id, "money-capacity", "DRAFT"),
+    safetySuspended: await createStore(organizations.safetySuspended.id, "legacy-suspended", "SUSPENDED"),
   };
 
   const cookies = {
@@ -139,6 +147,8 @@ async function main() {
     collisionOwner: activeCookie(sessions.owner.cookie, organizations.collision.id),
     orderOwner: activeCookie(sessions.owner.cookie, organizations.orderConflict.id),
     reservationOwner: activeCookie(sessions.owner.cookie, organizations.reservationConflict.id),
+    moneyOwner: activeCookie(sessions.owner.cookie, organizations.money.id),
+    safetySuspendedOwner: activeCookie(sessions.owner.cookie, organizations.safetySuspended.id),
     foreignOwner: activeCookie(sessions.foreignOwner.cookie, organizations.foreign.id),
     managerAllowed: activeCookie(sessions.managerAllowed.cookie, organizations.primary.id),
     managerDenied: activeCookie(sessions.managerDenied.cookie, organizations.primary.id),
@@ -162,6 +172,47 @@ async function main() {
     fillStore(parameters, "Collision", directStores.foreign.slug);
   }, cookies.collisionOwner);
   assert.equal(await prisma.store.count({ where: { organizationId: organizations.collision.id } }), 0);
+
+  const moneyPage = await body("/business/commerce/store", cookies.moneyOwner);
+  let moneyForm = findForm(moneyPage.text, { mode: "update", storeId: directStores.money.id });
+  await submit("/business/commerce/store", moneyForm, (parameters) => {
+    parameters.set("deliveryFee", "999999999999999");
+    parameters.set("idempotencyKey", randomUUID());
+  }, cookies.moneyOwner);
+  assert.equal(
+    (await prisma.store.findUniqueOrThrow({ where: { id: directStores.money.id } })).deliveryFee.toFixed(0),
+    "999999999999999",
+  );
+  moneyForm = findForm(
+    (await body("/business/commerce/store", cookies.moneyOwner)).text,
+    { mode: "update", storeId: directStores.money.id },
+  );
+  const moneyAuditBefore = await prisma.businessAuditLog.count({ where: { targetId: directStores.money.id } });
+  const moneyLedgerBefore = await prisma.businessOperationMutation.count({ where: { targetId: directStores.money.id } });
+  await submit("/business/commerce/store", moneyForm, (parameters) => {
+    parameters.set("deliveryFee", "1000000000000000");
+    parameters.set("idempotencyKey", randomUUID());
+  }, cookies.moneyOwner);
+  assert.equal(
+    (await prisma.store.findUniqueOrThrow({ where: { id: directStores.money.id } })).deliveryFee.toFixed(0),
+    "999999999999999",
+  );
+  assert.equal(await prisma.businessAuditLog.count({ where: { targetId: directStores.money.id } }), moneyAuditBefore);
+  assert.equal(await prisma.businessOperationMutation.count({ where: { targetId: directStores.money.id } }), moneyLedgerBefore);
+  moneyForm = findForm(
+    (await body("/business/commerce/store", cookies.moneyOwner)).text,
+    { mode: "update", storeId: directStores.money.id },
+  );
+  const moneyReplayKey = randomUUID();
+  const canonicalMoney = (parameters: URLSearchParams, value: string) => {
+    parameters.set("deliveryFee", value);
+    parameters.set("minimumOrderValue", "0000");
+    parameters.set("idempotencyKey", moneyReplayKey);
+  };
+  await submit("/business/commerce/store", moneyForm, (parameters) => canonicalMoney(parameters, "1"), cookies.moneyOwner);
+  await submit("/business/commerce/store", moneyForm, (parameters) => canonicalMoney(parameters, "0001"), cookies.moneyOwner);
+  assert.equal(await prisma.businessOperationMutation.count({ where: { organizationId: organizations.money.id, idempotencyKey: moneyReplayKey } }), 1);
+  checks.add(31);
 
   const createPage = await body("/business/commerce/store", cookies.owner);
   const createForm = findForm(createPage.text, { mode: "create" });
@@ -334,6 +385,126 @@ async function main() {
   checks.add(14);
 
   assert.equal((await publicStore(primarySlug)).status, 200);
+  const unsafeSentinel = `https://127.0.0.1/${runId}-legacy-store.png`;
+  const beforeLegacyClear = await prisma.store.update({
+    where: { id: primaryStore.id },
+    data: {
+      coverImageUrl: `https://cdn.example.com/${runId}-safe-cover.png`,
+      logoUrl: unsafeSentinel,
+    },
+  });
+  const safetyCategory = await prisma.marketplaceCategory.create({
+    data: {
+      name: `Stage 3A safety ${runId}`,
+      normalizedName: `stage-3a-safety-${runId}`,
+      slug: `stage-3a-safety-${runId}`,
+    },
+  });
+  remember(resources.marketplaceCategoryIds, safetyCategory.id);
+  const safetyProduct = await prisma.product.create({
+    data: {
+      categoryId: safetyCategory.id,
+      name: "Stage 3A safety Product",
+      normalizedSearchText: "stage 3a safety product",
+      publishedAt: new Date(),
+      slug: `stage3a-safety-${runId}`,
+      status: "PUBLISHED",
+      storeId: primaryStore.id,
+    },
+  });
+  remember(resources.productIds, safetyProduct.id);
+  const safetyVariant = await prisma.productVariant.create({
+    data: {
+      isDefault: true,
+      optionKey: "default",
+      optionValues: {},
+      price: "999999999999999",
+      productId: safetyProduct.id,
+      sku: `STAGE3A-SAFETY-${runId}`,
+      storeId: primaryStore.id,
+      title: "Default",
+    },
+  });
+  remember(resources.productVariantIds, safetyVariant.id);
+  const safetyInventory = await prisma.inventoryItem.create({
+    data: { onHand: 2, variantId: safetyVariant.id },
+  });
+  remember(resources.inventoryItemIds, safetyInventory.id);
+
+  for (const rsc of [false, true]) {
+    const merchantSafety = await body("/business/commerce/store", cookies.owner, rsc);
+    assert.equal(merchantSafety.text.includes(unsafeSentinel), false);
+    const adminSafety = await body(`/admin/commerce/stores/${primaryStore.id}`, cookies.reviewer, rsc);
+    assert.equal(adminSafety.text.includes(unsafeSentinel), false);
+  }
+  const publicSafety = await page(`/api/commerce/public/stores/${primarySlug}`, undefined, false, "REZNO-Expo-Mobile-Gate3A-Safety");
+  const publicSafetyText = await publicSafety.text();
+  assert.equal(publicSafety.status, 200);
+  assert.equal(publicSafetyText.includes(unsafeSentinel), false);
+  assert.equal((JSON.parse(publicSafetyText) as { data: { logoUrl: string | null } }).data.logoUrl, null);
+  const productSafety = await page(`/api/commerce/public/stores/${primarySlug}/products/${safetyProduct.slug}`, undefined, false, "REZNO-Expo-Mobile-Gate3A-Safety");
+  const productSafetyText = await productSafety.text();
+  assert.equal(productSafety.status, 200);
+  assert.equal(productSafetyText.includes(unsafeSentinel), false);
+  assert.equal((JSON.parse(productSafetyText) as { data: { store: { logoUrl: string | null } } }).data.store.logoUrl, null);
+
+  const remediationPage = await body("/business/commerce/store", cookies.owner);
+  const remediationForm = findForm(remediationPage.text, { action: "clearUnsafeImages", storeId: primaryStore.id });
+  await submit("/business/commerce/store", remediationForm, () => undefined, cookies.owner);
+  await submit("/business/commerce/store", remediationForm, () => undefined, cookies.owner);
+  const remediated = await prisma.store.findUniqueOrThrow({ where: { id: primaryStore.id } });
+  assert.equal(remediated.logoUrl, null);
+  assert.equal(remediated.coverImageUrl, `https://cdn.example.com/${runId}-safe-cover.png`);
+  assert.equal(remediated.status, "ACTIVE");
+  assert.equal(remediated.publishedAt?.toISOString(), beforeLegacyClear.publishedAt?.toISOString());
+  assert.equal(await prisma.businessAuditLog.count({ where: { action: "commerce.store.images.clear-unsafe", targetId: primaryStore.id } }), 1);
+  assert.equal(await prisma.businessOperationMutation.count({ where: { action: "commerce.store.images.clear-unsafe", targetId: primaryStore.id } }), 1);
+
+  const suspendedUnsafe = `javascript:${runId}-legacy-suspended`;
+  const suspendedBefore = await prisma.store.update({
+    where: { id: directStores.safetySuspended.id },
+    data: { logoUrl: suspendedUnsafe },
+  });
+  const suspendedSafetyPage = await body("/business/commerce/store", cookies.safetySuspendedOwner);
+  assert.equal(suspendedSafetyPage.text.includes(suspendedUnsafe), false);
+  const suspendedRemediation = findForm(suspendedSafetyPage.text, {
+    action: "clearUnsafeImages",
+    storeId: directStores.safetySuspended.id,
+  });
+  await submit("/business/commerce/store", suspendedRemediation, () => undefined, cookies.safetySuspendedOwner);
+  const suspendedAfter = await prisma.store.findUniqueOrThrow({ where: { id: directStores.safetySuspended.id } });
+  assert.equal(suspendedAfter.logoUrl, null);
+  assert.equal(suspendedAfter.status, "SUSPENDED");
+  assert.equal(suspendedAfter.publishedAt?.toISOString(), suspendedBefore.publishedAt?.toISOString());
+  checks.add(32);
+
+  const added = await commerceRequest("/api/commerce/customer/cart/items", {
+    body: { quantity: 2, variantId: safetyVariant.id },
+    cookie: sessions.reviewer.cookie,
+    method: "POST",
+  });
+  assert.equal(added.response.status, 200);
+  const overflowCart = (added.body as { data: { id: string; version: number } }).data;
+  const overflowKey = randomUUID();
+  const overflowCheckout = await commerceRequest("/api/commerce/customer/checkout", {
+    body: {
+      cartId: overflowCart.id,
+      cartVersion: overflowCart.version,
+      fulfillmentMethod: "CUSTOMER_PICKUP",
+    },
+    cookie: sessions.reviewer.cookie,
+    headers: { "idempotency-key": overflowKey },
+    method: "POST",
+  });
+  assert.equal(overflowCheckout.response.status, 400);
+  assert.equal((overflowCheckout.body as { error: { code: string } }).error.code, "INVALID_REQUEST");
+  assert.equal(await prisma.order.count({ where: { customerId: sessions.reviewer.personId, storeId: primaryStore.id } }), 0);
+  assert.equal(await prisma.checkoutIdempotency.count({ where: { customerId: sessions.reviewer.personId, key: overflowKey } }), 0);
+  assert.equal((await prisma.inventoryItem.findUniqueOrThrow({ where: { id: safetyInventory.id } })).reserved, 0);
+  assert.equal(await prisma.inventoryReservation.count({ where: { productVariantId: safetyVariant.id } }), 0);
+  await prisma.cart.delete({ where: { id: overflowCart.id } });
+  checks.add(33);
+
   const activeDetail = await body(`/admin/commerce/stores/${primaryStore.id}`, cookies.reviewer);
   const suspendForm = findForm(activeDetail.text, { action: "suspend", storeId: primaryStore.id });
   await submit(`/admin/commerce/stores/${primaryStore.id}`, suspendForm, (parameters) => {
@@ -512,8 +683,8 @@ async function main() {
   );
   checks.add(22);
 
-  assert.equal(await prisma.businessOperationMutation.count({ where: { targetId: primaryStore.id } }), 6);
-  assert.equal(await prisma.businessAuditLog.count({ where: { targetId: primaryStore.id } }), 6);
+  assert.equal(await prisma.businessOperationMutation.count({ where: { targetId: primaryStore.id } }), 7);
+  assert.equal(await prisma.businessAuditLog.count({ where: { targetId: primaryStore.id } }), 7);
   assert.equal(await prisma.adminAuditLog.count({ where: { targetId: primaryStore.id } }), 4);
   checks.add(23);
 
@@ -556,7 +727,7 @@ async function main() {
   checks.add(27);
 
   checks.add(29);
-  assert.equal(checks.size, 29);
+  assert.equal(checks.size, 32);
 }
 
 async function signUp(label: string, phoneSuffix: number): Promise<Session> {
@@ -723,6 +894,24 @@ async function submit(
   }
   assertNoRaw(responseBody);
   return response;
+}
+
+async function commerceRequest(
+  path: string,
+  options: { body?: unknown; cookie?: string; headers?: Record<string, string>; method?: string } = {},
+) {
+  const response = await fetch(`${baseUrl}${path}`, {
+    body: options.body === undefined ? undefined : JSON.stringify(options.body),
+    headers: requestHeaders({
+      ...(options.body === undefined ? {} : { "content-type": "application/json" }),
+      ...(options.cookie ? { cookie: options.cookie } : {}),
+      ...options.headers,
+    }),
+    method: options.method ?? "GET",
+  });
+  const body = await response.json() as Record<string, unknown>;
+  assertNoRaw(JSON.stringify(body));
+  return { body, response };
 }
 
 function requestHeaders(initial: Record<string, string>) {
@@ -905,7 +1094,7 @@ async function runSmoke() {
     return;
   }
 
-  assert.equal(checks.size, 30);
+  assert.equal(checks.size, 33);
   console.log(
     `Stage 3A authenticated staging smoke passed. identities=10 checks=${checks.size} cleanup=verified confirmation=${COMMERCE_STAGE3A_SMOKE_CONFIRMATION.length}`,
   );
