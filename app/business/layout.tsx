@@ -11,6 +11,7 @@ import {
 } from "@/features/messages/services/messages";
 import { getDashboardNotifications } from "@/features/notifications/services/notifications";
 import { canPerformBusinessOperation } from "@/features/business-operations/domain/policy";
+import { effectiveCommercePermissions } from "@/features/commerce/domain/merchant-access";
 
 export default async function BusinessDashboardLayout({
   children,
@@ -70,6 +71,7 @@ export default async function BusinessDashboardLayout({
       membershipId={membership.id}
       activeBusinessId={membership.organizationId}
       businesses={identity.accessibleBusinesses}
+      commercePermissions={effectiveCommercePermissions(membership.role)}
     >
       {children}
     </DashboardLayout>

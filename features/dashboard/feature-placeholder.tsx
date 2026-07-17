@@ -61,7 +61,6 @@ const customerFeatures: Readonly<Record<string, FeatureDefinition>> = {
 };
 
 export const deferredBusinessRouteRegistry = {
-  "/business/commerce": "Stage 3 Commerce Merchant and Admin operations",
   "/business/communications": "Stage 4 Notifications and Messaging closure",
   "/business/media": "Stage 5 Media, Storage and Payments Foundation",
   "/business/payments": "Stage 5 Media, Storage and Payments Foundation",

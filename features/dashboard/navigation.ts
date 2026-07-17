@@ -17,11 +17,12 @@ import {
   ShieldCheck,
   Sparkles,
   Star,
+  ShoppingBag,
   Armchair,
   UserRound,
   UsersRound,
 } from "lucide-react";
-import type { BusinessVertical, SystemRole } from "@prisma/client";
+import type { BusinessVertical, CommercePermission, SystemRole } from "@prisma/client";
 
 import { isRestaurantVertical } from "@/features/businesses/config/verticals";
 import type {
@@ -97,6 +98,7 @@ const customerNavigation: DashboardNavigationGroup[] = [
 
 function businessNavigation(input: {
   canAccessMessages: boolean;
+  commercePermissions: readonly CommercePermission[];
   membershipId?: string;
   role: SystemRole | null;
   vertical?: BusinessVertical;
@@ -107,6 +109,7 @@ function businessNavigation(input: {
   );
   const management = input.role === "OWNER" || input.role === "MANAGER";
   const staff = input.role === "STAFF";
+  const canViewCommerce = input.commercePermissions.length > 0;
   const workspace: DashboardNavigationGroup["items"] = [
     { title: "overview", href: "/business", icon: LayoutDashboard },
     { title: "calendar", href: "/business/calendar", icon: CalendarDays },
@@ -135,6 +138,21 @@ function businessNavigation(input: {
             ? [{ title: "availability" as const, href: `/business/team/${input.membershipId}/availability`, icon: Clock3 }]
             : []),
         ] satisfies DashboardNavigationGroup["items"])
+      : []),
+    ...(canViewCommerce
+      ? ([{
+          title: "commerce",
+          href: "/business/commerce",
+          icon: ShoppingBag,
+          children: [
+            ...(input.commercePermissions.includes("STORE_VIEW")
+              ? [{ title: "commerceStore" as const, href: "/business/commerce/store", icon: ShoppingBag }]
+              : []),
+            ...(input.role === "OWNER"
+              ? [{ title: "commerceAccess" as const, href: "/business/commerce/access", icon: ShieldCheck }]
+              : []),
+          ],
+        }] satisfies DashboardNavigationGroup["items"])
       : []),
     ...(management
       ? ([
@@ -174,10 +192,12 @@ export function getDashboardNavigation(
   systemRole: SystemRole | null = null,
   membershipId?: string,
   canAccessMessages = true,
+  commercePermissions: readonly CommercePermission[] = [],
 ): DashboardNavigationGroup[] {
   if (role !== "business") return customerNavigation;
   return businessNavigation({
     canAccessMessages,
+    commercePermissions,
     membershipId,
     role: systemRole,
     vertical,
@@ -220,4 +240,7 @@ export const dashboardRouteLabels: Readonly<
   messages: "messages",
   admin: "admin",
   assistant: "assistant",
+  commerce: "commerce",
+  store: "commerceStore",
+  access: "commerceAccess",
 };

@@ -1187,7 +1187,10 @@
       "publicProfile": "الصفحة العامة",
       "profile": "بيانات النشاط",
       "notifications": "الإشعارات",
-      "settings": "الإعدادات"
+      "settings": "الإعدادات",
+      "commerce": "التجارة",
+      "commerceStore": "المتجر",
+      "commerceAccess": "صلاحيات التجارة"
     },
     "customer": {
       "dashboard": "لوحة التحكم",
@@ -1241,7 +1244,10 @@
         "reservations": "الحجوزات",
         "tables": "الطاولات",
         "menu": "القائمة",
-        "assistant": "المساعد"
+        "assistant": "المساعد",
+        "commerce": "التجارة",
+        "commerceStore": "المتجر",
+        "commerceAccess": "صلاحيات التجارة"
       }
     },
     "openMenu": "فتح قائمة التنقل",
@@ -1696,5 +1702,54 @@
     "branch": "الفرع",
     "selectBranch": "اختر الفرع",
     "chooseBranch": "اختيار الفرع"
+  },
+  "Commerce": {
+    "hubTitle": "التجارة",
+    "hubDescription": "إدارة أساس المتجر وصلاحيات التجارة الصريحة لهذا النشاط.",
+    "currentAccess": "صلاحيات التجارة الحالية",
+    "storePresent": "افتح ملف المتجر والجاهزية ودورة المراجعة.",
+    "storeAbsent": "أنشئ المتجر الوحيد المملوك لهذا النشاط.",
+    "store": "المتجر",
+    "access": "صلاحيات التجارة",
+    "accessDescription": "صلاحيات تشغيلية صريحة يديرها المالك للأدوار المؤهلة.",
+    "gate3b": "إدارة المنتجات والمخزون تبدأ في Gate 3B.",
+    "productsInventory": "المنتجات والمخزون",
+    "gate3c": "إدارة الطلبات والتنفيذ تبدأ في Gate 3C.",
+    "ordersFulfillment": "الطلبات والتنفيذ",
+    "open": "فتح",
+    "notAvailable": "غير متاح في Gate 3A",
+    "storeTitle": "متجر التاجر",
+    "storeDescription": "ملف وإعدادات تنفيذ وجاهزية ودورة مراجعة متصلة بالإنتاج.",
+    "publicSlug": "الرابط العام",
+    "readiness": "الجاهزية",
+    "ready": "جاهز",
+    "notReady": "يحتاج إلى إكمال",
+    "editStore": "تعديل إعدادات المتجر",
+    "createStore": "إنشاء متجر",
+    "readOnly": "صلاحيتك الصريحة تمنحك عرضًا آمنًا للقراءة فقط.",
+    "lifecycle": "دورة حياة المتجر",
+    "save": "حفظ المتجر",
+    "create": "إنشاء المتجر",
+    "saving": "جارٍ الحفظ…",
+    "submit": "إرسال للمراجعة",
+    "confirmSubmit": "هل تريد إرسال المتجر للمراجعة الآن؟",
+    "reopen": "إعادة فتح المسودة",
+    "archive": "أرشفة المتجر",
+    "confirmArchive": "هل تريد أرشفة المتجر؟ لا يمكن التراجع عن هذا الإجراء هنا.",
+    "archiveReason": "سبب الأرشفة",
+    "accessTitle": "صلاحيات التجارة",
+    "accessPageDescription": "منح صلاحيات تشغيلية محدودة دون تغيير أدوار النظام.",
+    "fixedRole": "هذا الدور ثابت ولا يمكن تعديله هنا.",
+    "saveAccess": "حفظ الصلاحيات",
+    "delivery": { "title": "التوصيل", "enabled": "تفعيل توصيل المتجر" },
+    "pickup": { "title": "الاستلام", "enabled": "تفعيل استلام العميل" },
+    "fields": {
+      "name": "اسم المتجر", "slug": "معرّف المتجر", "description": "الوصف",
+      "logoUrl": "رابط الشعار الآمن", "coverImageUrl": "رابط الغلاف الآمن",
+      "supportPhone": "هاتف الدعم", "preparationEstimate": "مدة التجهيز بالدقائق",
+      "deliveryEstimate": "مدة التوصيل بالدقائق", "deliveryFee": "رسوم التوصيل بالدينار",
+      "minimumOrder": "الحد الأدنى للطلب بالدينار", "city": "المدينة", "area": "المنطقة",
+      "street": "الشارع", "details": "تفاصيل إضافية", "instructions": "تعليمات الاستلام"
+    }
   }
 }

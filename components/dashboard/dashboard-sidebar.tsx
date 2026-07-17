@@ -9,7 +9,7 @@ import {
   ChevronsRight,
   ShieldCheck,
 } from "lucide-react";
-import type { BusinessVertical, SystemRole } from "@prisma/client";
+import type { BusinessVertical, CommercePermission, SystemRole } from "@prisma/client";
 import { usePathname } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 
@@ -88,6 +88,7 @@ export function DashboardSidebar({
   canAccessCustomerDashboard = false,
   canAccessBusinessDashboard = false,
   canAccessMessages = true,
+  commercePermissions = [],
 }: {
   collapsed: boolean;
   onCollapsedChange: (collapsed: boolean) => void;
@@ -99,6 +100,7 @@ export function DashboardSidebar({
   canAccessCustomerDashboard?: boolean;
   canAccessBusinessDashboard?: boolean;
   canAccessMessages?: boolean;
+  commercePermissions?: readonly CommercePermission[];
 }) {
   const pathname = usePathname();
   const locale = useLocale();
@@ -109,6 +111,7 @@ export function DashboardSidebar({
     systemRole,
     membershipId,
     canAccessMessages,
+    commercePermissions,
   );
 
   return (
@@ -157,11 +160,17 @@ export function DashboardSidebar({
                       open={isNavigationItemActive(pathname, item.href)}
                       className="group/nav"
                     >
-                      <summary className="flex min-h-10 cursor-pointer list-none items-center gap-3 rounded-xl px-3 text-sm font-medium text-sidebar-foreground/68 outline-none transition-colors hover:bg-white/8 hover:text-white focus-visible:ring-3 focus-visible:ring-sidebar-ring/50">
-                        <item.icon className="size-4" aria-hidden="true" />
-                        <span className="truncate">
-                          {t(`navigation.items.${item.title}`)}
-                        </span>
+                      <summary className="flex min-h-10 cursor-pointer list-none items-center gap-1 rounded-xl px-1 text-sm font-medium text-sidebar-foreground/68 outline-none transition-colors hover:bg-white/8 hover:text-white focus-visible:ring-3 focus-visible:ring-sidebar-ring/50">
+                        <Link
+                          href={item.href}
+                          onClick={(event) => event.stopPropagation()}
+                          className="flex min-w-0 flex-1 items-center gap-3 rounded-lg px-2 py-2 outline-none focus-visible:ring-3 focus-visible:ring-sidebar-ring/50"
+                        >
+                          <item.icon className="size-4 shrink-0" aria-hidden="true" />
+                          <span className="truncate">
+                            {t(`navigation.items.${item.title}`)}
+                          </span>
+                        </Link>
                         <ChevronDown className="ms-auto size-3.5 transition-transform group-open/nav:rotate-180" />
                       </summary>
                       <div className="mt-1 space-y-1">

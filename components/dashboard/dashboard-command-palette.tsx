@@ -23,8 +23,9 @@ import {
   Sparkles,
   UserPlus,
   UsersRound,
+  ShoppingBag,
 } from "lucide-react";
-import type { BusinessVertical, SystemRole } from "@prisma/client";
+import type { BusinessVertical, CommercePermission, SystemRole } from "@prisma/client";
 import { useTranslations } from "next-intl";
 
 import {
@@ -61,6 +62,9 @@ type CommandDefinition = {
     | "business.profile"
     | "business.notifications"
     | "business.settings"
+    | "business.commerce"
+    | "business.commerceStore"
+    | "business.commerceAccess"
     | "customer.dashboard"
     | "customer.marketplace"
     | "customer.bookings"
@@ -101,6 +105,7 @@ export default function DashboardCommandPalette({
   systemRole,
   membershipId,
   canAccessMessages = true,
+  commercePermissions = [],
 }: {
   role: DashboardRole;
   publicSlug?: string;
@@ -108,6 +113,7 @@ export default function DashboardCommandPalette({
   systemRole?: SystemRole | null;
   membershipId?: string;
   canAccessMessages?: boolean;
+  commercePermissions?: readonly CommercePermission[];
 }) {
   const t = useTranslations("CommandPalette");
   const router = useRouter();
@@ -135,6 +141,7 @@ export default function DashboardCommandPalette({
           systemRole,
           membershipId,
           canAccessMessages,
+          commercePermissions,
         ).flatMap((group) =>
           group.items.flatMap((item) => [
             item.href,
@@ -161,6 +168,9 @@ export default function DashboardCommandPalette({
         { id: "business-profile", labelKey: "business.profile", group: "navigation", href: "/business/manage", icon: Building2 },
         { id: "business-notifications", labelKey: "business.notifications", group: "navigation", href: "/business/notifications", icon: Bell },
         { id: "business-settings", labelKey: "business.settings", group: "navigation", href: "/business/manage/settings", icon: Settings },
+        { id: "business-commerce", labelKey: "business.commerce", group: "navigation", href: "/business/commerce", icon: ShoppingBag },
+        { id: "business-commerce-store", labelKey: "business.commerceStore", group: "navigation", href: "/business/commerce/store", icon: ShoppingBag },
+        { id: "business-commerce-access", labelKey: "business.commerceAccess", group: "navigation", href: "/business/commerce/access", icon: Settings },
         ...(management
           ? [
               { id: "add-service", labelKey: "actions.addService" as const, group: "actions" as const, href: "/business/services", icon: Plus },
@@ -188,6 +198,7 @@ export default function DashboardCommandPalette({
     ];
   }, [
     canAccessMessages,
+    commercePermissions,
     membershipId,
     publicSlug,
     role,

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Building2, CalendarDays, Menu, ShieldCheck } from "lucide-react";
-import type { BusinessVertical, SystemRole } from "@prisma/client";
+import type { BusinessVertical, CommercePermission, SystemRole } from "@prisma/client";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
@@ -33,6 +33,7 @@ export function DashboardMobileNav({
   canAccessAdmin = false,
   canAccessCustomerDashboard = false,
   canAccessBusinessDashboard = false,
+  commercePermissions = [],
 }: {
   role: DashboardRole;
   vertical?: BusinessVertical;
@@ -42,6 +43,7 @@ export function DashboardMobileNav({
   canAccessAdmin?: boolean;
   canAccessCustomerDashboard?: boolean;
   canAccessBusinessDashboard?: boolean;
+  commercePermissions?: readonly CommercePermission[];
 }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
@@ -53,6 +55,7 @@ export function DashboardMobileNav({
     systemRole,
     membershipId,
     canAccessMessages,
+    commercePermissions,
   );
 
   return (
