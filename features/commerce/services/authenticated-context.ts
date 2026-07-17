@@ -18,11 +18,21 @@ export async function requireAuthenticatedMerchantCommerceContext(
   const identity = await requireBusinessIdentity();
   return resolveMerchantCommerceContext(
     {
-      organizationId: identity.membership.organizationId,
+      contextOrganizationId: identity.membership.organizationId,
+      membershipId: identity.membership.id,
       personId: identity.person.id,
     },
     permission,
   );
+}
+
+export async function requireAuthenticatedMerchantActor(): Promise<MerchantCommerceContext> {
+  const identity = await requireBusinessIdentity();
+  return resolveMerchantCommerceContext({
+    contextOrganizationId: identity.membership.organizationId,
+    membershipId: identity.membership.id,
+    personId: identity.person.id,
+  });
 }
 
 export async function requireAuthenticatedCommerceAdmin(
@@ -33,8 +43,11 @@ export async function requireAuthenticatedCommerceAdmin(
     return commerceError("FORBIDDEN", `Missing admin permission ${permission}.`);
   }
   return {
+    adminAccessId: access.adminAccess?.id ?? null,
     isSuperAdmin: access.isSuperAdmin,
+    personId: access.identity.person.id,
     permissions: access.permissions,
+    source: access.source,
     userId: access.identity.session.user.id,
   };
 }

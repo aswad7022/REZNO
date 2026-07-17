@@ -73,3 +73,31 @@ export async function lockOrder(
     Prisma.sql`SELECT "id" FROM "Order" WHERE "id" = CAST(${orderId} AS uuid) FOR UPDATE`,
   );
 }
+
+export async function lockCommerceOrganization(
+  transaction: Prisma.TransactionClient,
+  organizationId: string,
+) {
+  await transaction.$queryRaw(
+    Prisma.sql`SELECT "id" FROM "Organization" WHERE "id" = CAST(${organizationId} AS uuid) FOR UPDATE`,
+  );
+}
+
+export async function lockStore(
+  transaction: Prisma.TransactionClient,
+  storeId: string,
+) {
+  await transaction.$queryRaw(
+    Prisma.sql`SELECT "id" FROM "Store" WHERE "id" = CAST(${storeId} AS uuid) FOR UPDATE`,
+  );
+}
+
+export async function lockCommerceRole(
+  transaction: Prisma.TransactionClient,
+  roleId: string,
+  organizationId: string,
+) {
+  await transaction.$queryRaw(
+    Prisma.sql`SELECT "id" FROM "Role" WHERE "id" = CAST(${roleId} AS uuid) AND "organizationId" = CAST(${organizationId} AS uuid) FOR UPDATE`,
+  );
+}

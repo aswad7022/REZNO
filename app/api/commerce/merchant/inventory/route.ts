@@ -10,7 +10,11 @@ export const dynamic = "force-dynamic";
 export function GET(request: NextRequest) {
   return handleMerchantCommerceRequest(request, "inventory.read", "INVENTORY_VIEW", async (context) => {
     const result = await listMerchantInventory(
-      { organizationId: context.organizationId, personId: context.personId },
+      {
+        contextOrganizationId: context.organizationId,
+        membershipId: context.membershipId,
+        personId: context.personId,
+      },
       parseMerchantInventoryQuery(request.nextUrl.searchParams),
     );
     return commerceCollection(result.data.map(serializeMerchantInventory), result.pageInfo);

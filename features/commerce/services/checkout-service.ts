@@ -119,7 +119,13 @@ export async function createPendingOrder(input: CreatePendingOrderInput) {
             },
             orderBy: { productVariantId: "asc" },
           },
-          store: true,
+          store: {
+            include: {
+              organization: {
+                select: { deletedAt: true, isActive: true, status: true },
+              },
+            },
+          },
         },
       });
       if (!cart) commerceError("NOT_FOUND", "Active Cart was not found.");
@@ -128,7 +134,10 @@ export async function createPendingOrder(input: CreatePendingOrderInput) {
       if (
         cart.store.status !== "ACTIVE" ||
         cart.store.archivedAt ||
-        !cart.store.publishedAt
+        !cart.store.publishedAt ||
+        cart.store.organization.deletedAt !== null ||
+        !cart.store.organization.isActive ||
+        cart.store.organization.status !== "ACTIVE"
       ) {
         commerceError("STORE_UNAVAILABLE", "Store is not available for Checkout.");
       }

@@ -249,6 +249,7 @@ export async function suspendProduct(
 
 export const publicStoreWhere = {
   archivedAt: null,
+  organization: { deletedAt: null, isActive: true, status: "ACTIVE" as const },
   publishedAt: { not: null },
   status: "ACTIVE" as const,
 };

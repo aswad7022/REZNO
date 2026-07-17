@@ -52,7 +52,12 @@ async function findPurchasableVariant(
         publishedAt: { not: null },
         status: "PUBLISHED",
       },
-      store: { archivedAt: null, publishedAt: { not: null }, status: "ACTIVE" },
+      store: {
+        archivedAt: null,
+        organization: { deletedAt: null, isActive: true, status: "ACTIVE" },
+        publishedAt: { not: null },
+        status: "ACTIVE",
+      },
     },
     include: { inventory: true, product: true, store: true },
   });
