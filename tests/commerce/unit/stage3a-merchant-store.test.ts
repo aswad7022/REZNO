@@ -49,12 +49,12 @@ test("Stage 3A Merchant Store domain contracts", async (t) => {
     assert.deepEqual(effectiveCommercePermissions({ commercePermissions: ["STORE_VIEW"], systemRole: "RECEPTIONIST" }), []);
   });
 
-  await t.test("Staff receives only the locked explicit operational subset", () => {
+  await t.test("Staff receives only the current explicit Product and Inventory operational subset", () => {
     const effective = effectiveCommercePermissions({
       commercePermissions: ["STORE_VIEW", "PRODUCT_CREATE", "INVENTORY_ADJUST", "ORDER_CANCEL"],
       systemRole: "STAFF",
     });
-    assert.deepEqual(effective, ["STORE_VIEW", "INVENTORY_ADJUST"]);
+    assert.deepEqual(effective, ["INVENTORY_ADJUST"]);
   });
 
   await t.test("Store create schema canonicalizes slug, phone and whole IQD values", () => {

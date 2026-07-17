@@ -217,11 +217,14 @@ test(
     });
     assert.equal(inventoryList.response.status, 200);
     assert.equal((inventoryList.body.data as unknown[]).length, 1);
+    const currentInventory = await prisma.inventoryItem.findUniqueOrThrow({
+      where: { id: fixture.catalogA.inventory.id },
+    });
     const adjustmentKey = randomUUID();
     const adjustment = await commerceRequest(
       `/api/commerce/merchant/inventory/${fixture.catalogA.inventory.id}/adjustments`,
       {
-        body: { delta: 2, operationKey: adjustmentKey, reason: "HTTP stock correction" },
+        body: { delta: 2, expectedVersion: currentInventory.version, operationKey: adjustmentKey, reason: "HTTP stock correction" },
         cookie: merchantCookie,
         method: "POST",
       },
@@ -230,7 +233,7 @@ test(
     const adjustmentReplay = await commerceRequest(
       `/api/commerce/merchant/inventory/${fixture.catalogA.inventory.id}/adjustments`,
       {
-        body: { delta: 2, operationKey: adjustmentKey, reason: "HTTP stock correction" },
+        body: { delta: 2, expectedVersion: currentInventory.version, operationKey: adjustmentKey, reason: "HTTP stock correction" },
         cookie: merchantCookie,
         method: "POST",
       },
@@ -239,7 +242,7 @@ test(
     const adjustmentConflict = await commerceRequest(
       `/api/commerce/merchant/inventory/${fixture.catalogA.inventory.id}/adjustments`,
       {
-        body: { delta: 3, operationKey: adjustmentKey, reason: "HTTP stock correction" },
+        body: { delta: 3, expectedVersion: currentInventory.version, operationKey: adjustmentKey, reason: "HTTP stock correction" },
         cookie: merchantCookie,
         method: "POST",
       },

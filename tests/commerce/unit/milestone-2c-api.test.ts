@@ -237,6 +237,7 @@ test("Checkout and merchant Inventory DTOs serialize safe receipt and operationa
 test("Inventory input and merchant cursor validation reject unsafe requests", async () => {
   const adjustment = await parseInventoryAdjustment(jsonRequest({
     delta: -2,
+    expectedVersion: 3,
     operationKey: "44444444-4444-4444-8444-444444444444",
     reason: "  damaged   stock ",
   }));
