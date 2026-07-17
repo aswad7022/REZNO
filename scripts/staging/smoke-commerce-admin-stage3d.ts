@@ -41,6 +41,16 @@ const runId = randomUUID().replaceAll("-", "").slice(0, 16);
 const userIds: string[] = [];
 const personIds: string[] = [];
 const cartIds: string[] = [];
+const sideEffectEvidence = {
+  adminAuditDelta: 0,
+  historyDelta: 0,
+  movementDelta: 0,
+  notificationDelta: 0,
+  restoredAdminAudits: 0,
+  restoredHistories: 0,
+  restoredMovements: 0,
+  restoredNotifications: 0,
+};
 let baselineFingerprint = "";
 let phase = "safety";
 const evidence = new Set<string>();
@@ -155,7 +165,7 @@ async function main() {
   await assert.rejects(createPendingOrder({
     cartId: unavailableCart!.id, cartVersion: unavailableCart!.version, customerId: foreign.personId,
     fulfillmentMethod: "CUSTOMER_PICKUP", idempotencyKey: randomUUID(),
-  }), isCode("CART_ITEM_UNAVAILABLE"));
+  }), isCode("PRODUCT_UNAVAILABLE"));
   assert.equal((await prisma.order.findUniqueOrThrow({ where: { id: activeOrderBefore.id } })).status, activeOrderBefore.status);
   evidence.add("category-public-cart-checkout-order-preservation");
 
@@ -197,6 +207,16 @@ async function main() {
 
   phase = "order-interventions";
   await resetFixture();
+  const interventionOrderIds = [FIXTURE.orders.overdue, FIXTURE.orders.pending];
+  const notificationScope = {
+    OR: interventionOrderIds.map((orderId) => ({ eventKey: { startsWith: `commerce:${orderId}:` } })),
+  };
+  const orderSideEffectsBefore = {
+    adminAudit: await prisma.adminAuditLog.count({ where: { targetId: { in: interventionOrderIds }, targetType: "Order" } }),
+    history: await prisma.orderStatusHistory.count({ where: { orderId: { in: interventionOrderIds } } }),
+    movement: await prisma.stockMovement.count({ where: { orderId: { in: interventionOrderIds } } }),
+    notification: await prisma.notification.count({ where: notificationScope }),
+  };
   const overdue = await prisma.order.findUniqueOrThrow({ where: { id: FIXTURE.orders.overdue } });
   await interveneAdminOrder(admins.ordersManage.context, {
     action: "expire", expectedVersion: overdue.updatedAt.toISOString(), idempotencyKey: randomUUID(),
@@ -219,6 +239,22 @@ async function main() {
     action: "cancel", expectedVersion: out.updatedAt.toISOString(), idempotencyKey: randomUUID(),
     orderId: out.id, reason: "Out for delivery denial probe", returnedStock: false,
   }), isCode("INVALID_TRANSITION"));
+  const orderSideEffectsAfter = {
+    adminAudit: await prisma.adminAuditLog.count({ where: { targetId: { in: interventionOrderIds }, targetType: "Order" } }),
+    history: await prisma.orderStatusHistory.count({ where: { orderId: { in: interventionOrderIds } } }),
+    movement: await prisma.stockMovement.count({ where: { orderId: { in: interventionOrderIds } } }),
+    notification: await prisma.notification.count({ where: notificationScope }),
+  };
+  sideEffectEvidence.adminAuditDelta = orderSideEffectsAfter.adminAudit - orderSideEffectsBefore.adminAudit;
+  sideEffectEvidence.historyDelta = orderSideEffectsAfter.history - orderSideEffectsBefore.history;
+  sideEffectEvidence.movementDelta = orderSideEffectsAfter.movement - orderSideEffectsBefore.movement;
+  sideEffectEvidence.notificationDelta = orderSideEffectsAfter.notification - orderSideEffectsBefore.notification;
+  assert.deepEqual({
+    adminAuditDelta: sideEffectEvidence.adminAuditDelta,
+    historyDelta: sideEffectEvidence.historyDelta,
+    movementDelta: sideEffectEvidence.movementDelta,
+    notificationDelta: sideEffectEvidence.notificationDelta,
+  }, { adminAuditDelta: 2, historyDelta: 2, movementDelta: 2, notificationDelta: 6 });
   evidence.add("order-expire-cancel-replay-paid-delivery-denial");
 
   phase = "audit-and-reports";
@@ -243,9 +279,18 @@ async function main() {
   phase = "restore-and-counts";
   const restored = await resetFixture();
   assert.equal(restored.fingerprint, baselineFingerprint);
-  assert.equal(await prisma.orderStatusHistory.count({ where: { orderId: { in: Object.values(FIXTURE.orders) } } }), 8);
-  assert.equal(await prisma.stockMovement.count({ where: { orderId: { in: Object.values(FIXTURE.orders) } } }), 8);
-  assert.equal(await prisma.adminAuditLog.count({ where: { id: { in: [1, 2, 3, 4].map(FIXTURE.adminAudit) } } }), 4);
+  sideEffectEvidence.restoredHistories = await prisma.orderStatusHistory.count({ where: { orderId: { in: Object.values(FIXTURE.orders) } } });
+  sideEffectEvidence.restoredMovements = await prisma.stockMovement.count({ where: { orderId: { in: Object.values(FIXTURE.orders) } } });
+  sideEffectEvidence.restoredAdminAudits = await prisma.adminAuditLog.count({ where: { id: { in: [1, 2, 3, 4].map(FIXTURE.adminAudit) } } });
+  sideEffectEvidence.restoredNotifications = await prisma.notification.count({
+    where: { OR: Object.values(FIXTURE.orders).map((orderId) => ({ eventKey: { startsWith: `commerce:${orderId}:` } })) },
+  });
+  assert.deepEqual({
+    adminAudits: sideEffectEvidence.restoredAdminAudits,
+    histories: sideEffectEvidence.restoredHistories,
+    movements: sideEffectEvidence.restoredMovements,
+    notifications: sideEffectEvidence.restoredNotifications,
+  }, { adminAudits: 4, histories: 8, movements: 8, notifications: 0 });
   evidence.add("deterministic-restore-exact-counts");
 }
 
@@ -359,7 +404,12 @@ async function run() {
     process.exitCode = 1;
     return;
   }
-  console.log(`Stage 3D authenticated staging smoke passed. identities=14 checks=${evidence.size} cleanup=verified fingerprint=${baselineFingerprint}`);
+  console.log(
+    `Stage 3D authenticated staging smoke passed. identities=14 checks=${evidence.size} ` +
+    `deltas=audit:${sideEffectEvidence.adminAuditDelta},history:${sideEffectEvidence.historyDelta},movement:${sideEffectEvidence.movementDelta},notification:${sideEffectEvidence.notificationDelta} ` +
+    `restored=audit:${sideEffectEvidence.restoredAdminAudits},history:${sideEffectEvidence.restoredHistories},movement:${sideEffectEvidence.restoredMovements},notification:${sideEffectEvidence.restoredNotifications} ` +
+    `cleanup=verified fingerprint=${baselineFingerprint}`,
+  );
 }
 
 void run();

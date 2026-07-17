@@ -1,8 +1,8 @@
 # Stage 3D Commerce Admin and Stage 3 closure
 
-Status: implementation and local closure completed on 2026-07-17; exact-head
-real-staging evidence remains intentionally pending until the Draft PR preview is
-Ready.
+Status: implementation, local validation, and real-staging closure completed on
+2026-07-17. The Draft PR may be marked Ready only after the final documentation
+head has repeated its exact-head CI/Vercel and staging smoke.
 
 Baseline: `origin/main` and this worktree started at
 `29d907b57cf7238805669e38469725660ca8d6ec`. The repository contains 33
@@ -451,7 +451,7 @@ Local validation completed on 2026-07-17:
 | ESLint | passed |
 | root non-incremental TypeScript | passed |
 | Prisma format/validate/generate | passed |
-| unit suite | 255/255 |
+| unit suite | 257/257 |
 | PostgreSQL integration suite | 226/226 |
 | production HTTP/RSC/Server Action suite | 66/66 |
 | focused Stage 3D unit/integration | 17/17 |
@@ -471,31 +471,72 @@ downgrades and were not applied in this gate.
 
 ## Real-staging evidence
 
-Pending the exact PR-head Vercel Preview. This section will be replaced with the
-deployment SHA, Ready URL, 34/34 deploy evidence, two identical fixture runs,
-prior Gate 3A–3C fingerprint proof, scoped-role smoke results, exact side-effect
-counts, cleanup, and deterministic restoration before the Draft PR is marked
-Ready.
+The exact PR-head `rezno-staging` Vercel Preview was Ready and was exercised
+through the protected branch Preview alias
+`https://rezno-staging-git-feat-commerce-admin-stage3-closure-rafidedu.vercel.app`.
+The GitHub Vercel status attached the deployment to the PR head, and OIDC
+authenticated the smoke without persisting a bypass token or environment file.
+
+The first authenticated attempt proved a real staging blocker: Better Auth
+trusted only the stable base URL and rejected the exact Preview with
+`INVALID_ORIGIN`. `buildAuthTrustedOrigins` now accepts only exact HTTPS
+`VERCEL_URL`/`VERCEL_BRANCH_URL` origins whose hostname ends in `.vercel.app`;
+it does not trust request headers, HTTP, credentials, paths, or wildcard suffixes.
+The fix has unit, TypeScript, lint, build, Vercel, and exact-Preview proof.
+
+Database preflight reported `rezno_staging` at 33/33. `prisma migrate deploy`
+applied only migration 34, and post-deploy reported 34/34 with zero pending. No
+reset, db push, historical migration edit, or production target was used.
+
+Remote fixture evidence:
+
+- Stage 3D run 1 and run 2 both produced
+  `101c94ba87b3c458c707b29ddae24436ee0665d7ab285099782bf8461a8f229e`;
+- Gate 3A remained
+  `3c92ab6aa3a387de458b0b70fec598c5d640e2a139540d426fb14372af2a3b2a`;
+- Gate 3B remained
+  `89f4fbb6aa64f299dc05d9614458c990d0810e18931c8fd32cc3e150111ce388`;
+- Gate 3C remained
+  `849c3819bd1f1ef2b09d70e4f95e406ed117c2805d9228d4822c042564e90372`;
+- all four fingerprints were repeated unchanged after the smoke and cleanup.
+
+The authenticated smoke created 14 temporary identities: every one of the nine
+scoped permission profiles, database Super Admin, expired access, revoked
+access, foreign non-Admin, and Merchant `REPORTS_VIEW`. Its nine evidence groups
+covered HTML and RSC structural navigation, direct-route denial, scoped DTO/PII
+boundaries, Store moderation/replay, Category public/Cart/Checkout/Order impact,
+Product suspend/replay/clear-to-DRAFT, Inventory floor/correction/replay, Order
+expiry/cancel/replay/paid and OUT_FOR_DELIVERY denial, audit cursor binding,
+reports, deterministic restoration, and raw-error absence.
+
+For the two successful Admin Order interventions, the exact first-success deltas
+were two Admin audits, two Order histories, two StockMovements, and six
+notifications (one customer and two eligible Merchant recipients per Order).
+Replay and the two denied interventions added zero rows. Deterministic
+restoration ended with 4 seeded Admin audits, 8 histories, 8 movements, and 0
+fixture Order notifications. All temporary users, sessions, access rows,
+memberships, carts, notifications, and their Admin audit rows were removed, and
+the Stage 3D fixture was restored to its baseline fingerprint.
 
 ## Stage 3 closure matrix
 
 | Surface | Route/service | Authorization | Automated proof | Staging | Remaining limitation / owner |
 | --- | --- | --- | --- | --- | --- |
-| Merchant Store lifecycle | `/business/commerce/store`; `store-service.ts` | `STORE_VIEW`/`STORE_MANAGE` | Gate 3A + full regressions | pending final smoke | managed upload: Stage 5 |
-| Commerce access | `/business/commerce/access` | Owner role policy | Gate 3A + Stage 3D dependency tests | pending final smoke | no limitation in Stage 3 |
-| Products | `/business/commerce/products`; canonical Merchant service | Product permissions | Gate 3B + full regressions | pending final smoke | managed media: Stage 5 |
-| Variants | Product detail; canonical Merchant service | Product permissions | Gate 3B + full regressions | pending final smoke | no limitation in Stage 3 |
-| Product media metadata | Product detail; canonical Merchant service | Product permissions | unsafe-media unit/HTTP regressions | pending final smoke | upload/storage/transformation: Stage 5 |
-| Inventory | `/business/commerce/inventory`; `inventory-service.ts` | Inventory permissions | Gate 3B + Stage 3D regressions | pending final smoke | no limitation in Stage 3 |
-| Orders | `/business/commerce/orders`; `order-service.ts` | `ORDER_VIEW`/`ORDER_MANAGE` | Gate 3C + full regressions | pending final smoke | gateways/refunds: Stage 5 |
-| Fulfillment | Order detail/actions; Gate 3C engine | `ORDER_MANAGE` | lifecycle/race/replay PostgreSQL + HTTP | pending final smoke | courier integration excluded |
-| Operational reports | `/business/commerce/reports`; report service | `REPORTS_VIEW` | Stage 3D unit/PostgreSQL/HTTP | pending final smoke | financial reports/payments: Stage 5 |
-| Admin Stores | `/admin/commerce/stores`; Store/Admin query services | Store View/Review | Gate 3A + Stage 3D | pending final smoke | no limitation in Stage 3 |
-| Admin Categories | `/admin/commerce/categories`; Category Admin service | Catalog View/Moderate | Stage 3D PostgreSQL/HTTP | pending final smoke | no limitation in Stage 3 |
-| Admin Products | `/admin/commerce/products`; Product Admin service | Catalog View/Moderate | Stage 3D PostgreSQL/HTTP | pending final smoke | Merchant profile ownership retained |
-| Admin Inventory | `/admin/commerce/inventory`; Inventory Admin service | Inventory View/Manage | Stage 3D PostgreSQL/HTTP | pending final smoke | no limitation in Stage 3 |
-| Admin Orders | `/admin/commerce/orders`; Gate 3C engine wrapper | Orders View/Manage | Stage 3D PostgreSQL/HTTP | pending final smoke | payment/refund actions: Stage 5 |
-| Admin Commerce audit | `/admin/commerce/audit`; audit service | `AUDIT_LOG_VIEW` | cursor/privacy/replay tests | pending final smoke | platform-wide operations: Stage 6 |
+| Merchant Store lifecycle | `/business/commerce/store`; `store-service.ts` | `STORE_VIEW`/`STORE_MANAGE` | Gate 3A + full regressions | passed; fingerprint retained | managed upload: Stage 5 |
+| Commerce access | `/business/commerce/access` | Owner role policy | Gate 3A + Stage 3D dependency tests | passed | no limitation in Stage 3 |
+| Products | `/business/commerce/products`; canonical Merchant service | Product permissions | Gate 3B + full regressions | passed; fingerprint retained | managed media: Stage 5 |
+| Variants | Product detail; canonical Merchant service | Product permissions | Gate 3B + full regressions | passed | no limitation in Stage 3 |
+| Product media metadata | Product detail; canonical Merchant service | Product permissions | unsafe-media unit/HTTP regressions | passed | upload/storage/transformation: Stage 5 |
+| Inventory | `/business/commerce/inventory`; `inventory-service.ts` | Inventory permissions | Gate 3B + Stage 3D regressions | passed | no limitation in Stage 3 |
+| Orders | `/business/commerce/orders`; `order-service.ts` | `ORDER_VIEW`/`ORDER_MANAGE` | Gate 3C + full regressions | passed; fingerprint retained | gateways/refunds: Stage 5 |
+| Fulfillment | Order detail/actions; Gate 3C engine | `ORDER_MANAGE` | lifecycle/race/replay PostgreSQL + HTTP | passed | courier integration excluded |
+| Operational reports | `/business/commerce/reports`; report service | `REPORTS_VIEW` | Stage 3D unit/PostgreSQL/HTTP | passed; tenant/PII checked | financial reports/payments: Stage 5 |
+| Admin Stores | `/admin/commerce/stores`; Store/Admin query services | Store View/Review | Gate 3A + Stage 3D | passed | no limitation in Stage 3 |
+| Admin Categories | `/admin/commerce/categories`; Category Admin service | Catalog View/Moderate | Stage 3D PostgreSQL/HTTP | passed; impact checked | no limitation in Stage 3 |
+| Admin Products | `/admin/commerce/products`; Product Admin service | Catalog View/Moderate | Stage 3D PostgreSQL/HTTP | passed; impact checked | Merchant profile ownership retained |
+| Admin Inventory | `/admin/commerce/inventory`; Inventory Admin service | Inventory View/Manage | Stage 3D PostgreSQL/HTTP | passed; floor/counts checked | no limitation in Stage 3 |
+| Admin Orders | `/admin/commerce/orders`; Gate 3C engine wrapper | Orders View/Manage | Stage 3D PostgreSQL/HTTP | passed; exact counts checked | payment/refund actions: Stage 5 |
+| Admin Commerce audit | `/admin/commerce/audit`; audit service | `AUDIT_LOG_VIEW` | cursor/privacy/replay tests | passed; cursor checked | platform-wide operations: Stage 6 |
 
 All Stage 3 cards and routes are implemented, reachable, authorized, tested, or
 explicitly owned by a later locked stage. Notification-center/outbound delivery
@@ -518,5 +559,5 @@ No P1 or P2 finding remains locally. Process-local rate limiting remains an
 explicit deployment limitation: it is safe per process but is not a distributed
 global quota and belongs to Stage 6 platform operations. No credentials or
 temporary environment files were created, and no physical-device QA is claimed.
-The final security verdict remains conditional only on exact-head CI/Vercel and
-real-staging closure.
+The staging-origin blocker was fixed with exact suffix validation and no broader
+trust. No P1 or P2 remains. No physical-device QA is claimed.
