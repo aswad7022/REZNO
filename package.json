@@ -25,6 +25,7 @@
     "seed:staging:business-daily-operations-stage2c": "tsx scripts/staging/seed-business-daily-operations-stage2c.ts",
     "seed:staging:business-operations-stage2d-closure": "tsx scripts/staging/seed-business-operations-stage2d-closure.ts",
     "seed:staging:commerce-merchant-store-stage3a": "tsx scripts/staging/seed-commerce-merchant-store-stage3a.ts",
+    "smoke:staging:commerce-merchant-store-stage3a": "tsx scripts/staging/smoke-commerce-merchant-store-stage3a.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {
