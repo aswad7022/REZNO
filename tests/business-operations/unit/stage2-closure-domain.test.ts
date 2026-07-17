@@ -56,7 +56,6 @@ test("Stage 2D closure domain keeps role scopes and routes fail-closed", () => {
 
 test("Deferred Business routes preserve the locked pre-AI stage ownership", () => {
   assert.deepEqual(deferredBusinessRouteRegistry, {
-    "/business/commerce": "Stage 3 Commerce Merchant and Admin operations",
     "/business/communications": "Stage 4 Notifications and Messaging closure",
     "/business/media": "Stage 5 Media, Storage and Payments Foundation",
     "/business/payments": "Stage 5 Media, Storage and Payments Foundation",
@@ -72,6 +71,11 @@ test("Deferred Business routes preserve the locked pre-AI stage ownership", () =
     );
   }
   assert.equal(getFeatureDefinition("business", ["unknown"]), undefined);
+  assert.equal(
+    "/business/commerce" in deferredBusinessRouteRegistry,
+    false,
+    "Gate 3A replaces the deferred Commerce root with a concrete route",
+  );
 });
 
 test("Branch-local day ranges preserve independent timezones and completed periods", () => {

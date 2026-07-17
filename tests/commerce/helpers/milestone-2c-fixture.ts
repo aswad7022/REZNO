@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import type { CommercePermission } from "@prisma/client";
+import type { CommercePermission, SystemRole } from "@prisma/client";
 
 import { prisma } from "../../../lib/db/prisma";
 
@@ -46,6 +46,7 @@ export async function createTestPerson(label: string) {
 export async function createTestMerchant(
   label: string,
   permissions: CommercePermission[] = ALL_COMMERCE_PERMISSIONS,
+  systemRole: SystemRole = "OWNER",
 ) {
   const person = await createTestPerson(`${label}-merchant`);
   const roleId = randomUUID();
@@ -58,17 +59,21 @@ export async function createTestMerchant(
           id: roleId,
           isSystem: true,
           name: "Commerce Role",
-          systemRole: "OWNER",
+          systemRole,
         },
       },
       slug: `${label}-${randomUUID().slice(0, 8)}`,
     },
   });
-  await prisma.organizationMember.create({
+  const membership = await prisma.organizationMember.create({
     data: { organizationId: organization.id, personId: person.id, roleId },
   });
   return {
-    identity: { organizationId: organization.id, personId: person.id },
+    identity: {
+      contextOrganizationId: organization.id,
+      membershipId: membership.id,
+      personId: person.id,
+    },
     organization,
     person,
   };
@@ -146,7 +151,11 @@ export async function seedMilestone2cFixture() {
   });
   const merchantA = await createTestMerchant("merchant-a");
   const merchantB = await createTestMerchant("merchant-b");
-  const merchantNoPermissions = await createTestMerchant("merchant-no-permissions", []);
+  const merchantNoPermissions = await createTestMerchant(
+    "merchant-no-permissions",
+    [],
+    "MANAGER",
+  );
   const catalogA = await createTestStoreCatalog("catalog-a", merchantA.organization.id, category.id);
   const catalogB = await createTestStoreCatalog("catalog-b", merchantB.organization.id, category.id);
   const customers = await Promise.all(
@@ -182,6 +191,7 @@ export async function prepareMilestone2cHttpFixture(input: {
     "http-no-permission",
     identities.merchantNoPermissionEmail.person.id,
     [],
+    "MANAGER",
   );
   const catalogA = await createTestStoreCatalog("http-a", merchant.organization.id, category.id);
   const catalogBMerchant = await createTestMerchant("http-catalog-b");
@@ -200,6 +210,7 @@ async function attachHttpMerchant(
   label: string,
   personId: string,
   permissions: CommercePermission[],
+  systemRole: SystemRole = "OWNER",
 ) {
   const roleId = randomUUID();
   const organization = await prisma.organization.create({
@@ -211,14 +222,21 @@ async function attachHttpMerchant(
           id: roleId,
           isSystem: true,
           name: "HTTP Commerce Role",
-          systemRole: "OWNER",
+          systemRole,
         },
       },
       slug: `${label}-${randomUUID().slice(0, 8)}`,
     },
   });
-  await prisma.organizationMember.create({
+  const membership = await prisma.organizationMember.create({
     data: { organizationId: organization.id, personId, roleId },
   });
-  return { identity: { organizationId: organization.id, personId }, organization };
+  return {
+    identity: {
+      contextOrganizationId: organization.id,
+      membershipId: membership.id,
+      personId,
+    },
+    organization,
+  };
 }

@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
 import type { CommercePermission } from "@prisma/client";
+import type { CreateStoreInput } from "../../../features/commerce/domain/store-input";
+import type { MerchantActorReference } from "../../../features/commerce/services/authorization";
 
 import { CommerceDomainError } from "../../../features/commerce/domain/errors";
 import {
@@ -32,13 +34,13 @@ import {
   rejectOrder,
 } from "../../../features/commerce/services/order-service";
 import {
-  approveStore,
-  archiveStore,
-  createStoreDraft,
-  reactivateStore,
-  rejectStore,
-  submitStoreForReview,
-  suspendStore,
+  approveStore as approveStoreMutation,
+  archiveStore as archiveStoreMutation,
+  createStoreDraft as createStoreDraftMutation,
+  reactivateStore as reactivateStoreMutation,
+  rejectStore as rejectStoreMutation,
+  submitStoreForReview as submitStoreForReviewMutation,
+  suspendStore as suspendStoreMutation,
 } from "../../../features/commerce/services/store-service";
 import { prisma } from "../../../lib/db/prisma";
 
@@ -57,11 +59,77 @@ const OWNER_PERMISSIONS: CommercePermission[] = [
   "REPORTS_VIEW",
 ];
 
+const adminAccessId = randomUUID();
+const adminPersonId = randomUUID();
 const adminContext = {
-  isSuperAdmin: true,
-  permissions: [] as const,
+  adminAccessId,
+  isSuperAdmin: false,
+  personId: adminPersonId,
+  permissions: ["COMMERCE_STORES_VIEW", "COMMERCE_STORES_REVIEW", "COMMERCE_CATALOG_MODERATE"] as const,
+  source: "database" as const,
   userId: "commerce-test-admin",
 };
+
+type TestStoreDraftInput = Omit<CreateStoreInput, "contextOrganizationId" | "idempotencyKey">;
+
+function createStoreDraft(identity: MerchantActorReference, input: TestStoreDraftInput) {
+  return createStoreDraftMutation(identity, {
+    ...input,
+    contextOrganizationId: identity.contextOrganizationId,
+    idempotencyKey: randomUUID(),
+  });
+}
+
+async function submitStoreForReview(identity: MerchantActorReference, storeId: string) {
+  const store = await prisma.store.findUniqueOrThrow({ where: { id: storeId } });
+  return submitStoreForReviewMutation(identity, {
+    contextOrganizationId: identity.contextOrganizationId,
+    expectedVersion: store.updatedAt.toISOString(),
+    idempotencyKey: randomUUID(),
+    storeId,
+  });
+}
+
+async function adminStoreAction(
+  action: typeof approveStoreMutation,
+  storeId: string,
+  reason: string | null,
+) {
+  const store = await prisma.store.findUniqueOrThrow({ where: { id: storeId } });
+  return action(adminContext, {
+    expectedVersion: store.updatedAt.toISOString(),
+    idempotencyKey: randomUUID(),
+    reason,
+    storeId,
+  });
+}
+
+function approveStore(_context: typeof adminContext, storeId: string) {
+  return adminStoreAction(approveStoreMutation, storeId, null);
+}
+
+function rejectStore(_context: typeof adminContext, storeId: string, reason: string) {
+  return adminStoreAction(rejectStoreMutation, storeId, reason);
+}
+
+function suspendStore(_context: typeof adminContext, storeId: string, reason: string) {
+  return adminStoreAction(suspendStoreMutation, storeId, reason);
+}
+
+function reactivateStore(_context: typeof adminContext, storeId: string) {
+  return adminStoreAction(reactivateStoreMutation, storeId, null);
+}
+
+async function archiveStore(identity: MerchantActorReference, storeId: string, reason: string) {
+  const store = await prisma.store.findUniqueOrThrow({ where: { id: storeId } });
+  return archiveStoreMutation(identity, {
+    contextOrganizationId: identity.contextOrganizationId,
+    expectedVersion: store.updatedAt.toISOString(),
+    idempotencyKey: randomUUID(),
+    reason,
+    storeId,
+  });
+}
 
 async function assertDisposableDatabase() {
   const rows = await prisma.$queryRaw<Array<{ database: string }>>`SELECT current_database() AS database`;
@@ -105,11 +173,15 @@ async function createMerchant(label: string) {
       slug: `${label}-${randomUUID().slice(0, 8)}`,
     },
   });
-  await prisma.organizationMember.create({
+  const membership = await prisma.organizationMember.create({
     data: { organizationId: organization.id, personId: owner.id, roleId },
   });
   return {
-    identity: { organizationId: organization.id, personId: owner.id },
+    identity: {
+      contextOrganizationId: organization.id,
+      membershipId: membership.id,
+      personId: owner.id,
+    },
     organization,
     owner,
   };
@@ -180,6 +252,21 @@ test("Milestone 2A PostgreSQL commerce foundation", { concurrency: false }, asyn
       name: "Commerce Test Admin",
     },
   });
+  await prisma.person.create({
+    data: {
+      authUserId: adminContext.userId,
+      firstName: "Commerce Admin",
+      id: adminPersonId,
+      isOnboarded: true,
+    },
+  });
+  await prisma.adminAccess.create({
+    data: {
+      id: adminAccessId,
+      permissions: [...adminContext.permissions],
+      userId: adminContext.userId,
+    },
+  });
   const category = await prisma.marketplaceCategory.create({
     data: {
       name: "Test Products",
@@ -201,7 +288,7 @@ test("Milestone 2A PostgreSQL commerce foundation", { concurrency: false }, asyn
       systemRole: "MANAGER",
     },
   });
-  await prisma.organizationMember.create({
+  const failClosedMembership = await prisma.organizationMember.create({
     data: {
       organizationId: primary.organization.id,
       personId: failClosedManager.id,
@@ -314,7 +401,11 @@ test("Milestone 2A PostgreSQL commerce foundation", { concurrency: false }, asyn
   await t.test("non-OWNER roles remain fail-closed without explicit commerce permissions", async () => {
     await assert.rejects(
       createProduct(
-        { organizationId: primary.organization.id, personId: failClosedManager.id },
+        {
+          contextOrganizationId: primary.organization.id,
+          membershipId: failClosedMembership.id,
+          personId: failClosedManager.id,
+        },
         {
           categoryId: category.id,
           defaultVariant: {
@@ -368,7 +459,7 @@ test("Milestone 2A PostgreSQL commerce foundation", { concurrency: false }, asyn
     const rejectionAudit = await prisma.adminAuditLog.findFirstOrThrow({
       where: { action: "commerce.store.reject", targetId: rejectedDraft.id },
     });
-    assert.deepEqual(rejectionAudit.metadata, { reason: "Audit rejection reason" });
+    assert.equal((rejectionAudit.metadata as { reason: string }).reason, "Audit rejection reason");
     const suspensionAudit = await prisma.adminAuditLog.findFirstOrThrow({
       where: { action: "commerce.product.suspend", targetId: atomicProduct.id },
     });
