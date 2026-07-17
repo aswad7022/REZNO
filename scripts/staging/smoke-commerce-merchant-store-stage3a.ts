@@ -728,7 +728,6 @@ async function submit(
 function requestHeaders(initial: Record<string, string>) {
   const headers = new Headers(initial);
   headers.set("x-vercel-protection-bypass", bypass);
-  headers.set("x-vercel-set-bypass-cookie", "true");
   return headers;
 }
 
