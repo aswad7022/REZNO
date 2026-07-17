@@ -85,10 +85,12 @@ test("Order DTOs use immutable snapshots, Decimal strings, and no internal ident
 });
 
 test("Customer cancellation eligibility and reason validation are strict", async () => {
+  const expectedVersion = "2026-07-17T12:00:00.000Z";
   assert.equal(canCustomerCancel({ fulfillmentStatus: "UNFULFILLED", paymentStatus: "UNPAID", status: "PENDING" }), true);
   assert.equal(canCustomerCancel({ fulfillmentStatus: "PREPARING", paymentStatus: "UNPAID", status: "CONFIRMED" }), false);
   assert.equal(canCustomerCancel({ fulfillmentStatus: "UNFULFILLED", paymentStatus: "PAID", status: "CONFIRMED" }), false);
-  assert.deepEqual(await parseCancellationRequest(jsonRequest({ reason: "  changed   plans " })), {
+  assert.deepEqual(await parseCancellationRequest(jsonRequest({ expectedVersion, reason: "  changed   plans " })), {
+    expectedVersion,
     reason: "changed plans",
   });
   await assert.rejects(() => parseCancellationRequest(jsonRequest({ reason: " " })), (error: unknown) =>
@@ -156,6 +158,18 @@ test("Milestone 2D domain errors map to stable safe HTTP responses", () => {
   let cancellation: unknown;
   try { commerceError("ORDER_NOT_CANCELLABLE", "not allowed"); } catch (error) { cancellation = error; }
   assert.equal(mapCommerceApiError(cancellation).status, 409);
+  let transition: unknown;
+  try { commerceError("INVALID_TRANSITION", "terminal Order"); } catch (error) { transition = error; }
+  assert.deepEqual(
+    [mapCommerceApiError(transition).code, mapCommerceApiError(transition).status],
+    ["ORDER_STATE_CONFLICT", 409],
+  );
+  let aggregate: unknown;
+  try { commerceError("CONFLICT", "inconsistent Order", { kind: "ORDER_PAYMENT_INTEGRITY" }); } catch (error) { aggregate = error; }
+  assert.deepEqual(
+    [mapCommerceApiError(aggregate).code, mapCommerceApiError(aggregate).status],
+    ["ORDER_STATE_CONFLICT", 409],
+  );
 });
 
 function orderFixture() {

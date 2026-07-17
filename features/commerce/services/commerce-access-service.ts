@@ -6,6 +6,7 @@ import {
   assignableCommercePermissions,
   canManageCommerceAccess,
   effectiveCommercePermissions,
+  isValidCommercePermissionCombination,
 } from "@/features/commerce/domain/merchant-access";
 import {
   updateCommerceRolePermissionsSchema,
@@ -99,6 +100,12 @@ export async function updateCommerceRolePermissions(
     const allowed = new Set(assignableCommercePermissions(role.systemRole));
     if (input.permissions.some((permission) => !allowed.has(permission))) {
       commerceError("FORBIDDEN", "One or more Commerce permissions cannot be assigned to this role.");
+    }
+    if (!isValidCommercePermissionCombination(role.systemRole, input.permissions)) {
+      commerceError(
+        "VALIDATION_ERROR",
+        "ORDER_MANAGE and ORDER_CANCEL require ORDER_VIEW, and Staff can never receive ORDER_CANCEL.",
+      );
     }
     assertCommerceExpectedVersion(role.updatedAt, input.expectedVersion);
     const updated = await transaction.role.update({

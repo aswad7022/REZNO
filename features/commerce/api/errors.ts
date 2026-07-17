@@ -89,10 +89,15 @@ export function mapCommerceApiError(error: unknown) {
         ? "UNAUTHENTICATED"
         : error.code === "VALIDATION_ERROR"
           ? "INVALID_REQUEST"
+          : error.code === "INVALID_TRANSITION"
+            ? "ORDER_STATE_CONFLICT"
           : error.code === "CONFLICT"
             ? error.details?.kind === "CART_STORE_CONFLICT"
               ? "CART_STORE_CONFLICT"
-              : "INVENTORY_CONFLICT"
+              : error.details?.kind === "ORDER_PAYMENT_INTEGRITY" ||
+                  error.details?.kind === "ORDER_STORE_INTEGRITY"
+                ? "ORDER_STATE_CONFLICT"
+                : "INVENTORY_CONFLICT"
             : directCodes.has(error.code as CommerceApiErrorCode)
               ? (error.code as CommerceApiErrorCode)
               : "INVALID_REQUEST";

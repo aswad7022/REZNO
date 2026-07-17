@@ -45,7 +45,13 @@ export default async function BusinessCommercePage() {
       icon: Package,
       title: t("inventoryTitle"),
     },
-    { active: false, description: t("gate3c"), icon: ClipboardList, title: t("ordersFulfillment") },
+    {
+      active: actor.permissions.includes("ORDER_VIEW"),
+      description: t("ordersDescription"),
+      href: "/business/commerce/orders",
+      icon: ClipboardList,
+      title: t("ordersFulfillment"),
+    },
   ];
   return (
     <DashboardShell>

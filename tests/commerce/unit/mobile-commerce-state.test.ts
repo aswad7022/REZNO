@@ -17,6 +17,7 @@ import {
   resolvedSetMembership,
   rollbackOptimisticSet,
   resolveCheckoutAttempt,
+  resolveOrderCancellationAttempt,
 } from "../../../apps/mobile/src/commerce/state";
 import { commerceNotificationOrderDestination } from "../../../apps/mobile/src/commerce/notification-navigation";
 import { commerceCopy, commercePaymentMethodLabel, formatCommerceMoney } from "../../../apps/mobile/src/i18n/commerce";
@@ -38,6 +39,25 @@ test("mobile Checkout reuses one key for an unchanged retry and rotates for sema
   assert.equal(retry.key, first.key);
   assert.notEqual(changed.key, first.key);
   assert.equal(next, 2);
+});
+
+test("mobile Order cancellation reuses one key for a normalized retry and rotates on material change", () => {
+  let sequence = 0;
+  const createKey = () => `cancel-key-${++sequence}`;
+  const input = {
+    expectedVersion: "2026-07-17T12:00:00.000Z",
+    orderId: "11111111-1111-4111-8111-111111111111",
+    reason: "Changed plans",
+  };
+  const first = resolveOrderCancellationAttempt(null, input, createKey);
+  const retry = resolveOrderCancellationAttempt(first, { ...input, reason: "  Changed   plans " }, createKey);
+  const changedReason = resolveOrderCancellationAttempt(retry, { ...input, reason: "Unavailable" }, createKey);
+  const changedVersion = resolveOrderCancellationAttempt(changedReason, {
+    ...input, expectedVersion: "2026-07-17T12:01:00.000Z", reason: "Unavailable",
+  }, createKey);
+  assert.equal(first.key, retry.key);
+  assert.notEqual(retry.key, changedReason.key);
+  assert.notEqual(changedReason.key, changedVersion.key);
 });
 
 test("pickup signatures exclude stale addresses and normalize instructions", () => {
@@ -165,8 +185,9 @@ test("favorite bootstrap follows every cursor before publishing a complete snaps
 test("stale search responses and paid cancellation controls fail closed", () => {
   assert.equal(isLatestRequest(3, 4), false);
   assert.equal(isLatestRequest(4, 4), true);
-  assert.equal(canRenderCustomerCancellation({ canCustomerCancel: true, paymentStatus: "PAID" }), false);
-  assert.equal(canRenderCustomerCancellation({ canCustomerCancel: true, paymentStatus: "UNPAID" }), true);
+  assert.equal(canRenderCustomerCancellation({ canCustomerCancel: true, expectedVersion: "version", paymentStatus: "PAID" }), false);
+  assert.equal(canRenderCustomerCancellation({ canCustomerCancel: true, paymentStatus: "UNPAID" }), false);
+  assert.equal(canRenderCustomerCancellation({ canCustomerCancel: true, expectedVersion: "version", paymentStatus: "UNPAID" }), true);
 });
 
 test("Commerce notification activation maps only server-authorized Order destinations", () => {

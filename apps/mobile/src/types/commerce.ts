@@ -216,6 +216,7 @@ export type CommerceOrderDetail = CommerceOrderSummary & {
   customerInstructions: string | null;
   deliveryFee: string;
   discountTotal: string;
+  expectedVersion?: string;
   history: Array<{
     actorType: string;
     createdAt: string;

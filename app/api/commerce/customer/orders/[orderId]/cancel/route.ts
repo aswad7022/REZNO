@@ -4,9 +4,11 @@ import { serializeCustomerOrderDetail } from "@/features/commerce/api/dto";
 import { commerceData, handleCustomerCommerceRequest } from "@/features/commerce/api/http";
 import {
   parseCancellationRequest,
+  parseIdempotencyKey,
   parseRouteUuid,
 } from "@/features/commerce/api/validation";
 import { cancelCustomerOrder } from "@/features/commerce/services/order-service";
+import { getCustomerOrderDetail } from "@/features/commerce/services/customer-order-query-service";
 
 export const dynamic = "force-dynamic";
 
@@ -16,8 +18,13 @@ export function POST(
 ) {
   return handleCustomerCommerceRequest(request, "orders.cancel", async ({ personId }) => {
     const orderId = parseRouteUuid((await params).orderId, "orderId");
-    const { reason } = await parseCancellationRequest(request);
-    const order = await cancelCustomerOrder(personId, { orderId, reason });
-    return commerceData(serializeCustomerOrderDetail(order));
+    const { expectedVersion, reason } = await parseCancellationRequest(request);
+    await cancelCustomerOrder(personId, {
+      expectedVersion,
+      idempotencyKey: parseIdempotencyKey(request),
+      orderId,
+      reason,
+    });
+    return commerceData(serializeCustomerOrderDetail(await getCustomerOrderDetail(personId, orderId)));
   }, { limit: 10 });
 }

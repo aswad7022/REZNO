@@ -47,6 +47,7 @@ import {
   optimisticSet,
   resolvedSetMembership,
   resolveCheckoutAttempt,
+  resolveOrderCancellationAttempt,
   rollbackOptimisticSet,
   type CheckoutDraft,
   type ResourceLoadState,
@@ -961,8 +962,9 @@ function OrderDetail(props: CommonProps & { order: CommerceOrderDetail }) {
   const [order, setOrder] = useState(initialOrder);
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const cancellationAttemptRef = useRef<{ key: string; signature: string } | null>(null);
   const cancel = () => Alert.alert(copy.cancelOrder, copy.cancelReason, [{ text: copy.cancel, style: "cancel" }, { text: copy.confirm, style: "destructive", onPress: () => void submitCancellation() }]);
-  const submitCancellation = async () => { if (reason.trim().length < 2 || submitting) return; setSubmitting(true); try { setOrder(await commerceApi.cancelOrder(order.id, reason.trim())); setNotice(copy.orderCancelled); } catch (error) { handlePrivateError(error); } finally { setSubmitting(false); } };
+  const submitCancellation = async () => { const normalizedReason = reason.trim().replace(/\s+/g, " "); const expectedVersion = order.expectedVersion; if (normalizedReason.length < 2 || submitting || !expectedVersion) return; const attempt = resolveOrderCancellationAttempt(cancellationAttemptRef.current, { expectedVersion, orderId: order.id, reason: normalizedReason }, createUuid); cancellationAttemptRef.current = attempt; setSubmitting(true); try { setOrder(await commerceApi.cancelOrder(order.id, expectedVersion, normalizedReason, attempt.key)); cancellationAttemptRef.current = null; setNotice(copy.orderCancelled); } catch (error) { handlePrivateError(error); } finally { setSubmitting(false); } };
   if (sessionAvailable === false) return <View style={styles.stack}><CommerceHeader copy={copy} isRtl={isRtl} title={copy.order} theme={theme} /><CommerceState body={copy.sessionRequired} buttonLabel={copy.retry} onPress={onOpenAccount} theme={theme} title={copy.sessionRequired} /></View>;
   return <View style={styles.stack}>
     <CommerceHeader copy={copy} isRtl={isRtl} onBack={goBack} title={copy.order} theme={theme} />

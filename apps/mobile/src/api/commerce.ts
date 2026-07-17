@@ -50,8 +50,13 @@ export const commerceApi = {
     authenticated<{ favoriteId: string; store: CommerceStore }>(
       "/api/commerce/customer/favorites/stores", "POST", { storeId },
     ),
-  cancelOrder: (orderId: string, reason: string) =>
-    authenticated<CommerceOrderDetail>(`/api/commerce/customer/orders/${orderId}/cancel`, "POST", { reason }),
+  cancelOrder: (orderId: string, expectedVersion: string, reason: string, idempotencyKey: string) =>
+    authenticated<CommerceOrderDetail>(
+      `/api/commerce/customer/orders/${orderId}/cancel`,
+      "POST",
+      { expectedVersion, reason },
+      { "idempotency-key": idempotencyKey },
+    ),
   checkout: (
     input: {
       addressId: string | null;

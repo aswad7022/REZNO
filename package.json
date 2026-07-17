@@ -29,6 +29,9 @@
     "seed:staging:commerce-products-inventory-stage3b": "tsx scripts/staging/seed-commerce-products-inventory-stage3b.ts",
     "smoke:staging:commerce-products-inventory-stage3b": "NODE_OPTIONS=--conditions=react-server tsx scripts/staging/smoke-commerce-products-inventory-stage3b.ts",
     "test:commerce-stage3b": "tsx --test tests/commerce/unit/stage3b-products-inventory.test.ts tests/commerce/unit/commerce-products-inventory-stage3b-seed.test.ts && NODE_OPTIONS=--conditions=react-server tsx --test --test-concurrency=1 tests/commerce/integration/stage3b-products-inventory-e2e.test.ts",
+    "seed:staging:commerce-orders-fulfillment-stage3c": "tsx scripts/staging/seed-commerce-orders-fulfillment-stage3c.ts",
+    "smoke:staging:commerce-orders-fulfillment-stage3c": "NODE_OPTIONS=--conditions=react-server tsx scripts/staging/smoke-commerce-orders-fulfillment-stage3c.ts",
+    "test:commerce-stage3c": "tsx --test tests/commerce/unit/stage3c-orders-fulfillment.test.ts tests/commerce/unit/commerce-orders-fulfillment-stage3c-seed.test.ts tests/commerce/unit/commerce-orders-fulfillment-stage3c-smoke.test.ts && NODE_OPTIONS=--conditions=react-server tsx --test --test-concurrency=1 tests/commerce/integration/stage3c-orders-fulfillment-e2e.test.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {

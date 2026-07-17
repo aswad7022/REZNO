@@ -1,8 +1,13 @@
 import { MAX_CART_ITEM_QUANTITY } from "@/features/commerce/domain/cart";
+import {
+  merchantOrderDateRangeError,
+  parseCanonicalMerchantOrderTimestamp,
+} from "@/features/commerce/domain/merchant-order-filter-policy";
 import { publicQueryFingerprint } from "@/features/commerce/public/cursor";
 import { commerceApiError } from "@/features/commerce/api/errors";
 import type { CustomerAddressInput } from "@/features/commerce/services/customer-service";
 import type { MerchantInventoryQuery } from "@/features/commerce/services/merchant-inventory-service";
+import type { MerchantOrderQuery } from "@/features/commerce/services/merchant-order-query-service";
 import type { CustomerOrderQuery } from "@/features/commerce/services/customer-order-query-service";
 import type { FavoriteQuery } from "@/features/commerce/services/customer-favorite-service";
 
@@ -286,6 +291,40 @@ export function parseMerchantInventoryQuery(params: URLSearchParams): MerchantIn
   };
 }
 
+export function parseMerchantOrderQuery(params: URLSearchParams): MerchantOrderQuery {
+  assertUniqueQueryParameters(params, [
+    "actionable", "createdFrom", "createdTo", "cursor", "fulfillmentMethod",
+    "fulfillmentStatus", "limit", "overdue", "paymentStatus", "q", "queue",
+    "status", "updatedFrom", "updatedTo",
+  ]);
+  const query = params.get("q")?.trim() || undefined;
+  if (query && (query.length > 80 || !/^[\p{L}\p{N}-]+$/u.test(query))) {
+    commerceApiError("INVALID_REQUEST", 400, "q is invalid.");
+  }
+  const result: MerchantOrderQuery = {
+    actionableOnly: queryBoolean(params.get("actionable"), "actionable"),
+    createdFrom: queryDate(params.get("createdFrom"), "createdFrom"),
+    createdTo: queryDate(params.get("createdTo"), "createdTo"),
+    cursor: boundedCursor(params.get("cursor")),
+    fulfillmentMethod: optionalEnum(params.get("fulfillmentMethod"), "fulfillmentMethod", ["CUSTOMER_PICKUP", "STORE_DELIVERY"] as const),
+    fulfillmentStatus: optionalEnum(params.get("fulfillmentStatus"), "fulfillmentStatus", ["UNFULFILLED", "PREPARING", "READY_FOR_PICKUP", "OUT_FOR_DELIVERY", "DELIVERED", "PICKED_UP", "DELIVERY_FAILED", "CANCELLED"] as const),
+    limit: parseCollectionLimit(params.get("limit")),
+    overduePending: queryBoolean(params.get("overdue"), "overdue"),
+    paymentStatus: optionalEnum(params.get("paymentStatus"), "paymentStatus", ["UNPAID", "PAID", "VOIDED"] as const),
+    query,
+    queue: optionalEnum(params.get("queue"), "queue", ["pending", "active", "ready", "delivery_issues", "completed", "closed", "all"] as const) ?? "pending",
+    status: optionalEnum(params.get("status"), "status", ["PENDING", "CONFIRMED", "COMPLETED", "REJECTED", "CANCELLED", "EXPIRED"] as const),
+    updatedFrom: queryDate(params.get("updatedFrom"), "updatedFrom"),
+    updatedTo: queryDate(params.get("updatedTo"), "updatedTo"),
+  };
+  for (const [from, to] of [[result.createdFrom, result.createdTo], [result.updatedFrom, result.updatedTo]]) {
+    const error = merchantOrderDateRangeError(from, to);
+    if (error === "ORDER") commerceApiError("INVALID_REQUEST", 400, "Order date range is invalid.");
+    if (error === "TOO_WIDE") commerceApiError("INVALID_REQUEST", 400, "Order date range cannot exceed 366 days.");
+  }
+  return result;
+}
+
 export async function parseInventoryAdjustment(request: Request) {
   const body = await readJsonObject(request, ["delta", "expectedVersion", "reason", "operationKey"]);
   if (!Number.isSafeInteger(body.delta) || body.delta === 0 || Math.abs(body.delta as number) > 2_147_483_647) {
@@ -350,7 +389,7 @@ export async function parseFavoriteTarget(request: Request, field: "productId" |
 }
 
 export async function parseCancellationRequest(request: Request) {
-  const body = await readJsonObject(request, ["reason"]);
+  const body = await readJsonObject(request, ["expectedVersion", "reason"]);
   if (typeof body.reason !== "string" || body.reason.trim().length < 2 || body.reason.trim().length > 500) {
     commerceApiError(
       "CANCELLATION_REASON_REQUIRED",
@@ -358,7 +397,14 @@ export async function parseCancellationRequest(request: Request) {
       "A cancellation reason between 2 and 500 characters is required.",
     );
   }
-  return { reason: body.reason.trim().replace(/\s+/g, " ") };
+  if (typeof body.expectedVersion !== "string") {
+    commerceApiError("INVALID_REQUEST", 400, "expectedVersion is required.");
+  }
+  const expectedVersion = new Date(body.expectedVersion);
+  if (Number.isNaN(expectedVersion.getTime()) || expectedVersion.toISOString() !== body.expectedVersion) {
+    commerceApiError("INVALID_REQUEST", 400, "expectedVersion must be an ISO timestamp.");
+  }
+  return { expectedVersion: body.expectedVersion, reason: body.reason.trim().replace(/\s+/g, " ") };
 }
 
 function assertUniqueQueryParameters(params: URLSearchParams, allowed: readonly string[]) {
@@ -382,6 +428,19 @@ function boundedCursor(value: string | null) {
   const cursor = value.trim();
   if (!cursor || cursor.length > 2048) commerceApiError("INVALID_CURSOR", 400, "cursor is invalid.");
   return cursor;
+}
+
+function queryBoolean(value: string | null, name: string) {
+  if (value === null) return undefined;
+  if (value !== "true" && value !== "false") commerceApiError("INVALID_REQUEST", 400, `${name} is invalid.`);
+  return value === "true";
+}
+
+function queryDate(value: string | null, name: string) {
+  if (value === null) return undefined;
+  const date = parseCanonicalMerchantOrderTimestamp(value);
+  if (!date) commerceApiError("INVALID_REQUEST", 400, `${name} must be an ISO timestamp with a timezone.`);
+  return date;
 }
 
 function optionalEnum<const T extends readonly string[]>(

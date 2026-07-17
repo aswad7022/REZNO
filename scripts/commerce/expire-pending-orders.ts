@@ -1,15 +1,10 @@
 import "dotenv/config";
 
 import { expireAllEligiblePendingOrders } from "../../features/commerce/services/expiration-service";
-
-const REQUIRED_CONFIRMATION = "EXPIRE_PENDING_COMMERCE_ORDERS";
+import { validateCommerceExpirationEnvironment } from "./expiration-safety";
 
 async function main() {
-  if (process.env.COMMERCE_EXPIRATION_CONFIRM !== REQUIRED_CONFIRMATION) {
-    throw new Error(
-      `Refusing to run. Set COMMERCE_EXPIRATION_CONFIRM=${REQUIRED_CONFIRMATION} for the intended database.`,
-    );
-  }
+  validateCommerceExpirationEnvironment(process.env);
   const result = await expireAllEligiblePendingOrders();
   process.stdout.write(`Expired ${result.expired} pending commerce Orders in ${result.batches} batch(es).\n`);
 }

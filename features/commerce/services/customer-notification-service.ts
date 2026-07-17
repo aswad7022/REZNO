@@ -24,7 +24,9 @@ const CUSTOMER_NOTIFICATION_EVENTS = [
   "order.preparing",
   "order.ready_for_pickup",
   "order.out_for_delivery",
+  "order.delivery_failed",
   "order.delivered",
+  "order.picked_up",
   "order.cancelled",
   "order.expired",
 ] as const satisfies readonly CommerceNotificationEvent[];

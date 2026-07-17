@@ -4,6 +4,7 @@ import {
   commerceNotificationCopy,
   type CommerceNotificationEvent,
 } from "@/features/commerce/domain/notification-events";
+import { effectiveCommercePermissions } from "@/features/commerce/domain/merchant-access";
 
 type Transaction = Prisma.TransactionClient;
 
@@ -25,6 +26,11 @@ export async function notifyCustomerCancellation(transaction: Transaction, order
   await notifyEligibleMerchants(transaction, orderId, "order.customer_cancelled");
 }
 
+export async function notifyOrderExpired(transaction: Transaction, orderId: string) {
+  await notifyCustomer(transaction, orderId, "order.expired");
+  await notifyEligibleMerchants(transaction, orderId, "order.expired");
+}
+
 async function notifyCustomer(
   transaction: Transaction,
   orderId: string,
@@ -40,13 +46,13 @@ async function notifyCustomer(
   });
   await createNotifications(transaction, orderId, event, order.orderNumber, order.storeNameSnapshot, [
     order.customer,
-  ]);
+  ], "customer");
 }
 
 async function notifyEligibleMerchants(
   transaction: Transaction,
   orderId: string,
-  event: "order.new" | "order.customer_cancelled",
+  event: "order.new" | "order.customer_cancelled" | "order.expired",
 ) {
   const order = await transaction.order.findUniqueOrThrow({
     where: { id: orderId },
@@ -63,12 +69,12 @@ async function notifyEligibleMerchants(
       status: "ACTIVE",
       organization: { deletedAt: null, isActive: true, status: "ACTIVE" },
       person: { deletedAt: null, isOnboarded: true, status: "ACTIVE" },
-      role: {
-        commercePermissions: { hasSome: ["ORDER_VIEW", "ORDER_MANAGE"] },
-        organizationId: order.store.organizationId,
-      },
+      role: { organizationId: order.store.organizationId },
     },
-    select: { person: { select: { id: true, preferredLanguage: true } } },
+    select: {
+      person: { select: { id: true, preferredLanguage: true } },
+      role: { select: { commercePermissions: true, systemRole: true } },
+    },
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],
   });
   await createNotifications(
@@ -77,7 +83,10 @@ async function notifyEligibleMerchants(
     event,
     order.orderNumber,
     order.storeNameSnapshot,
-    members.map((member) => member.person),
+    members
+      .filter((member) => effectiveCommercePermissions(member.role).includes("ORDER_VIEW"))
+      .map((member) => member.person),
+    "merchant",
   );
 }
 
@@ -88,6 +97,7 @@ async function createNotifications(
   orderNumber: string,
   storeName: string,
   recipients: Array<{ id: string; preferredLanguage: LanguageCode }>,
+  destinationType: "customer" | "merchant",
 ) {
   if (recipients.length === 0) return;
   await transaction.notification.createMany({
@@ -96,12 +106,13 @@ async function createNotifications(
       return {
         audience: "USER" as const,
         body: copy.body,
-        eventKey: commerceNotificationEventKey(orderId, event, recipient.id),
+        eventKey: commerceNotificationEventKey(orderId, event, recipient.id, destinationType),
         metadata: {
           bodyKey: copy.bodyKey,
-          destination: event === "order.new" || event === "order.customer_cancelled"
-            ? "/business/notifications"
+          destination: destinationType === "merchant"
+            ? `/business/commerce/orders/${orderId}`
             : "/customer/notifications",
+          ...(destinationType === "customer" ? { orderDestination: `/customer/orders/${orderId}` } : {}),
           eventType: event,
           orderId,
           orderNumber,
@@ -122,6 +133,9 @@ export function commerceNotificationEventKey(
   orderId: string,
   event: CommerceNotificationEvent,
   recipientPersonId: string,
+  destinationType: "customer" | "merchant" = "customer",
 ) {
-  return `commerce:${orderId}:${event}:${recipientPersonId}`;
+  return destinationType === "merchant"
+    ? `commerce:${orderId}:${event}:merchant:${recipientPersonId}`
+    : `commerce:${orderId}:${event}:${recipientPersonId}`;
 }

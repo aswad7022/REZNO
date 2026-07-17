@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { commerceError } from "@/features/commerce/domain/errors";
 import { canonicalRequestJson } from "@/features/commerce/domain/idempotency";
 
-type CursorKind = "products" | "inventory" | "movements";
+type CursorKind = "products" | "inventory" | "movements" | "orders" | "order_history";
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export interface MerchantCursorValue {
@@ -50,7 +50,10 @@ export function decodeMerchantCursor(
   if (!encoded || encoded.length > 2_048) invalid();
   let value: unknown;
   try {
-    value = JSON.parse(Buffer.from(encoded, "base64url").toString("utf8"));
+    if (!/^[A-Za-z0-9_-]+$/.test(encoded)) invalid();
+    const decoded = Buffer.from(encoded, "base64url");
+    if (decoded.toString("base64url") !== encoded) invalid();
+    value = JSON.parse(decoded.toString("utf8"));
   } catch {
     invalid();
   }
@@ -82,7 +85,7 @@ function isEncoded(value: unknown): value is Encoded {
     typeof item.actor === "string" && item.actor.length <= 200 &&
     typeof item.filter === "string" && /^[a-f0-9]{64}$/.test(item.filter) &&
     typeof item.id === "string" && UUID_PATTERN.test(item.id) &&
-    (item.kind === "products" || item.kind === "inventory" || item.kind === "movements") &&
+    (item.kind === "products" || item.kind === "inventory" || item.kind === "movements" || item.kind === "orders" || item.kind === "order_history") &&
     typeof item.snapshot === "string" &&
     typeof item.sortValue === "string" &&
     typeof item.target === "string" && item.target.length <= 100 &&

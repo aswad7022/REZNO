@@ -8,7 +8,9 @@ export type CommerceNotificationEvent =
   | "order.preparing"
   | "order.ready_for_pickup"
   | "order.out_for_delivery"
+  | "order.delivery_failed"
   | "order.delivered"
+  | "order.picked_up"
   | "order.cancelled"
   | "order.expired"
   | "order.new"
@@ -76,6 +78,14 @@ const COPY: Record<CommerceNotificationEvent, Record<CommerceNotificationLocale,
     (number) => `Order ${number} was delivered.`,
     (number) => `داواکاری ${number} گەیەندرا.`,
   ),
+  "order.delivery_failed": localized(
+    "تعذر تسليم الطلب",
+    "Delivery needs attention",
+    "گەیاندنی داواکاری سەرکەوتوو نەبوو",
+    (number) => `تعذر تسليم الطلب ${number} وسيُعاد التواصل عند المحاولة التالية.`,
+    (number) => `Delivery failed for order ${number}; the next attempt will be communicated.`,
+    (number) => `گەیاندنی داواکاری ${number} سەرکەوتوو نەبوو؛ هەوڵی داهاتوو ڕادەگەیەنرێت.`,
+  ),
   "order.expired": localized(
     "انتهت مهلة الطلب",
     "Order expired",
@@ -99,6 +109,14 @@ const COPY: Record<CommerceNotificationEvent, Record<CommerceNotificationLocale,
     (number) => `الطلب ${number} في طريقه إليك.`,
     (number) => `Order ${number} is on the way.`,
     (number) => `داواکاری ${number} لە ڕێگادایە.`,
+  ),
+  "order.picked_up": localized(
+    "تم استلام الطلب",
+    "Order picked up",
+    "داواکاری وەرگیرا",
+    (number) => `تم استلام الطلب ${number} وإكماله.`,
+    (number) => `Order ${number} was picked up and completed.`,
+    (number) => `داواکاری ${number} وەرگیرا و تەواو کرا.`,
   ),
   "order.preparing": localized(
     "جارٍ تجهيز الطلب",
