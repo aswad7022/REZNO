@@ -202,6 +202,26 @@ test("Gate 3C production HTML, RSC, Server Actions, and customer API enforce Ord
     assert.deepEqual([completed.status, completed.fulfillmentStatus, completed.paymentStatus], ["COMPLETED", "PICKED_UP", "PAID"]);
     assert.equal(completed.payment?.status, "PAID");
     assert.equal(completed.payment?.recordedById, ownerSession.person.id);
+    const terminalCancellation = await fetch(
+      `${baseUrl}/api/commerce/merchant/orders/${order.id}/transitions`,
+      {
+        body: JSON.stringify({
+          action: "cancel",
+          expectedVersion: completed.updatedAt.toISOString(),
+          reason: "Paid terminal Order",
+          returnedStock: false,
+        }),
+        headers: {
+          "content-type": "application/json",
+          cookie: cookies.owner,
+          "idempotency-key": randomUUID(),
+          origin: baseUrl!,
+        },
+        method: "POST",
+      },
+    );
+    assert.equal(terminalCancellation.status, 409);
+    assert.equal((await terminalCancellation.json()).error.code, "ORDER_STATE_CONFLICT");
   });
 
   await t.test("customer cancellation API requires version/key and replays the original result", async () => {

@@ -158,6 +158,18 @@ test("Milestone 2D domain errors map to stable safe HTTP responses", () => {
   let cancellation: unknown;
   try { commerceError("ORDER_NOT_CANCELLABLE", "not allowed"); } catch (error) { cancellation = error; }
   assert.equal(mapCommerceApiError(cancellation).status, 409);
+  let transition: unknown;
+  try { commerceError("INVALID_TRANSITION", "terminal Order"); } catch (error) { transition = error; }
+  assert.deepEqual(
+    [mapCommerceApiError(transition).code, mapCommerceApiError(transition).status],
+    ["ORDER_STATE_CONFLICT", 409],
+  );
+  let aggregate: unknown;
+  try { commerceError("CONFLICT", "inconsistent Order", { kind: "ORDER_PAYMENT_INTEGRITY" }); } catch (error) { aggregate = error; }
+  assert.deepEqual(
+    [mapCommerceApiError(aggregate).code, mapCommerceApiError(aggregate).status],
+    ["ORDER_STATE_CONFLICT", 409],
+  );
 });
 
 function orderFixture() {
