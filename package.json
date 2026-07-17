@@ -26,6 +26,9 @@
     "seed:staging:business-operations-stage2d-closure": "tsx scripts/staging/seed-business-operations-stage2d-closure.ts",
     "seed:staging:commerce-merchant-store-stage3a": "tsx scripts/staging/seed-commerce-merchant-store-stage3a.ts",
     "smoke:staging:commerce-merchant-store-stage3a": "tsx scripts/staging/smoke-commerce-merchant-store-stage3a.ts",
+    "seed:staging:commerce-products-inventory-stage3b": "tsx scripts/staging/seed-commerce-products-inventory-stage3b.ts",
+    "smoke:staging:commerce-products-inventory-stage3b": "NODE_OPTIONS=--conditions=react-server tsx scripts/staging/smoke-commerce-products-inventory-stage3b.ts",
+    "test:commerce-stage3b": "tsx --test tests/commerce/unit/stage3b-products-inventory.test.ts tests/commerce/unit/commerce-products-inventory-stage3b-seed.test.ts && NODE_OPTIONS=--conditions=react-server tsx --test --test-concurrency=1 tests/commerce/integration/stage3b-products-inventory-e2e.test.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {
