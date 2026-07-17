@@ -14,6 +14,7 @@ import {
   encodeMerchantCursor,
   merchantCursorFingerprint,
 } from "@/features/commerce/domain/merchant-cursor";
+import { merchantOrderDateRangeError } from "@/features/commerce/domain/merchant-order-filter-policy";
 import {
   merchantOrderDetail,
   merchantOrderSummary,
@@ -50,6 +51,10 @@ export interface MerchantOrderQuery {
   updatedTo?: Date;
 }
 
+export interface MerchantOrderQueryOptions {
+  clock?: () => Date;
+}
+
 const summarySelect = {
   _count: { select: { items: true } },
   createdAt: true,
@@ -71,6 +76,7 @@ const summarySelect = {
 export async function listMerchantOrders(
   reference: MerchantActorReference,
   query: MerchantOrderQuery,
+  options: MerchantOrderQueryOptions = {},
 ) {
   const actor = await resolveMerchantCommerceContext(reference, "ORDER_VIEW");
   if (!actor.storeId) commerceError("NOT_FOUND", "Merchant Store was not found.");
@@ -98,16 +104,18 @@ export async function listMerchantOrders(
         target: actor.storeId,
       })
     : null;
-  const snapshot = cursor?.snapshotDate ?? new Date();
+  const evaluationTime = cursor?.snapshotDate ?? (options.clock ?? systemClock)();
+  if (Number.isNaN(evaluationTime.getTime())) {
+    commerceError("VALIDATION_ERROR", "Order evaluation time is invalid.");
+  }
   const sort = queueSort(query.queue);
-  const now = new Date();
   const baseWhere: Prisma.OrderWhereInput = {
     AND: [
       { storeId: actor.storeId },
       queueWhere(query.queue),
       ...(query.actionableOnly ? [{
         OR: [
-          { reservationExpiresAt: { gt: now }, status: "PENDING" as const },
+          { reservationExpiresAt: { gt: evaluationTime }, status: "PENDING" as const },
           { status: "CONFIRMED" as const },
         ],
       }] : []),
@@ -118,7 +126,7 @@ export async function listMerchantOrders(
       ...(query.fulfillmentStatus ? [{ fulfillmentStatus: query.fulfillmentStatus }] : []),
       ...(query.paymentStatus ? [{ paymentStatus: query.paymentStatus }] : []),
       ...(query.overduePending
-        ? [{ reservationExpiresAt: { lte: now }, status: "PENDING" as const }]
+        ? [{ reservationExpiresAt: { lte: evaluationTime }, status: "PENDING" as const }]
         : []),
       ...(query.query ? [{ orderNumber: { contains: query.query, mode: "insensitive" as const } }] : []),
       ...(query.status ? [{ status: query.status }] : []),
@@ -128,8 +136,8 @@ export async function listMerchantOrders(
     ],
   };
   const snapshotWhere: Prisma.OrderWhereInput = sort.field === "updatedAt"
-    ? { updatedAt: { lte: snapshot } }
-    : { createdAt: { lte: snapshot } };
+    ? { updatedAt: { lte: evaluationTime } }
+    : { createdAt: { lte: evaluationTime } };
   const cursorWhere = cursor
     ? orderCursorWhere(sort.field, sort.direction, cursor.sortDate, cursor.id)
     : {};
@@ -156,7 +164,7 @@ export async function listMerchantOrders(
         filter,
         id: last.id,
         kind: "orders",
-        snapshot: snapshot.toISOString(),
+        snapshot: evaluationTime.toISOString(),
         sortValue: last[sort.field].toISOString(),
         target: actor.storeId,
       })
@@ -173,9 +181,10 @@ export async function listMerchantOrders(
       order,
       totalByOrder.get(order.id) ?? 0,
       canMutate,
+      evaluationTime,
     )),
     pageInfo: { hasNextPage: Boolean(nextCursor), nextCursor },
-    snapshot: snapshot.toISOString(),
+    snapshot: evaluationTime.toISOString(),
   };
 }
 
@@ -307,7 +316,16 @@ function validateQuery(query: MerchantOrderQuery) {
   if (query.query && (query.query.length > 80 || !/^[\p{L}\p{N}-]+$/u.test(query.query))) {
     commerceError("VALIDATION_ERROR", "Order search is invalid.");
   }
-  for (const [from, to] of [[query.createdFrom, query.createdTo], [query.updatedFrom, query.updatedTo]]) {
-    if (from && to && from > to) commerceError("VALIDATION_ERROR", "Order date range is invalid.");
+  for (const date of [query.createdFrom, query.createdTo, query.updatedFrom, query.updatedTo]) {
+    if (date && Number.isNaN(date.getTime())) commerceError("VALIDATION_ERROR", "Order date filter is invalid.");
   }
+  for (const [from, to] of [[query.createdFrom, query.createdTo], [query.updatedFrom, query.updatedTo]]) {
+    const error = merchantOrderDateRangeError(from, to);
+    if (error === "ORDER") commerceError("VALIDATION_ERROR", "Order date range is invalid.");
+    if (error === "TOO_WIDE") commerceError("VALIDATION_ERROR", "Order date range cannot exceed 366 days.");
+  }
+}
+
+function systemClock() {
+  return new Date();
 }

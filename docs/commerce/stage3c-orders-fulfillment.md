@@ -240,6 +240,35 @@ cancellation is permitted. Replay returns a safe authoritative transition DTO.
   `rezno_staging` database before running the bounded service. It does not deploy
   or imply a scheduler.
 
+### Cursor evaluation and operational date filters
+
+Every Merchant Order result set has one canonical evaluation timestamp. A fresh
+query receives the current clock value; every next cursor stores that value and
+all later pages decode and reuse it exactly. The same timestamp controls the
+snapshot boundary, actionable PENDING comparison, overdue PENDING comparison,
+summary `overdue` value and the generated next cursor. A cursor therefore never
+re-evaluates a reservation deadline against a later wall clock. A new query has
+a new evaluation timestamp and may correctly reclassify the same persisted
+Orders. Raw persisted status counts remain independent because they are not
+labelled actionable, overdue or expiring.
+
+The actionable PENDING definition is `status = PENDING` and
+`reservationExpiresAt > evaluationTime`. The overdue PENDING definition is
+`status = PENDING` and `reservationExpiresAt <= evaluationTime`. Confirmed
+actionability continues to follow persisted state and the existing allowed-action
+policy.
+
+Merchant Web renders local `datetime-local` controls. Its small client boundary
+converts the browser-local value to a canonical UTC ISO timestamp before the GET
+submission and restores canonical query values in the user's local timezone.
+The API and Server Component accept only complete ISO timestamps with `Z` or an
+explicit offset, normalize accepted values to UTC and reject date-only,
+timezone-less, malformed, duplicate or reversed values. Created and updated
+bounds are inclusive. Each paired range is explicitly limited to 366 days; no
+end-of-day expansion is inferred. Invalid input renders a safe visible validation
+state and never falls back to an unfiltered query. Pagination links retain all
+four normalized timestamps, and the cursor fingerprint rejects any date change.
+
 ## History, audit and notifications
 
 `OrderStatusHistory` remains the single transition ledger. Safe metadata stores
@@ -300,11 +329,11 @@ On the local disposable database named exactly `rezno_staging`, migrations were
 
 Pre-publish validation completed:
 
-- 242/242 unit tests.
-- 217/217 PostgreSQL integration tests.
-- 60/60 production HTTP/RSC/Server Action tests against an optimized local Next
+- 245/245 unit tests.
+- 219/219 PostgreSQL integration tests.
+- 61/61 production HTTP/RSC/Server Action tests against an optimized local Next
   production server, with no skipped live test.
-- focused Gate 3C: 14/14 unit, 9/9 PostgreSQL and 4/4 live HTTP tests.
+- focused Gate 3C: 17/17 unit, 11/11 PostgreSQL and 5/5 live HTTP tests.
 - root lint, non-incremental TypeScript, Prisma format/validate/generate and
   `git diff --check`.
 - Next 16.2.9 optimized production build.

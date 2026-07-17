@@ -1,4 +1,8 @@
 import { MAX_CART_ITEM_QUANTITY } from "@/features/commerce/domain/cart";
+import {
+  merchantOrderDateRangeError,
+  parseCanonicalMerchantOrderTimestamp,
+} from "@/features/commerce/domain/merchant-order-filter-policy";
 import { publicQueryFingerprint } from "@/features/commerce/public/cursor";
 import { commerceApiError } from "@/features/commerce/api/errors";
 import type { CustomerAddressInput } from "@/features/commerce/services/customer-service";
@@ -297,7 +301,7 @@ export function parseMerchantOrderQuery(params: URLSearchParams): MerchantOrderQ
   if (query && (query.length > 80 || !/^[\p{L}\p{N}-]+$/u.test(query))) {
     commerceApiError("INVALID_REQUEST", 400, "q is invalid.");
   }
-  return {
+  const result: MerchantOrderQuery = {
     actionableOnly: queryBoolean(params.get("actionable"), "actionable"),
     createdFrom: queryDate(params.get("createdFrom"), "createdFrom"),
     createdTo: queryDate(params.get("createdTo"), "createdTo"),
@@ -313,6 +317,12 @@ export function parseMerchantOrderQuery(params: URLSearchParams): MerchantOrderQ
     updatedFrom: queryDate(params.get("updatedFrom"), "updatedFrom"),
     updatedTo: queryDate(params.get("updatedTo"), "updatedTo"),
   };
+  for (const [from, to] of [[result.createdFrom, result.createdTo], [result.updatedFrom, result.updatedTo]]) {
+    const error = merchantOrderDateRangeError(from, to);
+    if (error === "ORDER") commerceApiError("INVALID_REQUEST", 400, "Order date range is invalid.");
+    if (error === "TOO_WIDE") commerceApiError("INVALID_REQUEST", 400, "Order date range cannot exceed 366 days.");
+  }
+  return result;
 }
 
 export async function parseInventoryAdjustment(request: Request) {
@@ -428,10 +438,8 @@ function queryBoolean(value: string | null, name: string) {
 
 function queryDate(value: string | null, name: string) {
   if (value === null) return undefined;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime()) || date.toISOString() !== value) {
-    commerceApiError("INVALID_REQUEST", 400, `${name} must be an ISO timestamp.`);
-  }
+  const date = parseCanonicalMerchantOrderTimestamp(value);
+  if (!date) commerceApiError("INVALID_REQUEST", 400, `${name} must be an ISO timestamp with a timezone.`);
   return date;
 }
 

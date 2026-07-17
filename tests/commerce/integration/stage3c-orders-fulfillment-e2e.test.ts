@@ -252,6 +252,129 @@ test("Gate 3C Merchant Orders and fulfillment PostgreSQL end-to-end", { concurre
     await assert.rejects(getMerchantOrderDetail(foreign.reference, queueOrders[0]!.order.id), code("NOT_FOUND"));
   });
 
+  await t.test("time-relative pending queues remain bound to the first cursor evaluation timestamp", async () => {
+    const evaluationTime = new Date("2035-06-01T12:00:00.000Z");
+    const afterDeadlines = new Date("2035-06-01T12:10:00.000Z");
+    const createdAt = new Date("2035-05-31T12:00:00.000Z");
+    const createdFrom = new Date("2035-05-31T11:59:00.000Z");
+    const createdTo = new Date("2035-05-31T12:01:00.000Z");
+    const offsets = [-4, -3, -2, -1, 0, 1, 2, 3, 4];
+    const deadlineOrders = [];
+    for (const offset of offsets) deadlineOrders.push(await checkout(`snapshot-${offset}`));
+    for (const [index, item] of deadlineOrders.entries()) {
+      const reservationExpiresAt = new Date(evaluationTime.getTime() + offsets[index]! * 60_000);
+      await prisma.$executeRaw`
+        UPDATE "Order"
+        SET "createdAt" = ${createdAt}, "updatedAt" = ${createdAt}, "reservationExpiresAt" = ${reservationExpiresAt}
+        WHERE "id" = ${item.order.id}::uuid
+      `;
+    }
+    const oldOverdue = new Set(deadlineOrders.filter((_, index) => offsets[index]! <= 0).map((item) => item.order.id));
+    const oldActionable = new Set(deadlineOrders.filter((_, index) => offsets[index]! > 0).map((item) => item.order.id));
+    const base = { createdFrom, createdTo, queue: "pending" as const };
+
+    const actionableFirst = await listMerchantOrders(owner.reference, {
+      ...base, actionableOnly: true, limit: 2,
+    }, { clock: () => evaluationTime });
+    assert.equal(actionableFirst.snapshot, evaluationTime.toISOString());
+    assert.ok(actionableFirst.pageInfo.nextCursor);
+    assert.equal(actionableFirst.data.every((item) => item.overdue === false), true);
+    const actionableSecond = await listMerchantOrders(owner.reference, {
+      ...base, actionableOnly: true, cursor: actionableFirst.pageInfo.nextCursor!, limit: 2,
+    }, { clock: () => afterDeadlines });
+    assert.equal(actionableSecond.snapshot, evaluationTime.toISOString());
+    assert.equal(actionableSecond.data.every((item) => item.overdue === false), true);
+    const actionableIds = [...actionableFirst.data, ...actionableSecond.data].map((item) => item.id);
+    assert.equal(new Set(actionableIds).size, actionableIds.length);
+    assert.deepEqual(new Set(actionableIds), oldActionable);
+
+    const changedPageSizeFirst = await listMerchantOrders(owner.reference, {
+      ...base, actionableOnly: true, limit: 1,
+    }, { clock: () => evaluationTime });
+    const changedPageSizeSecond = await listMerchantOrders(owner.reference, {
+      ...base, actionableOnly: true, cursor: changedPageSizeFirst.pageInfo.nextCursor!, limit: 3,
+    }, { clock: () => afterDeadlines });
+    assert.deepEqual(
+      new Set([...changedPageSizeFirst.data, ...changedPageSizeSecond.data].map((item) => item.id)),
+      oldActionable,
+    );
+    await assert.rejects(listMerchantOrders(owner.reference, {
+      ...base, cursor: actionableFirst.pageInfo.nextCursor!, limit: 2, overduePending: true,
+    }, { clock: () => afterDeadlines }), code("INVALID_CURSOR"));
+
+    const overdueFirst = await listMerchantOrders(owner.reference, {
+      ...base, limit: 2, overduePending: true,
+    }, { clock: () => evaluationTime });
+    const overdueSecond = await listMerchantOrders(owner.reference, {
+      ...base, cursor: overdueFirst.pageInfo.nextCursor!, limit: 3, overduePending: true,
+    }, { clock: () => afterDeadlines });
+    assert.equal(overdueSecond.snapshot, evaluationTime.toISOString());
+    assert.equal([...overdueFirst.data, ...overdueSecond.data].every((item) => item.overdue), true);
+    assert.deepEqual(new Set([...overdueFirst.data, ...overdueSecond.data].map((item) => item.id)), oldOverdue);
+
+    const pendingFirst = await listMerchantOrders(owner.reference, {
+      ...base, limit: 4,
+    }, { clock: () => evaluationTime });
+    const pendingSecond = await listMerchantOrders(owner.reference, {
+      ...base, cursor: pendingFirst.pageInfo.nextCursor!, limit: 5,
+    }, { clock: () => afterDeadlines });
+    assert.equal(pendingSecond.snapshot, evaluationTime.toISOString());
+    assert.deepEqual(new Set([...pendingFirst.data, ...pendingSecond.data].map((item) => item.id)), new Set(deadlineOrders.map((item) => item.order.id)));
+    for (const item of [...pendingFirst.data, ...pendingSecond.data]) {
+      assert.equal(item.overdue, oldOverdue.has(item.id));
+    }
+
+    const freshActionable = await listMerchantOrders(owner.reference, {
+      ...base, actionableOnly: true, limit: 20,
+    }, { clock: () => afterDeadlines });
+    assert.equal(freshActionable.data.length, 0);
+    const freshOverdue = await listMerchantOrders(owner.reference, {
+      ...base, limit: 20, overduePending: true,
+    }, { clock: () => afterDeadlines });
+    assert.deepEqual(new Set(freshOverdue.data.map((item) => item.id)), new Set(deadlineOrders.map((item) => item.order.id)));
+    assert.equal(freshOverdue.data.every((item) => item.overdue), true);
+  });
+
+  await t.test("created and updated filters use inclusive bounded timestamp ranges", async () => {
+    const lower = new Date("2026-05-01T10:00:00.000Z");
+    const upper = new Date("2026-05-01T11:00:00.000Z");
+    const timestamps = [
+      new Date(lower.getTime() - 1),
+      lower,
+      new Date("2026-05-01T10:30:00.000Z"),
+      upper,
+      new Date(upper.getTime() + 1),
+    ];
+    const ranged = [];
+    for (const [index] of timestamps.entries()) ranged.push(await checkout(`range-${index}`));
+    for (const [index, item] of ranged.entries()) {
+      await prisma.$executeRaw`
+        UPDATE "Order"
+        SET "createdAt" = ${timestamps[index]!}, "updatedAt" = ${timestamps[index]!}
+        WHERE "id" = ${item.order.id}::uuid
+      `;
+    }
+    const expected = new Set(ranged.slice(1, 4).map((item) => item.order.id));
+    const created = await listMerchantOrders(owner.reference, {
+      createdFrom: lower, createdTo: upper, limit: 20, queue: "pending",
+    });
+    assert.deepEqual(new Set(created.data.map((item) => item.id)), expected);
+    const updated = await listMerchantOrders(owner.reference, {
+      limit: 20, queue: "pending", updatedFrom: lower, updatedTo: upper,
+    });
+    assert.deepEqual(new Set(updated.data.map((item) => item.id)), expected);
+    const combined = await listMerchantOrders(owner.reference, {
+      createdFrom: lower, createdTo: upper, limit: 20, queue: "pending", updatedFrom: lower, updatedTo: upper,
+    });
+    assert.deepEqual(new Set(combined.data.map((item) => item.id)), expected);
+    await assert.rejects(listMerchantOrders(owner.reference, {
+      createdFrom: new Date("2025-01-01T00:00:00.000Z"),
+      createdTo: new Date("2026-01-03T00:00:00.000Z"),
+      limit: 20,
+      queue: "pending",
+    }), code("VALIDATION_ERROR"));
+  });
+
   await t.test("confirmation consumes once and exact replay returns its original result after later transitions", async () => {
     const { order } = await checkout("exact-replay");
     const input = { ...transition(order), action: "confirm" as const };

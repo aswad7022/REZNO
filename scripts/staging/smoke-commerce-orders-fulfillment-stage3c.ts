@@ -21,6 +21,7 @@ const oidcToken = process.env.VERCEL_OIDC_TOKEN ?? "";
 const runId = randomUUID().replaceAll("-", "").slice(0, 16);
 const userIds: string[] = [];
 const personIds: string[] = [];
+const probeOrderIds: string[] = [];
 let phase = "safety";
 let baselineFingerprint = "";
 const evidence = {
@@ -125,6 +126,92 @@ async function main() {
   assert.equal(collection(switched.body).data.some((item) => item.id === FIXTURE.order("archivedVariant")), true);
   assert.equal(collection(switched.body).data.some((item) => item.id === FIXTURE.order("pendingValid")), false);
   evidence.checks.add("queue-pagination-isolation");
+
+  phase = "snapshot-and-date-filter-probe";
+  await resetFixture();
+  const probeCreatedAt = new Date(Date.now() - 60_000);
+  const probeCreatedTo = new Date(probeCreatedAt.getTime() + 60_000);
+  const probeDeadline = new Date(Date.now() + 30_000);
+  const probeRows = Array.from({ length: 21 }, (_, index) => ({
+    createdAt: new Date(probeCreatedAt.getTime() + index),
+    currency: "IQD",
+    customerId: FIXTURE.people.customerA[0],
+    customerNameSnapshot: `Stage 3C snapshot probe ${index}`,
+    customerPhoneSnapshot: "+964750004099",
+    fulfillmentMethod: "CUSTOMER_PICKUP" as const,
+    grandTotal: "10000",
+    id: randomUUID(),
+    orderNumber: `RZ-STAGE3C-SNAPSHOT-${runId}-${String(index).padStart(2, "0")}`,
+    paymentMethod: "PAY_AT_PICKUP" as const,
+    pickupAddressSnapshot: "Stage 3C snapshot probe",
+    reservationExpiresAt: probeDeadline,
+    storeId: FIXTURE.stores.primary[0],
+    storeNameSnapshot: "Stage 3C Orders Primary",
+    storePhoneSnapshot: "+964750004099",
+    storeSlugSnapshot: FIXTURE.stores.primary[1],
+    subtotal: "10000",
+    updatedAt: new Date(probeCreatedAt.getTime() + index),
+  }));
+  probeOrderIds.push(...probeRows.map((item) => item.id));
+  await prisma.order.createMany({ data: probeRows });
+  const canonicalDates = {
+    createdFrom: new Date(probeCreatedAt.getTime() - 1).toISOString(),
+    createdTo: probeCreatedTo.toISOString(),
+    updatedFrom: new Date(probeCreatedAt.getTime() - 1).toISOString(),
+    updatedTo: probeCreatedTo.toISOString(),
+  };
+  const probeQuery = `RZ-STAGE3C-SNAPSHOT-${runId}`;
+  const filtered = new URLSearchParams({ actionable: "true", limit: "2", q: probeQuery, queue: "pending", ...canonicalDates });
+  const snapshotFirst = collection((await api(`/api/commerce/merchant/orders?${filtered}`, cookies.owner)).body);
+  assert.equal(snapshotFirst.data.length, 2);
+  assert.ok(snapshotFirst.pageInfo.nextCursor);
+  assert.equal(snapshotFirst.data.every((item) => item.overdue === false), true);
+  const firstSnapshot = cursorSnapshot(snapshotFirst.pageInfo.nextCursor!);
+  assert.ok(new Date(firstSnapshot) < probeDeadline, "The first cursor must be created before the controlled deadline.");
+
+  const businessBeforeDeadline = await page(`/business/commerce/orders?${new URLSearchParams({ q: probeQuery, queue: "pending", ...canonicalDates })}`, cookies.owner);
+  assert.equal((businessBeforeDeadline.text.match(/type="datetime-local"/g) ?? []).length, 4);
+  const nextHref = htmlDecode(businessBeforeDeadline.text.match(/href="([^"]*cursor=[^"]+)"/)?.[1] ?? "");
+  assert.ok(nextHref, "The Business date-filter probe must have a next-page link.");
+  const nextUrl = new URL(nextHref, baseUrl);
+  for (const [key, value] of Object.entries(canonicalDates)) assert.equal(nextUrl.searchParams.get(key), value);
+
+  const waitMs = Math.max(0, probeDeadline.getTime() - Date.now() + 500);
+  await new Promise((resolve) => setTimeout(resolve, waitMs));
+  const snapshotSecondParams = new URLSearchParams(filtered);
+  snapshotSecondParams.set("cursor", snapshotFirst.pageInfo.nextCursor!);
+  const snapshotSecond = collection((await api(`/api/commerce/merchant/orders?${snapshotSecondParams}`, cookies.owner)).body);
+  assert.equal(snapshotSecond.data.length, 2);
+  assert.equal(snapshotSecond.data.every((item) => item.overdue === false), true);
+  assert.equal(new Set([...snapshotFirst.data, ...snapshotSecond.data].map((item) => item.id)).size, 4);
+  assert.ok(snapshotSecond.pageInfo.nextCursor);
+  assert.equal(cursorSnapshot(snapshotSecond.pageInfo.nextCursor!), firstSnapshot);
+
+  const freshActionable = collection((await api(`/api/commerce/merchant/orders?${filtered}`, cookies.owner)).body);
+  assert.equal(freshActionable.data.length, 0);
+  const overdueParams = new URLSearchParams({ limit: "50", overdue: "true", q: probeQuery, queue: "pending", ...canonicalDates });
+  const freshOverdue = collection((await api(`/api/commerce/merchant/orders?${overdueParams}`, cookies.owner)).body);
+  assert.deepEqual(new Set(freshOverdue.data.map((item) => item.id)), new Set(probeOrderIds));
+  assert.equal(freshOverdue.data.every((item) => item.overdue === true), true);
+  const crossFilter = new URLSearchParams(overdueParams);
+  crossFilter.set("cursor", snapshotFirst.pageInfo.nextCursor!);
+  assert.equal((await api(`/api/commerce/merchant/orders?${crossFilter}`, cookies.owner)).response.status, 400);
+  const changedRange = new URLSearchParams(filtered);
+  changedRange.set("createdFrom", probeCreatedAt.toISOString());
+  changedRange.set("cursor", snapshotFirst.pageInfo.nextCursor!);
+  assert.equal((await api(`/api/commerce/merchant/orders?${changedRange}`, cookies.owner)).response.status, 400);
+  const malformed = await page("/business/commerce/orders?createdFrom=2026-07-17", cookies.owner);
+  assert.match(malformed.text, /role="alert"/);
+  assert.equal(malformed.text.includes(probeRows[0]!.orderNumber), false);
+  evidence.checks.add("snapshot-deadline-pagination");
+  evidence.checks.add("business-date-filters");
+
+  phase = "snapshot-and-date-filter-cleanup";
+  const probeCleanup = await prisma.order.deleteMany({ where: { id: { in: probeOrderIds } } });
+  assert.equal(probeCleanup.count, probeOrderIds.length);
+  assert.equal(await prisma.order.count({ where: { id: { in: probeOrderIds } } }), 0);
+  probeOrderIds.splice(0);
+  evidence.checks.add("snapshot-date-probe-cleanup");
 
   phase = "dto-pii-and-role-apis";
   const ownerDetail = data(await api(`/api/commerce/merchant/orders/${FIXTURE.order("preparingDelivery")}`, cookies.owner));
@@ -403,9 +490,19 @@ async function assertSideEffects(orderId: string, expected: { audit: number; his
 
 function collection(body: Record<string, unknown>) {
   return body as unknown as {
-    data: Array<{ id: string }>;
+    data: Array<{ id: string; overdue: boolean }>;
     pageInfo: { hasNextPage: boolean; nextCursor: string | null };
   };
+}
+
+function cursorSnapshot(cursor: string) {
+  const value = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")) as { snapshot?: unknown };
+  if (typeof value.snapshot !== "string") throw new Error("Merchant Order cursor snapshot is missing.");
+  return value.snapshot;
+}
+
+function htmlDecode(value: string) {
+  return value.replaceAll("&amp;", "&").replaceAll("&#x27;", "'").replaceAll("&quot;", '"');
 }
 
 function data(result: ApiResult) {
@@ -452,6 +549,11 @@ function assertNoRaw(text: string) {
 }
 
 async function cleanup() {
+  if (probeOrderIds.length) {
+    await prisma.order.deleteMany({ where: { id: { in: probeOrderIds } } });
+    assert.equal(await prisma.order.count({ where: { id: { in: probeOrderIds } } }), 0);
+    probeOrderIds.splice(0);
+  }
   if (baselineFingerprint) await resetFixture();
   await prisma.$transaction(async (transaction) => {
     await transaction.notification.deleteMany({ where: { recipientPersonId: { in: personIds } } });

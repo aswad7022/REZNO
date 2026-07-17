@@ -55,6 +55,12 @@ async function get(path: string, cookie: string, rsc = false) {
   });
   return { response, text: await response.text() };
 }
+async function getJson(path: string, cookie: string) {
+  const response = await fetch(`${baseUrl}${path}`, { headers: { cookie }, redirect: "manual" });
+  const text = await response.text();
+  assert.doesNotMatch(text, /PrismaClient|PostgreSQL|Invalid `prisma\./);
+  return { body: JSON.parse(text) as { data: Array<{ id: string }>; pageInfo: { nextCursor: string | null } }, response };
+}
 function routeText(value: string) { return value.replaceAll("\\/", "/"); }
 function assertForbidden(value: string) {
   assert.match(value, /NEXT_HTTP_ERROR_FALLBACK;403/);
@@ -183,6 +189,135 @@ test("Gate 3C production HTML, RSC, Server Actions, and customer API enforce Ord
     assert.equal(formParams(staffDetail.text).getAll("action").includes("cancel"), false);
     const viewDetail = await get(`/business/commerce/orders/${order.id}`, cookies.view);
     assert.doesNotMatch(viewDetail.text, /name="expectedVersion"|name="idempotencyKey"|name="action"/);
+  });
+
+  await t.test("Business and API date filters are operational, inclusive, visible, and cursor-bound", async () => {
+    const lower = new Date("2026-04-01T10:00:00.000Z");
+    const upper = new Date("2026-04-01T11:00:00.000Z");
+    const boundaryTimes = [
+      new Date(lower.getTime() - 1),
+      lower,
+      new Date("2026-04-01T10:30:00.000Z"),
+      upper,
+      new Date(upper.getTime() + 1),
+    ];
+    const boundaryOrders = [];
+    for (const [index, timestamp] of boundaryTimes.entries()) {
+      boundaryOrders.push(await prisma.order.create({ data: {
+        createdAt: timestamp,
+        currency: "IQD",
+        customerId: customerSession.person.id,
+        customerNameSnapshot: `Date Boundary ${index}`,
+        customerPhoneSnapshot: "+9647500000399",
+        fulfillmentMethod: "CUSTOMER_PICKUP",
+        grandTotal: "10000",
+        orderNumber: `RZ-HTTP-DATE-${index}-${randomUUID().slice(0, 8)}`,
+        paymentMethod: "PAY_AT_PICKUP",
+        pickupAddressSnapshot: "HTTP Street",
+        reservationExpiresAt: new Date(`2030-01-01T00:0${index}:00.000Z`),
+        storeId: store.id,
+        storeNameSnapshot: store.name,
+        storePhoneSnapshot: store.supportPhone,
+        storeSlugSnapshot: store.slug,
+        subtotal: "10000",
+        updatedAt: timestamp,
+      } }));
+    }
+    const expectedBoundary = new Set(boundaryOrders.slice(1, 4).map((item) => item.id));
+    const query = (values: Record<string, string>) => {
+      const params = new URLSearchParams({ limit: "50", queue: "pending", ...values });
+      return `/api/commerce/merchant/orders?${params}`;
+    };
+    const created = await getJson(query({ createdFrom: lower.toISOString(), createdTo: upper.toISOString() }), cookies.owner);
+    assert.equal(created.response.status, 200);
+    assert.deepEqual(new Set(created.body.data.map((item) => item.id)), expectedBoundary);
+    const updated = await getJson(query({ updatedFrom: lower.toISOString(), updatedTo: upper.toISOString() }), cookies.owner);
+    assert.deepEqual(new Set(updated.body.data.map((item) => item.id)), expectedBoundary);
+    const combined = await getJson(query({
+      createdFrom: lower.toISOString(), createdTo: upper.toISOString(),
+      updatedFrom: lower.toISOString(), updatedTo: upper.toISOString(),
+    }), cookies.owner);
+    assert.deepEqual(new Set(combined.body.data.map((item) => item.id)), expectedBoundary);
+
+    const businessParams = new URLSearchParams({
+      createdFrom: lower.toISOString(), createdTo: upper.toISOString(), queue: "pending",
+      updatedFrom: lower.toISOString(), updatedTo: upper.toISOString(),
+    });
+    for (const rsc of [false, true]) {
+      const page = await get(`/business/commerce/orders?${businessParams}`, cookies.owner, rsc);
+      assert.equal(page.response.status, 200);
+      for (const item of boundaryOrders.slice(1, 4)) assert.match(page.text, new RegExp(item.orderNumber));
+      assert.doesNotMatch(page.text, new RegExp(boundaryOrders[0]!.orderNumber));
+      assert.doesNotMatch(page.text, new RegExp(boundaryOrders[4]!.orderNumber));
+    }
+    const controls = await get(`/business/commerce/orders?${businessParams}`, cookies.owner);
+    assert.equal((controls.text.match(/type="datetime-local"/g) ?? []).length, 4);
+    const filterForm = findForm(controls.text, { queue: "pending" });
+    const canonicalFields = formParams(filterForm);
+    assert.equal(canonicalFields.get("createdFrom"), lower.toISOString());
+    assert.equal(canonicalFields.get("createdTo"), upper.toISOString());
+    assert.equal(canonicalFields.get("updatedFrom"), lower.toISOString());
+    assert.equal(canonicalFields.get("updatedTo"), upper.toISOString());
+
+    const pageLower = new Date("2026-04-02T10:00:00.000Z");
+    const pageUpper = new Date("2026-04-02T11:00:00.000Z");
+    for (let index = 0; index < 21; index += 1) {
+      await prisma.order.create({ data: {
+        createdAt: new Date(pageLower.getTime() + index * 1_000),
+        currency: "IQD",
+        customerId: customerSession.person.id,
+        customerNameSnapshot: `Date Page ${index}`,
+        customerPhoneSnapshot: "+9647500000399",
+        fulfillmentMethod: "CUSTOMER_PICKUP",
+        grandTotal: "10000",
+        orderNumber: `RZ-HTTP-DATE-PAGE-${index}-${randomUUID().slice(0, 8)}`,
+        paymentMethod: "PAY_AT_PICKUP",
+        pickupAddressSnapshot: "HTTP Street",
+        reservationExpiresAt: new Date(2031, 0, 1, 0, index),
+        storeId: store.id,
+        storeNameSnapshot: store.name,
+        storePhoneSnapshot: store.supportPhone,
+        storeSlugSnapshot: store.slug,
+        subtotal: "10000",
+        updatedAt: new Date(pageLower.getTime() + index * 1_000),
+      } });
+    }
+    const paginationParams = new URLSearchParams({
+      createdFrom: pageLower.toISOString(), createdTo: pageUpper.toISOString(), queue: "pending",
+      updatedFrom: pageLower.toISOString(), updatedTo: pageUpper.toISOString(),
+    });
+    const pagination = await get(`/business/commerce/orders?${paginationParams}`, cookies.owner);
+    const nextHref = decodeHtml(pagination.text.match(/href="([^"]*cursor=[^"]+)"/)?.[1] ?? "");
+    assert.ok(nextHref);
+    const next = new URL(nextHref, baseUrl);
+    for (const key of ["createdFrom", "createdTo", "updatedFrom", "updatedTo"]) {
+      assert.equal(next.searchParams.get(key), paginationParams.get(key));
+    }
+    const changed = new URL(next);
+    changed.searchParams.set("createdFrom", new Date(pageLower.getTime() + 1_000).toISOString());
+    const crossDateApi = await fetch(`${baseUrl}/api/commerce/merchant/orders?${changed.searchParams}`, {
+      headers: { cookie: cookies.owner },
+      redirect: "manual",
+    });
+    assert.equal(crossDateApi.status, 400);
+    assert.doesNotMatch(await crossDateApi.text(), /PrismaClient|PostgreSQL|Invalid `prisma\./);
+    const crossDate = await get(`${changed.pathname}${changed.search}`, cookies.owner);
+    assert.ok([200, 404].includes(crossDate.response.status));
+    assert.match(crossDate.text, /NEXT_HTTP_ERROR_FALLBACK;404|404/);
+    assert.doesNotMatch(crossDate.text, /PrismaClient|PostgreSQL|Invalid `prisma\./);
+
+    for (const path of [
+      "/business/commerce/orders?createdFrom=2026-04-01",
+      `/business/commerce/orders?createdFrom=${encodeURIComponent(lower.toISOString())}&createdFrom=${encodeURIComponent(upper.toISOString())}`,
+    ]) {
+      for (const rsc of [false, true]) {
+        const invalid = await get(path, cookies.owner, rsc);
+        assert.equal(invalid.response.status, 200);
+        assert.doesNotMatch(invalid.text, new RegExp(order.orderNumber));
+        if (!rsc) assert.match(invalid.text, /role="alert"/);
+        assert.doesNotMatch(invalid.text, /PrismaClient|PostgreSQL|Invalid `prisma\./);
+      }
+    }
   });
 
   await t.test("Server Actions run the complete pickup flow and exact duplicate submit is side-effect free", async () => {

@@ -60,7 +60,7 @@ export function merchantOrderSummary(order: {
   status: string;
   storeNameSnapshot: string;
   updatedAt: Date;
-}, totalQuantity: number, canMutate: boolean) {
+}, totalQuantity: number, canMutate: boolean, evaluationTime: Date) {
   return {
     createdAt: order.createdAt.toISOString(),
     currency: order.currency,
@@ -72,7 +72,7 @@ export function merchantOrderSummary(order: {
     id: order.id,
     itemCount: order._count.items,
     orderNumber: order.orderNumber,
-    overdue: order.status === "PENDING" && order.reservationExpiresAt <= new Date(),
+    overdue: order.status === "PENDING" && order.reservationExpiresAt <= evaluationTime,
     paymentMethod: order.paymentMethod,
     paymentStatus: order.paymentStatus,
     reservationExpiresAt: order.status === "PENDING" ? order.reservationExpiresAt.toISOString() : null,

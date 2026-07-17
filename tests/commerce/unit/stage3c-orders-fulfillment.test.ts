@@ -2,12 +2,16 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
 
+import { Prisma } from "@prisma/client";
+
 import {
   COMMERCE_EXPIRATION_CONFIRMATION,
   validateCommerceExpirationEnvironment,
 } from "../../../scripts/commerce/expiration-safety";
 
 import { canCustomerCancel } from "../../../features/commerce/api/dto";
+import { CommerceApiError } from "../../../features/commerce/api/errors";
+import { parseMerchantOrderQuery } from "../../../features/commerce/api/validation";
 import {
   assignableCommercePermissions,
   effectiveCommercePermissions,
@@ -18,6 +22,12 @@ import {
   encodeMerchantCursor,
   merchantCursorFingerprint,
 } from "../../../features/commerce/domain/merchant-cursor";
+import {
+  canonicalMerchantOrderTimestampToLocal,
+  localMerchantOrderTimestampToCanonical,
+  merchantOrderNextHref,
+} from "../../../features/commerce/domain/merchant-order-filter-policy";
+import { merchantOrderSummary } from "../../../features/commerce/domain/order-dto";
 import { commerceNotificationEventKey } from "../../../features/commerce/services/commerce-notification-service";
 import {
   customerOrderCancellationSchema,
@@ -155,6 +165,84 @@ test("Merchant Order cursors bind actor, Store, filters, queue, sort, and snapsh
   assert.throws(() => decodeMerchantCursor(encoded, { ...value, filter: merchantCursorFingerprint({ queue: "active" }) }));
   assert.throws(() => decodeMerchantCursor(encoded, { ...value, target: randomUUID() }));
   assert.throws(() => decodeMerchantCursor(`${encoded}x`, value));
+});
+
+test("Merchant Order summaries use one explicit evaluation timestamp", () => {
+  const deadline = new Date("2030-07-17T12:00:00.000Z");
+  const order = {
+    _count: { items: 1 },
+    createdAt: new Date("2030-07-17T10:00:00.000Z"),
+    currency: "IQD",
+    customerNameSnapshot: "Snapshot Customer",
+    fulfillmentMethod: "CUSTOMER_PICKUP",
+    fulfillmentStatus: "UNFULFILLED",
+    grandTotal: new Prisma.Decimal("10000"),
+    id: randomUUID(),
+    orderNumber: "RZ-SNAPSHOT-SUMMARY",
+    paymentMethod: "PAY_AT_PICKUP",
+    paymentStatus: "UNPAID",
+    reservationExpiresAt: deadline,
+    status: "PENDING",
+    storeNameSnapshot: "Snapshot Store",
+    updatedAt: new Date("2030-07-17T10:00:00.000Z"),
+  };
+  assert.equal(merchantOrderSummary(order, 1, true, new Date("2030-07-17T11:59:59.999Z")).overdue, false);
+  assert.equal(merchantOrderSummary(order, 1, true, deadline).overdue, true);
+  assert.equal(merchantOrderSummary(order, 1, true, new Date("2030-07-17T12:00:00.001Z")).overdue, true);
+  const fixed = new Date("2030-07-17T11:00:00.000Z");
+  assert.equal(merchantOrderSummary(order, 1, true, fixed).overdue, false);
+  assert.equal(merchantOrderSummary(order, 1, true, fixed).overdue, false);
+});
+
+test("Merchant Order API date filters accept zoned ISO and reject unsafe ranges", () => {
+  const utc = parseMerchantOrderQuery(new URLSearchParams("createdFrom=2026-07-17T12%3A00%3A00.000Z"));
+  assert.equal(utc.createdFrom?.toISOString(), "2026-07-17T12:00:00.000Z");
+  const offset = parseMerchantOrderQuery(new URLSearchParams("createdFrom=2026-07-17T15%3A00%3A00%2B03%3A00"));
+  assert.equal(offset.createdFrom?.toISOString(), "2026-07-17T12:00:00.000Z");
+
+  const invalid = (value: string) => assert.throws(
+    () => parseMerchantOrderQuery(new URLSearchParams(value)),
+    (error: unknown) => error instanceof CommerceApiError && error.code === "INVALID_REQUEST",
+  );
+  invalid("createdFrom=2026-07-17");
+  invalid("createdFrom=2026-07-17T12%3A00");
+  invalid("createdFrom=2026-02-30T12%3A00%3A00Z");
+  invalid("createdFrom=not-a-date");
+  invalid("createdFrom=2026-07-17T12%3A00%3A00Z&createdFrom=2026-07-18T12%3A00%3A00Z");
+  invalid("createdFrom=2026-07-18T12%3A00%3A00Z&createdTo=2026-07-17T12%3A00%3A00Z");
+  invalid("updatedFrom=2025-01-01T00%3A00%3A00Z&updatedTo=2026-01-03T00%3A00%3A00Z");
+});
+
+test("Merchant Order local controls and next links preserve canonical filters", () => {
+  const local = "2026-07-17T15:04:05.123";
+  const canonical = localMerchantOrderTimestampToCanonical(local);
+  assert.ok(canonical);
+  assert.equal(canonicalMerchantOrderTimestampToLocal(canonical), local);
+
+  const values = {
+    actionableOnly: true,
+    createdFrom: new Date("2026-07-17T09:00:00.000Z"),
+    createdTo: new Date("2026-07-17T10:00:00.000Z"),
+    overduePending: false,
+    queue: "pending",
+    updatedFrom: new Date("2026-07-17T11:00:00.000Z"),
+    updatedTo: new Date("2026-07-17T12:00:00.000Z"),
+  };
+  const params = new URL(merchantOrderNextHref(values, "stable-cursor"), "https://rezno.invalid").searchParams;
+  assert.deepEqual(
+    ["createdFrom", "createdTo", "updatedFrom", "updatedTo"].map((key) => params.get(key)),
+    [
+      "2026-07-17T09:00:00.000Z",
+      "2026-07-17T10:00:00.000Z",
+      "2026-07-17T11:00:00.000Z",
+      "2026-07-17T12:00:00.000Z",
+    ],
+  );
+  assert.equal(params.get("cursor"), "stable-cursor");
+  assert.notEqual(
+    merchantCursorFingerprint({ createdFrom: values.createdFrom.toISOString(), queue: values.queue }),
+    merchantCursorFingerprint({ createdFrom: values.createdTo.toISOString(), queue: values.queue }),
+  );
 });
 
 test("Commerce notification keys separate customer and Merchant destinations", () => {
