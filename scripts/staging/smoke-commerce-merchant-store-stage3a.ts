@@ -567,7 +567,7 @@ async function signUp(label: string, phoneSuffix: number): Promise<Session> {
   };
   let response: Response | undefined;
   for (let attempt = 0; attempt < 3; attempt += 1) {
-    response = await fetch(`${authBaseUrl}/api/auth/sign-up/email`, {
+    response = await fetch(`${baseUrl}/api/auth/sign-up/email`, {
       body: JSON.stringify(request),
       headers: requestHeaders({
         "content-type": "application/json",
