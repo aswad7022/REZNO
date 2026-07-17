@@ -271,6 +271,7 @@ export function serializeCustomerOrderSummary(order: CustomerOrderRecord) {
 export function serializeCustomerOrderDetail(order: CustomerOrderRecord) {
   return {
     ...serializeCustomerOrderSummary(order),
+    ...(canCustomerCancel(order) ? { expectedVersion: order.updatedAt.toISOString() } : {}),
     address: order.address
       ? {
           additionalDetails: order.address.additionalDetails,
