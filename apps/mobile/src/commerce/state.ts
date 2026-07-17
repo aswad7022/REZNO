@@ -9,6 +9,11 @@ export type CheckoutSemanticInput = {
 };
 
 export type CheckoutAttempt = { key: string; signature: string };
+export type OrderCancellationSemanticInput = {
+  expectedVersion: string;
+  orderId: string;
+  reason: string;
+};
 
 export type CheckoutDraft = {
   addressId: string | null;
@@ -52,6 +57,19 @@ export function resolveCheckoutAttempt(
   createKey: () => string,
 ) {
   const signature = checkoutSemanticSignature(input);
+  return current?.signature === signature ? current : { key: createKey(), signature };
+}
+
+export function resolveOrderCancellationAttempt(
+  current: CheckoutAttempt | null,
+  input: OrderCancellationSemanticInput,
+  createKey: () => string,
+) {
+  const signature = JSON.stringify({
+    expectedVersion: input.expectedVersion,
+    orderId: input.orderId,
+    reason: input.reason.trim().replace(/\s+/g, " "),
+  });
   return current?.signature === signature ? current : { key: createKey(), signature };
 }
 
@@ -100,9 +118,10 @@ export function finishKeyedMutation(
 
 export function canRenderCustomerCancellation(order: {
   canCustomerCancel: boolean;
+  expectedVersion?: string;
   paymentStatus: string;
 }) {
-  return order.canCustomerCancel && order.paymentStatus !== "PAID";
+  return order.canCustomerCancel && Boolean(order.expectedVersion) && order.paymentStatus !== "PAID";
 }
 
 export function isLatestRequest(sequence: number, latest: number) {

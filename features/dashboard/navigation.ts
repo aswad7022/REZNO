@@ -8,6 +8,7 @@ import {
   CalendarRange,
   ChartNoAxesCombined,
   Clock3,
+  ClipboardList,
   Heart,
   LayoutDashboard,
   MapPin,
@@ -154,6 +155,9 @@ function businessNavigation(input: {
             ...(input.commercePermissions.includes("INVENTORY_VIEW")
               ? [{ title: "commerceInventory" as const, href: "/business/commerce/inventory", icon: ShoppingBag }]
               : []),
+            ...(input.commercePermissions.includes("ORDER_VIEW")
+              ? [{ title: "commerceOrders" as const, href: "/business/commerce/orders", icon: ClipboardList }]
+              : []),
             ...(input.role === "OWNER"
               ? [{ title: "commerceAccess" as const, href: "/business/commerce/access", icon: ShieldCheck }]
               : []),
@@ -251,4 +255,5 @@ export const dashboardRouteLabels: Readonly<
   access: "commerceAccess",
   products: "commerceProducts",
   inventory: "commerceInventory",
+  orders: "commerceOrders",
 };

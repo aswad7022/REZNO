@@ -11,6 +11,7 @@ import {
   CalendarPlus,
   ChartNoAxesCombined,
   ClipboardCopy,
+  ClipboardList,
   Clock3,
   ExternalLink,
   Heart,
@@ -67,6 +68,7 @@ type CommandDefinition = {
     | "business.commerceAccess"
     | "business.commerceProducts"
     | "business.commerceInventory"
+    | "business.commerceOrders"
     | "customer.dashboard"
     | "customer.marketplace"
     | "customer.bookings"
@@ -175,6 +177,7 @@ export default function DashboardCommandPalette({
         { id: "business-commerce-access", labelKey: "business.commerceAccess", group: "navigation", href: "/business/commerce/access", icon: Settings },
         { id: "business-commerce-products", labelKey: "business.commerceProducts", group: "navigation", href: "/business/commerce/products", icon: ShoppingBag },
         { id: "business-commerce-inventory", labelKey: "business.commerceInventory", group: "navigation", href: "/business/commerce/inventory", icon: ShoppingBag },
+        { id: "business-commerce-orders", labelKey: "business.commerceOrders", group: "navigation", href: "/business/commerce/orders", icon: ClipboardList },
         ...(management
           ? [
               { id: "add-service", labelKey: "actions.addService" as const, group: "actions" as const, href: "/business/services", icon: Plus },
