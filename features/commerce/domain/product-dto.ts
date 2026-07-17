@@ -75,11 +75,15 @@ export function serializeMerchantProduct(
       total + Math.max(0, (variant.inventory?.onHand ?? 0) - (variant.inventory?.reserved ?? 0)),
     0,
   );
-  const canUpdate = permissions.includes("PRODUCT_UPDATE") && editableStore(product.store.status);
+  const productMutable = product.status !== "ARCHIVED" && !product.archivedAt;
+  const canUpdate =
+    permissions.includes("PRODUCT_UPDATE") &&
+    editableStore(product.store.status) &&
+    productMutable;
   const canArchive =
     permissions.includes("PRODUCT_ARCHIVE") &&
     editableStore(product.store.status) &&
-    product.status !== "ARCHIVED";
+    productMutable;
   const safeMedia = product.media.flatMap((item) => {
     const url = safePublicImageUrlOrNull(item.url);
     return url
@@ -146,7 +150,7 @@ export function serializeMerchantProduct(
   if (mode === "read-only") return { ...base, variants };
   return {
     ...base,
-    expectedVersion: product.updatedAt.toISOString(),
+    ...(productMutable ? { expectedVersion: product.updatedAt.toISOString() } : {}),
     media: safeMedia,
     permittedActions: {
       addMedia: canUpdate && product.media.length < 12,

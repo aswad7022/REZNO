@@ -139,13 +139,18 @@ export async function getMerchantInventoryDetail(
   });
   if (!inventory) commerceError("NOT_FOUND", "Inventory item was not found.");
   const movementPage = await listMovementPage(actor, inventory.id, query);
+  const mutable =
+    inventory.variant.status !== "ARCHIVED" &&
+    !inventory.variant.archivedAt &&
+    inventory.variant.product.status !== "ARCHIVED" &&
+    !inventory.variant.product.archivedAt;
   return {
     actor,
     inventory: serializeInventorySummary(inventory),
     movements: movementPage,
     permittedActions: {
-      adjust: actor.permissions.includes("INVENTORY_ADJUST"),
-      threshold: actor.permissions.includes("INVENTORY_ADJUST"),
+      adjust: mutable && actor.permissions.includes("INVENTORY_ADJUST"),
+      threshold: mutable && actor.permissions.includes("INVENTORY_ADJUST"),
     },
   };
 }

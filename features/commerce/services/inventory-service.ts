@@ -104,12 +104,7 @@ export async function adjustInventory(
       include: merchantInventoryInclude,
     });
     if (!inventory) commerceError("NOT_FOUND", "Inventory item was not found.");
-    assertInventoryStoreMutable(inventory.variant.product.storeId, await transaction.store.findUnique({
-      where: { id: inventory.variant.product.storeId },
-      select: { status: true },
-    }));
     await lockInventoryItems(transaction, [inventory.id]);
-    await assertMerchantCommerceContextCurrent(transaction, context, "INVENTORY_ADJUST");
     const locked = await transaction.inventoryItem.findUniqueOrThrow({
       where: { id: inventory.id },
       include: merchantInventoryInclude,
@@ -117,6 +112,12 @@ export async function adjustInventory(
     if (locked.version !== input.expectedVersion) {
       commerceError("STALE_VERSION", "Inventory changed. Refresh and retry.");
     }
+    await assertMerchantCommerceContextCurrent(transaction, context, "INVENTORY_ADJUST");
+    assertInventoryStoreMutable(locked.variant.product.storeId, await transaction.store.findUnique({
+      where: { id: locked.variant.product.storeId },
+      select: { status: true },
+    }));
+    assertInventoryAggregateMutable(locked);
     if (locked.version >= POSTGRES_INT_MAX) {
       commerceError("VALIDATION_ERROR", "Inventory version exceeds persistence capacity.");
     }
@@ -217,18 +218,19 @@ export async function updateInventoryThreshold(
       include: merchantInventoryInclude,
     });
     if (!inventory) commerceError("NOT_FOUND", "Inventory item was not found.");
+    if (inventory.version !== input.expectedVersion) {
+      commerceError("STALE_VERSION", "Inventory changed. Refresh and retry.");
+    }
+    await assertMerchantCommerceContextCurrent(transaction, actor, "INVENTORY_ADJUST");
     const store = await transaction.store.findUnique({
       where: { id: inventory.variant.product.storeId },
       select: { status: true },
     });
     assertInventoryStoreMutable(inventory.variant.product.storeId, store);
-    if (inventory.version !== input.expectedVersion) {
-      commerceError("STALE_VERSION", "Inventory changed. Refresh and retry.");
-    }
+    assertInventoryAggregateMutable(inventory);
     if (inventory.version >= POSTGRES_INT_MAX) {
       commerceError("VALIDATION_ERROR", "Inventory version exceeds persistence capacity.");
     }
-    await assertMerchantCommerceContextCurrent(transaction, actor, "INVENTORY_ADJUST");
     const updated = await transaction.inventoryItem.update({
       where: { id: inventory.id },
       data: { lowStockThreshold: input.lowStockThreshold, version: { increment: 1 } },
@@ -256,6 +258,19 @@ function assertInventoryStoreMutable(storeId: string, store: { status: string } 
   if (store.status === "PENDING_REVIEW" || store.status === "ARCHIVED") {
     commerceError("INVALID_TRANSITION", `Inventory is read-only while Store is ${store.status}.`, {
       storeId,
+    });
+  }
+}
+
+function assertInventoryAggregateMutable(item: MerchantInventoryRecord) {
+  if (item.variant.status === "ARCHIVED" || item.variant.archivedAt) {
+    commerceError("INVALID_TRANSITION", "Inventory linked to an archived Variant is read-only.", {
+      variantId: item.variant.id,
+    });
+  }
+  if (item.variant.product.status === "ARCHIVED" || item.variant.product.archivedAt) {
+    commerceError("INVALID_TRANSITION", "Inventory linked to an archived Product is read-only.", {
+      productId: item.variant.product.id,
     });
   }
 }

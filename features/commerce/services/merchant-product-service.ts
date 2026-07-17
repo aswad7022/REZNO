@@ -110,13 +110,24 @@ export async function listMerchantProducts(
   if (query.categoryId) conditions.push(Prisma.sql`p."categoryId" = CAST(${query.categoryId} AS uuid)`);
   if (query.published === "published") conditions.push(Prisma.sql`p."status" = 'PUBLISHED' AND p."publishedAt" IS NOT NULL`);
   if (query.published === "unpublished") conditions.push(Prisma.sql`(p."status" <> 'PUBLISHED' OR p."publishedAt" IS NULL)`);
-  if (query.stock) {
-    const comparison = query.stock === "in_stock" ? Prisma.sql`>` : Prisma.sql`<=`;
+  if (query.stock === "in_stock") {
     conditions.push(Prisma.sql`EXISTS (
       SELECT 1 FROM "ProductVariant" v
       JOIN "InventoryItem" i ON i."variantId" = v."id"
       WHERE v."productId" = p."id" AND v."status" = 'ACTIVE' AND v."archivedAt" IS NULL
-        AND i."onHand" - i."reserved" ${comparison} 0
+        AND i."onHand" - i."reserved" > 0
+    )`);
+  }
+  if (query.stock === "out_of_stock") {
+    conditions.push(Prisma.sql`EXISTS (
+      SELECT 1 FROM "ProductVariant" v
+      JOIN "InventoryItem" i ON i."variantId" = v."id"
+      WHERE v."productId" = p."id" AND v."status" = 'ACTIVE' AND v."archivedAt" IS NULL
+    ) AND NOT EXISTS (
+      SELECT 1 FROM "ProductVariant" v
+      JOIN "InventoryItem" i ON i."variantId" = v."id"
+      WHERE v."productId" = p."id" AND v."status" = 'ACTIVE' AND v."archivedAt" IS NULL
+        AND i."onHand" - i."reserved" > 0
     )`);
   }
   if (cursor) {
@@ -546,6 +557,7 @@ async function mutateProduct(
       assertCommerceExpectedVersion(product.updatedAt, input.expectedVersion);
       assertProductMutationStoreState(product.store.status);
       await assertMerchantCommerceContextCurrent(transaction, actor, permission);
+      assertProductMutable(product);
       const before = auditProduct(product);
       const result = await operation({ actor, product, transaction });
       const dto = serializeMerchantProduct(result.product, actor.permissions, "management");
@@ -582,6 +594,14 @@ async function loadStoreForCreate(transaction: Prisma.TransactionClient, actor: 
 function assertProductMutationStoreState(status: string) {
   if (status === "PENDING_REVIEW" || status === "ARCHIVED") {
     commerceError("INVALID_TRANSITION", `Product changes are read-only while Store is ${status}.`);
+  }
+}
+
+function assertProductMutable(product: Pick<MerchantProductRecord, "archivedAt" | "id" | "status">) {
+  if (product.status === "ARCHIVED" || product.archivedAt) {
+    commerceError("INVALID_TRANSITION", "Archived Product aggregates are immutable.", {
+      productId: product.id,
+    });
   }
 }
 
