@@ -12,12 +12,12 @@ import {
   updateCartItemQuantity,
 } from "../../../features/commerce/services/cart-service";
 import {
-  archiveProduct,
-  createProduct,
-  createProductVariant,
-  publishProduct,
-  suspendProduct,
-} from "../../../features/commerce/services/catalog-service";
+  archiveMerchantProduct,
+  createMerchantProduct,
+  createMerchantVariant,
+  publishMerchantProduct,
+} from "../../../features/commerce/services/merchant-product-service";
+import { moderateAdminProduct } from "../../../features/commerce/services/admin-product-service";
 import { createPendingOrder } from "../../../features/commerce/services/checkout-service";
 import {
   createCustomerAddress,
@@ -65,7 +65,7 @@ const adminContext = {
   adminAccessId,
   isSuperAdmin: false,
   personId: adminPersonId,
-  permissions: ["COMMERCE_STORES_VIEW", "COMMERCE_STORES_REVIEW", "COMMERCE_CATALOG_MODERATE"] as const,
+  permissions: ["COMMERCE_STORES_VIEW", "COMMERCE_STORES_REVIEW", "COMMERCE_CATALOG_VIEW", "COMMERCE_CATALOG_MODERATE"] as const,
   source: "database" as const,
   userId: "commerce-test-admin",
 };
@@ -128,6 +128,100 @@ async function archiveStore(identity: MerchantActorReference, storeId: string, r
     idempotencyKey: randomUUID(),
     reason,
     storeId,
+  });
+}
+
+type LegacyProductInput = {
+  categoryId: string;
+  defaultVariant: {
+    compareAtPrice?: string | null;
+    optionValues?: Record<string, string>;
+    price: string;
+    sku: string;
+    title: string;
+  };
+  description?: string | null;
+  name: string;
+  slug: string;
+  storeId: string;
+};
+
+async function createProduct(identity: MerchantActorReference, input: LegacyProductInput) {
+  const created = await createMerchantProduct(identity, {
+    categoryId: input.categoryId,
+    contextOrganizationId: identity.contextOrganizationId,
+    defaultVariant: {
+      compareAtPrice: input.defaultVariant.compareAtPrice ?? "",
+      optionValues: input.defaultVariant.optionValues ?? {},
+      price: input.defaultVariant.price,
+      sku: input.defaultVariant.sku,
+      title: input.defaultVariant.title,
+    },
+    description: input.description ?? "",
+    idempotencyKey: randomUUID(),
+    name: input.name,
+    slug: input.slug,
+  });
+  return prisma.product.findUniqueOrThrow({
+    where: { id: String((created as { id: string }).id) },
+    include: { variants: true },
+  });
+}
+
+async function publishProduct(identity: MerchantActorReference, productId: string) {
+  const product = await prisma.product.findUniqueOrThrow({ where: { id: productId } });
+  await publishMerchantProduct(identity, {
+    contextOrganizationId: identity.contextOrganizationId,
+    expectedVersion: product.updatedAt.toISOString(),
+    idempotencyKey: randomUUID(),
+    productId,
+  });
+  return prisma.product.findUniqueOrThrow({ where: { id: productId }, include: { variants: true } });
+}
+
+async function archiveProduct(identity: MerchantActorReference, productId: string) {
+  const product = await prisma.product.findUniqueOrThrow({ where: { id: productId } });
+  await archiveMerchantProduct(identity, {
+    contextOrganizationId: identity.contextOrganizationId,
+    expectedVersion: product.updatedAt.toISOString(),
+    idempotencyKey: randomUUID(),
+    productId,
+  });
+  return prisma.product.findUniqueOrThrow({ where: { id: productId }, include: { variants: true } });
+}
+
+async function createProductVariant(
+  identity: MerchantActorReference,
+  input: { optionValues?: Record<string, string>; price: string; productId: string; sku: string; title: string },
+) {
+  const product = await prisma.product.findUniqueOrThrow({ where: { id: input.productId } });
+  await createMerchantVariant(identity, {
+    compareAtPrice: "",
+    contextOrganizationId: identity.contextOrganizationId,
+    expectedVersion: product.updatedAt.toISOString(),
+    idempotencyKey: randomUUID(),
+    optionValues: input.optionValues ?? {},
+    price: input.price,
+    productId: input.productId,
+    sku: input.sku,
+    title: input.title,
+  });
+  const variant = await prisma.productVariant.findFirst({
+    where: { productId: input.productId, title: input.title },
+    orderBy: { createdAt: "desc" },
+  });
+  assert.ok(variant);
+  return variant;
+}
+
+async function suspendProduct(context: typeof adminContext, productId: string, reason: string) {
+  const product = await prisma.product.findUniqueOrThrow({ where: { id: productId } });
+  return moderateAdminProduct(context, {
+    action: "suspend",
+    expectedVersion: product.updatedAt.toISOString(),
+    idempotencyKey: randomUUID(),
+    productId,
+    reason,
   });
 }
 
@@ -515,7 +609,7 @@ test("Milestone 2A PostgreSQL commerce foundation", { concurrency: false }, asyn
     const suspensionAudit = await prisma.adminAuditLog.findFirstOrThrow({
       where: { action: "commerce.product.suspend", targetId: atomicProduct.id },
     });
-    assert.deepEqual(suspensionAudit.metadata, { reason: "Audit Product reason" });
+    assert.equal((suspensionAudit.metadata as { reason: string }).reason, "Audit Product reason");
     const archived = await archiveStore(
       rejectedMerchant.identity,
       rejectedDraft.id,
