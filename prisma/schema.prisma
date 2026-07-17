@@ -923,6 +923,7 @@ model Product {
   @@index([categoryId, status, publishedAt])
   @@index([normalizedSearchText])
   @@index([createdAt, id])
+  @@index([storeId, updatedAt, id])
 }
 
 model ProductVariant {
@@ -984,6 +985,8 @@ model InventoryItem {
   variant           ProductVariant         @relation(fields: [variantId], references: [id], onDelete: Restrict)
   movements         StockMovement[]
   reservations      InventoryReservation[]
+
+  @@index([updatedAt, id])
 }
 
 model InventoryReservation {
@@ -1032,7 +1035,7 @@ model StockMovement {
   order             Order?                @relation(fields: [orderId], references: [id], onDelete: Restrict)
   reservation       InventoryReservation? @relation(fields: [reservationId], references: [id], onDelete: Restrict)
 
-  @@index([inventoryItemId, createdAt])
+  @@index([inventoryItemId, createdAt, id])
   @@index([orderId, createdAt])
   @@index([reservationId])
 }

@@ -92,6 +92,15 @@ export async function lockStore(
   );
 }
 
+export async function lockProduct(
+  transaction: Prisma.TransactionClient,
+  productId: string,
+) {
+  await transaction.$queryRaw(
+    Prisma.sql`SELECT "id" FROM "Product" WHERE "id" = CAST(${productId} AS uuid) FOR UPDATE`,
+  );
+}
+
 export async function lockCommerceRole(
   transaction: Prisma.TransactionClient,
   roleId: string,
