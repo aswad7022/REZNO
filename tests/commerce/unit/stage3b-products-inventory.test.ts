@@ -42,7 +42,7 @@ import { getDashboardNavigation } from "../../../features/dashboard/navigation";
 const organizationId = randomUUID();
 const productId = randomUUID();
 
-test("Gate 3B role and navigation policy is fail-closed", () => {
+test("Gate 3B Product policy remains fail-closed after the Gate 3C Staff Order extension", () => {
   const owner = effectiveCommercePermissions({ commercePermissions: [], systemRole: "OWNER" });
   assert.equal(owner.includes("PRODUCT_CREATE"), true);
   assert.equal(owner.includes("INVENTORY_ADJUST"), true);
@@ -54,12 +54,14 @@ test("Gate 3B role and navigation policy is fail-closed", () => {
   assert.deepEqual(manager.filter((value) => value === "PRODUCT_VIEW" || value === "PRODUCT_CREATE"), ["PRODUCT_VIEW", "PRODUCT_CREATE"]);
   assert.equal(manager.includes("STORE_MANAGE"), false);
 
-  assert.deepEqual(STAFF_ASSIGNABLE_COMMERCE_PERMISSIONS, ["PRODUCT_VIEW", "INVENTORY_VIEW", "INVENTORY_ADJUST"]);
+  assert.deepEqual(STAFF_ASSIGNABLE_COMMERCE_PERMISSIONS, [
+    "PRODUCT_VIEW", "INVENTORY_VIEW", "INVENTORY_ADJUST", "ORDER_VIEW", "ORDER_MANAGE",
+  ]);
   const staff = effectiveCommercePermissions({
     commercePermissions: ["PRODUCT_VIEW", "PRODUCT_CREATE", "INVENTORY_VIEW", "ORDER_VIEW"],
     systemRole: "STAFF",
   });
-  assert.deepEqual(staff, ["PRODUCT_VIEW", "INVENTORY_VIEW"]);
+  assert.deepEqual(staff, ["PRODUCT_VIEW", "INVENTORY_VIEW", "ORDER_VIEW"]);
   assert.deepEqual(effectiveCommercePermissions({ commercePermissions: ["PRODUCT_VIEW"], systemRole: "RECEPTIONIST" }), []);
 
   const staffNavigation = getDashboardNavigation("business", undefined, "STAFF", randomUUID(), true, staff);
@@ -67,7 +69,7 @@ test("Gate 3B role and navigation policy is fail-closed", () => {
   assert.equal(staffHrefs.includes("/business/commerce/products"), true);
   assert.equal(staffHrefs.includes("/business/commerce/inventory"), true);
   assert.equal(staffHrefs.includes("/business/commerce/store"), false);
-  assert.equal(staffHrefs.some((href) => href.includes("orders")), false);
+  assert.equal(staffHrefs.includes("/business/commerce/orders"), true);
   const receptionist = getDashboardNavigation("business", undefined, "RECEPTIONIST", randomUUID(), true, []);
   assert.equal(JSON.stringify(receptionist).includes("/business/commerce"), false);
 });

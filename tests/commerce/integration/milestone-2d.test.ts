@@ -26,7 +26,7 @@ import {
   cancelCustomerOrder,
   confirmOrder,
   rejectOrder,
-} from "../../../features/commerce/services/order-service";
+} from "../helpers/legacy-order-transitions";
 import { expirePendingOrdersBatch } from "../../../features/commerce/services/expiration-service";
 import { prisma } from "../../../lib/db/prisma";
 import {
@@ -415,9 +415,8 @@ test("Milestone 2D PostgreSQL Orders, Favorites, and Notifications", { concurren
       cancelCustomerOrder(customers[0]!.id, { orderId: pending.id, reason: "Changed plans" }),
       cancelCustomerOrder(customers[0]!.id, { orderId: pending.id, reason: "Changed plans" }),
     ]);
-    assert.equal(attempts.filter((attempt) => attempt.status === "fulfilled").length, 1);
-    assert.equal(attempts.filter((attempt) =>
-      attempt.status === "rejected" && expectCode("ORDER_NOT_CANCELLABLE")(attempt.reason)).length, 1);
+    assert.equal(attempts.filter((attempt) => attempt.status === "fulfilled").length, 2);
+    assert.equal(attempts.filter((attempt) => attempt.status === "rejected").length, 0);
     await prisma.$disconnect();
     await assert.rejects(
       () => cancelCustomerOrder(customers[0]!.id, { orderId: pending.id, reason: "A different reason" }),
@@ -454,7 +453,9 @@ test("Milestone 2D PostgreSQL Orders, Favorites, and Notifications", { concurren
     const expiry = await expirePendingOrdersBatch({ now: new Date("2026-07-12T12:16:00.000Z") });
     assert.equal(expiry.expired, 1);
     assert.equal((await expirePendingOrdersBatch({ now: new Date("2026-07-12T12:17:00.000Z") })).expired, 0);
-    assert.equal(await prisma.notification.count({ where: { eventKey: { contains: `${expiring.id}:order.expired:` } } }), 1);
+    assert.equal(await prisma.notification.count({
+      where: { eventKey: { contains: `${expiring.id}:order.expired:` }, recipientPersonId: customers[4]!.id },
+    }), 1);
 
     const deliveryAddress = await createCustomerAddress(customers[5]!.id, {
       additionalDetails: "Delivery details",

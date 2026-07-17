@@ -29,10 +29,10 @@ import {
   advanceOrderFulfillment,
   cancelCustomerOrder,
   confirmOrder,
-  getCustomerOrder,
   recordOfflinePaymentPaid,
   rejectOrder,
-} from "../../../features/commerce/services/order-service";
+} from "../helpers/legacy-order-transitions";
+import { getCustomerOrder } from "../../../features/commerce/services/order-service";
 import {
   approveStore as approveStoreMutation,
   archiveStore as archiveStoreMutation,
@@ -676,36 +676,23 @@ test("Milestone 2A PostgreSQL commerce foundation", { concurrency: false }, asyn
       orderId: order.id,
     });
     const transitionKey = randomUUID();
-    const transitionReason = "Packing started";
     const transitioned = await advanceOrderFulfillment(primary.identity, {
       idempotencyKey: transitionKey,
       next: "PREPARING",
       orderId: order.id,
-      reason: transitionReason,
     });
     assert.equal(transitioned.fulfillmentStatus, "PREPARING");
     const replayed = await advanceOrderFulfillment(primary.identity, {
       idempotencyKey: transitionKey,
       next: "PREPARING",
       orderId: order.id,
-      reason: ` ${transitionReason} `,
     });
     assert.equal(replayed.fulfillmentStatus, "PREPARING");
     await assert.rejects(
       advanceOrderFulfillment(primary.identity, {
         idempotencyKey: transitionKey,
-        next: "PREPARING",
-        orderId: order.id,
-        reason: "A different reason",
-      }),
-      expectCommerceCode("IDEMPOTENCY_CONFLICT"),
-    );
-    await assert.rejects(
-      advanceOrderFulfillment(primary.identity, {
-        idempotencyKey: transitionKey,
         next: "READY_FOR_PICKUP",
         orderId: order.id,
-        reason: transitionReason,
       }),
       expectCommerceCode("IDEMPOTENCY_CONFLICT"),
     );
@@ -937,17 +924,15 @@ test("Milestone 2A PostgreSQL commerce foundation", { concurrency: false }, asyn
     const pendingBefore = await prisma.inventoryItem.findUniqueOrThrow({
       where: { variantId: primary.variant.id },
     });
-    await cancelCustomerOrder(pendingCustomer.id, {
+    const pendingCancellation = await cancelCustomerOrder(pendingCustomer.id, {
       orderId: pendingOrder.id,
       reason: "Customer changed plans",
     });
-    await assert.rejects(
-      () => cancelCustomerOrder(pendingCustomer.id, {
-        orderId: pendingOrder.id,
-        reason: "Customer changed plans",
-      }),
-      expectCommerceCode("ORDER_NOT_CANCELLABLE"),
-    );
+    const pendingReplay = await cancelCustomerOrder(pendingCustomer.id, {
+      orderId: pendingOrder.id,
+      reason: "Customer changed plans",
+    });
+    assert.deepEqual(pendingReplay, pendingCancellation);
     assert.equal(
       await prisma.stockMovement.count({ where: { orderId: pendingOrder.id, type: "RELEASE" } }),
       1,
@@ -974,17 +959,15 @@ test("Milestone 2A PostgreSQL commerce foundation", { concurrency: false }, asyn
     const confirmedBeforeCancellation = await prisma.inventoryItem.findUniqueOrThrow({
       where: { variantId: primary.variant.id },
     });
-    await cancelCustomerOrder(confirmedCustomer.id, {
+    const confirmedCancellation = await cancelCustomerOrder(confirmedCustomer.id, {
       orderId: confirmedOrder.id,
       reason: "Cancel before preparation",
     });
-    await assert.rejects(
-      () => cancelCustomerOrder(confirmedCustomer.id, {
-        orderId: confirmedOrder.id,
-        reason: "Cancel before preparation",
-      }),
-      expectCommerceCode("ORDER_NOT_CANCELLABLE"),
-    );
+    const confirmedReplay = await cancelCustomerOrder(confirmedCustomer.id, {
+      orderId: confirmedOrder.id,
+      reason: "Cancel before preparation",
+    });
+    assert.deepEqual(confirmedReplay, confirmedCancellation);
     assert.equal(
       await prisma.stockMovement.count({ where: { orderId: confirmedOrder.id, type: "RESTOCK" } }),
       1,

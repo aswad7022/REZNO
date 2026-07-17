@@ -97,41 +97,49 @@ test(
     });
     assert.equal(checkout.response.status, 201);
     const orderId = (checkout.body.data as { id: string }).id;
+    const orderDetail = await request(`/api/commerce/customer/orders/${orderId}`, {
+      cookie: customerACookie,
+    });
+    const expectedVersion = (orderDetail.body.data as { expectedVersion: string }).expectedVersion;
+    const cancellationKey = randomUUID();
 
     const cancellation = await request(`/api/commerce/customer/orders/${orderId}/cancel`, {
-      body: { reason: "Changed plans" },
+      body: { expectedVersion, reason: "Changed plans" },
       cookie: customerACookie,
+      headers: { "idempotency-key": cancellationKey },
       method: "POST",
     });
     assert.equal(cancellation.response.status, 200);
     const cancellationReplay = await request(`/api/commerce/customer/orders/${orderId}/cancel`, {
-      body: { reason: "Changed plans" },
+      body: { expectedVersion, reason: "Changed plans" },
       cookie: customerACookie,
+      headers: { "idempotency-key": cancellationKey },
       method: "POST",
     });
-    assert.equal(cancellationReplay.response.status, 409);
-    assert.equal((cancellationReplay.body.error as { code: string }).code, "ORDER_NOT_CANCELLABLE");
+    assert.equal(cancellationReplay.response.status, 200);
+    assert.deepEqual(cancellationReplay.body, cancellation.body);
     assert.equal(await prisma.orderStatusHistory.count({ where: { orderId, newOrderStatus: "CANCELLED" } }), 1);
     const cancellationConflict = await request(`/api/commerce/customer/orders/${orderId}/cancel`, {
-      body: { reason: "Another attempt" },
+      body: { expectedVersion, reason: "Another attempt" },
       cookie: customerACookie,
+      headers: { "idempotency-key": cancellationKey },
       method: "POST",
     });
     assert.equal(cancellationConflict.response.status, 409);
-    assert.equal((cancellationConflict.body.error as { code: string }).code, "ORDER_NOT_CANCELLABLE");
+    assert.equal((cancellationConflict.body.error as { code: string }).code, "IDEMPOTENCY_CONFLICT");
 
     const [customerCreated, merchantNew, customerCancelled, merchantCustomerCancelled] = await Promise.all([
       prisma.notification.findUniqueOrThrow({
         where: { eventKey: `commerce:${orderId}:order.created:${fixture.customerA.person.id}` },
       }),
       prisma.notification.findUniqueOrThrow({
-        where: { eventKey: `commerce:${orderId}:order.new:${fixture.customerA.person.id}` },
+        where: { eventKey: `commerce:${orderId}:order.new:merchant:${fixture.customerA.person.id}` },
       }),
       prisma.notification.findUniqueOrThrow({
         where: { eventKey: `commerce:${orderId}:order.cancelled:${fixture.customerA.person.id}` },
       }),
       prisma.notification.findUniqueOrThrow({
-        where: { eventKey: `commerce:${orderId}:order.customer_cancelled:${fixture.customerA.person.id}` },
+        where: { eventKey: `commerce:${orderId}:order.customer_cancelled:merchant:${fixture.customerA.person.id}` },
       }),
     ]);
 

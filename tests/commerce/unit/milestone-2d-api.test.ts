@@ -85,10 +85,12 @@ test("Order DTOs use immutable snapshots, Decimal strings, and no internal ident
 });
 
 test("Customer cancellation eligibility and reason validation are strict", async () => {
+  const expectedVersion = "2026-07-17T12:00:00.000Z";
   assert.equal(canCustomerCancel({ fulfillmentStatus: "UNFULFILLED", paymentStatus: "UNPAID", status: "PENDING" }), true);
   assert.equal(canCustomerCancel({ fulfillmentStatus: "PREPARING", paymentStatus: "UNPAID", status: "CONFIRMED" }), false);
   assert.equal(canCustomerCancel({ fulfillmentStatus: "UNFULFILLED", paymentStatus: "PAID", status: "CONFIRMED" }), false);
-  assert.deepEqual(await parseCancellationRequest(jsonRequest({ reason: "  changed   plans " })), {
+  assert.deepEqual(await parseCancellationRequest(jsonRequest({ expectedVersion, reason: "  changed   plans " })), {
+    expectedVersion,
     reason: "changed plans",
   });
   await assert.rejects(() => parseCancellationRequest(jsonRequest({ reason: " " })), (error: unknown) =>
