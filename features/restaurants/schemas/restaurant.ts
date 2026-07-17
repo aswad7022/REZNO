@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { isSafePublicImageUrl } from "@/lib/security/public-image-url";
+
 const optionalText = z
   .string()
   .trim()
@@ -29,7 +31,9 @@ export const menuItemSchema = z.object({
   description: optionalText,
   price: z.coerce.number().positive().max(999_999_999),
   currency: z.string().trim().min(3).max(3).default("IQD"),
-  imageUrl: optionalText,
+  imageUrl: optionalText.refine(
+    (value) => !value || isSafePublicImageUrl(value),
+  ),
   isAvailable: z.string().optional().transform((value) => value === "on"),
   sortOrder: z.coerce.number().int().min(0).max(10_000),
   preparationMinutes: z

@@ -2,6 +2,7 @@ import type { BookingStatus, Prisma, SystemRole } from "@prisma/client";
 import { z } from "zod";
 
 import { businessOperationsError } from "@/features/business-operations/domain/errors";
+import { isSafePublicImageUrl } from "@/lib/security/public-image-url";
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -199,11 +200,7 @@ const optionalUrl = z
   .string()
   .trim()
   .max(2048)
-  .refine((value) => {
-    if (!value || !z.url().safeParse(value).success) return !value;
-    const protocol = new URL(value).protocol;
-    return protocol === "https:" || protocol === "http:";
-  })
+  .refine((value) => !value || isSafePublicImageUrl(value))
   .transform((value) => value || null);
 
 const operationalRestaurantTableFields = {

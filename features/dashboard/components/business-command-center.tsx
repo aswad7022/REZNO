@@ -1,80 +1,111 @@
 import Link from "next/link";
 import {
+  Activity,
+  Armchair,
   Bell,
+  Building2,
   CalendarDays,
   CalendarPlus,
-  ExternalLink,
+  ChartNoAxesCombined,
+  Clock3,
+  MapPin,
+  Menu,
   MessageSquareText,
-  Plus,
+  PanelsTopLeft,
+  Settings,
+  ShieldCheck,
   Sparkles,
-  UserPlus,
+  UserRoundCheck,
+  UsersRound,
 } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { DashboardSummary } from "@/features/dashboard/services/dashboard-summary";
+import type { BusinessQuickActionKey } from "@/features/business-operations/domain/closure";
+import type { BusinessOverview } from "@/features/dashboard/services/business-overview";
 
 const metricIcons = {
-  todayBookings: CalendarDays,
-  upcomingBookings: CalendarPlus,
-  pendingReviews: MessageSquareText,
-  unreadNotifications: Bell,
+  activeBranches: Building2,
+  activeMenuItems: Menu,
+  activeRestaurantTables: Armchair,
+  activeServices: Sparkles,
+  activeWorkforce: UsersRound,
+  cancellationsToday: CalendarPlus,
+  completedToday: UserRoundCheck,
+  noShowsToday: Clock3,
+  operationalUpdatesLast24Hours: Bell,
+  ownCompletedLast7Days: UserRoundCheck,
+  ownNoShowsLast7Days: Clock3,
+  ownToday: CalendarDays,
+  ownUpcoming: CalendarPlus,
+  pendingChangeRequests: Activity,
+  pendingConfirmations: Clock3,
+  restaurantReservationsToday: Armchair,
+  reviewsAwaitingReply: MessageSquareText,
+  todayActive: CalendarDays,
+  upcomingActive: CalendarPlus,
 } as const;
 
-const quickActions = [
-  ["addService", "/business/services", Plus],
-  ["addEmployee", "/business/team", UserPlus],
-  ["publicProfile", "/business/public-profile", Sparkles],
-  ["calendar", "/business/calendar", CalendarDays],
-  ["bookings", "/business/bookings", CalendarPlus],
-] as const;
+const actionIcons = {
+  analytics: ChartNoAxesCombined,
+  audit: ShieldCheck,
+  availability: Clock3,
+  bookings: CalendarPlus,
+  calendar: CalendarDays,
+  locations: MapPin,
+  menu: Menu,
+  publicProfile: PanelsTopLeft,
+  reservations: Armchair,
+  services: Sparkles,
+  settings: Settings,
+  tables: Armchair,
+  team: UsersRound,
+} as const satisfies Record<BusinessQuickActionKey, typeof CalendarDays>;
+
+function overviewMetrics(overview: BusinessOverview) {
+  return Object.entries(overview.metrics).filter(
+    (entry): entry is [keyof typeof metricIcons, number] =>
+      entry[1] !== null && entry[0] in metricIcons,
+  );
+}
 
 export async function BusinessCommandCenter({
-  summary,
-  publicSlug,
+  overview,
 }: {
-  summary: DashboardSummary;
-  publicSlug: string;
+  overview: BusinessOverview;
 }) {
   const t = await getTranslations("DashboardHome.commandCenter");
-  const metrics = summary.commandCenter;
-
-  if (!metrics) {
-    return null;
-  }
+  const metrics = overviewMetrics(overview);
 
   return (
     <section
       aria-labelledby="business-command-center-title"
       className="space-y-4 rounded-[2rem] border border-primary/10 bg-card/55 p-4 shadow-sm backdrop-blur sm:p-5"
     >
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-sm font-medium text-primary">{t("eyebrow")}</p>
-          <h2
-            id="business-command-center-title"
-            className="text-2xl font-bold tracking-tight"
-          >
-            {t("title")}
-          </h2>
-          <p className="text-sm text-muted-foreground">{t("description")}</p>
-        </div>
+      <div>
+        <p className="text-sm font-medium text-primary">
+          {t(`scopes.${overview.scope}.eyebrow`)}
+        </p>
+        <h2
+          id="business-command-center-title"
+          className="text-2xl font-bold tracking-tight"
+        >
+          {t(`scopes.${overview.scope}.title`)}
+        </h2>
+        <p className="text-sm text-muted-foreground">
+          {t(`scopes.${overview.scope}.description`)}
+        </p>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {Object.entries(metrics).map(([key, value]) => {
-          const metricKey = key as keyof typeof metricIcons;
-          const Icon = metricIcons[metricKey];
-
+        {metrics.map(([key, value]) => {
+          const Icon = metricIcons[key];
           return (
-            <Card
-              key={key}
-              className="rezno-card-hover border-primary/10 bg-card/95"
-            >
+            <Card key={key} className="border-primary/10 bg-card/95">
               <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
-                  {t(`metrics.${metricKey}`)}
+                  {t(`metrics.${key}`)}
                 </CardTitle>
                 <span className="grid size-9 place-items-center rounded-xl bg-primary/10 text-primary">
                   <Icon aria-hidden="true" className="size-4" />
@@ -88,26 +119,23 @@ export async function BusinessCommandCenter({
         })}
       </div>
 
-      <Card className="border-dashed border-primary/15 bg-gradient-to-l from-primary/5 via-background to-violet-500/5">
+      <Card className="border-dashed border-primary/15">
         <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:flex-wrap sm:items-center">
           <p className="text-sm font-medium text-muted-foreground">
             {t("quickActions")}
           </p>
           <div className="flex flex-1 flex-wrap gap-2">
-            {quickActions.map(([key, href, Icon]) => (
-              <Button key={key} asChild size="sm" variant="outline">
-                <Link href={href}>
-                  <Icon aria-hidden="true" />
-                  {t(`actions.${key}`)}
-                </Link>
-              </Button>
-            ))}
-            <Button asChild size="sm">
-              <Link href={`/${publicSlug}`} target="_blank">
-                <ExternalLink aria-hidden="true" />
-                {t("actions.openPublic")}
-              </Link>
-            </Button>
+            {overview.quickActions.map((action) => {
+              const Icon = actionIcons[action.key];
+              return (
+                <Button key={action.key} asChild size="sm" variant="outline">
+                  <Link href={action.href}>
+                    <Icon aria-hidden="true" />
+                    {t(`actions.${action.key}`)}
+                  </Link>
+                </Button>
+              );
+            })}
           </div>
         </CardContent>
       </Card>

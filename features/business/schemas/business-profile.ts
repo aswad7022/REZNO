@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { isSafePublicImageUrl } from "@/lib/security/public-image-url";
+
 type ValidationKey =
   | "businessNameMin"
   | "businessNameMax"
@@ -20,6 +22,10 @@ export function createBusinessProfileSchema(t: ValidationTranslator) {
   const optionalUrl = z.preprocess(
     emptyToNull,
     z.string().trim().url(t("urlInvalid")).max(2048).nullable(),
+  );
+  const optionalImageUrl = z.preprocess(
+    emptyToNull,
+    z.string().trim().max(2048).refine(isSafePublicImageUrl, t("urlInvalid")).nullable(),
   );
 
   return z.object({
@@ -81,7 +87,7 @@ export function createBusinessProfileSchema(t: ValidationTranslator) {
         [...new Set(value.split(/\r?\n/).map((item) => item.trim()).filter(Boolean))],
       )
       .refine(
-        (items) => items.every((item) => z.url().safeParse(item).success),
+        (items) => items.every(isSafePublicImageUrl),
         t("urlInvalid"),
       ),
     faqItems: z
@@ -108,9 +114,9 @@ export function createBusinessProfileSchema(t: ValidationTranslator) {
     visibility: z.enum(["PUBLISHED", "HIDDEN"]),
     website: optionalUrl,
     googleMapsUrl: optionalUrl,
-    logoUrl: optionalUrl,
-    coverImageUrl: optionalUrl,
-    ogImageUrl: optionalUrl,
+    logoUrl: optionalImageUrl,
+    coverImageUrl: optionalImageUrl,
+    ogImageUrl: optionalImageUrl,
     facebookUrl: optionalUrl,
     instagramUrl: optionalUrl,
     tiktokUrl: optionalUrl,

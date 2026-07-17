@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import type { BusinessVertical } from "@prisma/client";
+import type { BusinessVertical, SystemRole } from "@prisma/client";
 
 import { Separator } from "@/components/ui/separator";
 import { DashboardBreadcrumbs } from "@/components/dashboard/dashboard-breadcrumbs";
@@ -29,6 +29,8 @@ export function DashboardHeader({
   canAccessBusinessDashboard,
   canAccessMessages = true,
   vertical,
+  systemRole,
+  membershipId,
   activeBusinessId,
   businesses = [],
 }: {
@@ -44,6 +46,8 @@ export function DashboardHeader({
   canAccessBusinessDashboard?: boolean;
   canAccessMessages?: boolean;
   vertical?: BusinessVertical;
+  systemRole?: SystemRole | null;
+  membershipId?: string;
   activeBusinessId?: string;
   businesses?: Array<{ id: string; name: string }>;
 }) {
@@ -53,6 +57,9 @@ export function DashboardHeader({
         <DashboardMobileNav
           role={role}
           vertical={vertical}
+          systemRole={systemRole}
+          membershipId={membershipId}
+          canAccessMessages={canAccessMessages}
           canAccessAdmin={canAccessAdmin}
           canAccessCustomerDashboard={canAccessCustomerDashboard}
           canAccessBusinessDashboard={canAccessBusinessDashboard}

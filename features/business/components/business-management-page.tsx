@@ -1,5 +1,16 @@
 import Link from "next/link";
-import { CheckCircle2, Clock3, ExternalLink, LockKeyhole } from "lucide-react";
+import {
+  Armchair,
+  CalendarClock,
+  ChartNoAxesCombined,
+  MapPin,
+  Menu,
+  PanelsTopLeft,
+  Settings,
+  ShieldCheck,
+  Sparkles,
+  UsersRound,
+} from "lucide-react";
 import { getTranslations } from "next-intl/server";
 
 import {
@@ -8,87 +19,94 @@ import {
 } from "@/components/dashboard/dashboard-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { BusinessProfileForm } from "@/features/business/components/business-profile-form";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { isRestaurantVertical } from "@/features/businesses/config/verticals";
+import { resolveBusinessOperationActor } from "@/features/business-operations/services/context";
 import { currentBusinessOperationReference } from "@/features/business-operations/services/identity-adapter";
-import { getCurrentBusinessProfile } from "@/features/business/services/business-profile";
-import { CopyProfileLink } from "@/features/dashboard/components/copy-profile-link";
+import { getBusinessReadiness } from "@/features/dashboard/services/business-setup";
+import { prisma } from "@/lib/db/prisma";
 
 export async function BusinessManagementPage() {
-  await currentBusinessOperationReference("BRANCH_READ");
-  const [profile, t] = await Promise.all([
-    getCurrentBusinessProfile(),
-    getTranslations("BusinessManagement"),
+  const reference = await currentBusinessOperationReference(
+    "BUSINESS_MANAGEMENT_HUB_READ",
+  );
+  const actor = await resolveBusinessOperationActor(
+    reference,
+    "BUSINESS_MANAGEMENT_HUB_READ",
+  );
+  const [readiness, t, organization] = await Promise.all([
+    getBusinessReadiness(reference),
+    getTranslations("BusinessManagementHub"),
+    prisma.organization.findUniqueOrThrow({
+      where: { id: actor.organizationId },
+      select: { vertical: true },
+    }),
   ]);
+  const restaurant = isRestaurantVertical(organization.vertical);
+  const cards = [
+    ["settings", "/business/manage/settings", Settings],
+    ["locations", "/business/manage/locations", MapPin],
+    ["hours", "/business/manage/locations", CalendarClock],
+    ...(restaurant
+      ? ([
+          ["tables", "/business/tables", Armchair],
+          ["menu", "/business/menu", Menu],
+          ["workforce", "/business/team", UsersRound],
+        ] as const)
+      : ([
+          ["services", "/business/services", Sparkles],
+          ["workforce", "/business/team", UsersRound],
+        ] as const)),
+    ["publicProfile", "/business/public-profile", PanelsTopLeft],
+    ["analytics", "/business/analytics", ChartNoAxesCombined],
+    ...(actor.role === "OWNER"
+      ? ([["audit", "/business/manage/audit", ShieldCheck]] as const)
+      : []),
+  ] as const;
 
   return (
     <DashboardShell>
-      <DashboardPageHeader
-        title={t("title")}
-        description={t("description")}
-        actions={
-          <div className="flex flex-wrap gap-2">
-            <Badge variant={profile.visibility === "PUBLISHED" ? "default" : "secondary"}>
-              {profile.visibility === "PUBLISHED" ? t("visibility.PUBLISHED") : t("visibility.HIDDEN")}
-            </Badge>
-            <Button asChild size="sm" variant="outline">
-              <Link href={`/${profile.slug}`} target="_blank">
-                <ExternalLink />
-                {t("openPublicPage")}
-              </Link>
-            </Button>
-            <CopyProfileLink
-              slug={profile.slug}
-              label={t("copyPublicLink")}
-              copiedLabel={t("copiedPublicLink")}
-            />
-            <Badge variant={profile.isVerified ? "default" : "secondary"}>
-              {profile.isVerified ? (
-                <CheckCircle2 aria-hidden="true" />
-              ) : (
-                <Clock3 aria-hidden="true" />
-              )}
-              {profile.isVerified
-                ? t("status.verified")
-                : t("status.unverified")}
-            </Badge>
+      <DashboardPageHeader title={t("title")} description={t("description")} />
+      <Card className="border-primary/15">
+        <CardHeader className="flex-row items-center justify-between gap-4">
+          <div>
+            <CardTitle>{t("readiness.title")}</CardTitle>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {t(`readiness.states.${readiness.status}`)}
+            </p>
           </div>
-        }
-      />
-
-      <Card className="shadow-none">
-        <CardContent className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
-          <span>
-            <span className="text-muted-foreground">{t("status.slug")}:</span>{" "}
-            <span dir="ltr" className="font-mono">
-              {profile.slug}
-            </span>
-          </span>
-          <span>
-            <span className="text-muted-foreground">{t("status.role")}:</span>{" "}
-            {profile.roleName}
-          </span>
-        </CardContent>
-      </Card>
-
-      {!profile.canEdit ? (
-        <Card className="border-amber-500/30 bg-amber-500/5">
-          <CardContent className="flex gap-3">
-            <LockKeyhole
-              className="mt-0.5 size-4 shrink-0 text-amber-700 dark:text-amber-400"
-              aria-hidden="true"
-            />
-            <div>
-              <p className="text-sm font-medium">{t("restrictedTitle")}</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {t("restrictedDescription")}
-              </p>
-            </div>
+          <Badge variant={readiness.status === "ready" ? "default" : "secondary"}>
+            {readiness.score}%
+          </Badge>
+        </CardHeader>
+        {readiness.status !== "ready" ? (
+          <CardContent>
+            <Button asChild size="sm" variant="outline">
+              <Link href="/business">{t("readiness.action")}</Link>
+            </Button>
           </CardContent>
-        </Card>
-      ) : null}
-
-      <BusinessProfileForm profile={profile} />
+        ) : null}
+      </Card>
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {cards.map(([key, href, Icon]) => (
+          <Card key={key}>
+            <CardHeader>
+              <span className="grid size-10 place-items-center rounded-xl bg-primary/10 text-primary">
+                <Icon className="size-5" aria-hidden="true" />
+              </span>
+              <CardTitle className="mt-3">{t(`cards.${key}.title`)}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="mb-4 text-sm text-muted-foreground">
+                {t(`cards.${key}.description`)}
+              </p>
+              <Button asChild size="sm" variant="outline">
+                <Link href={href}>{t("open")}</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        ))}
+      </section>
     </DashboardShell>
   );
 }

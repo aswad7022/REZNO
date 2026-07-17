@@ -6,6 +6,7 @@ import {
   Building2,
   CalendarDays,
   CalendarRange,
+  ChartNoAxesCombined,
   Clock3,
   Heart,
   LayoutDashboard,
@@ -13,13 +14,14 @@ import {
   Menu as MenuIcon,
   PanelsTopLeft,
   Settings,
+  ShieldCheck,
   Sparkles,
   Star,
   Armchair,
   UserRound,
   UsersRound,
 } from "lucide-react";
-import type { BusinessVertical } from "@prisma/client";
+import type { BusinessVertical, SystemRole } from "@prisma/client";
 
 import { isRestaurantVertical } from "@/features/businesses/config/verticals";
 import type {
@@ -93,120 +95,93 @@ const customerNavigation: DashboardNavigationGroup[] = [
   },
 ];
 
-const businessNavigation: DashboardNavigationGroup[] = [
-  {
-    label: "workspace",
-    items: [
-      {
-        title: "overview",
-        href: "/business",
-        icon: LayoutDashboard,
-      },
-      {
-        title: "publicProfile",
-        href: "/business/public-profile",
-        icon: PanelsTopLeft,
-      },
-      {
-        title: "bookings",
-        href: "/business/bookings",
-        icon: CalendarRange,
-      },
-      {
-        title: "calendar",
-        href: "/business/calendar",
-        icon: CalendarDays,
-      },
-      {
-        title: "services",
-        href: "/business/services",
-        icon: Sparkles,
-      },
-      {
-        title: "team",
-        href: "/business/team",
-        icon: UsersRound,
-      },
-      {
-        title: "business",
-        href: "/business/manage",
-        icon: Building2,
-        children: [
-          {
-            title: "locations",
-            href: "/business/manage/locations",
-            icon: MapPin,
-          },
-          {
-            title: "settings",
-            href: "/business/manage/settings",
-            icon: Settings,
-          },
-        ],
-      },
-    ],
-  },
-  {
-    label: "insights",
-    items: [
-      {
-        title: "notifications",
-        href: "/business/notifications",
-        icon: Bell,
-      },
-      {
-        title: "reviews",
-        href: "/business/reviews",
-        icon: Star,
-      },
-      {
-        title: "messages",
-        href: "/business/messages",
-        icon: BookOpen,
-      },
-    ],
-  },
-];
-
-const restaurantNavigation: DashboardNavigationGroup[] = [
-  {
-    label: "workspace",
-    items: [
-      { title: "overview", href: "/business", icon: LayoutDashboard },
-      { title: "reservations", href: "/business/reservations", icon: CalendarRange },
-      { title: "tables", href: "/business/tables", icon: Armchair },
-      { title: "menu", href: "/business/menu", icon: MenuIcon },
-      { title: "publicProfile", href: "/business/public-profile", icon: PanelsTopLeft },
-      { title: "calendar", href: "/business/calendar", icon: CalendarDays },
-      {
-        title: "business",
-        href: "/business/manage",
-        icon: Building2,
-        children: [
+function businessNavigation(input: {
+  canAccessMessages: boolean;
+  membershipId?: string;
+  role: SystemRole | null;
+  vertical?: BusinessVertical;
+}): DashboardNavigationGroup[] {
+  if (!input.role) return [];
+  const restaurant = Boolean(
+    input.vertical && isRestaurantVertical(input.vertical),
+  );
+  const management = input.role === "OWNER" || input.role === "MANAGER";
+  const staff = input.role === "STAFF";
+  const workspace: DashboardNavigationGroup["items"] = [
+    { title: "overview", href: "/business", icon: LayoutDashboard },
+    { title: "calendar", href: "/business/calendar", icon: CalendarDays },
+    ...(restaurant && !staff
+      ? ([
+          { title: "reservations", href: "/business/reservations", icon: CalendarRange },
+          { title: "tables", href: "/business/tables", icon: Armchair },
+          { title: "menu", href: "/business/menu", icon: MenuIcon },
+        ] satisfies DashboardNavigationGroup["items"])
+      : []),
+    ...(!restaurant && !staff
+      ? ([{ title: "bookings", href: "/business/bookings", icon: CalendarRange }] satisfies DashboardNavigationGroup["items"])
+      : []),
+    ...(!restaurant && management
+      ? ([{ title: "services", href: "/business/services", icon: Sparkles }] satisfies DashboardNavigationGroup["items"])
+      : []),
+    ...(management
+      ? ([{ title: "team", href: "/business/team", icon: UsersRound }] satisfies DashboardNavigationGroup["items"])
+      : []),
+    ...(staff
+      ? ([
+          ...(!restaurant
+            ? [{ title: "services" as const, href: "/business/services", icon: Sparkles }]
+            : []),
+          ...(input.membershipId
+            ? [{ title: "availability" as const, href: `/business/team/${input.membershipId}/availability`, icon: Clock3 }]
+            : []),
+        ] satisfies DashboardNavigationGroup["items"])
+      : []),
+    ...(management
+      ? ([
+          { title: "publicProfile", href: "/business/public-profile", icon: PanelsTopLeft },
+          { title: "business", href: "/business/manage", icon: Building2 },
           { title: "locations", href: "/business/manage/locations", icon: MapPin },
           { title: "settings", href: "/business/manage/settings", icon: Settings },
-        ],
-      },
-    ],
-  },
-  {
-    label: "insights",
-    items: [
-      { title: "notifications", href: "/business/notifications", icon: Bell },
-      { title: "reviews", href: "/business/reviews", icon: Star },
-      { title: "messages", href: "/business/messages", icon: BookOpen },
-    ],
-  },
-];
+          ...(input.role === "OWNER"
+            ? [{ title: "audit" as const, href: "/business/manage/audit", icon: ShieldCheck }]
+            : []),
+        ] satisfies DashboardNavigationGroup["items"])
+      : []),
+  ];
+  const insights: DashboardNavigationGroup["items"] = [
+    { title: "notifications", href: "/business/notifications", icon: Bell },
+    ...(management
+      ? ([
+          { title: "analytics", href: "/business/analytics", icon: ChartNoAxesCombined },
+          ...(!restaurant
+            ? [{ title: "reviews" as const, href: "/business/reviews", icon: Star }]
+            : []),
+          ...(input.canAccessMessages
+            ? [{ title: "messages" as const, href: "/business/messages", icon: BookOpen }]
+            : []),
+        ] satisfies DashboardNavigationGroup["items"])
+      : []),
+  ];
+  return [
+    { label: "workspace", items: workspace },
+    ...(insights.length ? [{ label: "insights" as const, items: insights }] : []),
+  ];
+}
 
 export function getDashboardNavigation(
   role: DashboardRole,
   vertical?: BusinessVertical,
+  systemRole: SystemRole | null = null,
+  membershipId?: string,
+  canAccessMessages = true,
 ): DashboardNavigationGroup[] {
   if (role !== "business") return customerNavigation;
-  return vertical && isRestaurantVertical(vertical)
-    ? restaurantNavigation
-    : businessNavigation;
+  return businessNavigation({
+    canAccessMessages,
+    membershipId,
+    role: systemRole,
+    vertical,
+  });
 }
 
 export function isNavigationItemActive(
@@ -230,6 +205,7 @@ export const dashboardRouteLabels: Readonly<
   profile: "profile",
   "public-profile": "publicProfile",
   calendar: "calendar",
+  availability: "availability",
   services: "services",
   reservations: "reservations",
   tables: "tables",
@@ -239,6 +215,7 @@ export const dashboardRouteLabels: Readonly<
   locations: "locations",
   settings: "settings",
   analytics: "analytics",
+  audit: "audit",
   reviews: "reviews",
   messages: "messages",
   admin: "admin",

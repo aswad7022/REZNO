@@ -1,11 +1,13 @@
 import "server-only";
 
 import { requireBusinessIdentity } from "@/features/identity/server";
+import { currentBusinessOperationReference } from "@/features/business-operations/services/identity-adapter";
 import { canRespondToBusinessReview } from "@/features/reviews/domain/review-policy";
 import { getPublicOrganizationReviewAggregates } from "@/features/reviews/services/review-lifecycle";
 import { prisma } from "@/lib/db/prisma";
 
 export async function getBusinessReviewsPageData() {
+  await currentBusinessOperationReference("SETTINGS_READ");
   const { membership } = await requireBusinessIdentity();
 
   const [reviews, aggregates] = await Promise.all([

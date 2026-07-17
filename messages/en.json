@@ -108,6 +108,64 @@
       "slugReserved": "That URL is reserved. Choose another."
     }
   },
+  "BusinessManagementHub": {
+    "title": "Business management",
+    "description": "Open only the operational areas your role is allowed to manage.",
+    "open": "Open",
+    "readiness": {
+      "title": "Operational readiness",
+      "action": "Review missing readiness checks",
+      "states": {
+        "ready": "All required Stage 2 readiness checks pass.",
+        "almost": "Most readiness checks pass; review the remaining items.",
+        "notReady": "Required operational setup is still incomplete."
+      }
+    },
+    "cards": {
+      "settings": { "title": "Settings", "description": "Booking and marketplace operating preferences." },
+      "locations": { "title": "Locations", "description": "Active and historical business locations." },
+      "hours": { "title": "Hours and closures", "description": "Branch-local working hours and operational blocks." },
+      "services": { "title": "Services", "description": "Service lifecycle and Branch offerings." },
+      "workforce": { "title": "Workforce", "description": "Roles, Branch assignments, Service assignments, and schedules." },
+      "tables": { "title": "Tables", "description": "Restaurant tables by active location." },
+      "menu": { "title": "Menu", "description": "Restaurant categories and available items." },
+      "publicProfile": { "title": "Public profile", "description": "Customer-facing business information and publishing." },
+      "analytics": { "title": "Operational analytics", "description": "Bounded Booking activity without revenue claims." },
+      "audit": { "title": "Audit log", "description": "Owner-only tenant operation history." }
+    }
+  },
+  "BusinessAnalytics": {
+    "title": "Operational analytics",
+    "description": "Read-only Booking activity for completed Branch-local calendar days.",
+    "period": "Last {days} days",
+    "completedLocalDays": "Completed Branch-local days",
+    "snapshot": "Snapshot: {value}",
+    "topServices": "Top Services by Booking count",
+    "branches": "Bookings by location",
+    "staffWorkload": "Assigned staff workload",
+    "bookingMix": "Booking mix",
+    "statusDistribution": "Status distribution",
+    "dailySeries": "Daily Booking count",
+    "daysAgo": "{days} local days ago",
+    "empty": "No Bookings in this period.",
+    "noRevenue": "Price snapshots are not collected revenue. Revenue, payments, refunds, tax, and profit reporting are intentionally excluded.",
+    "metrics": {
+      "totalBookings": "Total Bookings",
+      "completionRate": "Completion rate",
+      "cancellationRate": "Cancellation rate",
+      "noShowRate": "No-show rate",
+      "genericBookings": "Generic Bookings",
+      "restaurantReservations": "Restaurant reservations",
+      "restaurantGuests": "Restaurant guests"
+    },
+    "statuses": {
+      "PENDING": "Pending",
+      "CONFIRMED": "Confirmed",
+      "COMPLETED": "Completed",
+      "CANCELLED": "Cancelled",
+      "NO_SHOW": "No-show"
+    }
+  },
   "PublicProfileManagement": {
     "title": "Manage public page",
     "description": "Control how your business identity, information, and images appear to customers.",
@@ -939,6 +997,11 @@
   "DashboardHome": {
     "welcome": "Welcome back, {name}",
     "businessDescription": "A quick view of your business and upcoming schedule.",
+    "businessScopeDescriptions": {
+      "MANAGEMENT": "Organization-wide operations, readiness, and permitted management actions.",
+      "RECEPTIONIST": "Active-location bookings and customer requests you can operate.",
+      "STAFF_SELF": "Your own agenda and upcoming assigned appointments."
+    },
     "customerDescription": "Manage your appointments and discover your next visit.",
     "openCalendar": "Open calendar",
     "bookAppointment": "Book appointment",
@@ -982,23 +1045,59 @@
       "categoriesDescription": "Start quickly with restaurants, cafes, salons, clinics, and more."
     },
     "commandCenter": {
-      "eyebrow": "Command center",
-      "title": "Today at a glance",
-      "description": "The most important booking signals and actions in one place.",
+      "scopes": {
+        "MANAGEMENT": {
+          "eyebrow": "Operations command center",
+          "title": "Business operations at a glance",
+          "description": "Tenant-scoped activity, readiness, and operational actions."
+        },
+        "RECEPTIONIST": {
+          "eyebrow": "Active-location operations",
+          "title": "Today's booking desk",
+          "description": "Only active-location bookings and permitted operational actions."
+        },
+        "STAFF_SELF": {
+          "eyebrow": "My agenda",
+          "title": "Your assigned work",
+          "description": "Only your appointments, recent outcomes, and self-service actions."
+        }
+      },
       "quickActions": "Quick actions",
       "metrics": {
-        "todayBookings": "Today's bookings",
-        "upcomingBookings": "Upcoming bookings",
-        "pendingReviews": "Pending reviews",
-        "unreadNotifications": "Unread notifications"
+        "activeBranches": "Active locations",
+        "activeMenuItems": "Available menu items",
+        "activeRestaurantTables": "Active tables",
+        "activeServices": "Active services",
+        "activeWorkforce": "Active workforce",
+        "cancellationsToday": "Bookings scheduled today: cancelled",
+        "completedToday": "Bookings scheduled today: completed",
+        "noShowsToday": "Bookings scheduled today: no-show",
+        "operationalUpdatesLast24Hours": "Operational updates (24h)",
+        "ownCompletedLast7Days": "My completed (7 days)",
+        "ownNoShowsLast7Days": "My no-shows (7 days)",
+        "ownToday": "My active bookings today",
+        "ownUpcoming": "My upcoming bookings",
+        "pendingChangeRequests": "Pending customer changes",
+        "pendingConfirmations": "Pending confirmations",
+        "restaurantReservationsToday": "Restaurant reservations today",
+        "reviewsAwaitingReply": "Visible reviews awaiting reply",
+        "todayActive": "Active bookings today",
+        "upcomingActive": "Upcoming active bookings"
       },
       "actions": {
-        "addService": "Add service",
-        "addEmployee": "Add employee",
-        "publicProfile": "Public profile",
-        "calendar": "Calendar",
+        "analytics": "Analytics",
+        "audit": "Audit log",
+        "availability": "My availability",
         "bookings": "Bookings",
-        "openPublic": "Open public page"
+        "calendar": "Calendar",
+        "locations": "Locations",
+        "menu": "Menu",
+        "publicProfile": "Public profile",
+        "reservations": "Reservations",
+        "services": "Services",
+        "settings": "Settings",
+        "tables": "Tables",
+        "team": "Workforce"
       }
     }
   },
@@ -1098,12 +1197,15 @@
       }
     },
     "items": {
+      "organization": "Keep the organization active",
       "businessInfo": "Complete business information",
       "coverImage": "Add a cover image",
       "logo": "Add a logo",
       "branch": "Add a location",
       "hours": "Set working hours",
+      "bookingEnabled": "Enable bookings",
       "service": "Add a service",
+      "offering": "Publish an available location offering",
       "employee": "Add an employee if needed",
       "published": "Publish public profile",
       "table": "Add an active table",
@@ -1111,12 +1213,15 @@
       "menuCategory": "Add a menu category"
     },
     "explanations": {
+      "organization": "The active business and membership must remain available.",
       "businessInfo": "Customers need a category, description, and phone number before they trust the listing.",
       "coverImage": "A cover image makes the public page feel complete and professional.",
       "logo": "A logo helps customers recognize your business across REZNO.",
       "branch": "Bookings need at least one active location.",
-      "hours": "REZNO cannot generate bookable times until working hours are configured.",
+      "hours": "Every active location needs a complete seven-day hours definition.",
+      "bookingEnabled": "Bookings must be enabled in business settings.",
       "service": "Customers need at least one active service to book.",
+      "offering": "An active service must be available from an active location.",
       "employee": "One or more services require a staff member, so add a team member first.",
       "published": "Hidden profiles are not discoverable by customers.",
       "table": "Restaurants and cafes need active tables before the upcoming reservation experience is enabled.",
@@ -1127,6 +1232,9 @@
       "addService": "Add service",
       "addEmployee": "Add employee",
       "bookings": "View bookings",
+      "tables": "Manage tables",
+      "menu": "Manage menu",
+      "reservations": "View reservations",
       "openPublic": "Open public page"
     }
   },
@@ -1145,6 +1253,12 @@
       "dashboard": "Dashboard",
       "bookings": "Bookings",
       "calendar": "Calendar",
+      "reservations": "Reservations",
+      "tables": "Tables",
+      "menu": "Menu",
+      "analytics": "Analytics",
+      "audit": "Audit log",
+      "availability": "My availability",
       "services": "Services",
       "team": "Team",
       "publicProfile": "Public profile",
@@ -1190,12 +1304,14 @@
         "profile": "Profile",
         "publicProfile": "Public page",
         "calendar": "Calendar",
+        "availability": "My availability",
         "services": "Services",
         "team": "Team",
         "business": "Business",
         "locations": "Locations",
         "settings": "Settings",
         "analytics": "Analytics",
+        "audit": "Audit log",
         "messages": "Messages",
         "reviews": "Reviews",
         "admin": "Admin",

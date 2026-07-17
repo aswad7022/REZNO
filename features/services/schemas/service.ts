@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { isSafePublicImageUrl } from "@/lib/security/public-image-url";
+
 type ServiceValidationKey =
   | "serviceNameMin"
   | "serviceNameMax"
@@ -30,7 +32,7 @@ export function createServiceSchema(t: ServiceValidationTranslator) {
       .string()
       .trim()
       .refine(
-        (value) => !value || z.url().safeParse(value).success,
+        (value) => !value || isSafePublicImageUrl(value),
         t("urlInvalid"),
       )
       .transform((value) => value || null),

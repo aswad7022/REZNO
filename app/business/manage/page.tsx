@@ -4,7 +4,7 @@ import { getTranslations } from "next-intl/server";
 import { BusinessManagementPage } from "@/features/business/components/business-management-page";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const t = await getTranslations("BusinessManagement");
+  const t = await getTranslations("BusinessManagementHub");
 
   return {
     title: t("title"),

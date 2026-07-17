@@ -1,10 +1,12 @@
 import Link from "next/link";
 import {
   AlertCircle,
+  Armchair,
   CalendarDays,
   CheckCircle2,
   Circle,
   ExternalLink,
+  Menu,
   Plus,
   UserPlus,
 } from "lucide-react";
@@ -14,17 +16,20 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CopyProfileLink } from "@/features/dashboard/components/copy-profile-link";
 import {
-  getBusinessSetupStatus,
   type BusinessSetupCheckKey,
+  type BusinessSetupStatus,
 } from "@/features/dashboard/services/business-setup";
 
 const items = [
+  ["organization", "/business/manage/settings"],
   ["businessInfo", "/business/public-profile"],
   ["coverImage", "/business/public-profile"],
   ["logo", "/business/public-profile"],
   ["branch", "/business/manage/locations"],
   ["hours", "/business/manage/locations"],
+  ["bookingEnabled", "/business/manage/settings"],
   ["service", "/business/services"],
+  ["offering", "/business/services"],
   ["employee", "/business/team"],
   ["table", "/business/tables"],
   ["menuCategory", "/business/menu"],
@@ -47,11 +52,12 @@ const statusStyles = {
   },
 } as const;
 
-export async function BusinessSetupChecklist() {
-  const [setup, t] = await Promise.all([
-    getBusinessSetupStatus(),
-    getTranslations("BusinessSetup"),
-  ]);
+export async function BusinessSetupChecklist({
+  setup,
+}: {
+  setup: BusinessSetupStatus;
+}) {
+  const t = await getTranslations("BusinessSetup");
   const requiredItems = items.filter(([key]) => setup.requiredChecks.includes(key));
   const missingItems = requiredItems.filter(([key]) => !setup.checks[key]);
   const status = statusStyles[setup.status];
@@ -115,24 +121,49 @@ export async function BusinessSetupChecklist() {
       </CardHeader>
       <CardContent className="space-y-5 p-4 sm:p-6">
         <div className="flex flex-wrap gap-2 border-b pb-4">
-          <Button asChild size="sm">
-            <Link href="/business/services">
-              <Plus />
-              {t("quick.addService")}
-            </Link>
-          </Button>
-          <Button asChild size="sm" variant="outline">
-            <Link href="/business/team">
-              <UserPlus />
-              {t("quick.addEmployee")}
-            </Link>
-          </Button>
-          <Button asChild size="sm" variant="outline">
-            <Link href="/business/bookings">
-              <CalendarDays />
-              {t("quick.bookings")}
-            </Link>
-          </Button>
+          {setup.restaurant ? (
+            <>
+              <Button asChild size="sm">
+                <Link href="/business/tables">
+                  <Armchair />
+                  {t("quick.tables")}
+                </Link>
+              </Button>
+              <Button asChild size="sm" variant="outline">
+                <Link href="/business/menu">
+                  <Menu />
+                  {t("quick.menu")}
+                </Link>
+              </Button>
+              <Button asChild size="sm" variant="outline">
+                <Link href="/business/reservations">
+                  <CalendarDays />
+                  {t("quick.reservations")}
+                </Link>
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button asChild size="sm">
+                <Link href="/business/services">
+                  <Plus />
+                  {t("quick.addService")}
+                </Link>
+              </Button>
+              <Button asChild size="sm" variant="outline">
+                <Link href="/business/team">
+                  <UserPlus />
+                  {t("quick.addEmployee")}
+                </Link>
+              </Button>
+              <Button asChild size="sm" variant="outline">
+                <Link href="/business/bookings">
+                  <CalendarDays />
+                  {t("quick.bookings")}
+                </Link>
+              </Button>
+            </>
+          )}
           <Button asChild size="sm" variant="ghost">
             <Link href={`/${setup.slug}`} target="_blank">
               <ExternalLink />

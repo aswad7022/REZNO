@@ -108,6 +108,29 @@
       "slugReserved": "هذا الرابط محجوز للنظام. اختر رابطًا آخر."
     }
   },
+  "BusinessManagementHub": {
+    "title": "إدارة النشاط",
+    "description": "افتح مناطق التشغيل التي يسمح دورك بإدارتها فقط.",
+    "open": "فتح",
+    "readiness": { "title": "الجاهزية التشغيلية", "action": "مراجعة متطلبات الجاهزية الناقصة", "states": { "ready": "اجتازت جميع متطلبات جاهزية المرحلة الثانية.", "almost": "اجتازت معظم المتطلبات؛ راجع العناصر المتبقية.", "notReady": "لا يزال الإعداد التشغيلي المطلوب غير مكتمل." } },
+    "cards": {
+      "settings": { "title": "الإعدادات", "description": "تفضيلات الحجز والظهور في السوق." },
+      "locations": { "title": "المواقع", "description": "مواقع النشاط النشطة والتاريخية." },
+      "hours": { "title": "الساعات والإغلاقات", "description": "ساعات العمل المحلية والحظر التشغيلي." },
+      "services": { "title": "الخدمات", "description": "دورة حياة الخدمات وعروض المواقع." },
+      "workforce": { "title": "فريق العمل", "description": "الأدوار وإسناد المواقع والخدمات والجداول." },
+      "tables": { "title": "الطاولات", "description": "طاولات المطعم حسب الموقع النشط." },
+      "menu": { "title": "القائمة", "description": "أقسام المطعم والأصناف المتاحة." },
+      "publicProfile": { "title": "الصفحة العامة", "description": "معلومات النشاط الظاهرة للعملاء والنشر." },
+      "analytics": { "title": "التحليلات التشغيلية", "description": "نشاط حجوزات محدود بدون ادعاءات الإيرادات." },
+      "audit": { "title": "سجل التدقيق", "description": "سجل عمليات المؤسسة للمالك فقط." }
+    }
+  },
+  "BusinessAnalytics": {
+    "title": "التحليلات التشغيلية", "description": "نشاط حجوزات للقراءة فقط لأيام الفروع المحلية المكتملة.", "period": "آخر {days} أيام", "completedLocalDays": "أيام محلية مكتملة للفروع", "snapshot": "وقت اللقطة: {value}", "topServices": "أعلى الخدمات حسب عدد الحجوزات", "branches": "الحجوزات حسب الموقع", "staffWorkload": "حمل العمل للموظفين المسندين", "bookingMix": "توزيع نوع الحجز", "statusDistribution": "توزيع الحالات", "dailySeries": "عدد الحجوزات اليومي", "daysAgo": "قبل {days} أيام محلية", "empty": "لا توجد حجوزات في هذه الفترة.", "noRevenue": "لقطة السعر ليست إيرادًا محصلاً. تقارير الإيرادات والمدفوعات والاسترداد والضريبة والأرباح مستبعدة عمدًا.",
+    "metrics": { "totalBookings": "إجمالي الحجوزات", "completionRate": "معدل الإكمال", "cancellationRate": "معدل الإلغاء", "noShowRate": "معدل عدم الحضور", "genericBookings": "حجوزات الخدمات", "restaurantReservations": "حجوزات المطعم", "restaurantGuests": "ضيوف المطعم" },
+    "statuses": { "PENDING": "معلق", "CONFIRMED": "مؤكد", "COMPLETED": "مكتمل", "CANCELLED": "ملغى", "NO_SHOW": "عدم حضور" }
+  },
   "PublicProfileManagement": {
     "title": "إدارة الصفحة العامة",
     "description": "تحكم في هوية نشاطك ومعلوماته وصوره كما تظهر للعملاء.",
@@ -939,6 +962,11 @@
   "DashboardHome": {
     "welcome": "مرحبًا بعودتك، {name}",
     "businessDescription": "هذه نظرة سريعة على نشاطك ومواعيدك القادمة.",
+    "businessScopeDescriptions": {
+      "MANAGEMENT": "تشغيل النشاط بالكامل والجاهزية وإجراءات الإدارة المسموح بها.",
+      "RECEPTIONIST": "حجوزات المواقع النشطة وطلبات العملاء التي يمكنك تشغيلها.",
+      "STAFF_SELF": "جدولك الشخصي والمواعيد القادمة المسندة إليك."
+    },
     "customerDescription": "أدر مواعيدك واكتشف زيارتك التالية.",
     "openCalendar": "فتح التقويم",
     "bookAppointment": "حجز موعد",
@@ -982,23 +1010,17 @@
       "categoriesDescription": "ابدأ بسرعة من المطاعم، الكافيهات، الصالونات، العيادات والمزيد."
     },
     "commandCenter": {
-      "eyebrow": "مركز القيادة",
-      "title": "نظرة اليوم",
-      "description": "أهم مؤشرات الحجز والإجراءات التشغيلية في مكان واحد.",
+      "scopes": {
+        "MANAGEMENT": { "eyebrow": "مركز العمليات", "title": "نظرة تشغيلية على النشاط", "description": "نشاط معزول للمؤسسة والجاهزية والإجراءات المسموح بها." },
+        "RECEPTIONIST": { "eyebrow": "تشغيل المواقع النشطة", "title": "مكتب حجوزات اليوم", "description": "حجوزات المواقع النشطة والإجراءات التشغيلية المسموح بها فقط." },
+        "STAFF_SELF": { "eyebrow": "جدولي", "title": "العمل المسند إليك", "description": "مواعيدك ونتائجك الأخيرة وإجراءاتك الشخصية فقط." }
+      },
       "quickActions": "إجراءات سريعة",
       "metrics": {
-        "todayBookings": "حجوزات اليوم",
-        "upcomingBookings": "الحجوزات القادمة",
-        "pendingReviews": "تقييمات بانتظار العميل",
-        "unreadNotifications": "إشعارات غير مقروءة"
+        "activeBranches": "المواقع النشطة", "activeMenuItems": "أصناف القائمة المتاحة", "activeRestaurantTables": "الطاولات النشطة", "activeServices": "الخدمات النشطة", "activeWorkforce": "فريق العمل النشط", "cancellationsToday": "حجوزات مقررة اليوم: ملغاة", "completedToday": "حجوزات مقررة اليوم: مكتملة", "noShowsToday": "حجوزات مقررة اليوم: عدم حضور", "operationalUpdatesLast24Hours": "تحديثات تشغيلية (24 ساعة)", "ownCompletedLast7Days": "مواعيدي المكتملة (7 أيام)", "ownNoShowsLast7Days": "عدم حضوري (7 أيام)", "ownToday": "حجوزاتي النشطة اليوم", "ownUpcoming": "حجوزاتي القادمة", "pendingChangeRequests": "طلبات تغيير العملاء المعلقة", "pendingConfirmations": "بانتظار التأكيد", "restaurantReservationsToday": "حجوزات المطعم اليوم", "reviewsAwaitingReply": "تقييمات ظاهرة بانتظار الرد", "todayActive": "الحجوزات النشطة اليوم", "upcomingActive": "الحجوزات النشطة القادمة"
       },
       "actions": {
-        "addService": "إضافة خدمة",
-        "addEmployee": "إضافة موظف",
-        "publicProfile": "الصفحة العامة",
-        "calendar": "التقويم",
-        "bookings": "الحجوزات",
-        "openPublic": "فتح الصفحة العامة"
+        "analytics": "التحليلات", "audit": "سجل التدقيق", "availability": "توفري", "bookings": "الحجوزات", "calendar": "التقويم", "locations": "المواقع", "menu": "القائمة", "publicProfile": "الصفحة العامة", "reservations": "الحجوزات", "services": "الخدمات", "settings": "الإعدادات", "tables": "الطاولات", "team": "فريق العمل"
       }
     }
   },
@@ -1098,12 +1120,15 @@
       }
     },
     "items": {
+      "organization": "أبقِ النشاط نشطًا",
       "businessInfo": "أكمل معلومات النشاط",
       "coverImage": "أضف صورة غلاف",
       "logo": "أضف الشعار",
       "branch": "أضف موقعًا",
       "hours": "اضبط ساعات العمل",
+      "bookingEnabled": "فعّل الحجوزات",
       "service": "أضف خدمة",
+      "offering": "وفّر خدمة في موقع نشط",
       "employee": "أضف موظفًا عند الحاجة",
       "published": "انشر الملف العام",
       "table": "أضف طاولة نشطة",
@@ -1111,12 +1136,15 @@
       "menuCategory": "أضف قسمًا في القائمة"
     },
     "explanations": {
+      "organization": "يجب أن يبقى النشاط والعضوية الحالية نشطين.",
       "businessInfo": "يحتاج العملاء إلى فئة ووصف ورقم هاتف قبل الوثوق بصفحة النشاط.",
       "coverImage": "صورة الغلاف تجعل الصفحة العامة مكتملة واحترافية.",
       "logo": "الشعار يساعد العملاء على تمييز نشاطك داخل ريزنو.",
       "branch": "لا يمكن إنشاء الحجوزات بدون موقع نشط واحد على الأقل.",
-      "hours": "لا يستطيع ريزنو توليد مواعيد قابلة للحجز قبل ضبط ساعات العمل.",
+      "hours": "يحتاج كل موقع نشط إلى تعريف كامل لساعات أيام الأسبوع السبعة.",
+      "bookingEnabled": "يجب تفعيل الحجوزات في إعدادات النشاط.",
       "service": "يحتاج العملاء إلى خدمة نشطة واحدة على الأقل للحجز.",
+      "offering": "يجب إتاحة خدمة نشطة من موقع نشط.",
       "employee": "بعض الخدمات تتطلب مقدم خدمة، لذلك أضف عضوًا في الفريق أولًا.",
       "published": "الصفحات المخفية لا تظهر للعملاء في السوق.",
       "table": "تحتاج المطاعم والكافيهات إلى طاولات نشطة قبل فتح تجربة الحجز القادمة.",
@@ -1127,6 +1155,9 @@
       "addService": "إضافة خدمة",
       "addEmployee": "إضافة موظف",
       "bookings": "عرض الحجوزات",
+      "tables": "إدارة الطاولات",
+      "menu": "إدارة القائمة",
+      "reservations": "عرض حجوزات المطعم",
       "openPublic": "فتح الصفحة العامة"
     }
   },
@@ -1145,6 +1176,12 @@
       "dashboard": "لوحة التحكم",
       "bookings": "الحجوزات",
       "calendar": "التقويم",
+      "reservations": "الحجوزات",
+      "tables": "الطاولات",
+      "menu": "القائمة",
+      "analytics": "التحليلات",
+      "audit": "سجل التدقيق",
+      "availability": "توفري",
       "services": "الخدمات",
       "team": "فريق العمل",
       "publicProfile": "الصفحة العامة",
@@ -1190,12 +1227,14 @@
         "profile": "الملف الشخصي",
         "publicProfile": "الصفحة العامة",
         "calendar": "التقويم",
+        "availability": "توفري",
         "services": "الخدمات",
         "team": "الفريق",
         "business": "النشاط",
         "locations": "المواقع",
         "settings": "الإعدادات",
         "analytics": "التحليلات",
+        "audit": "سجل التدقيق",
         "messages": "الرسائل",
         "reviews": "المراجعات",
         "admin": "الأدمن",
