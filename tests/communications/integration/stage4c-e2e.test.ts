@@ -40,7 +40,9 @@ function rejectsWith(code: string) {
 test("Gate 4C campaigns, authorization, snapshot, and deterministic delivery are PostgreSQL exact", { concurrency: false }, async (t) => {
   await resetCommunicationTestDatabase();
   const fixture = await createCommunicationFixture();
-  setCommunicationTestPushEndpointResolver((personId) => `test-push:${personId}`);
+  setCommunicationTestPushEndpointResolver((personIds) => new Map(
+    personIds.map((personId) => [personId, `test-push:${personId}`]),
+  ));
   setCommunicationTestProviderFactory((channel) => new DeterministicSinkProvider(channel));
 
   t.after(async () => {

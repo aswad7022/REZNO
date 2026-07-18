@@ -46,13 +46,39 @@ import {
   mutationReplay,
   recordCampaignMutation,
 } from "@/features/communications/services/campaigns";
-import { resolvePersonEndpoint } from "@/features/communications/services/endpoints";
+import {
+  resolvePersonEndpoint,
+  resolvePersonEndpointsBulk,
+  type ResolvedEndpoint,
+} from "@/features/communications/services/endpoints";
 import { communicationSerializable } from "@/features/communications/services/transaction";
 import { createCanonicalNotifications } from "@/features/notifications/services/producer";
 import { notificationEventKey } from "@/features/notifications/domain/contracts";
 import { prisma } from "@/lib/db/prisma";
 
 const CLAIM_LEASE_MS = 5 * 60_000;
+export const DELIVERY_INSERT_CHUNK_SIZE = 1_000;
+
+export type SnapshotDiagnostics = {
+  deliveryInsertChunkCount: number;
+  deliveryRowCount: number;
+  elapsedMs: number;
+  endpointQueryCount: number;
+  recipientCount: number;
+  selectedChannels: OutboundChannel[];
+};
+
+type SnapshotDiagnosticsTestHook = (diagnostics: SnapshotDiagnostics) => Promise<void> | void;
+let snapshotDiagnosticsTestHook: SnapshotDiagnosticsTestHook | undefined;
+
+export function setCommunicationSnapshotDiagnosticsTestHook(
+  hook: SnapshotDiagnosticsTestHook | undefined,
+) {
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("Communication snapshot diagnostics hooks are unavailable in production.");
+  }
+  snapshotDiagnosticsTestHook = hook;
+}
 
 export async function sendCampaignNow(
   context: CommunicationAdminContext,
@@ -368,6 +394,7 @@ async function enqueueCampaign(
     requestHash: string;
   },
 ): Promise<CampaignSummaryDto> {
+  const snapshotStartedAt = Date.now();
   const recipients = await assertAudienceWithinLimit(transaction, input.campaign);
   let inAppNotificationId: string | null = input.campaign.inAppNotificationId;
   if (input.campaign.channels.includes("IN_APP")) {
@@ -411,15 +438,37 @@ async function enqueueCampaign(
   }
 
   const selectedOutbound = outboundChannels.filter((channel) => input.campaign.channels.includes(channel));
+  const endpointCandidates = recipients.filter((recipient) =>
+    recipient.active && selectedOutbound.some((channel) => recipient.outboundEnabled[channel]));
+  const endpointResolution = await resolvePersonEndpointsBulk(
+    transaction,
+    endpointCandidates.map((recipient) => recipient.personId),
+    selectedOutbound,
+  );
   const deliveries: Prisma.OutboundDeliveryCreateManyInput[] = [];
   for (const recipient of recipients) {
     for (const channel of selectedOutbound) {
-      deliveries.push(await snapshotDelivery(transaction, input.campaign, recipient, channel, input.now));
+      deliveries.push(snapshotDelivery(
+        input.campaign,
+        recipient,
+        channel,
+        endpointResolution.byPerson.get(recipient.personId)?.[channel] ?? null,
+        input.now,
+      ));
     }
   }
-  if (deliveries.length > 0) {
-    await transaction.outboundDelivery.createMany({ data: deliveries, skipDuplicates: true });
+  const deliveryChunks = chunks(deliveries, DELIVERY_INSERT_CHUNK_SIZE);
+  for (const deliveryChunk of deliveryChunks) {
+    await transaction.outboundDelivery.createMany({ data: deliveryChunk, skipDuplicates: true });
   }
+  await snapshotDiagnosticsTestHook?.({
+    deliveryInsertChunkCount: deliveryChunks.length,
+    deliveryRowCount: deliveries.length,
+    elapsedMs: Date.now() - snapshotStartedAt,
+    endpointQueryCount: endpointResolution.diagnostics.endpointQueryCount,
+    recipientCount: recipients.length,
+    selectedChannels: selectedOutbound,
+  });
   const groups = await transaction.outboundDelivery.groupBy({
     by: ["status"],
     where: { campaignId: input.campaign.id },
@@ -455,16 +504,13 @@ async function enqueueCampaign(
   return result;
 }
 
-async function snapshotDelivery(
-  transaction: Prisma.TransactionClient,
+export function snapshotDelivery(
   campaign: CommunicationCampaign,
   recipient: EvaluatedRecipient,
   channel: OutboundChannel,
+  endpoint: ResolvedEndpoint | null,
   now: Date,
-): Promise<Prisma.OutboundDeliveryCreateManyInput> {
-  const endpoint = recipient.active && recipient.outboundEnabled[channel]
-    ? await resolvePersonEndpoint(transaction, recipient.personId, channel)
-    : null;
+): Prisma.OutboundDeliveryCreateManyInput {
   const suppressionReason = !recipient.active
     ? "RECIPIENT_INACTIVE"
     : !recipient.outboundEnabled[channel]
@@ -483,6 +529,14 @@ async function snapshotDelivery(
     suppressionReason,
     nextAttemptAt: suppressionReason ? null : now,
   };
+}
+
+function chunks<T>(values: readonly T[], size: number): T[][] {
+  const result: T[][] = [];
+  for (let offset = 0; offset < values.length; offset += size) {
+    result.push(values.slice(offset, offset + size));
+  }
+  return result;
 }
 
 async function prepareProviderMessage(

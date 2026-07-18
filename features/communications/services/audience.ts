@@ -10,7 +10,7 @@ import type {
 import { outboundChannels } from "@/features/communications/domain/contracts";
 import { communicationError } from "@/features/communications/domain/errors";
 import { localeFromPersonLanguage } from "@/features/communications/domain/validation";
-import { resolvePersonEndpoint } from "@/features/communications/services/endpoints";
+import { resolvePersonEndpointsBulk } from "@/features/communications/services/endpoints";
 
 export const MAX_CAMPAIGN_RECIPIENTS = 5_000;
 
@@ -88,6 +88,14 @@ export async function previewAudience(
       suppressed: active.filter((recipient) => !recipient.inAppEnabled).length,
     };
   }
+  const selectedOutbound = outboundChannels.filter((channel) => input.channels.includes(channel));
+  const endpointCandidates = active.filter((recipient) =>
+    selectedOutbound.some((channel) => recipient.outboundEnabled[channel]));
+  const endpoints = await resolvePersonEndpointsBulk(
+    transaction,
+    endpointCandidates.map((recipient) => recipient.personId),
+    selectedOutbound,
+  );
   for (const channel of outboundChannels) {
     if (!input.channels.includes(channel)) continue;
     let eligible = 0;
@@ -98,8 +106,8 @@ export async function previewAudience(
         suppressed += 1;
         continue;
       }
-      const endpoint = await resolvePersonEndpoint(transaction, recipient.personId, channel);
-      if (endpoint.eligible) eligible += 1;
+      const endpoint = endpoints.byPerson.get(recipient.personId)?.[channel];
+      if (endpoint?.eligible) eligible += 1;
       else missingEndpoint += 1;
     }
     result.channels[channel] = { eligible, missingEndpoint, suppressed };

@@ -270,7 +270,9 @@ async function main() {
     source: "database" as const,
     adminAccessId: fullAccess.id,
   };
-  setCommunicationTestPushEndpointResolver((personId) => `stage4c-push:${personId}`);
+  setCommunicationTestPushEndpointResolver((personIds) => new Map(
+    personIds.map((personId) => [personId, `stage4c-push:${personId}`]),
+  ));
 
   const draft = await createCampaign(context, campaign({ key: KEYS.draft, targetPersonId: customer.id }));
   const scheduledDraft = await createCampaign(context, campaign({ key: KEYS.scheduledCreate, targetPersonId: customer.id }));
