@@ -5,6 +5,12 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-nati
 import { MobileApiRequestError } from "../api/client";
 import { notificationApi } from "../api/notifications";
 import type { MobileLocale } from "../i18n/labels";
+import {
+  mergeNotificationPage,
+  reconcileMarkAllRead,
+  reconcileNotificationState,
+  type MobileNotificationInboxFilter,
+} from "../notifications/notification-filter-state";
 import type { MobileTheme } from "../theme/tokens";
 import type {
   MobileNotificationDestinationKind,
@@ -18,8 +24,6 @@ export type MobileNotificationDestination = {
   targetId: string | null;
 };
 
-type InboxFilter = "all" | "archived" | "important" | "read" | "unread";
-
 export function CustomerNotificationCenter({ locale, onOpenDestination, theme }: {
   locale: MobileLocale;
   onOpenDestination: (destination: MobileNotificationDestination) => void;
@@ -27,14 +31,14 @@ export function CustomerNotificationCenter({ locale, onOpenDestination, theme }:
 }) {
   const copy = COPY[locale];
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const [filter, setFilter] = useState<InboxFilter>("all");
+  const [filter, setFilter] = useState<MobileNotificationInboxFilter>("all");
   const [inbox, setInbox] = useState<MobileNotificationInbox | null>(null);
   const [preferences, setPreferences] = useState<MobileNotificationPreferences | null>(null);
   const [status, setStatus] = useState<"error" | "loading" | "ready" | "unauthenticated">("loading");
   const [pendingId, setPendingId] = useState<string | null>(null);
   const requestSequence = useRef(0);
 
-  const load = useCallback(async (nextFilter: InboxFilter, cursor?: string, append = false) => {
+  const load = useCallback(async (nextFilter: MobileNotificationInboxFilter, cursor?: string, append = false) => {
     const requestId = ++requestSequence.current;
     setStatus("loading");
     try {
@@ -43,7 +47,7 @@ export function CustomerNotificationCenter({ locale, onOpenDestination, theme }:
         preferences ? Promise.resolve(preferences) : notificationApi.preferences(),
       ]);
       if (requestSequence.current !== requestId) return;
-      setInbox((current) => append && current ? { ...result, data: [...current.data, ...result.data] } : result);
+      setInbox((current) => append && current ? mergeNotificationPage(current, result, nextFilter) : result);
       setPreferences(nextPreferences);
       setStatus("ready");
     } catch (error) {
@@ -62,15 +66,8 @@ export function CustomerNotificationCenter({ locale, onOpenDestination, theme }:
     setPendingId(item.id);
     try {
       const result = await notificationApi.updateState(item, action, randomUUID());
-      setInbox((current) => current ? {
-        ...current,
-        data: current.data
-          .map((entry) => entry.id === item.id ? {
-            ...entry, archived: result.archived, read: result.readState === "READ", stateVersion: result.version,
-          } : entry)
-          .filter((entry) => filter === "archived" ? entry.archived : !entry.archived),
-        unreadCount: Math.max(0, current.unreadCount + (!item.read && result.readState === "READ" ? -1 : item.read && result.readState === "UNREAD" ? 1 : 0)),
-      } : current);
+      setInbox((current) => current ? reconcileNotificationState(current, filter, item.id, result) : current);
+      await load(filter);
     } catch {
       await load(filter);
     } finally {
@@ -87,7 +84,8 @@ export function CustomerNotificationCenter({ locale, onOpenDestination, theme }:
     if (!inbox || inbox.unreadCount === 0) return;
     try {
       const result = await notificationApi.markAllRead(inbox.inboxVersion, inbox.snapshot, randomUUID());
-      setInbox({ ...inbox, data: inbox.data.map((item) => ({ ...item, read: true })), inboxVersion: result.version, unreadCount: 0 });
+      setInbox(reconcileMarkAllRead(inbox, filter, result));
+      await load(filter);
     } catch { await load(filter); }
   }
 
