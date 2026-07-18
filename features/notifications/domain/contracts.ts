@@ -1,12 +1,14 @@
 import { createHash } from "node:crypto";
 
 import type {
+  CommercePermission,
   LanguageCode,
   NotificationAudience,
   NotificationCategory,
   NotificationDestinationKind,
   NotificationPriority,
   NotificationSourceType,
+  SystemRole,
 } from "@prisma/client";
 
 import { notificationError } from "@/features/notifications/domain/errors";
@@ -36,15 +38,19 @@ export interface CanonicalNotificationEvent {
   titleKey?: string;
 }
 
-export interface NotificationActorContext {
-  commercePermissions?: readonly string[];
-  membershipId?: string;
-  mode: "business" | "customer";
-  organizationId?: string;
+export type NotificationActorContext = {
+  mode: "customer";
   personId: string;
-  restaurant?: boolean;
-  role?: "OWNER" | "MANAGER" | "RECEPTIONIST" | "STAFF";
-}
+} | {
+  effectiveCommercePermissions: readonly CommercePermission[];
+  membershipId: string;
+  mode: "business";
+  organizationId: string;
+  personId: string;
+  restaurant: boolean;
+  roleId: string;
+  systemRole: SystemRole;
+};
 
 export const notificationCategories = [
   "BOOKINGS",
@@ -77,10 +83,7 @@ const FORBIDDEN_VARIABLE_KEY = /(address|authorization|cookie|customer.*name|dat
 
 export function notificationScopeKey(context: NotificationActorContext) {
   if (context.mode === "customer") return `customer:${context.personId}`;
-  if (!context.organizationId || !context.membershipId || !context.role) {
-    notificationError("FORBIDDEN", "A current Business notification scope is required.");
-  }
-  return `business:${context.organizationId}:${context.membershipId}:${context.role}`;
+  return `business:${context.organizationId}:${context.membershipId}:${context.roleId}:${context.systemRole}`;
 }
 
 export function notificationEventKey(input: {

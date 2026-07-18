@@ -9,6 +9,7 @@ import {
 export async function createCanonicalNotifications(
   transaction: Prisma.TransactionClient,
   events: readonly CanonicalNotificationEvent[],
+  options: { producedAt?: Date } = {},
 ) {
   if (events.length === 0) return { created: 0, suppressed: 0 };
   events.forEach(validateCanonicalNotificationEvent);
@@ -28,30 +29,35 @@ export async function createCanonicalNotifications(
     categoryEnabled(preferenceByPerson.get(event.recipientPersonId!), event.category)
   );
   if (deliverable.length === 0) return { created: 0, suppressed: events.length };
+  const producedAt = options.producedAt ?? new Date();
   const result = await transaction.notification.createMany({
-    data: deliverable.map((event) => ({
-      audience: event.audience,
-      body: event.body.trim(),
-      bodyKey: event.bodyKey,
-      businessId: event.businessId,
-      category: event.category,
-      createdByUserId: event.createdByUserId,
-      destinationKind: event.destinationKind,
-      destinationTargetId: event.destinationTargetId,
-      eventKey: event.eventKey,
-      eventType: event.eventType,
-      expiresAt: event.expiresAt,
-      localizationVariables: sanitizeLocalizationVariables(event.localizationVariables),
-      mandatory: event.mandatory,
-      metadata: compatibilityMetadata(event),
-      occurredAt: event.occurredAt,
-      priority: event.priority,
-      recipientPersonId: event.recipientPersonId,
-      sourceId: event.sourceId,
-      sourceType: event.sourceType,
-      title: event.title.trim(),
-      titleKey: event.titleKey,
-    })),
+    data: deliverable.map((event) => {
+      const occurredAt = event.occurredAt ?? producedAt;
+      return {
+        audience: event.audience,
+        body: event.body.trim(),
+        bodyKey: event.bodyKey,
+        businessId: event.businessId,
+        category: event.category,
+        createdAt: occurredAt,
+        createdByUserId: event.createdByUserId,
+        destinationKind: event.destinationKind,
+        destinationTargetId: event.destinationTargetId,
+        eventKey: event.eventKey,
+        eventType: event.eventType,
+        expiresAt: event.expiresAt,
+        localizationVariables: sanitizeLocalizationVariables(event.localizationVariables),
+        mandatory: event.mandatory,
+        metadata: compatibilityMetadata(event),
+        occurredAt,
+        priority: event.priority,
+        recipientPersonId: event.recipientPersonId,
+        sourceId: event.sourceId,
+        sourceType: event.sourceType,
+        title: event.title.trim(),
+        titleKey: event.titleKey,
+      };
+    }),
     skipDuplicates: true,
   });
   return { created: result.count, suppressed: events.length - deliverable.length };

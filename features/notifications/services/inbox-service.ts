@@ -11,6 +11,10 @@ import {
   encodeNotificationCursor,
   notificationFilterFingerprint,
 } from "@/features/notifications/domain/cursor";
+import {
+  canAccessBusinessCommerceOrderDestination,
+  canAccessBusinessMessagesDestination,
+} from "@/features/notifications/domain/destination-policy";
 import { notificationError } from "@/features/notifications/domain/errors";
 import {
   notificationEffectiveArchived,
@@ -56,94 +60,106 @@ export async function listNotificationInbox(
   query: NotificationInboxQuery,
 ) {
   assertQuery(query);
-  await prisma.$transaction((transaction) => assertNotificationActorCurrent(transaction, context));
-  const scopeKey = notificationScopeKey(context);
-  const fingerprint = notificationFilterFingerprint({
-    category: query.category,
-    filter: query.filter,
-    from: query.from?.toISOString(),
-    to: query.to?.toISOString(),
-  });
-  const cursor = query.cursor
-    ? decodeNotificationCursor(query.cursor, { context, filter: fingerprint, pageSize: query.limit })
-    : null;
-  const snapshot = cursor?.snapshotDate ?? new Date();
-  const inboxState = await prisma.notificationInboxState.findUnique({
-    where: { personId_scopeKey: { personId: context.personId, scopeKey } },
-  });
-  const conditions = baseConditions(context, query, snapshot, inboxState, cursor);
-  const ids = await prisma.$queryRaw<Array<{ id: string }>>(Prisma.sql`
-    SELECT n."id"
-    FROM "Notification" n
-    LEFT JOIN "NotificationRecipientState" s
-      ON s."notificationId" = n."id" AND s."personId" = ${context.personId}::uuid
-    WHERE ${Prisma.join(conditions, " AND ")}
-    ORDER BY n."createdAt" DESC, n."id" DESC
-    LIMIT ${query.limit + 1}
-  `);
-  const pageIds = ids.slice(0, query.limit).map((item) => item.id);
-  const [records, states] = await Promise.all([
-    pageIds.length
-      ? prisma.notification.findMany({ where: { id: { in: pageIds } }, select: inboxSelect })
-      : Promise.resolve([]),
-    pageIds.length
-      ? prisma.notificationRecipientState.findMany({
-          where: { notificationId: { in: pageIds }, personId: context.personId },
-        })
-      : Promise.resolve([]),
-  ]);
-  const recordById = new Map(records.map((record) => [record.id, record]));
-  const stateById = new Map(states.map((state) => [state.notificationId, state]));
-  const ordered = pageIds.map((id) => recordById.get(id)).filter((item): item is InboxRecord => Boolean(item));
-  const destinationById = await authorizeDestinations(context, ordered);
-  const last = ordered.at(-1);
-  return {
-    data: ordered.map((record) => {
-      const state = stateById.get(record.id);
-      return {
-        archived: notificationEffectiveArchived(state),
-        body: record.body,
-        bodyKey: record.bodyKey,
-        category: record.category,
-        createdAt: record.createdAt.toISOString(),
-        destination: destinationById.get(record.id) ?? fallbackDestination(context),
-        eventType: record.eventType,
-        id: record.id,
-        localizationVariables: safeVariables(record.localizationVariables),
-        mandatory: record.mandatory,
-        priority: record.priority,
-        read: notificationEffectiveRead(record.createdAt, state, inboxState),
-        stateVersion: state?.version ?? 0,
-        title: record.title,
-        titleKey: record.titleKey,
-      };
-    }),
-    inboxVersion: inboxState?.version ?? 0,
-    pageInfo: {
-      hasNextPage: ids.length > query.limit,
-      nextCursor: ids.length > query.limit && last
-        ? encodeNotificationCursor({
-            filter: fingerprint,
-            id: last.id,
-            pageSize: query.limit,
-            scope: scopeKey,
-            snapshot: snapshot.toISOString(),
-            sortValue: last.createdAt.toISOString(),
+  return prisma.$transaction(async (transaction) => {
+    const currentContext = await assertNotificationActorCurrent(transaction, context);
+    const scopeKey = notificationScopeKey(currentContext);
+    const fingerprint = notificationFilterFingerprint({
+      category: query.category,
+      filter: query.filter,
+      from: query.from?.toISOString(),
+      to: query.to?.toISOString(),
+    });
+    const cursor = query.cursor
+      ? decodeNotificationCursor(query.cursor, { context: currentContext, filter: fingerprint, pageSize: query.limit })
+      : null;
+    const snapshot = cursor?.snapshotDate ?? new Date();
+    const inboxState = await transaction.notificationInboxState.findUnique({
+      where: { personId_scopeKey: { personId: currentContext.personId, scopeKey } },
+    });
+    const conditions = baseConditions(currentContext, query, snapshot, inboxState, cursor);
+    const ids = await transaction.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+      SELECT n."id"
+      FROM "Notification" n
+      LEFT JOIN "NotificationRecipientState" s
+        ON s."notificationId" = n."id" AND s."personId" = ${currentContext.personId}::uuid
+      WHERE ${Prisma.join(conditions, " AND ")}
+      ORDER BY n."createdAt" DESC, n."id" DESC
+      LIMIT ${query.limit + 1}
+    `);
+    const pageIds = ids.slice(0, query.limit).map((item) => item.id);
+    const [records, states] = await Promise.all([
+      pageIds.length
+        ? transaction.notification.findMany({ where: { id: { in: pageIds } }, select: inboxSelect })
+        : Promise.resolve([]),
+      pageIds.length
+        ? transaction.notificationRecipientState.findMany({
+            where: { notificationId: { in: pageIds }, personId: currentContext.personId },
           })
-        : null,
-    },
-    snapshot: snapshot.toISOString(),
-    unreadCount: await countUnreadNotifications(context, snapshot),
-  };
+        : Promise.resolve([]),
+    ]);
+    const recordById = new Map(records.map((record) => [record.id, record]));
+    const stateById = new Map(states.map((state) => [state.notificationId, state]));
+    const ordered = pageIds.map((id) => recordById.get(id)).filter((item): item is InboxRecord => Boolean(item));
+    const destinationById = await authorizeDestinations(transaction, currentContext, ordered);
+    const last = ordered.at(-1);
+    return {
+      data: ordered.map((record) => {
+        const state = stateById.get(record.id);
+        return {
+          archived: notificationEffectiveArchived(state),
+          body: record.body,
+          bodyKey: record.bodyKey,
+          category: record.category,
+          createdAt: record.createdAt.toISOString(),
+          destination: destinationById.get(record.id) ?? fallbackDestination(currentContext),
+          eventType: record.eventType,
+          id: record.id,
+          localizationVariables: safeVariables(record.localizationVariables),
+          mandatory: record.mandatory,
+          priority: record.priority,
+          read: notificationEffectiveRead(record.createdAt, state, inboxState),
+          stateVersion: state?.version ?? 0,
+          title: record.title,
+          titleKey: record.titleKey,
+        };
+      }),
+      inboxVersion: inboxState?.version ?? 0,
+      pageInfo: {
+        hasNextPage: ids.length > query.limit,
+        nextCursor: ids.length > query.limit && last
+          ? encodeNotificationCursor({
+              filter: fingerprint,
+              id: last.id,
+              pageSize: query.limit,
+              scope: scopeKey,
+              snapshot: snapshot.toISOString(),
+              sortValue: last.createdAt.toISOString(),
+            })
+          : null,
+      },
+      snapshot: snapshot.toISOString(),
+      unreadCount: await countUnreadNotificationsInTransaction(transaction, currentContext, snapshot),
+    };
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
 }
 
 export async function countUnreadNotifications(
   context: NotificationActorContext,
   snapshot = new Date(),
 ) {
-  await prisma.$transaction((transaction) => assertNotificationActorCurrent(transaction, context));
+  return prisma.$transaction(async (transaction) => {
+    const currentContext = await assertNotificationActorCurrent(transaction, context);
+    return countUnreadNotificationsInTransaction(transaction, currentContext, snapshot);
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
+}
+
+async function countUnreadNotificationsInTransaction(
+  transaction: Prisma.TransactionClient,
+  context: NotificationActorContext,
+  snapshot: Date,
+) {
   const scopeKey = notificationScopeKey(context);
-  const inboxState = await prisma.notificationInboxState.findUnique({
+  const inboxState = await transaction.notificationInboxState.findUnique({
     where: { personId_scopeKey: { personId: context.personId, scopeKey } },
   });
   const conditions = baseConditions(
@@ -153,7 +169,7 @@ export async function countUnreadNotifications(
     inboxState,
     null,
   );
-  const rows = await prisma.$queryRaw<Array<{ count: bigint }>>(Prisma.sql`
+  const rows = await transaction.$queryRaw<Array<{ count: bigint }>>(Prisma.sql`
     SELECT COUNT(*)::bigint AS count FROM (
       SELECT 1
       FROM "Notification" n
@@ -209,12 +225,12 @@ function visibilitySql(context: NotificationActorContext) {
     (n."audience" = 'USER'::"NotificationAudience" AND n."recipientPersonId" = ${context.personId}::uuid)
   )`;
   const direct = Prisma.sql`(n."audience" = 'USER'::"NotificationAudience" AND n."recipientPersonId" = ${context.personId}::uuid)`;
-  if (context.role === "STAFF") return Prisma.sql`(n."audience" = 'ALL'::"NotificationAudience" OR ${direct})`;
+  if (context.systemRole === "STAFF") return Prisma.sql`(n."audience" = 'ALL'::"NotificationAudience" OR ${direct})`;
   const organizationId = context.organizationId!;
   return Prisma.sql`(
     n."audience" = 'ALL'::"NotificationAudience" OR
     ${direct} OR
-    ${context.role === "OWNER" ? Prisma.sql`n."audience" = 'BUSINESS_OWNERS'::"NotificationAudience" OR` : Prisma.empty}
+    ${context.systemRole === "OWNER" ? Prisma.sql`n."audience" = 'BUSINESS_OWNERS'::"NotificationAudience" OR` : Prisma.empty}
     (n."audience" = 'BUSINESS'::"NotificationAudience" AND n."businessId" = ${organizationId}::uuid) OR
     ${context.restaurant ? Prisma.sql`n."audience" = 'RESTAURANTS'::"NotificationAudience"` : Prisma.sql`false`}
   )`;
@@ -228,20 +244,20 @@ function readSql(inboxState: { readAt: Date; readThrough: Date } | null) {
   ), false)`;
 }
 
-async function authorizeDestinations(context: NotificationActorContext, records: InboxRecord[]) {
+async function authorizeDestinations(transaction: Prisma.TransactionClient, context: NotificationActorContext, records: InboxRecord[]) {
   const bookingIds = uniqueTargets(records, ["CUSTOMER_BOOKING", "CUSTOMER_RESTAURANT", "BUSINESS_BOOKING", "BUSINESS_RESTAURANT"]);
   const orderIds = uniqueTargets(records, ["CUSTOMER_COMMERCE_ORDER", "BUSINESS_COMMERCE_ORDER"]);
   const conversationIds = uniqueTargets(records, ["CUSTOMER_MESSAGES", "BUSINESS_MESSAGES"]);
   const [bookings, orders, conversations] = await Promise.all([
-    bookingIds.length ? prisma.booking.findMany({
+    bookingIds.length ? transaction.booking.findMany({
       where: { id: { in: bookingIds } },
       select: { customerId: true, id: true, memberId: true, organizationId: true, restaurantReservation: { select: { id: true } } },
     }) : [],
-    orderIds.length ? prisma.order.findMany({
+    orderIds.length ? transaction.order.findMany({
       where: { id: { in: orderIds } },
       select: { customerId: true, id: true, store: { select: { organizationId: true } } },
     }) : [],
-    conversationIds.length ? prisma.conversation.findMany({
+    conversationIds.length ? transaction.conversation.findMany({
       where: { id: { in: conversationIds } },
       select: { businessId: true, customerId: true, id: true },
     }) : [],
@@ -273,7 +289,8 @@ function destinationFor(
     }
   }
   if (kind === "BUSINESS_MESSAGES" && context.mode === "business") {
-    if (!targetId || data.conversations.some((item) => item.id === targetId && item.businessId === context.organizationId)) {
+    if (canAccessBusinessMessagesDestination(context) &&
+      (!targetId || data.conversations.some((item) => item.id === targetId && item.businessId === context.organizationId))) {
       return destination(kind, targetId, "/business/messages");
     }
   }
@@ -285,7 +302,7 @@ function destinationFor(
   }
   if ((kind === "BUSINESS_BOOKING" || kind === "BUSINESS_RESTAURANT") && context.mode === "business" && targetId) {
     const item = data.bookings.find((booking) => booking.id === targetId && booking.organizationId === context.organizationId &&
-      (context.role !== "STAFF" || booking.memberId === context.membershipId));
+      (context.systemRole !== "STAFF" || booking.memberId === context.membershipId));
     if (item && (kind !== "BUSINESS_RESTAURANT" || item.restaurantReservation)) {
       return destination(kind, targetId, kind === "BUSINESS_RESTAURANT" ? `/business/reservations/${targetId}` : `/business/bookings/${targetId}`);
     }
@@ -295,7 +312,7 @@ function destinationFor(
     return destination(kind, targetId, "/customer/notifications");
   }
   if (kind === "BUSINESS_COMMERCE_ORDER" && context.mode === "business" && targetId &&
-    context.commercePermissions?.includes("ORDER_VIEW") &&
+    canAccessBusinessCommerceOrderDestination(context) &&
     data.orders.some((order) => order.id === targetId && order.store.organizationId === context.organizationId)) {
     return destination(kind, targetId, `/business/commerce/orders/${targetId}`);
   }

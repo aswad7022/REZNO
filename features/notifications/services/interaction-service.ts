@@ -8,6 +8,7 @@ import {
   type NotificationActorContext,
 } from "@/features/notifications/domain/contracts";
 import { NotificationDomainError, notificationError } from "@/features/notifications/domain/errors";
+import { assertMarkAllSnapshotCurrent } from "@/features/notifications/domain/mark-all";
 import { notificationVisibilityWhere } from "@/features/notifications/domain/visibility";
 import { assertNotificationActorCurrent } from "@/features/notifications/services/actor-current";
 import { prisma } from "@/lib/db/prisma";
@@ -71,12 +72,12 @@ export async function mutateNotificationState(
   return serializable(async (transaction) => {
     const replay = await interactionReplay<NotificationStateMutationResult>(transaction, context.personId, input.idempotencyKey, requestHash);
     if (replay) return replay;
-    await assertNotificationActorCurrent(transaction, context);
+    const currentContext = await assertNotificationActorCurrent(transaction, context);
     const notification = await transaction.notification.findFirst({
       where: {
         id: input.notificationId,
         AND: [
-          notificationVisibilityWhere(context),
+          notificationVisibilityWhere(currentContext),
           {
             OR: [
               { expiresAt: null },
@@ -135,9 +136,10 @@ export async function mutateNotificationState(
 export async function markAllNotificationsRead(
   context: NotificationActorContext,
   input: { expectedVersion: number; idempotencyKey: string; snapshot: Date },
+  options: { now?: () => Date } = {},
 ): Promise<NotificationMarkAllResult> {
   if (!isUuid(input.idempotencyKey) || !Number.isInteger(input.expectedVersion) || input.expectedVersion < 0 ||
-    Number.isNaN(input.snapshot.getTime()) || input.snapshot.getTime() > Date.now() + 5_000) {
+    Number.isNaN(input.snapshot.getTime())) {
     notificationError("VALIDATION_ERROR", "Mark-all input is invalid.");
   }
   const scopeKey = notificationScopeKey(context);
@@ -152,12 +154,14 @@ export async function markAllNotificationsRead(
     const replay = await interactionReplay<NotificationMarkAllResult>(transaction, context.personId, input.idempotencyKey, requestHash);
     if (replay) return replay;
     await assertNotificationActorCurrent(transaction, context);
+    const authoritativeNow = options.now ? options.now() : await notificationTransactionTime(transaction);
+    assertMarkAllSnapshotCurrent(input.snapshot, authoritativeNow);
     const current = await transaction.notificationInboxState.findUnique({
       where: { personId_scopeKey: { personId: context.personId, scopeKey } },
     });
     const currentVersion = current?.version ?? 0;
     if (currentVersion !== input.expectedVersion) stale(currentVersion);
-    const readAt = new Date();
+    const readAt = authoritativeNow;
     const readThrough = current && current.readThrough > input.snapshot ? current.readThrough : input.snapshot;
     const state = current
       ? await transaction.notificationInboxState.update({
@@ -187,6 +191,13 @@ export async function markAllNotificationsRead(
     });
     return result;
   });
+}
+
+async function notificationTransactionTime(transaction: Prisma.TransactionClient) {
+  const rows = await transaction.$queryRaw<Array<{ now: Date }>>`SELECT clock_timestamp() AS "now"`;
+  const now = rows[0]?.now;
+  if (!(now instanceof Date) || Number.isNaN(now.getTime())) throw new Error("Notification transaction time is unavailable.");
+  return now;
 }
 
 export async function getNotificationPreferences(personId: string): Promise<NotificationPreferenceResult> {

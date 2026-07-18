@@ -15,12 +15,12 @@ export function notificationVisibilityWhere(
     };
   }
   const organizationUpdates =
-    context.role === "OWNER" || context.role === "MANAGER" || context.role === "RECEPTIONIST";
+    context.systemRole === "OWNER" || context.systemRole === "MANAGER" || context.systemRole === "RECEPTIONIST";
   return {
     OR: [
       { audience: "ALL" },
       { audience: "USER", recipientPersonId: context.personId },
-      ...(context.role === "OWNER" ? [{ audience: "BUSINESS_OWNERS" as const }] : []),
+      ...(context.systemRole === "OWNER" ? [{ audience: "BUSINESS_OWNERS" as const }] : []),
       ...(organizationUpdates && context.organizationId
         ? [
             { audience: "BUSINESS" as const, businessId: context.organizationId },
@@ -33,5 +33,5 @@ export function notificationVisibilityWhere(
 
 export function canReceiveOrganizationNotifications(context: NotificationActorContext) {
   return context.mode === "business" &&
-    (context.role === "OWNER" || context.role === "MANAGER" || context.role === "RECEPTIONIST");
+    (context.systemRole === "OWNER" || context.systemRole === "MANAGER" || context.systemRole === "RECEPTIONIST");
 }
