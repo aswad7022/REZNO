@@ -37,6 +37,6 @@ export function POST(request: NextRequest) {
       );
       return messageData(result, result.replayed ? 200 : 201);
     },
-    10,
+    null,
   );
 }

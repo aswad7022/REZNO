@@ -52,6 +52,6 @@ export function POST(
       });
       return messageData(result, result.replayed ? 200 : 201);
     },
-    20,
+    null,
   );
 }

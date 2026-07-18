@@ -30,16 +30,18 @@ export async function handleCustomerMessageRequest(
   request: NextRequest,
   scope: string,
   operation: (actor: CustomerMessageActor) => Promise<MessageHttpResult>,
-  limit = 120,
+  limit: number | null = 120,
 ) {
   try {
     const identity = await resolveBookingCustomerApiContext(request);
-    const rate = consumeRateLimit(
-      `message.customer.${scope}`,
-      `person:${identity.personId}`,
-      { limit, windowMs: 60_000 },
-    );
-    if (!rate.success) {
+    const rate = limit === null
+      ? null
+      : consumeRateLimit(
+          `message.customer.${scope}`,
+          `person:${identity.personId}`,
+          { limit, windowMs: 60_000 },
+        );
+    if (rate && !rate.success) {
       return NextResponse.json(
         { error: { code: "RATE_LIMITED", message: "Too many requests." } },
         {
