@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AdminPageHeader } from "@/features/admin/components/admin-shell";
 import { canAdmin, requireAdminPermission } from "@/features/admin/services/admin-auth";
 import { CampaignEditor } from "@/features/communications/components/campaign-editor";
+import { CommunicationDomainError } from "@/features/communications/domain/errors";
 import { communicationAdminContext } from "@/features/communications/services/admin-actor";
 import { getCampaignDetail } from "@/features/communications/services/campaigns";
 import { getAttemptPage, getDeliveryPage } from "@/features/communications/services/reporting";
@@ -39,19 +40,30 @@ export default async function AdminCommunicationDetailPage({
     : null;
   const deliveryId = typeof query.deliveryId === "string" ? query.deliveryId : null;
   const attemptCursor = typeof query.attemptCursor === "string" ? query.attemptCursor : null;
-  const [campaign, deliveries, canSend] = await Promise.all([
-    getCampaignDetail(context, campaignId),
-    getDeliveryPage(context, {
-      campaignId,
-      cursor: deliveryCursor,
-      pageSize: 20,
-      status: deliveryStatus,
-    }),
-    canAdmin("NOTIFICATIONS_SEND"),
-  ]);
-  const attempts = deliveryId
-    ? await getAttemptPage(context, { deliveryId, cursor: attemptCursor, pageSize: 20 })
-    : null;
+  let campaign: Awaited<ReturnType<typeof getCampaignDetail>>;
+  let deliveries: Awaited<ReturnType<typeof getDeliveryPage>>;
+  let canSend: boolean;
+  let attempts: Awaited<ReturnType<typeof getAttemptPage>> | null;
+  try {
+    [campaign, deliveries, canSend] = await Promise.all([
+      getCampaignDetail(context, campaignId),
+      getDeliveryPage(context, {
+        campaignId,
+        cursor: deliveryCursor,
+        pageSize: 20,
+        status: deliveryStatus,
+      }),
+      canAdmin("NOTIFICATIONS_SEND"),
+    ]);
+    attempts = deliveryId
+      ? await getAttemptPage(context, { deliveryId, cursor: attemptCursor, pageSize: 20 })
+      : null;
+  } catch (error) {
+    if (error instanceof CommunicationDomainError && error.code === "INVALID_CURSOR") {
+      return <InvalidCommunicationCursor />;
+    }
+    throw error;
+  }
 
   return (
     <>
@@ -111,6 +123,23 @@ export default async function AdminCommunicationDetailPage({
           </CardContent>
         </Card>
       ) : null}
+    </>
+  );
+}
+
+function InvalidCommunicationCursor() {
+  return (
+    <>
+      <AdminPageHeader
+        title="Campaign detail"
+        description="Immutable snapshot and sanitized outbound-delivery reporting."
+      />
+      <Card className="border-destructive/20">
+        <CardHeader><CardTitle>Communications reporting request was rejected safely.</CardTitle></CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">Refresh the current reporting scope and try again.</p>
+        </CardContent>
+      </Card>
     </>
   );
 }

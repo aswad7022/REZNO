@@ -1,10 +1,15 @@
-import { createHash } from "node:crypto";
+import "server-only";
 
 import { communicationError } from "@/features/communications/domain/errors";
 import { communicationRequestHash } from "@/features/communications/domain/validation";
 import type { CommunicationAdminContext } from "@/features/communications/services/admin-actor";
+import {
+  signCommunicationCursor,
+  verifyCommunicationCursorMac,
+} from "@/features/communications/domain/cursor-signing";
 
 export const COMMUNICATION_CURSOR_MAX_LENGTH = 3_000;
+export const COMMUNICATION_CURSOR_ENVELOPE_VERSION = 2;
 
 type CommunicationCursorKind =
   | "COMMUNICATION_CAMPAIGN_CURSOR"
@@ -12,9 +17,10 @@ type CommunicationCursorKind =
   | "OUTBOUND_ATTEMPT_CURSOR";
 
 type CursorCore = {
+  version: typeof COMMUNICATION_CURSOR_ENVELOPE_VERSION;
+  kind: CommunicationCursorKind;
   adminScope: string;
   filterFingerprint: string;
-  kind: CommunicationCursorKind;
   pageSize: number;
   parentId: string | null;
   snapshotTimestamp: string;
@@ -22,7 +28,7 @@ type CursorCore = {
   tieBreakerId: string;
 };
 
-type CursorEnvelope = CursorCore & { checksum: string; version: 1 };
+type CursorEnvelope = CursorCore & { mac: string };
 
 type CursorValue = {
   adminScope: string;
@@ -93,17 +99,23 @@ export function decodeAttemptCursor(
 
 function encodeCursor(kind: CommunicationCursorKind, value: CursorValue) {
   const core: CursorCore = {
+    version: COMMUNICATION_CURSOR_ENVELOPE_VERSION,
+    kind,
     adminScope: value.adminScope,
     filterFingerprint: value.filterFingerprint,
-    kind,
     pageSize: value.pageSize,
     parentId: value.parentId,
     snapshotTimestamp: value.snapshot.toISOString(),
     sortTimestamp: value.sortTimestamp.toISOString(),
     tieBreakerId: value.tieBreakerId,
   };
-  return Buffer.from(JSON.stringify({ ...core, checksum: cursorChecksum(core), version: 1 }), "utf8")
-    .toString("base64url");
+  let mac: string;
+  try {
+    mac = signCommunicationCursor(canonicalCursorMacInput(core)).toString("hex");
+  } catch {
+    invalidCursor();
+  }
+  return Buffer.from(JSON.stringify({ ...core, mac }), "utf8").toString("base64url");
 }
 
 function decodeCursor(
@@ -112,7 +124,11 @@ function decodeCursor(
   expected: CursorExpectation,
   authoritativeNow: Date,
 ) {
-  if (!encoded || encoded.length > COMMUNICATION_CURSOR_MAX_LENGTH) invalidCursor();
+  if (
+    !encoded
+    || encoded.length > COMMUNICATION_CURSOR_MAX_LENGTH
+    || !/^[A-Za-z0-9_-]+$/.test(encoded)
+  ) invalidCursor();
   let decoded: unknown;
   try {
     decoded = JSON.parse(Buffer.from(encoded, "base64url").toString("utf8"));
@@ -121,18 +137,28 @@ function decodeCursor(
   }
   if (!isCursorEnvelope(decoded)) invalidCursor();
   const core: CursorCore = {
+    version: decoded.version,
+    kind: decoded.kind,
     adminScope: decoded.adminScope,
     filterFingerprint: decoded.filterFingerprint,
-    kind: decoded.kind,
     pageSize: decoded.pageSize,
     parentId: decoded.parentId,
     snapshotTimestamp: decoded.snapshotTimestamp,
     sortTimestamp: decoded.sortTimestamp,
     tieBreakerId: decoded.tieBreakerId,
   };
+  let authenticated = false;
+  try {
+    authenticated = verifyCommunicationCursorMac(
+      canonicalCursorMacInput(core),
+      decoded.mac,
+    );
+  } catch {
+    invalidCursor();
+  }
+  if (!authenticated) invalidCursor();
   if (
-    decoded.checksum !== cursorChecksum(core)
-    || core.kind !== kind
+    core.kind !== kind
     || core.adminScope !== expected.adminScope
     || core.filterFingerprint !== expected.filterFingerprint
     || core.pageSize !== expected.pageSize
@@ -146,16 +172,39 @@ function decodeCursor(
   return { ...core, snapshotDate, sortDate };
 }
 
-function cursorChecksum(value: CursorCore) {
-  return createHash("sha256")
-    .update(`rezno-communications-cursor:${JSON.stringify(value)}`)
-    .digest("hex");
+function canonicalCursorMacInput(value: CursorCore) {
+  return JSON.stringify({
+    version: value.version,
+    kind: value.kind,
+    adminScope: value.adminScope,
+    filterFingerprint: value.filterFingerprint,
+    pageSize: value.pageSize,
+    parentId: value.parentId,
+    snapshotTimestamp: value.snapshotTimestamp,
+    sortTimestamp: value.sortTimestamp,
+    tieBreakerId: value.tieBreakerId,
+  });
 }
 
 function isCursorEnvelope(value: unknown): value is CursorEnvelope {
   if (!value || typeof value !== "object") return false;
   const item = value as Record<string, unknown>;
-  return item.version === 1
+  const keys = Object.keys(item).sort();
+  const envelopeKeys = [
+    "adminScope",
+    "filterFingerprint",
+    "kind",
+    "mac",
+    "pageSize",
+    "parentId",
+    "snapshotTimestamp",
+    "sortTimestamp",
+    "tieBreakerId",
+    "version",
+  ].sort();
+  return keys.length === envelopeKeys.length
+    && keys.every((key, index) => key === envelopeKeys[index])
+    && item.version === COMMUNICATION_CURSOR_ENVELOPE_VERSION
     && [
       "COMMUNICATION_CAMPAIGN_CURSOR",
       "OUTBOUND_DELIVERY_CURSOR",
@@ -166,10 +215,10 @@ function isCursorEnvelope(value: unknown): value is CursorEnvelope {
     && typeof item.pageSize === "number" && Number.isInteger(item.pageSize)
     && item.pageSize > 0 && item.pageSize <= 50
     && (item.parentId === null || (typeof item.parentId === "string" && isUuid(item.parentId)))
-    && typeof item.snapshotTimestamp === "string"
-    && typeof item.sortTimestamp === "string"
+    && typeof item.snapshotTimestamp === "string" && item.snapshotTimestamp.length <= 64
+    && typeof item.sortTimestamp === "string" && item.sortTimestamp.length <= 64
     && typeof item.tieBreakerId === "string" && isUuid(item.tieBreakerId)
-    && typeof item.checksum === "string" && /^[a-f0-9]{64}$/.test(item.checksum);
+    && typeof item.mac === "string" && item.mac.length <= 128;
 }
 
 function exactDate(value: string) {
