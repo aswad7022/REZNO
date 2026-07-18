@@ -190,21 +190,23 @@ async function main() {
     (error) => error instanceof CommunicationDomainError && error.code === "FORBIDDEN",
   );
 
-  const firstDeliveryPage = await getDeliveryPage(fullContext, {
-    campaignId: broadcastMutation.campaignId,
-    cursor: null,
-    pageSize: 20,
-    status: null,
-  });
-  assert.ok(firstDeliveryPage.nextCursor);
-  const secondDeliveryPage = await getDeliveryPage(fullContext, {
-    campaignId: broadcastMutation.campaignId,
-    cursor: firstDeliveryPage.nextCursor,
-    pageSize: 20,
-    status: null,
-  });
+  const deliveryPages: Array<Awaited<ReturnType<typeof getDeliveryPage>>> = [];
+  let deliveryCursor: string | null = null;
+  do {
+    const page = await getDeliveryPage(fullContext, {
+      campaignId: broadcastMutation.campaignId,
+      cursor: deliveryCursor,
+      pageSize: 20,
+      status: null,
+    });
+    deliveryPages.push(page);
+    deliveryCursor = page.nextCursor;
+    assert.ok(deliveryPages.length <= 251, "Delivery pagination exceeded the 5,000-recipient safety ceiling.");
+  } while (deliveryCursor);
+  const firstDeliveryPage = deliveryPages[0]!;
+  assert.ok(deliveryPages.length > 1);
   assert.equal(
-    new Set([...firstDeliveryPage.items, ...secondDeliveryPage.items].map((item) => item.id)).size,
+    new Set(deliveryPages.flatMap((page) => page.items).map((item) => item.id)).size,
     broadcastDeliveries,
   );
   const attemptedDelivery = await prisma.outboundDelivery.findFirstOrThrow({
@@ -264,7 +266,7 @@ async function main() {
     sinkPermanentFailure: permanent,
     inAppExactOnce: inAppCampaigns,
     campaignPagesVerified: 2,
-    deliveryPagesVerified: 2,
+    deliveryPagesVerified: deliveryPages.length,
     audienceFamiliesVerified: audiencePreviews.length,
     preferenceContractVerified: true,
     auditRows: audits,
