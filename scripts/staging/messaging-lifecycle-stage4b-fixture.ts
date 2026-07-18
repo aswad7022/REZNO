@@ -14,11 +14,11 @@ export const MESSAGING_STAGE4B_FIXTURE = {
 
 export async function seedMessagingLifecycleStage4bFixture(client: PrismaClient) {
   const { id, marker, userId } = MESSAGING_STAGE4B_FIXTURE;
-  const personIds = Array.from({ length: 8 }, (_, index) => id(4_100 + index));
-  const userIds = Array.from({ length: 8 }, (_, index) => userId(index + 1));
+  const personIds = Array.from({ length: 12 }, (_, index) => id(4_100 + index));
+  const userIds = Array.from({ length: 12 }, (_, index) => userId(index + 1));
   const organizationIds = [id(4_201), id(4_202)];
-  const roleIds = Array.from({ length: 6 }, (_, index) => id(4_301 + index));
-  const membershipIds = Array.from({ length: 6 }, (_, index) => id(4_401 + index));
+  const roleIds = Array.from({ length: 7 }, (_, index) => id(4_301 + index));
+  const membershipIds = Array.from({ length: 7 }, (_, index) => id(4_401 + index));
   const conversationIds = [
     id(4_950), id(4_951), id(4_952), id(4_953),
     ...Array.from({ length: 22 }, (_, index) => id(5_000 + index)),
@@ -77,14 +77,15 @@ export async function seedMessagingLifecycleStage4bFixture(client: PrismaClient)
         id: personId,
         isOnboarded: true,
         preferredLanguage: index % 3 === 0 ? "AR" : index % 3 === 1 ? "EN" : "KU",
-        status: "ACTIVE",
+        status: index === 9 ? "INACTIVE" : "ACTIVE",
       })),
     });
-    await transaction.adminAccess.create({
-      data: {
-        permissions: ["MESSAGES_SEND", "MESSAGES_VIEW"],
-        userId: userIds[7]!,
-      },
+    await transaction.adminAccess.createMany({
+      data: [
+        { permissions: ["MESSAGES_SEND", "MESSAGES_VIEW"], userId: userIds[7]! },
+        { permissions: ["MESSAGES_VIEW"], userId: userIds[10]! },
+        { permissions: ["MESSAGES_SEND", "MESSAGES_VIEW"], userId: userIds[11]! },
+      ],
     });
     await transaction.organization.createMany({
       data: [
@@ -115,6 +116,7 @@ export async function seedMessagingLifecycleStage4bFixture(client: PrismaClient)
       [roleIds[3]!, organizationIds[0]!, "STAFF"],
       [roleIds[4]!, organizationIds[0]!, "STAFF"],
       [roleIds[5]!, organizationIds[1]!, "OWNER"],
+      [roleIds[6]!, organizationIds[0]!, "STAFF"],
     ] as const;
     await transaction.role.createMany({
       data: roleRows.map(([roleId, organizationId, systemRole]) => ({
@@ -133,6 +135,13 @@ export async function seedMessagingLifecycleStage4bFixture(client: PrismaClient)
         { id: membershipIds[3]!, organizationId: organizationIds[0]!, personId: personIds[5]!, roleId: roleIds[3]! },
         { id: membershipIds[4]!, organizationId: organizationIds[0]!, personId: personIds[6]!, roleId: roleIds[4]! },
         { id: membershipIds[5]!, organizationId: organizationIds[1]!, personId: personIds[1]!, roleId: roleIds[5]! },
+        {
+          id: membershipIds[6]!,
+          organizationId: organizationIds[0]!,
+          personId: personIds[8]!,
+          roleId: roleIds[6]!,
+          status: "INACTIVE",
+        },
       ],
     });
     await transaction.booking.create({
@@ -280,26 +289,38 @@ export async function seedMessagingLifecycleStage4bFixture(client: PrismaClient)
     });
   }, { isolationLevel: "Serializable", timeout: 30_000 });
 
-  const [conversations, messages, readStates, notifications, audits] = await Promise.all([
+  const [conversations, messages, readStates, notifications, audits, people, users, memberships, admins] = await Promise.all([
     client.conversation.count({ where: { id: { in: conversationIds } } }),
     client.message.findMany({ where: { conversationId: { in: conversationIds } }, orderBy: { id: "asc" }, select: { id: true } }),
     client.conversationReadState.count({ where: { conversationId: { in: conversationIds } } }),
     client.notification.findMany({ where: { eventKey: { in: notificationEventKeys } }, orderBy: { eventKey: "asc" }, select: { eventKey: true } }),
     client.adminAuditLog.count({ where: { adminUserId: userIds[7]!, action: "admin.message.send" } }),
+    client.person.count({ where: { id: { in: personIds } } }),
+    client.user.count({ where: { id: { in: userIds } } }),
+    client.organizationMember.count({ where: { id: { in: membershipIds } } }),
+    client.adminAccess.count({ where: { userId: { in: [userIds[7]!, userIds[10]!, userIds[11]!] } } }),
   ]);
   const fingerprint = createHash("sha256").update(JSON.stringify({
+    admins,
     audits,
     conversations,
+    memberships,
     messages: messages.map((item) => item.id),
     notifications: notifications.map((item) => item.eventKey),
+    people,
     readStates,
+    users,
   })).digest("hex");
   return {
+    admins,
     audits,
     conversations,
     fingerprint,
+    memberships,
     messages: messages.length,
     notifications: notifications.length,
+    people,
     readStates,
+    users,
   };
 }

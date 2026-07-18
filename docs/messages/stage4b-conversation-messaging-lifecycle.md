@@ -293,10 +293,17 @@ staging, complete local/HTTP/mobile regression, and explicit security review.
   Expo Doctor passes 20/20, Mobile TypeScript passes, and Android/iOS Hermes
   exports both complete. Physical-device QA remains explicitly unperformed.
 - The deterministic fixture produced the same SHA-256 fingerprint twice:
-  `534c9fbb7332b26f95a24085c091c2562996a51de68d6e3eaf4624b4813ad4da`.
-  Its local role smoke passed Customer, Owner, Manager, Receptionist, assigned
-  Staff, Admin, two-page Conversation/Message pagination, exact unread/read,
-  and two Notification reconciliations.
+  `387d550b8a89ed63f287ff816e2d5715aed2e36f91cae7c3eb4019e280d25966`.
+  It contains 12 Users, 12 People, seven memberships, three Admin identities,
+  26 Conversations, 61 Messages, three read states, two Notifications, and one
+  Admin audit row. Its expanded local role smoke passed Customer send/replay,
+  Owner, Manager, Receptionist, assigned Staff, full Admin User/Business sends,
+  read-only Admin denial, second-Admin isolation, unassigned/foreign/revoked/
+  inactive denial, active-Business scope enforcement, two-page Conversation
+  and Message pagination, cross-scope cursor rejection, personal read state,
+  post-read unread behavior, exact-once generic Notification delivery, PII/body
+  absence, and unchanged Stage 3A/3B/3C/3D and Gate 4A fixture fingerprints.
+  A third seed restored the exact deterministic baseline after the smoke.
 
 ### Query-plan evidence
 

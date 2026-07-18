@@ -237,8 +237,11 @@ test("Stage 4B staging fixture is confirmation-gated, production-refusing, bound
   ]);
   assert.match(fixture, /ownership collision/);
   assert.match(fixture, /fingerprint/);
+  assert.match(fixture, /length: 12/);
   assert.match(fixture, /length: 36/);
   assert.match(fixture, /length: 22/);
+  assert.match(fixture, /MESSAGES_VIEW/);
+  assert.match(fixture, /status: "INACTIVE"/);
   assert.match(fixture, /REZNO_MESSAGING_STAGE4B_FIXTURE/);
   assert.match(seed, /refuses production environments/);
   assert.match(seed, /rezno_staging\|stage4b\|test/);

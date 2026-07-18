@@ -28,7 +28,7 @@ async function main() {
   try {
     const result = await seedMessagingLifecycleStage4bFixture(client);
     process.stdout.write(
-      `Stage 4B fixture ready. marker=${MESSAGING_STAGE4B_FIXTURE.marker} fingerprint=${result.fingerprint} conversations=${result.conversations} messages=${result.messages} readStates=${result.readStates} notifications=${result.notifications} audits=${result.audits}\n`,
+      `Stage 4B fixture ready. marker=${MESSAGING_STAGE4B_FIXTURE.marker} fingerprint=${result.fingerprint} users=${result.users} people=${result.people} memberships=${result.memberships} admins=${result.admins} conversations=${result.conversations} messages=${result.messages} readStates=${result.readStates} notifications=${result.notifications} audits=${result.audits}\n`,
     );
   } finally {
     await client.$disconnect();
