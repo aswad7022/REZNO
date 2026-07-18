@@ -148,11 +148,6 @@ async function main() {
     receptionistPage,
     staffPage,
     unassignedPage,
-    foreignPage,
-    secondCustomerPage,
-    adminPage,
-    readOnlyAdminPage,
-    secondAdminPage,
   ] = await Promise.all([
     listConversations(customer, { limit: 20, mode: "all" }),
     listConversations(owner, { limit: 20, mode: "all" }),
@@ -160,6 +155,14 @@ async function main() {
     listConversations(receptionist, { limit: 20, mode: "all" }),
     listConversations(assignedStaff, { limit: 20, mode: "all" }),
     listConversations(unassignedStaff, { limit: 20, mode: "all" }),
+  ]);
+  const [
+    foreignPage,
+    secondCustomerPage,
+    adminPage,
+    readOnlyAdminPage,
+    secondAdminPage,
+  ] = await Promise.all([
     listConversations(foreignOwner, { limit: 20, mode: "all" }),
     listConversations(secondCustomer, { limit: 20, mode: "all" }),
     listConversations(admin, { limit: 20, mode: "all" }),

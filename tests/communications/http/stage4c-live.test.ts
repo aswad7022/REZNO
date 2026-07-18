@@ -5,12 +5,21 @@ import test from "node:test";
 import { prisma } from "../../../lib/db/prisma";
 
 const baseUrl = process.env.COMMUNICATION_HTTP_BASE_URL ?? process.env.COMMERCE_HTTP_BASE_URL;
+const bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET ?? "";
+const oidcToken = process.env.VERCEL_OIDC_TOKEN ?? "";
 const marker = `stage4c-http-${randomUUID().slice(0, 8)}`;
+
+function protectedHeaders(initial?: HeadersInit) {
+  const headers = new Headers(initial);
+  if (bypass) headers.set("x-vercel-protection-bypass", bypass);
+  else if (oidcToken) headers.set("x-vercel-trusted-oidc-idp-token", oidcToken);
+  return headers;
+}
 
 async function signUp(label: string) {
   const response = await fetch(`${baseUrl}/api/auth/sign-up/email`, {
     method: "POST",
-    headers: { "content-type": "application/json", origin: baseUrl! },
+    headers: protectedHeaders({ "content-type": "application/json", origin: baseUrl! }),
     body: JSON.stringify({ email: `${marker}-${label}@rezno.invalid`, name: label, password: "password123" }),
   });
   assert.equal(response.status, 200);
@@ -31,11 +40,11 @@ async function json(path: string, options: { body?: unknown; cookie?: string; ke
   const response = await fetch(`${baseUrl}${path}`, {
     method: options.method ?? "GET",
     body: options.body === undefined ? undefined : JSON.stringify(options.body),
-    headers: {
+    headers: protectedHeaders({
       ...(options.body === undefined ? {} : { "content-type": "application/json", origin: baseUrl! }),
       ...(options.cookie ? { cookie: options.cookie } : {}),
       ...(options.key ? { "idempotency-key": options.key } : {}),
-    },
+    }),
     redirect: "manual",
   });
   const body = await response.json() as Record<string, unknown>;
@@ -81,7 +90,7 @@ test("Gate 4C production HTML, RSC, redirect, and Customer Mobile outbound contr
   await t.test("Admin campaign pages render HTML/RSC and legacy route redirects", async () => {
     for (const rsc of [false, true]) {
       const response = await fetch(`${baseUrl}/admin/communications`, {
-        headers: { cookie: admin.cookie, ...(rsc ? { accept: "text/x-component", rsc: "1" } : {}) },
+        headers: protectedHeaders({ cookie: admin.cookie, ...(rsc ? { accept: "text/x-component", rsc: "1" } : {}) }),
         redirect: "manual",
       });
       const text = await response.text();
@@ -90,13 +99,13 @@ test("Gate 4C production HTML, RSC, redirect, and Customer Mobile outbound contr
       assert.doesNotMatch(text, /@rezno\.invalid|postgresql:\/\/|DATABASE_URL|PrismaClient/);
     }
     const detail = await fetch(`${baseUrl}/admin/communications/${campaign.id}`, {
-      headers: { cookie: admin.cookie },
+      headers: protectedHeaders({ cookie: admin.cookie }),
       redirect: "manual",
     });
     assert.equal(detail.status, 200);
     assert.match(await detail.text(), /Campaign detail/);
     const legacy = await fetch(`${baseUrl}/admin/notifications`, {
-      headers: { cookie: admin.cookie },
+      headers: protectedHeaders({ cookie: admin.cookie }),
       redirect: "manual",
     });
     const legacyText = await legacy.text();
@@ -143,7 +152,7 @@ test("Gate 4C production HTML, RSC, redirect, and Customer Mobile outbound contr
   await t.test("revoked Admin loses the page on the next authoritative read", async () => {
     await prisma.adminAccess.update({ where: { id: access.id }, data: { status: "REVOKED" } });
     const response = await fetch(`${baseUrl}/admin/communications`, {
-      headers: { cookie: admin.cookie },
+      headers: protectedHeaders({ cookie: admin.cookie }),
       redirect: "manual",
     });
     const text = await response.text();
