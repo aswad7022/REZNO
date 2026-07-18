@@ -1,6 +1,6 @@
 # Stage 4C — Admin Communications and Outbound Delivery
 
-Status: architecture audit and policy baseline, completed before production implementation.
+Status: implementation, migration, local validation, security review, and real-staging closure complete; pull-request closure pending.
 
 Baseline: `origin/main` and the isolated Gate 4C branch both started at `ed94620ddbc987481edbad3b6d7e67652b010d14`, the merge commit for PR #118 and Gate 4B. The real staging baseline reported 37 migrations, an up-to-date schema, and a successful Next.js build. PR #100 is outside this gate and remains protected.
 
@@ -241,6 +241,7 @@ Every Admin mutation records actor, action, campaign, safe before/after status, 
 - unit tests: 309/309;
 - complete PostgreSQL integration tests: 277/277, including the Gate 4C authorization, snapshot, provider, retry, cancellation, and query-plan suite;
 - production HTTP/RSC/API tests against `next start`: 81/81, including Admin campaign pages, legacy redirect, current revocation, and Customer Mobile outbound preferences;
+- the post-staging OIDC/protected-Preview test support and bounded Gate 4B smoke harness passed non-incremental TypeScript, zero-warning ESLint, and the affected Gate 4B/Gate 4C unit contracts 26/26;
 - deterministic local fixture ran twice with identical SHA-256 fingerprint `0669236ae62f4f61fbdca6801d525c77ea2f2fffba5fe73032d2619be565fc9e`;
 - local staging smoke proved 39 campaigns, a 24-row multi-page broadcast, 9 accepted sink attempts, transient/permanent/not-configured classification, suppression counts, all audience families, preference DTO safety, cursor pagination, audit redaction, and one canonical in-app event;
 - `git diff --check` passed and migration 1–37 comparison against `origin/main` is empty.
@@ -253,6 +254,44 @@ Raw contacts are available only to the just-in-time endpoint resolver and provid
 
 ### Real-staging and pull-request evidence
 
-Pending the exact committed branch head. This section must record staging 38/38, both identical fixture runs, expanded staging smoke, unchanged Gate 4A/Gate 4B/Stage 3 fingerprints, exact Vercel SHA/Ready state, cleanup, CI, review remediation, and Ready-for-review conversion before the final verdict.
+Neon access used the authenticated in-memory operator only. It discovered exactly one database named `rezno_staging`, required the verified owner role, selected the direct non-pooler `.neon.tech` endpoint, enforced SSL, and redacted the connection and host from child output. Preflight reported 37/37 with no failed or rolled-back migration. `prisma migrate deploy` applied only migration 38; the final status reports 38 migrations and an up-to-date schema. No reset or `db push` was used.
+
+The first guarded provider probe deliberately omitted `REZNO_OUTBOUND_SINK_CONFIRM`. The provider failed closed as `NOT_CONFIGURED`; its isolated fixture was then removed exactly before the accepted run. With all sink guards present, two consecutive fixture executions produced byte-identical JSON and SHA-256 fingerprint `36de535d2a90691f3408236c3f5bce80530b318478296f9ee8af44f7a547c290`. Each run reported 39 campaigns, 367 deliveries, 12 attempts, and `sinkIsHumanDelivery=false`.
+
+The expanded real-staging smoke traversed two campaign pages and 18 delivery pages and proved:
+
+- 38 migrations and 39 campaigns;
+- 357 broadcast delivery rows across all four audience families;
+- accepted provider outcomes: Email 4, SMS 2, Push 3;
+- attempt outcomes: accepted 9, transient failure 1, permanent failure 1, not configured 1;
+- suppressions: unverified endpoint 3, preference disabled 340, inactive recipient 12;
+- one scheduled retry, one sink permanent failure, and one provider-not-configured terminal result;
+- six exact-once in-app observations, strict contact-free preference DTOs, 63 safe audit rows, and no automatic production scheduler, human-delivery, or physical-device claim.
+
+The Git-integrated Vercel Preview deployment `dpl_8bSVGQFC1sJZmNWAQJueGKGUm2NG` was `READY` for commit `f81802fc6a6a0e5986155879c5b5db68303c4bfa` on the exact Gate 4C branch. An in-memory Vercel OIDC token traversed protection without persisting a bypass token or environment file. The live Preview suite passed 4/4: Admin HTML and RSC rendering, campaign detail and legacy redirect, strict/idempotent contact-free Customer Mobile preferences, and authoritative revoked-Admin denial. The test client now supports the same optional bypass/OIDC headers as the accepted Stage 3 protected-Preview harnesses.
+
+Fixture cleanup deleted exactly 12 attempts, 63 audits, 39 campaigns, 367 deliveries, 56 mutation rows, 6 Notifications, 8 People, and 8 Users. A second cleanup reported zero in every category. Only after that cleanup, the retained prior-gate fixtures were repeated and matched their accepted fingerprints:
+
+| Fixture | Repeated fingerprint |
+| --- | --- |
+| Stage 3A | `3c92ab6aa3a387de458b0b70fec598c5d640e2a139540d426fb14372af2a3b2a` |
+| Stage 3B | `89f4fbb6aa64f299dc05d9614458c990d0810e18931c8fd32cc3e150111ce388` |
+| Stage 3C | `849c3819bd1f1ef2b09d70e4f95e406ed117c2805d9228d4822c042564e90372` |
+| Stage 3D | `101c94ba87b3c458c707b29ddae24436ee0665d7ab285099782bf8461a8f229e` |
+| Gate 4A | `252f14499ff9fbd373e86755c2ae0e94cb6b04b68eac5b784e38dbc5988eef79` |
+| Gate 4B | `387d550b8a89ed63f287ff816e2d5715aed2e36f91cae7c3eb4019e280d25966` |
+
+The Gate 4B role smoke initially exposed a staging-harness pool mismatch: 11 simultaneous serializable reads exceeded the direct PostgreSQL pool's default capacity of 10 and the last transaction timed out before it could start. The smoke was bounded into batches of six and five without reducing role or isolation assertions. It then passed Customer, Owner, Manager, Receptionist, assigned Staff, Admin/read-only Admin/second-Admin isolation, send/replay, current-grant cursors, read reconciliation, exact-once Notification, PII absence, and `priorFingerprints=unchanged`; a final Gate 4B seed restored the fingerprint above.
+
+Production provider truth remains deliberately limited:
+
+| Channel | Production Gate 4C behavior | Guarded test/staging behavior |
+| --- | --- | --- |
+| Email | provider-neutral adapter returns `NOT_CONFIGURED` | deterministic sink only; acceptance is not receipt |
+| SMS | provider-neutral adapter returns `NOT_CONFIGURED` | deterministic sink only; verified phone is still required |
+| Push | `NOT_CONFIGURED` and no device endpoint | opaque injected endpoint in guarded tests only |
+| Scheduler | no automatic production scheduler | authorized manual dispatcher/CLI only |
+
+The final committed-head Preview, GitHub CI, Draft PR review/remediation, and Ready-for-review conversion are recorded after the documentation commit so they can refer to one immutable final head. No Gate 4D work has started.
 
 This document locks the Gate 4C policy baseline and evidence. Any material deviation must be justified by repository or staging evidence and updated here before review readiness.
