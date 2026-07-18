@@ -30,9 +30,11 @@ const CUSTOMER_USER_ID = "4c000000-0000-4000-8000-000000000007";
 const CUSTOMER_PERSON_ID = "4c000000-0000-4000-8000-000000000008";
 const ORGANIZATION_ID = "4c000000-0000-4000-8000-000000000011";
 const BROADCAST_CREATE_KEY = "4c100000-0000-4000-8000-00000000001e";
+let smokeCheckpoint = "bootstrap";
 
 async function main() {
   validateOutboundStage4cEnvironment(process.env);
+  smokeCheckpoint = "aggregate-queries";
   const [
     campaigns,
     acceptedGroups,
@@ -129,6 +131,7 @@ async function main() {
   const outcomes = Object.fromEntries(attempts.map((row) => [row.outcome ?? "IN_PROGRESS", row._count._all]));
   const suppressedByReason = Object.fromEntries(suppressions.map((row) => [row.suppressionReason ?? "UNKNOWN", row._count._all]));
 
+  smokeCheckpoint = "aggregate-assertions";
   assert.ok(campaignCount > 20);
   assert.ok(broadcastDeliveries > 20);
   assert.ok(statuses.DRAFT >= 20);
@@ -136,6 +139,7 @@ async function main() {
   assert.ok(statuses.CANCELLED >= 1);
   assert.ok(statuses.COMPLETED >= 1);
   assert.ok(statuses.FAILED >= 1);
+  smokeCheckpoint = "accepted-channel-assertions";
   assert.ok(acceptedByChannel.EMAIL >= 1);
   assert.ok(acceptedByChannel.SMS >= 1);
   assert.ok(acceptedByChannel.PUSH >= 1);
@@ -143,12 +147,15 @@ async function main() {
   assert.ok(outcomes.TRANSIENT_FAILURE >= 1);
   assert.ok(outcomes.PERMANENT_FAILURE >= 1);
   assert.ok(outcomes.NOT_CONFIGURED >= 1);
+  smokeCheckpoint = "suppression-assertions";
   assert.ok(suppressedByReason.UNVERIFIED_ENDPOINT >= 1);
   assert.ok(suppressedByReason.PREFERENCE_DISABLED >= 1);
+  smokeCheckpoint = "provider-outcome-assertions";
   assert.equal(notConfigured, 1);
   assert.equal(transient, 1);
   assert.equal(permanent, 1);
   assert.equal(inAppCampaigns, inAppNotifications);
+  smokeCheckpoint = "audit-access-assertions";
   assert.ok(audits >= campaignCount);
   assert.deepEqual(viewAccess?.permissions, ["NOTIFICATIONS_VIEW"]);
   assert.equal(revokedAccess?.status, "REVOKED");
@@ -173,6 +180,7 @@ async function main() {
     source: "database" as const,
     adminAccessId: revokedAccess!.id,
   };
+  smokeCheckpoint = "campaign-pagination";
   const firstCampaignPage = await getCampaignPage(fullContext, { cursor: null, pageSize: 20, status: null });
   assert.ok(firstCampaignPage.nextCursor);
   const secondCampaignPage = await getCampaignPage(fullContext, {
@@ -190,6 +198,7 @@ async function main() {
     (error) => error instanceof CommunicationDomainError && error.code === "FORBIDDEN",
   );
 
+  smokeCheckpoint = "delivery-pagination";
   const deliveryPages: Array<Awaited<ReturnType<typeof getDeliveryPage>>> = [];
   let deliveryCursor: string | null = null;
   do {
@@ -209,6 +218,7 @@ async function main() {
     new Set(deliveryPages.flatMap((page) => page.items).map((item) => item.id)).size,
     broadcastDeliveries,
   );
+  smokeCheckpoint = "attempt-detail";
   const attemptedDelivery = await prisma.outboundDelivery.findFirstOrThrow({
     where: { campaign: { createdByAdminUserId: FULL_ADMIN_USER_ID }, attempts: { some: {} } },
     select: { id: true, campaignId: true },
@@ -220,6 +230,7 @@ async function main() {
   })).items.length > 0);
   assert.equal((await getCampaignDetail(fullContext, attemptedDelivery.campaignId)).id, attemptedDelivery.campaignId);
 
+  smokeCheckpoint = "audience-preview";
   const audiencePreviews = await Promise.all([
     previewCampaignAudience(fullContext, {
       audience: "CUSTOMERS", targetPersonId: null, targetOrganizationId: null,
@@ -239,6 +250,7 @@ async function main() {
     }),
   ]);
   assert.ok(audiencePreviews.every((preview) => preview.evaluated > 0 && !preview.tooLarge));
+  smokeCheckpoint = "preference-target-search";
   const preferences = await getOutboundPreferences({ personId: CUSTOMER_PERSON_ID, userId: CUSTOMER_USER_ID });
   assert.equal(preferences.endpoints.EMAIL.eligible, true);
   assert.equal(preferences.endpoints.PUSH.eligible, false);
@@ -252,6 +264,7 @@ async function main() {
   });
   assert.doesNotMatch(safeServiceEvidence, /@stage4c|\+964|stage4c-push|postgres(?:ql)?:\/\//i);
 
+  smokeCheckpoint = "output-redaction";
   const output = {
     fixture: OUTBOUND_STAGE4C_FIXTURE,
     migrations: 38,
@@ -281,7 +294,7 @@ async function main() {
 
 main()
   .catch(() => {
-    process.stderr.write("Gate 4C staging smoke failed with a sanitized error.\n");
+    process.stderr.write(`Gate 4C staging smoke failed at ${smokeCheckpoint} with a sanitized error.\n`);
     process.exitCode = 1;
   })
   .finally(async () => prisma.$disconnect());
