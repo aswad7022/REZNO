@@ -41,6 +41,7 @@ import { bookingReference } from "@/features/bookings/domain/creation";
 import { evaluateReviewEligibility } from "@/features/reviews/domain/review-policy";
 import { serializeCustomerReview } from "@/features/reviews/services/review-lifecycle";
 import { prisma } from "@/lib/db/prisma";
+import { createBusinessBookingNotifications } from "@/features/notifications/services/booking-events";
 
 const MAX_SERIALIZABLE_ATTEMPTS = 4;
 
@@ -418,6 +419,11 @@ export async function cancelCustomerBookingPersisted(input: {
         note: input.reason,
       },
     });
+    await createBusinessBookingNotifications(transaction, {
+      bookingId: booking.id,
+      event: "booking.cancelled-by-customer",
+      eventKey: `booking:${booking.id}:customer-cancellation:${input.idempotencyKey}`,
+    });
     return { bookingId: booking.id, replayed: false };
   });
 }
@@ -597,6 +603,11 @@ export async function requestCustomerBookingChange(input: {
           creationRequestHash: requestHash,
           bookingUpdatedAtSnapshot: current.updatedAt,
         },
+      });
+      await createBusinessBookingNotifications(transaction, {
+        bookingId: current.id,
+        event: "booking.change-requested",
+        eventKey: `booking:${current.id}:customer-change:${created.id}`,
       });
       return { requestId: created.id, status: created.status, replayed: false };
     });
@@ -925,6 +936,11 @@ export async function respondToBusinessBookingProposal(input: {
         "Business proposal was answered concurrently.",
       );
     }
+    await createBusinessBookingNotifications(transaction, {
+      bookingId: request.booking.id,
+      event: input.decision === "accept" ? "booking.proposal-accepted" : "booking.proposal-rejected",
+      eventKey: `booking:${request.booking.id}:proposal-response:${request.id}:${expectedStatus.toLowerCase()}`,
+    });
     return {
       bookingId: request.booking.id,
       bookingVersion:

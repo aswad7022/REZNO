@@ -24,6 +24,8 @@ import {
   serializePersistedBookingDetail,
 } from "@/features/bookings/services/booking-detail";
 import { prisma } from "@/lib/db/prisma";
+import { createBusinessBookingNotifications } from "@/features/notifications/services/booking-events";
+import { createCanonicalNotifications } from "@/features/notifications/services/producer";
 
 const ACTIVE_BOOKING_STATUSES = ["PENDING", "CONFIRMED"] as const;
 const MAX_SERIALIZABLE_ATTEMPTS = 4;
@@ -471,6 +473,31 @@ export async function createCustomerBooking(
               organization: true,
             },
           });
+          await Promise.all([
+            createBusinessBookingNotifications(transaction, {
+              bookingId: booking.id,
+              event: "booking.created",
+              eventKey: `booking:${booking.id}:created`,
+            }),
+            createCanonicalNotifications(transaction, [{
+              audience: "USER",
+              body: "Your service booking was created. Open the booking to review its details.",
+              bodyKey: "notifications.booking.created.customer.body",
+              businessId: booking.organizationId,
+              category: "BOOKINGS",
+              destinationKind: "CUSTOMER_BOOKING",
+              destinationTargetId: booking.id,
+              eventKey: `booking:${booking.id}:created:customer:${booking.customerId}`,
+              eventType: "booking.created",
+              mandatory: true,
+              priority: "IMPORTANT",
+              recipientPersonId: booking.customerId,
+              sourceId: booking.id,
+              sourceType: "BOOKING",
+              title: "Booking created",
+              titleKey: "notifications.booking.created.customer.title",
+            }]),
+          ]);
           return {
             booking: serializePersistedBookingDetail(booking),
             replayed: false,

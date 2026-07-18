@@ -23,6 +23,7 @@ import {
   serializeRestaurantReservationDetail,
 } from "@/features/restaurants/services/reservation-detail";
 import { prisma } from "@/lib/db/prisma";
+import { createCanonicalNotifications } from "@/features/notifications/services/producer";
 
 const ACTIVE_RESERVATION_STATUSES = ["PENDING", "CONFIRMED"] as const;
 const MAX_SERIALIZABLE_ATTEMPTS = 4;
@@ -429,20 +430,41 @@ export async function createCustomerRestaurantReservation(
             },
             include: restaurantReservationDetailInclude,
           });
-          await transaction.notification.create({
-            data: {
+          await createCanonicalNotifications(transaction, [{
               audience: "BUSINESS",
               businessId: branch.organization.id,
+              category: "RESTAURANT",
+              destinationKind: "BUSINESS_RESTAURANT",
+              destinationTargetId: booking.id,
               priority: "IMPORTANT",
               eventKey: `restaurant-reservation:${booking.id}:created`,
+              eventType: "restaurant.reservation.created",
+              mandatory: true,
               title: "New restaurant reservation",
-              body: `${customerName} reserved for ${selection.guestCount} guests.`,
-              metadata: {
-                bookingId: booking.id,
-                event: "restaurant.reservation.created",
-              },
-            },
-          });
+              titleKey: "notifications.restaurant.reservation.created.title",
+              body: `A reservation was created for ${selection.guestCount} guests.`,
+              bodyKey: "notifications.restaurant.reservation.created.body",
+              localizationVariables: { guestCount: selection.guestCount },
+              sourceId: booking.id,
+              sourceType: "RESTAURANT_RESERVATION",
+          }, {
+              audience: "USER",
+              body: "Your restaurant reservation was created. Open it to review the details.",
+              bodyKey: "notifications.restaurant.reservation.created.customer.body",
+              businessId: branch.organization.id,
+              category: "RESTAURANT",
+              destinationKind: "CUSTOMER_RESTAURANT",
+              destinationTargetId: booking.id,
+              eventKey: `restaurant-reservation:${booking.id}:created:customer:${booking.customerId}`,
+              eventType: "restaurant.reservation.created",
+              mandatory: true,
+              priority: "IMPORTANT",
+              recipientPersonId: booking.customerId,
+              sourceId: booking.id,
+              sourceType: "RESTAURANT_RESERVATION",
+              title: "Reservation created",
+              titleKey: "notifications.restaurant.reservation.created.customer.title",
+          }]);
           return {
             reservation: serializeRestaurantReservationDetail(booking),
             replayed: false,

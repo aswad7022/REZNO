@@ -43,6 +43,7 @@ import {
 import { getPublicRestaurantReservationAvailability } from "@/features/restaurants/services/reservation-public";
 import type { CustomerRestaurantReservationPage } from "@/features/restaurants/types";
 import { prisma } from "@/lib/db/prisma";
+import { createCanonicalNotifications } from "@/features/notifications/services/producer";
 
 const MAX_SERIALIZABLE_ATTEMPTS = 4;
 const UUID_PATTERN =
@@ -300,20 +301,41 @@ export async function cancelCustomerRestaurantReservation(input: {
           note: canonical.reason ?? "Restaurant reservation cancelled by customer.",
         },
       });
-      await transaction.notification.create({
-        data: {
+      await createCanonicalNotifications(transaction, [{
           audience: "BUSINESS",
           businessId: booking.organizationId,
+          category: "RESTAURANT",
+          destinationKind: "BUSINESS_RESTAURANT",
+          destinationTargetId: booking.id,
           priority: "IMPORTANT",
           eventKey: `restaurant-reservation:${booking.id}:cancelled:${mutation.id}`,
+          eventType: "restaurant.reservation.cancelled",
+          mandatory: true,
           title: "Restaurant reservation cancelled",
+          titleKey: "notifications.restaurant.reservation.cancelled.title",
           body: `Reservation for ${booking.restaurantReservation.guestCount} guests was cancelled.`,
-          metadata: {
-            bookingId: booking.id,
-            event: "restaurant.reservation.cancelled",
-          },
-        },
-      });
+          bodyKey: "notifications.restaurant.reservation.cancelled.body",
+          localizationVariables: { guestCount: booking.restaurantReservation.guestCount },
+          sourceId: booking.id,
+          sourceType: "RESTAURANT_RESERVATION",
+      }, {
+          audience: "USER",
+          body: "Your restaurant reservation was cancelled.",
+          bodyKey: "notifications.restaurant.reservation.cancelled.customer.body",
+          businessId: booking.organizationId,
+          category: "RESTAURANT",
+          destinationKind: "CUSTOMER_RESTAURANT",
+          destinationTargetId: booking.id,
+          eventKey: `restaurant-reservation:${booking.id}:cancelled:${mutation.id}:customer:${canonical.customerId}`,
+          eventType: "restaurant.reservation.cancelled",
+          mandatory: true,
+          priority: "IMPORTANT",
+          recipientPersonId: canonical.customerId,
+          sourceId: booking.id,
+          sourceType: "RESTAURANT_RESERVATION",
+          title: "Reservation cancelled",
+          titleKey: "notifications.restaurant.reservation.cancelled.customer.title",
+      }]);
       return { bookingId: booking.id, mutationId: mutation.id, replayed: false };
     });
   } catch (error) {
@@ -589,20 +611,41 @@ export async function rescheduleCustomerRestaurantReservation(input: {
           note: `Restaurant reservation rescheduled by customer from ${booking.startsAt.toISOString()} to ${startsAt.toISOString()}; guests ${booking.restaurantReservation.guestCount} to ${canonical.guestCount}.`,
         },
       });
-      await transaction.notification.create({
-        data: {
+      await createCanonicalNotifications(transaction, [{
           audience: "BUSINESS",
           businessId: booking.organizationId,
+          category: "RESTAURANT",
+          destinationKind: "BUSINESS_RESTAURANT",
+          destinationTargetId: booking.id,
           priority: "IMPORTANT",
           eventKey: `restaurant-reservation:${booking.id}:rescheduled:${mutation.id}`,
+          eventType: "restaurant.reservation.rescheduled",
+          mandatory: true,
           title: "Restaurant reservation rescheduled",
+          titleKey: "notifications.restaurant.reservation.rescheduled.title",
           body: `Reservation moved to ${startsAt.toISOString()} for ${canonical.guestCount} guests.`,
-          metadata: {
-            bookingId: booking.id,
-            event: "restaurant.reservation.rescheduled",
-          },
-        },
-      });
+          bodyKey: "notifications.restaurant.reservation.rescheduled.body",
+          localizationVariables: { guestCount: canonical.guestCount, startsAt: startsAt.toISOString() },
+          sourceId: booking.id,
+          sourceType: "RESTAURANT_RESERVATION",
+      }, {
+          audience: "USER",
+          body: "Your restaurant reservation was rescheduled. Open it to review the updated details.",
+          bodyKey: "notifications.restaurant.reservation.rescheduled.customer.body",
+          businessId: booking.organizationId,
+          category: "RESTAURANT",
+          destinationKind: "CUSTOMER_RESTAURANT",
+          destinationTargetId: booking.id,
+          eventKey: `restaurant-reservation:${booking.id}:rescheduled:${mutation.id}:customer:${canonical.customerId}`,
+          eventType: "restaurant.reservation.rescheduled",
+          mandatory: true,
+          priority: "IMPORTANT",
+          recipientPersonId: canonical.customerId,
+          sourceId: booking.id,
+          sourceType: "RESTAURANT_RESERVATION",
+          title: "Reservation rescheduled",
+          titleKey: "notifications.restaurant.reservation.rescheduled.customer.title",
+      }]);
       return { bookingId: booking.id, mutationId: mutation.id, replayed: false };
     });
   } catch (error) {

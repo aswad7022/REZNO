@@ -311,6 +311,18 @@ test(
         await prisma.notification.count({
           where: {
             eventKey: { startsWith: `restaurant-reservation:${persisted.id}:cancelled:` },
+            audience: "BUSINESS",
+            businessId: persisted.organizationId,
+          },
+        }),
+        1,
+      );
+      assert.equal(
+        await prisma.notification.count({
+          where: {
+            eventKey: { startsWith: `restaurant-reservation:${persisted.id}:cancelled:` },
+            audience: "USER",
+            recipientPersonId: fixture.customer.id,
           },
         }),
         1,
@@ -708,6 +720,18 @@ test(
         await prisma.notification.count({
           where: {
             eventKey: { startsWith: `restaurant-reservation:${created.reservation.id}:rescheduled:` },
+            audience: "BUSINESS",
+            businessId: fixture.organization.id,
+          },
+        }),
+        2,
+      );
+      assert.equal(
+        await prisma.notification.count({
+          where: {
+            eventKey: { startsWith: `restaurant-reservation:${created.reservation.id}:rescheduled:` },
+            audience: "USER",
+            recipientPersonId: fixture.customer.id,
           },
         }),
         2,
@@ -957,6 +981,18 @@ test(
         await prisma.notification.count({
           where: {
             eventKey: { startsWith: `restaurant-reservation:${created.reservation.id}:rescheduled:` },
+            audience: "BUSINESS",
+            businessId: fixture.organization.id,
+          },
+        }),
+        1,
+      );
+      assert.equal(
+        await prisma.notification.count({
+          where: {
+            eventKey: { startsWith: `restaurant-reservation:${created.reservation.id}:rescheduled:` },
+            audience: "USER",
+            recipientPersonId: fixture.customer.id,
           },
         }),
         1,

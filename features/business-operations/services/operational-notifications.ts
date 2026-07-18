@@ -2,11 +2,16 @@ import "server-only";
 
 import type { Prisma } from "@prisma/client";
 
+import { createCanonicalNotifications } from "@/features/notifications/services/producer";
+
 export type CustomerOperationalNotificationEvent =
   | "booking.cancelled"
   | "booking.change-proposed"
   | "booking.change-request-accepted"
   | "booking.change-request-rejected"
+  | "booking.completed"
+  | "booking.confirmed"
+  | "booking.no-show"
   | "restaurant.rescheduled";
 
 const copy: Record<
@@ -33,6 +38,21 @@ const copy: Record<
     body: "رفض النشاط طلب تغيير الموعد. بقي الحجز على موعده الحالي.",
     priority: "NORMAL",
   },
+  "booking.completed": {
+    title: "اكتمل حجزك",
+    body: "اكتملت الخدمة. يمكنك فتح الحجز وإضافة تقييمك.",
+    priority: "NORMAL",
+  },
+  "booking.confirmed": {
+    title: "تم تأكيد حجزك",
+    body: "أكد النشاط حجزك. افتح التفاصيل لمراجعة الموعد.",
+    priority: "IMPORTANT",
+  },
+  "booking.no-show": {
+    title: "تم تحديث حالة الحجز",
+    body: "سجّل النشاط الحجز كعدم حضور. افتح التفاصيل إذا كنت بحاجة للمساعدة.",
+    priority: "IMPORTANT",
+  },
   "restaurant.rescheduled": {
     title: "تم تحديث حجز المطعم",
     body: "حدّث النشاط وقت الحجز أو بيانات الطاولة. راجع التفاصيل المحدثة.",
@@ -51,16 +71,22 @@ export async function createCustomerOperationalNotification(
   },
 ) {
   const message = copy[input.event];
-  return transaction.notification.create({
-    data: {
+  return createCanonicalNotifications(transaction, [{
       audience: "USER",
       body: message.body,
+      bodyKey: `notifications.${input.event}.body`,
       businessId: input.businessId,
+      category: input.event === "restaurant.rescheduled" ? "RESTAURANT" : "BOOKINGS",
+      destinationKind: input.event === "restaurant.rescheduled" ? "CUSTOMER_RESTAURANT" : "CUSTOMER_BOOKING",
+      destinationTargetId: input.bookingId,
       eventKey: input.eventKey,
-      metadata: { bookingId: input.bookingId, event: input.event },
+      eventType: input.event,
+      mandatory: message.priority === "IMPORTANT",
       priority: message.priority,
       recipientPersonId: input.customerId,
+      sourceId: input.bookingId,
+      sourceType: input.event === "restaurant.rescheduled" ? "RESTAURANT_RESERVATION" : "BOOKING",
       title: message.title,
-    },
-  });
+      titleKey: `notifications.${input.event}.title`,
+  }]);
 }

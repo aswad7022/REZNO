@@ -439,15 +439,17 @@ export async function transitionOperationalBooking(input: {
         toStatus: input.nextStatus,
       },
     });
-    if (input.nextStatus === "CANCELLED") {
-      await createCustomerOperationalNotification(transaction, {
+    const customerEvent = input.nextStatus === "CANCELLED" ? "booking.cancelled" as const
+      : input.nextStatus === "COMPLETED" ? "booking.completed" as const
+        : input.nextStatus === "NO_SHOW" ? "booking.no-show" as const
+          : "booking.confirmed" as const;
+    await createCustomerOperationalNotification(transaction, {
         bookingId: booking.id,
         businessId: actor.organizationId,
         customerId: booking.customerId,
-        event: "booking.cancelled",
-        eventKey: `business-booking:${actor.organizationId}:${input.idempotencyKey}:cancelled`,
-      });
-    }
+        event: customerEvent,
+        eventKey: `business-booking:${actor.organizationId}:${input.idempotencyKey}:${input.nextStatus.toLowerCase()}`,
+    });
     await recordBusinessOperation(transaction, {
       action: "BOOKING_STATUS_TRANSITION",
       actor,

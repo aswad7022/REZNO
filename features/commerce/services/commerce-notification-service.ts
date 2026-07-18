@@ -5,6 +5,7 @@ import {
   type CommerceNotificationEvent,
 } from "@/features/commerce/domain/notification-events";
 import { effectiveCommercePermissions } from "@/features/commerce/domain/merchant-access";
+import { createCanonicalNotifications } from "@/features/notifications/services/producer";
 
 type Transaction = Prisma.TransactionClient;
 
@@ -105,33 +106,30 @@ async function createNotifications(
   destinationType: "customer" | "merchant",
 ) {
   if (recipients.length === 0) return;
-  await transaction.notification.createMany({
-    data: recipients.map((recipient) => {
+  await createCanonicalNotifications(
+    transaction,
+    recipients.map((recipient) => {
       const copy = commerceNotificationCopy(event, recipient.preferredLanguage, orderNumber, storeName);
       return {
         audience: "USER" as const,
         body: copy.body,
+        bodyKey: copy.bodyKey,
+        category: "COMMERCE" as const,
+        destinationKind: destinationType === "merchant" ? "BUSINESS_COMMERCE_ORDER" as const : "CUSTOMER_COMMERCE_ORDER" as const,
+        destinationTargetId: orderId,
         eventKey: commerceNotificationEventKey(orderId, event, recipient.id, destinationType),
-        metadata: {
-          bodyKey: copy.bodyKey,
-          destination: destinationType === "merchant"
-            ? `/business/commerce/orders/${orderId}`
-            : "/customer/notifications",
-          ...(destinationType === "customer" ? { orderDestination: `/customer/orders/${orderId}` } : {}),
-          eventType: event,
-          orderId,
-          orderNumber,
-          status: event.replace("order.", ""),
-          storeName,
-          titleKey: copy.titleKey,
-        },
+        eventType: event,
+        localizationVariables: { orderNumber, storeName },
+        mandatory: event === "order.new" || event === "order.rejected" || event === "order.cancelled" || event === "order.admin_cancelled",
         priority: event === "order.new" || event === "order.rejected" ? "IMPORTANT" as const : "NORMAL" as const,
         recipientPersonId: recipient.id,
+        sourceId: orderId,
+        sourceType: "COMMERCE_ORDER" as const,
         title: copy.title,
+        titleKey: copy.titleKey,
       };
     }),
-    skipDuplicates: true,
-  });
+  );
 }
 
 export function commerceNotificationEventKey(

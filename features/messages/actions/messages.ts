@@ -22,6 +22,7 @@ import { logServerError } from "@/lib/logging/server";
 import { consumeRateLimit } from "@/lib/security/rate-limit";
 import type { DashboardRole } from "@/types/dashboard";
 import type { MessageActionState } from "@/features/messages/types";
+import { createCanonicalNotifications } from "@/features/notifications/services/producer";
 
 const bodySchema = z.string().trim().min(1).max(1000);
 
@@ -164,30 +165,43 @@ export async function startCustomerBusinessConversation(
   if (!business) return { status: "error", message: "النشاط غير متاح." };
 
   try {
-    await prisma.$transaction([
-      prisma.conversation.create({
+    await prisma.$transaction(async (transaction) => {
+      const conversation = await transaction.conversation.create({
         data: {
           type: "CUSTOMER_BUSINESS",
           businessId: business.id,
           customerId: person.id,
-          messages: {
-            create: {
-              senderUserId: session.user.id,
-              body: parsed.data.body,
-            },
-          },
         },
-      }),
-      prisma.notification.create({
+        select: { id: true },
+      });
+      const message = await transaction.message.create({
         data: {
-          audience: "BUSINESS",
-          businessId: business.id,
-          priority: "NORMAL",
-          title: "رسالة جديدة من عميل",
-          body: parsed.data.body.slice(0, 160),
+          body: parsed.data.body,
+          conversationId: conversation.id,
+          senderUserId: session.user.id,
         },
-      }),
-    ]);
+        select: { id: true },
+      });
+      const recipients = await businessMessageRecipients(transaction, business.id);
+      await createCanonicalNotifications(transaction, recipients.map((recipientPersonId) => ({
+        audience: "USER" as const,
+        body: "A customer sent a new message. Open the conversation to read it.",
+        bodyKey: "notifications.message.customer.body",
+        businessId: business.id,
+        category: "MESSAGES" as const,
+        destinationKind: "BUSINESS_MESSAGES" as const,
+        destinationTargetId: conversation.id,
+        eventKey: `message:${message.id}:business:${recipientPersonId}`,
+        eventType: "message.received",
+        mandatory: false,
+        priority: "NORMAL" as const,
+        recipientPersonId,
+        sourceId: conversation.id,
+        sourceType: "CONVERSATION" as const,
+        title: "New customer message",
+        titleKey: "notifications.message.customer.title",
+      })));
+    });
   } catch (error) {
     logServerError("messages.startCustomerBusiness", error, {
       customerId: person.id,
@@ -266,45 +280,60 @@ export async function sendConversationMessage(
   }
 
   try {
-    await prisma.$transaction([
-      prisma.message.create({
+    await prisma.$transaction(async (transaction) => {
+      const message = await transaction.message.create({
         data: {
           conversationId,
           senderUserId,
           body: parsed.data,
         },
-      }),
-      prisma.conversation.update({
+        select: { id: true },
+      });
+      await transaction.conversation.update({
         where: { id: conversationId },
         data: { updatedAt: new Date() },
-      }),
-      ...(role === "customer" && conversation.businessId
-        ? [
-            prisma.notification.create({
-              data: {
-                audience: "BUSINESS",
-                businessId: conversation.businessId,
-                priority: "NORMAL",
-                title: "رسالة جديدة من عميل",
-                body: parsed.data.slice(0, 160),
-              },
-            }),
-          ]
-        : []),
-      ...(role === "business" && conversation.customerId
-        ? [
-            prisma.notification.create({
-              data: {
-                audience: "USER",
-                recipientPersonId: conversation.customerId,
-                priority: "NORMAL",
-                title: "رسالة جديدة من النشاط",
-                body: parsed.data.slice(0, 160),
-              },
-            }),
-          ]
-        : []),
-    ]);
+      });
+      if (role === "customer" && conversation.businessId) {
+        const recipients = await businessMessageRecipients(transaction, conversation.businessId);
+        await createCanonicalNotifications(transaction, recipients.map((recipientPersonId) => ({
+          audience: "USER" as const,
+          body: "A customer sent a new message. Open the conversation to read it.",
+          bodyKey: "notifications.message.customer.body",
+          businessId: conversation.businessId!,
+          category: "MESSAGES" as const,
+          destinationKind: "BUSINESS_MESSAGES" as const,
+          destinationTargetId: conversationId,
+          eventKey: `message:${message.id}:business:${recipientPersonId}`,
+          eventType: "message.received",
+          mandatory: false,
+          priority: "NORMAL" as const,
+          recipientPersonId,
+          sourceId: conversationId,
+          sourceType: "CONVERSATION" as const,
+          title: "New customer message",
+          titleKey: "notifications.message.customer.title",
+        })));
+      } else if (role === "business" && conversation.customerId) {
+        await createCanonicalNotifications(transaction, [{
+          audience: "USER",
+          body: "A business sent a new message. Open the conversation to read it.",
+          bodyKey: "notifications.message.business.body",
+          businessId: conversation.businessId ?? undefined,
+          category: "MESSAGES",
+          destinationKind: "CUSTOMER_MESSAGES",
+          destinationTargetId: conversationId,
+          eventKey: `message:${message.id}:customer:${conversation.customerId}`,
+          eventType: "message.received",
+          mandatory: false,
+          priority: "NORMAL",
+          recipientPersonId: conversation.customerId,
+          sourceId: conversationId,
+          sourceType: "CONVERSATION",
+          title: "New business message",
+          titleKey: "notifications.message.business.title",
+        }]);
+      }
+    });
   } catch (error) {
     logServerError("messages.send", error, { conversationId, role });
     return {
@@ -331,6 +360,26 @@ export async function sendConversationMessage(
   if (role === "business") revalidatePath("/customer/notifications");
   if (role === "customer") revalidatePath("/business/notifications");
   return { status: "success", message: "تم الإرسال." };
+}
+
+async function businessMessageRecipients(
+  transaction: Prisma.TransactionClient,
+  organizationId: string,
+) {
+  const memberships = await transaction.organizationMember.findMany({
+    where: {
+      deletedAt: null,
+      organizationId,
+      status: "ACTIVE",
+      organization: { deletedAt: null, isActive: true, status: "ACTIVE" },
+      person: { deletedAt: null, isOnboarded: true, status: "ACTIVE" },
+      role: { organizationId },
+    },
+    select: { personId: true, role: { select: { systemRole: true } } },
+  });
+  return memberships
+    .filter((membership) => canAccessOrganizationConversations(membership.role.systemRole))
+    .map((membership) => membership.personId);
 }
 
 export async function startAdminConversation(
