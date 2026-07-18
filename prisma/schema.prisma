@@ -36,6 +36,7 @@ model Person {
   notificationPreference          NotificationPreference?
   notificationSuppressions        NotificationPreferenceSuppression[]
   customerConversations           Conversation[]                      @relation("ConversationCustomer")
+  conversationReadStates          ConversationReadState[]
   favoriteBusinesses              CustomerFavoriteBusiness[]
   favoriteServices                CustomerFavoriteService[]
   commerceAddresses               CustomerAddress[]
@@ -673,21 +674,22 @@ model BusinessAuditLog {
 }
 
 model User {
-  id                   String          @id
-  name                 String
-  email                String          @unique
-  emailVerified        Boolean         @default(false)
-  image                String?
-  createdAt            DateTime        @default(now())
-  updatedAt            DateTime        @updatedAt
-  accounts             Account[]
-  sessions             Session[]
-  sentMessages         Message[]
-  adminConversations   Conversation[]  @relation("ConversationAdminUser")
-  createdNotifications Notification[]  @relation("NotificationCreator")
-  adminAuditLogs       AdminAuditLog[] @relation("AdminAuditLogUser")
-  adminAccess          AdminAccess?
-  grantedAdminAccesses AdminAccess[]   @relation("AdminAccessGrantedBy")
+  id                     String                  @id
+  name                   String
+  email                  String                  @unique
+  emailVerified          Boolean                 @default(false)
+  image                  String?
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  accounts               Account[]
+  sessions               Session[]
+  sentMessages           Message[]
+  adminConversations     Conversation[]          @relation("ConversationAdminUser")
+  conversationReadStates ConversationReadState[]
+  createdNotifications   Notification[]          @relation("NotificationCreator")
+  adminAuditLogs         AdminAuditLog[]         @relation("AdminAuditLogUser")
+  adminAccess            AdminAccess?
+  grantedAdminAccesses   AdminAccess[]           @relation("AdminAccessGrantedBy")
 
   @@map("user")
 }
@@ -853,41 +855,71 @@ model NotificationPreferenceSuppression {
 }
 
 model Conversation {
-  id          String           @id @default(uuid()) @db.Uuid
-  type        ConversationType
-  businessId  String?          @db.Uuid
-  customerId  String?          @db.Uuid
-  bookingId   String?          @db.Uuid
-  adminUserId String?
-  subject     String?
-  createdAt   DateTime         @default(now()) @db.Timestamptz(6)
-  updatedAt   DateTime         @updatedAt @db.Timestamptz(6)
-  business    Organization?    @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  customer    Person?          @relation("ConversationCustomer", fields: [customerId], references: [id], onDelete: Cascade)
-  booking     Booking?         @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  adminUser   User?            @relation("ConversationAdminUser", fields: [adminUserId], references: [id], onDelete: SetNull)
-  messages    Message[]
+  id            String                  @id @default(uuid()) @db.Uuid
+  type          ConversationType
+  identityKey   String                  @unique @default(dbgenerated("gen_random_uuid()::text")) @db.VarChar(180)
+  businessId    String?                 @db.Uuid
+  customerId    String?                 @db.Uuid
+  bookingId     String?                 @db.Uuid
+  adminUserId   String?
+  subject       String?
+  lastMessageAt DateTime                @default(now()) @db.Timestamptz(6)
+  createdAt     DateTime                @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime                @updatedAt @db.Timestamptz(6)
+  business      Organization?           @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customer      Person?                 @relation("ConversationCustomer", fields: [customerId], references: [id], onDelete: Cascade)
+  booking       Booking?                @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  adminUser     User?                   @relation("ConversationAdminUser", fields: [adminUserId], references: [id], onDelete: SetNull)
+  messages      Message[]
+  readStates    ConversationReadState[]
 
   @@unique([businessId, customerId, bookingId])
-  @@index([type, updatedAt])
-  @@index([businessId, updatedAt])
-  @@index([customerId, updatedAt])
+  @@index([type, lastMessageAt, id])
+  @@index([businessId, lastMessageAt, id])
+  @@index([customerId, lastMessageAt, id])
   @@index([bookingId, updatedAt])
-  @@index([adminUserId, updatedAt])
+  @@index([adminUserId, lastMessageAt, id])
 }
 
 model Message {
-  id             String       @id @default(uuid()) @db.Uuid
-  conversationId String       @db.Uuid
+  id             String                  @id @default(uuid()) @db.Uuid
+  conversationId String                  @db.Uuid
   senderUserId   String
+  idempotencyKey String?                 @db.Uuid
+  requestHash    String?                 @db.VarChar(64)
+  sourceAction   String?                 @db.VarChar(40)
   body           String
-  createdAt      DateTime     @default(now()) @db.Timestamptz(6)
-  readAt         DateTime?    @db.Timestamptz(6)
-  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  sender         User         @relation(fields: [senderUserId], references: [id], onDelete: Cascade)
+  createdAt      DateTime                @default(now()) @db.Timestamptz(6)
+  readAt         DateTime?               @db.Timestamptz(6)
+  conversation   Conversation            @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User                    @relation(fields: [senderUserId], references: [id], onDelete: Cascade)
+  readBoundaries ConversationReadState[] @relation("ConversationLastReadMessage")
 
-  @@index([conversationId, createdAt])
+  @@unique([senderUserId, idempotencyKey])
+  @@index([conversationId, createdAt, id])
   @@index([senderUserId, createdAt])
+}
+
+model ConversationReadState {
+  id                       String       @id @default(uuid()) @db.Uuid
+  conversationId           String       @db.Uuid
+  personId                 String?      @db.Uuid
+  adminUserId              String?
+  scopeKey                 String       @db.VarChar(180)
+  lastReadMessageCreatedAt DateTime?    @db.Timestamptz(6)
+  lastReadMessageId        String?      @db.Uuid
+  version                  Int          @default(1)
+  createdAt                DateTime     @default(now()) @db.Timestamptz(6)
+  updatedAt                DateTime     @updatedAt @db.Timestamptz(6)
+  conversation             Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  person                   Person?      @relation(fields: [personId], references: [id], onDelete: Cascade)
+  adminUser                User?        @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+  lastReadMessage          Message?     @relation("ConversationLastReadMessage", fields: [lastReadMessageId], references: [id], onDelete: SetNull)
+
+  @@unique([conversationId, scopeKey])
+  @@index([personId, scopeKey, conversationId])
+  @@index([adminUserId, scopeKey, conversationId])
+  @@index([conversationId, lastReadMessageCreatedAt, lastReadMessageId])
 }
 
 model Session {
