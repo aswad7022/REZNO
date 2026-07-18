@@ -340,15 +340,28 @@ transaction. Both local runs produced the identical fingerprint
 
 ### Migration and performance evidence
 
-Both upgrade and fresh paths were rehearsed without `migrate reset`:
+Upgrade, correction, and fresh paths were rehearsed without `migrate reset`:
 
 - an existing local database at 34/34 applied only migration 35 and reached
   35/35;
-- a fresh local database deployed migrations 1 through 35 and reached 35/35;
+- an existing local database at 35/35 applied only migration 36 and reached
+  36/36;
+- a fresh local database deployed migrations 1 through 36 and reached 36/36;
 - the stage-4A schema has no generated migration drift. The only reported
   differences are five pre-existing migration/schema differences owned by
   prior gates (Booking FK action, BranchService update default, Business audit
   defaults, and a Restaurant index name); migration 35 does not rewrite them.
+
+## Focused review correction: canonical occurrence time
+
+Migration 36, `20260718080000_notification_backfill_occurrence_time`, is a
+forward-only data correction. Canonical producers now persist one event
+timestamp as both `createdAt` and `occurredAt`: an explicit domain occurrence
+time wins, otherwise one producer timestamp is shared by both fields. Migration
+36 updates only deterministic `backfill:%` notifications whose timestamps
+differ. It does not alter IDs, event keys, state, interactions, domain ledgers,
+legacy notifications, or live canonical rows, and is safe when no backfill rows
+exist.
 
 Representative PostgreSQL plans, with sequential scan disabled only to prove
 index eligibility on the deliberately tiny fixture, used:
@@ -376,15 +389,15 @@ The following evidence is complete locally as of 2026-07-18:
 - root ESLint: passed;
 - root non-incremental TypeScript: passed;
 - Prisma format, validate, and generate: passed;
-- focused Gate 4A unit/contract tests: 10/10;
-- focused Gate 4A PostgreSQL tests: 11/11;
-- complete unit suite: 269/269;
-- complete PostgreSQL integration suite: 240/240;
+- focused Gate 4A unit/contract tests: 22/22;
+- focused Gate 4A PostgreSQL tests: 12/12;
+- complete unit suite: 283/283;
+- complete PostgreSQL integration suite: 241/241;
 - complete production HTTP/RSC/API suite: 72/72;
 - focused Gate 4A production HTML/RSC/API suite: 3/3, including active-Business
   switching, revoked membership, inactive Person, post-snapshot unread state,
   preference suppression, and mandatory delivery;
-- complete local regression total: 581/581;
+- complete local regression total: 596/596;
 - Next production build: passed;
 - mobile TypeScript: passed;
 - Expo dependency check: passed;

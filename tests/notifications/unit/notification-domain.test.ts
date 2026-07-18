@@ -28,11 +28,14 @@ import { parseNotificationInboxQuery } from "../../../features/notifications/api
 
 const customer = { mode: "customer" as const, personId: "11111111-1111-4111-8111-111111111111" };
 const owner = {
+  effectiveCommercePermissions: ["ORDER_VIEW"] as const,
   membershipId: "22222222-2222-4222-8222-222222222222",
   mode: "business" as const,
   organizationId: "33333333-3333-4333-8333-333333333333",
   personId: "44444444-4444-4444-8444-444444444444",
-  role: "OWNER" as const,
+  restaurant: false,
+  roleId: "66666666-6666-4666-8666-666666666666",
+  systemRole: "OWNER" as const,
 };
 
 test("canonical notification keys and request hashes are stable and actor-bound", () => {
@@ -83,21 +86,21 @@ test("visibility policy locks customer, owner and staff scopes", () => {
   const ownerWhere = notificationVisibilityWhere(owner);
   assert.equal(JSON.stringify(ownerWhere).includes(owner.organizationId), true);
   assert.equal(JSON.stringify(ownerWhere).includes("BUSINESS_OWNERS"), true);
-  const staffWhere = notificationVisibilityWhere({ ...owner, role: "STAFF" });
+  const staffWhere = notificationVisibilityWhere({ ...owner, systemRole: "STAFF" });
   assert.equal(JSON.stringify(staffWhere).includes(owner.organizationId), false);
   assert.equal(JSON.stringify(staffWhere).includes(owner.personId), true);
 });
 
 test("Manager, Receptionist and Restaurant visibility remain explicit while Staff is direct-only", () => {
-  const manager = { ...owner, role: "MANAGER" as const };
-  const receptionist = { ...owner, role: "RECEPTIONIST" as const };
+  const manager = { ...owner, systemRole: "MANAGER" as const };
+  const receptionist = { ...owner, systemRole: "RECEPTIONIST" as const };
   const restaurant = { ...owner, restaurant: true };
   assert.equal(JSON.stringify(notificationVisibilityWhere(manager)).includes(owner.organizationId), true);
   assert.equal(JSON.stringify(notificationVisibilityWhere(manager)).includes("BUSINESS_OWNERS"), false);
   assert.equal(JSON.stringify(notificationVisibilityWhere(receptionist)).includes(owner.organizationId), true);
   assert.equal(JSON.stringify(notificationVisibilityWhere(restaurant)).includes("RESTAURANTS"), true);
   assert.equal(canReceiveOrganizationNotifications(manager), true);
-  assert.equal(canReceiveOrganizationNotifications({ ...owner, role: "STAFF" }), false);
+  assert.equal(canReceiveOrganizationNotifications({ ...owner, systemRole: "STAFF" }), false);
 });
 
 test("read calculation honors sparse overrides, mark-all watermark and archive independently", () => {

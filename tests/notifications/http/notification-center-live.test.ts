@@ -108,7 +108,8 @@ test("Gate 4A production HTML, RSC and mobile APIs enforce canonical notificatio
   const businessCookie = `${business.cookie}; rezno-active-business-id=${organization.id}`;
   const foreignBusinessCookie = `${business.cookie}; rezno-active-business-id=${foreignOrganization.id}`;
   const eventPrefix = `${marker}:`;
-  const customerEvent = canonical({ eventKey: `${eventPrefix}customer`, recipientPersonId: customer.person.id, title: `${marker} CUSTOMER VISIBLE` });
+  const historicalTime = new Date("2025-01-02T10:00:00.000Z");
+  const customerEvent = canonical({ eventKey: `${eventPrefix}customer`, occurredAt: historicalTime, recipientPersonId: customer.person.id, title: `${marker} CUSTOMER VISIBLE` });
   const foreignEvent = canonical({ eventKey: `${eventPrefix}foreign`, recipientPersonId: foreignCustomer.person.id, title: `${marker} FOREIGN PRIVATE` });
   const businessEvent = canonical({ audience: "BUSINESS", businessId: organization.id, eventKey: `${eventPrefix}business`, recipientPersonId: undefined, title: `${marker} BUSINESS VISIBLE` });
   const foreignBusinessEvent = canonical({ audience: "BUSINESS", businessId: foreignOrganization.id, eventKey: `${eventPrefix}foreign-business`, recipientPersonId: undefined, title: `${marker} FOREIGN BUSINESS PRIVATE` });
@@ -134,6 +135,7 @@ test("Gate 4A production HTML, RSC and mobile APIs enforce canonical notificatio
       const customerPage = await page("/customer/notifications?filter=all", customer.cookie, rsc);
       assert.equal(customerPage.response.status, 200);
       assert.match(customerPage.text, new RegExp(`${marker} CUSTOMER VISIBLE`));
+      assert.match(customerPage.text, /2025-01-02T10:00:00\.000Z/);
       assert.equal(customerPage.text.includes(`${marker} FOREIGN PRIVATE`), false);
 
       const ownerPage = await page("/business/notifications?filter=all", businessCookie, rsc);
@@ -181,7 +183,7 @@ test("Gate 4A production HTML, RSC and mobile APIs enforce canonical notificatio
     const listed = await jsonRequest("/api/mobile/notifications?filter=all&limit=50", { cookie: customer.cookie });
     assert.equal(listed.response.status, 200);
     const inbox = listed.body.data as {
-      data: Array<{ destination: { href: string; kind: string }; id: string; stateVersion: number; title: string }>;
+      data: Array<{ createdAt: string; destination: { href: string; kind: string }; id: string; stateVersion: number; title: string }>;
       inboxVersion: number;
       snapshot: string;
       unreadCount: number;
@@ -189,6 +191,7 @@ test("Gate 4A production HTML, RSC and mobile APIs enforce canonical notificatio
     const item = inbox.data.find((row) => row.title === `${marker} CUSTOMER VISIBLE`);
     const unsafe = inbox.data.find((row) => row.title === `${marker} UNSAFE FALLBACK`);
     assert.ok(item);
+    assert.equal(item.createdAt, historicalTime.toISOString());
     assert.deepEqual(unsafe?.destination, { href: "/customer/notifications", kind: "NOTIFICATIONS", targetId: null });
     assert.ok(inbox.unreadCount >= 2);
     const count = await jsonRequest("/api/mobile/notifications/count", { cookie: customer.cookie });
@@ -226,9 +229,9 @@ test("Gate 4A production HTML, RSC and mobile APIs enforce canonical notificatio
     });
     assert.equal((restored.body.data as { archived: boolean }).archived, false);
 
-    await new Promise((resolve) => setTimeout(resolve, 10));
     const postSnapshot = canonical({
       eventKey: `${eventPrefix}post-snapshot`,
+      occurredAt: new Date(new Date(inbox.snapshot).getTime() + 1),
       recipientPersonId: customer.person.id,
       title: `${marker} POST SNAPSHOT UNREAD`,
     });

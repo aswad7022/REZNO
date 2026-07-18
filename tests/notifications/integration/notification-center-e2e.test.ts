@@ -90,13 +90,13 @@ test("Gate 4A Notification Center is tenant-safe, idempotent and persistent", { 
   ]);
   const customerContext = { mode: "customer", personId: customer.id } satisfies NotificationActorContext;
   const foreignCustomerContext = { mode: "customer", personId: foreignCustomer.id } satisfies NotificationActorContext;
-  const ownerContext = { commercePermissions: ["ORDER_VIEW"], membershipId: owner.id, mode: "business", organizationId: organization.id, personId: ownerPerson.id, role: "OWNER" } satisfies NotificationActorContext;
-  const managerContext = { commercePermissions: ["ORDER_VIEW"], membershipId: manager.id, mode: "business", organizationId: organization.id, personId: managerPerson.id, role: "MANAGER" } satisfies NotificationActorContext;
-  const receptionistContext = { membershipId: receptionist.id, mode: "business", organizationId: organization.id, personId: receptionistPerson.id, role: "RECEPTIONIST" } satisfies NotificationActorContext;
-  const staffContext = { membershipId: staff.id, mode: "business", organizationId: organization.id, personId: staffPerson.id, role: "STAFF" } satisfies NotificationActorContext;
-  const foreignOwnerContext = { membershipId: foreignOwner.id, mode: "business", organizationId: foreignOrganization.id, personId: foreignOwnerPerson.id, role: "OWNER" } satisfies NotificationActorContext;
-  const restaurantOwnerContext = { membershipId: restaurantOwner.id, mode: "business", organizationId: restaurantOrganization.id, personId: restaurantOwnerPerson.id, restaurant: true, role: "OWNER" } satisfies NotificationActorContext;
-  const switchedOwnerContext = { membershipId: switchedOwner.id, mode: "business", organizationId: foreignOrganization.id, personId: ownerPerson.id, role: "OWNER" } satisfies NotificationActorContext;
+  const ownerContext = { effectiveCommercePermissions: ["ORDER_VIEW"], membershipId: owner.id, mode: "business", organizationId: organization.id, personId: ownerPerson.id, restaurant: false, roleId: owner.roleId, systemRole: "OWNER" } satisfies NotificationActorContext;
+  const managerContext = { effectiveCommercePermissions: ["ORDER_VIEW"], membershipId: manager.id, mode: "business", organizationId: organization.id, personId: managerPerson.id, restaurant: false, roleId: manager.roleId, systemRole: "MANAGER" } satisfies NotificationActorContext;
+  const receptionistContext = { effectiveCommercePermissions: [], membershipId: receptionist.id, mode: "business", organizationId: organization.id, personId: receptionistPerson.id, restaurant: false, roleId: receptionist.roleId, systemRole: "RECEPTIONIST" } satisfies NotificationActorContext;
+  const staffContext = { effectiveCommercePermissions: [], membershipId: staff.id, mode: "business", organizationId: organization.id, personId: staffPerson.id, restaurant: false, roleId: staff.roleId, systemRole: "STAFF" } satisfies NotificationActorContext;
+  const foreignOwnerContext = { effectiveCommercePermissions: [], membershipId: foreignOwner.id, mode: "business", organizationId: foreignOrganization.id, personId: foreignOwnerPerson.id, restaurant: false, roleId: foreignOwner.roleId, systemRole: "OWNER" } satisfies NotificationActorContext;
+  const restaurantOwnerContext = { effectiveCommercePermissions: [], membershipId: restaurantOwner.id, mode: "business", organizationId: restaurantOrganization.id, personId: restaurantOwnerPerson.id, restaurant: true, roleId: restaurantOwner.roleId, systemRole: "OWNER" } satisfies NotificationActorContext;
+  const switchedOwnerContext = { effectiveCommercePermissions: [], membershipId: switchedOwner.id, mode: "business", organizationId: foreignOrganization.id, personId: ownerPerson.id, restaurant: false, roleId: switchedOwner.roleId, systemRole: "OWNER" } satisfies NotificationActorContext;
 
   await t.test("consumer policy isolates broadcasts, direct recipients, roles, Restaurant and active Organizations", async () => {
     const directCustomer = event({ recipientPersonId: customer.id });
@@ -205,23 +205,54 @@ test("Gate 4A Notification Center is tenant-safe, idempotent and persistent", { 
     assert.equal(results.filter((item) => item.status === "rejected" && notificationError("STALE_VERSION")(item.reason)).length, 1);
   });
 
-  await t.test("mark-all uses a bounded watermark and preserves notifications arriving after the snapshot", async () => {
-    const old = event({ recipientPersonId: customer.id });
+  await t.test("mark-all rejects future snapshots and preserves an exact authoritative boundary without sleeps", async () => {
+    const actor = await person("mark-all-boundary");
+    const actorContext = { mode: "customer", personId: actor.id } satisfies NotificationActorContext;
+    const authoritativeNow = new Date();
+    const old = event({ occurredAt: new Date(authoritativeNow.getTime() - 3_600_000), recipientPersonId: actor.id });
     await createEvents([old]);
-    const snapshot = await listNotificationInbox(customerContext, { filter: "all", limit: 50 });
-    await new Promise((resolve) => setTimeout(resolve, 5));
-    const next = event({ recipientPersonId: customer.id });
-    await createEvents([next]);
-    const result = await markAllNotificationsRead(customerContext, {
-      expectedVersion: snapshot.inboxVersion, idempotencyKey: randomUUID(), snapshot: new Date(snapshot.snapshot),
-    });
-    assert.equal(result.version, snapshot.inboxVersion + 1);
-    const unread = await listNotificationInbox(customerContext, { filter: "unread", limit: 50 });
+    const before = await Promise.all([
+      prisma.notificationInboxState.count({ where: { personId: actor.id } }),
+      prisma.notificationInteraction.count({ where: { personId: actor.id } }),
+    ]);
+    for (const offset of [1, 5_000]) {
+      await assert.rejects(markAllNotificationsRead(actorContext, {
+        expectedVersion: 0,
+        idempotencyKey: randomUUID(),
+        snapshot: new Date(authoritativeNow.getTime() + offset),
+      }, { now: () => authoritativeNow }), notificationError("VALIDATION_ERROR"));
+    }
+    assert.deepEqual(await Promise.all([
+      prisma.notificationInboxState.count({ where: { personId: actor.id } }),
+      prisma.notificationInteraction.count({ where: { personId: actor.id } }),
+    ]), before);
+
+    const past = await markAllNotificationsRead(actorContext, {
+      expectedVersion: 0,
+      idempotencyKey: randomUUID(),
+      snapshot: new Date(authoritativeNow.getTime() - 1_000),
+    }, { now: () => authoritativeNow });
+    assert.equal(past.version, 1);
+    const exactKey = randomUUID();
+    const next = event({ occurredAt: new Date(authoritativeNow.getTime() + 1), recipientPersonId: actor.id });
+    const [result] = await Promise.all([
+      markAllNotificationsRead(actorContext, {
+        expectedVersion: past.version, idempotencyKey: exactKey, snapshot: authoritativeNow,
+      }, { now: () => authoritativeNow }),
+      createEvents([next]),
+    ]);
+    assert.equal(result.version, 2);
+    assert.equal((await markAllNotificationsRead(actorContext, {
+      expectedVersion: past.version, idempotencyKey: exactKey, snapshot: authoritativeNow,
+    }, { now: () => new Date(authoritativeNow.getTime() - 1) })).replayed, true);
+    await assert.rejects(markAllNotificationsRead(actorContext, {
+      expectedVersion: past.version, idempotencyKey: exactKey, snapshot: new Date(authoritativeNow.getTime() - 1),
+    }, { now: () => authoritativeNow }), notificationError("IDEMPOTENCY_CONFLICT"));
+    const unread = await listNotificationInbox(actorContext, { filter: "unread", limit: 50 });
     const nextId = (await prisma.notification.findUniqueOrThrow({ where: { eventKey: next.eventKey } })).id;
     const oldId = (await prisma.notification.findUniqueOrThrow({ where: { eventKey: old.eventKey } })).id;
     assert.equal(unread.data.some((item) => item.id === nextId), true);
     assert.equal(unread.data.some((item) => item.id === oldId), false);
-    assert.ok(unread.unreadCount >= 1);
   });
 
   await t.test("preferences keep mandatory events and suppression windows do not resurrect hidden broadcasts", async () => {
@@ -291,14 +322,99 @@ test("Gate 4A Notification Center is tenant-safe, idempotent and persistent", { 
     assert.deepEqual(listed.data.find((item) => item.id === unsafeId)?.destination, { href: "/customer/notifications", kind: "NOTIFICATIONS", targetId: null });
   });
 
-  await t.test("historical backfill is deterministic, rerunnable and preserves all domain ledgers", async () => {
-    const branch = await prisma.branch.create({ data: { name: "Main", organizationId: organization.id, slug: "main" } });
-    const booking = await prisma.booking.create({ data: {
-      branchId: branch.id, customerId: customer.id, customerNameSnapshot: "PRIVATE BACKFILL NAME",
-      endsAt: new Date(Date.now() - 3_600_000), organizationId: organization.id, priceSnapshot: "25000",
-      serviceNameSnapshot: "Private service snapshot", startsAt: new Date(Date.now() - 7_200_000), status: "COMPLETED",
-      statusHistory: { create: { toStatus: "COMPLETED" } },
+  await t.test("Business destinations use the exact current role and canonical Commerce and Messaging policies", async () => {
+    const [store, foreignStore] = await Promise.all([
+      prisma.store.create({ data: { name: "Stage 4A Store", organizationId: organization.id, slug: `stage4a-${randomUUID()}` } }),
+      prisma.store.create({ data: { name: "Foreign Store", organizationId: foreignOrganization.id, slug: `foreign-${randomUUID()}` } }),
+    ]);
+    const orderData = (storeId: string, slug: string, orderCustomerId: string) => ({
+      currency: "IQD", customerId: orderCustomerId, customerNameSnapshot: "QA", customerPhoneSnapshot: "+9647500000000",
+      fulfillmentMethod: "CUSTOMER_PICKUP" as const, grandTotal: "1000", orderNumber: `QA-${randomUUID()}`,
+      paymentMethod: "PAY_AT_PICKUP" as const, reservationExpiresAt: new Date(Date.now() + 86_400_000),
+      storeId, storeNameSnapshot: "QA Store", storeSlugSnapshot: slug, subtotal: "1000",
+    });
+    const [order, foreignOrder] = await Promise.all([
+      prisma.order.create({ data: orderData(store.id, store.slug, customer.id) }),
+      prisma.order.create({ data: orderData(foreignStore.id, foreignStore.slug, foreignCustomer.id) }),
+    ]);
+    const [conversation, foreignConversation] = await Promise.all([
+      prisma.conversation.create({ data: { businessId: organization.id, customerId: customer.id, type: "CUSTOMER_BUSINESS" } }),
+      prisma.conversation.create({ data: { businessId: foreignOrganization.id, customerId: foreignCustomer.id, type: "CUSTOMER_BUSINESS" } }),
+    ]);
+    const orderEvent = (recipientPersonId: string, suffix: string, destinationTargetId = order.id) => event({
+      businessId: organization.id, category: "COMMERCE", destinationKind: "BUSINESS_COMMERCE_ORDER", destinationTargetId,
+      eventKey: `stage4a:destination:order:${suffix}:${randomUUID()}`, eventType: "order.updated", recipientPersonId,
+      sourceId: destinationTargetId, sourceType: "COMMERCE_ORDER",
+    });
+    const messageEvent = (recipientPersonId: string, suffix: string, destinationTargetId = conversation.id) => event({
+      businessId: organization.id, category: "MESSAGES", destinationKind: "BUSINESS_MESSAGES", destinationTargetId,
+      eventKey: `stage4a:destination:message:${suffix}:${randomUUID()}`, eventType: "message.arrived", recipientPersonId,
+      sourceId: destinationTargetId, sourceType: "CONVERSATION",
+    });
+    const events = {
+      managerMessage: messageEvent(managerPerson.id, "manager"), managerOrder: orderEvent(managerPerson.id, "manager"),
+      ownerForeignMessage: messageEvent(ownerPerson.id, "owner-foreign", foreignConversation.id), ownerForeignOrder: orderEvent(ownerPerson.id, "owner-foreign", foreignOrder.id),
+      ownerMessage: messageEvent(ownerPerson.id, "owner"), ownerOrder: orderEvent(ownerPerson.id, "owner"),
+      receptionistMessage: messageEvent(receptionistPerson.id, "receptionist"), receptionistOrder: orderEvent(receptionistPerson.id, "receptionist"),
+      staffMessage: messageEvent(staffPerson.id, "staff"), staffOrder: orderEvent(staffPerson.id, "staff"),
+    };
+    await createEvents(Object.values(events));
+    const notificationId = async (eventKey: string) => (await prisma.notification.findUniqueOrThrow({ where: { eventKey } })).id;
+    const destination = async (actor: NotificationActorContext, eventKey: string) => {
+      const id = await notificationId(eventKey);
+      return (await listNotificationInbox(actor, { filter: "all", limit: 50 })).data.find((row) => row.id === id)?.destination;
+    };
+    const fallback = { href: "/business/notifications", kind: "NOTIFICATIONS", targetId: null };
+
+    await prisma.role.update({ where: { id: owner.roleId }, data: { commercePermissions: [] } });
+    assert.deepEqual(await destination(ownerContext, events.ownerOrder.eventKey), { href: `/business/commerce/orders/${order.id}`, kind: "BUSINESS_COMMERCE_ORDER", targetId: order.id });
+    assert.deepEqual(await destination(ownerContext, events.ownerMessage.eventKey), { href: "/business/messages", kind: "BUSINESS_MESSAGES", targetId: conversation.id });
+    assert.deepEqual(await destination(ownerContext, events.ownerForeignOrder.eventKey), fallback);
+    assert.deepEqual(await destination(ownerContext, events.ownerForeignMessage.eventKey), fallback);
+
+    assert.deepEqual(await destination(managerContext, events.managerOrder.eventKey), { href: `/business/commerce/orders/${order.id}`, kind: "BUSINESS_COMMERCE_ORDER", targetId: order.id });
+    assert.deepEqual(await destination(managerContext, events.managerMessage.eventKey), { href: "/business/messages", kind: "BUSINESS_MESSAGES", targetId: conversation.id });
+    await prisma.role.update({ where: { id: manager.roleId }, data: { commercePermissions: [] } });
+    assert.deepEqual(await destination(managerContext, events.managerOrder.eventKey), fallback);
+
+    await prisma.role.update({ where: { id: staff.roleId }, data: { commercePermissions: ["ORDER_VIEW"] } });
+    assert.deepEqual(await destination(staffContext, events.staffOrder.eventKey), { href: `/business/commerce/orders/${order.id}`, kind: "BUSINESS_COMMERCE_ORDER", targetId: order.id });
+    assert.deepEqual(await destination(staffContext, events.staffMessage.eventKey), fallback);
+    await prisma.role.update({ where: { id: staff.roleId }, data: { commercePermissions: ["ORDER_MANAGE"] } });
+    assert.deepEqual(await destination(staffContext, events.staffOrder.eventKey), fallback);
+    assert.deepEqual(await destination(receptionistContext, events.receptionistOrder.eventKey), fallback);
+    assert.deepEqual(await destination(receptionistContext, events.receptionistMessage.eventKey), fallback);
+
+    const managerPage = await listNotificationInbox(managerContext, { filter: "all", limit: 1 });
+    assert.ok(managerPage.pageInfo.nextCursor);
+    const replacementRole = await prisma.role.create({ data: {
+      commercePermissions: ["ORDER_VIEW"], isSystem: true, name: `MANAGER-replacement-${randomUUID()}`,
+      organizationId: organization.id, systemRole: "MANAGER",
     } });
+    await prisma.organizationMember.update({ where: { id: manager.id }, data: { roleId: replacementRole.id } });
+    await assert.rejects(listNotificationInbox(managerContext, { filter: "all", limit: 10 }), notificationError("FORBIDDEN"));
+    const replacementContext = { ...managerContext, effectiveCommercePermissions: ["ORDER_VIEW"] as const, roleId: replacementRole.id };
+    await assert.rejects(listNotificationInbox(replacementContext, { cursor: managerPage.pageInfo.nextCursor!, filter: "all", limit: 1 }), notificationError("INVALID_CURSOR"));
+    await prisma.organizationMember.update({ where: { id: staff.id }, data: { status: "INACTIVE" } });
+    await assert.rejects(listNotificationInbox(staffContext, { filter: "all", limit: 10 }), notificationError("FORBIDDEN"));
+    await prisma.organizationMember.update({ where: { id: staff.id }, data: { status: "ACTIVE" } });
+  });
+
+  await t.test("historical backfill is deterministic, rerunnable and preserves all domain ledgers", async () => {
+    const historyPerson = await person("historical-time");
+    const historyContext = { mode: "customer", personId: historyPerson.id } satisfies NotificationActorContext;
+    const branch = await prisma.branch.create({ data: { name: "Main", organizationId: organization.id, slug: "main" } });
+    const historyTime = new Date("2025-01-02T10:00:00.000Z");
+    const booking = await prisma.booking.create({ data: {
+      branchId: branch.id, createdAt: historyTime, customerId: historyPerson.id, customerNameSnapshot: "PRIVATE BACKFILL NAME",
+      endsAt: new Date("2025-01-02T12:00:00.000Z"), organizationId: organization.id, priceSnapshot: "25000",
+      serviceNameSnapshot: "Private service snapshot", startsAt: new Date("2025-01-02T11:00:00.000Z"), status: "COMPLETED",
+      statusHistory: { create: { createdAt: historyTime, toStatus: "COMPLETED" } }, updatedAt: historyTime,
+    } });
+    const readBoundary = new Date();
+    await markAllNotificationsRead(historyContext, {
+      expectedVersion: 0, idempotencyKey: randomUUID(), snapshot: readBoundary,
+    }, { now: () => readBoundary });
     const dry = await backfillNotificationCenter(prisma, { batchSize: 1, dryRun: true });
     assert.ok(dry.candidates.bookingHistory >= 1);
     assert.equal(dry.created, 0);
@@ -308,7 +424,27 @@ test("Gate 4A Notification Center is tenant-safe, idempotent and persistent", { 
     assert.equal(second.created, 0);
     assert.deepEqual(first.domainFingerprintBefore, first.domainFingerprintAfter);
     assert.deepEqual(second.domainFingerprintBefore, second.domainFingerprintAfter);
-    const rows = await prisma.notification.findMany({ where: { sourceId: booking.id } });
+    const rows = await prisma.notification.findMany({ where: { sourceId: booking.id }, orderBy: { createdAt: "asc" } });
+    assert.ok(rows.length >= 2);
+    assert.equal(rows.every((row) => row.createdAt.getTime() === row.occurredAt.getTime()), true);
+    assert.equal(rows.some((row) => row.createdAt.getTime() === historyTime.getTime()), true);
+    const historical = rows.find((row) => row.eventKey?.startsWith("backfill:booking-history:"));
+    assert.equal(historical?.createdAt.toISOString(), historyTime.toISOString());
+    const dateFiltered = await listNotificationInbox(historyContext, {
+      filter: "all", from: new Date("2025-01-02T00:00:00.000Z"), limit: 50, to: new Date("2025-01-02T23:59:59.999Z"),
+    });
+    assert.equal(dateFiltered.data.some((row) => row.id === historical?.id), true);
+    assert.equal((await listNotificationInbox(historyContext, { filter: "unread", limit: 50 })).data.some((row) => row.id === historical?.id), false);
+
+    const live = event({ recipientPersonId: historyPerson.id });
+    const liveTime = new Date();
+    await prisma.$transaction((transaction) => createCanonicalNotifications(transaction, [live], { producedAt: liveTime }));
+    const ordered = await listNotificationInbox(historyContext, { filter: "all", limit: 50 });
+    const liveId = (await prisma.notification.findUniqueOrThrow({ where: { eventKey: live.eventKey } })).id;
+    assert.ok(ordered.data.findIndex((row) => row.id === liveId) < ordered.data.findIndex((row) => row.id === historical?.id));
+    const firstPage = await listNotificationInbox(historyContext, { filter: "all", limit: 1 });
+    const secondPage = await listNotificationInbox(historyContext, { cursor: firstPage.pageInfo.nextCursor!, filter: "all", limit: 1 });
+    assert.equal(new Set([...firstPage.data, ...secondPage.data].map((row) => row.id)).size, 2);
     assert.equal(JSON.stringify(rows).includes("PRIVATE BACKFILL NAME"), false);
     assert.equal(JSON.stringify(rows).includes("Private service snapshot"), false);
   });
