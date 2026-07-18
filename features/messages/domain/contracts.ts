@@ -21,6 +21,7 @@ export type BusinessMessageActor = {
 export type AdminMessageActor = {
   adminSource: "database" | "env";
   canSend: boolean;
+  canView: boolean;
   kind: "admin";
   personId: string;
   userId: string;

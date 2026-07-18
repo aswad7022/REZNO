@@ -155,6 +155,7 @@ export async function createMessagingFixture(label = "fixture") {
   const adminActor: AdminMessageActor = {
     adminSource: "database",
     canSend: true,
+    canView: true,
     kind: "admin",
     personId: admin.person.id,
     userId: admin.userId,

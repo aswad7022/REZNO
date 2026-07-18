@@ -360,6 +360,7 @@ test("Gate 1A onboarding, tenant RBAC, backfill, and conversation boundaries", {
       actor: {
         adminSource: "database",
         canSend: false,
+        canView: true,
         kind: "admin",
         personId: adminB.person.id,
         userId: adminB.userId,
@@ -377,6 +378,7 @@ test("Gate 1A onboarding, tenant RBAC, backfill, and conversation boundaries", {
       actor: {
         adminSource: "database",
         canSend: false,
+        canView: true,
         kind: "admin",
         personId: adminA.person.id,
         userId: adminA.userId,

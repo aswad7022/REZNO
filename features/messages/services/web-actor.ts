@@ -42,6 +42,8 @@ export async function resolveMessageActor(
     adminSource: admin.source,
     canSend:
       admin.isSuperAdmin || admin.permissions.includes("MESSAGES_SEND"),
+    canView:
+      admin.isSuperAdmin || admin.permissions.includes("MESSAGES_VIEW"),
     kind: "admin",
     personId: admin.identity.person.id,
     userId: admin.identity.session.user.id,

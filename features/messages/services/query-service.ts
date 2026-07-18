@@ -21,7 +21,7 @@ import type {
 import { messageError } from "@/features/messages/domain/errors";
 import { canAccessConversation } from "@/features/messages/policies/conversation-access";
 import { assertMessageActorCurrent } from "@/features/messages/services/actor";
-import { prisma } from "@/lib/db/prisma";
+import { messagingSerializable } from "@/features/messages/services/transaction";
 
 export type ConversationListMode = "admin" | "all" | "booking" | "unread";
 
@@ -81,134 +81,135 @@ export async function listConversations(
   query: ConversationListQuery,
 ) {
   assertListQuery(query);
-  const currentActor = await prisma.$transaction((transaction) =>
-    assertMessageActorCurrent(transaction, actor),
-  );
-  const search = query.search?.trim() || undefined;
-  const filter = messageFilterFingerprint({ mode: query.mode, search });
-  const cursor = query.cursor
-    ? decodeMessageCursor(query.cursor, {
+  return messagingSerializable(async (transaction) => {
+    const currentActor = await assertMessageActorCurrent(transaction, actor);
+    const search = query.search?.trim() || undefined;
+    const filter = messageFilterFingerprint({ mode: query.mode, search });
+    const cursor = query.cursor
+      ? decodeMessageCursor(query.cursor, {
+          actor: currentActor,
+          filter,
+          kind: "conversation",
+          pageSize: query.limit,
+        })
+      : null;
+    const snapshot = cursor?.snapshotDate ?? new Date();
+    if (query.mode === "unread") {
+      return listUnreadConversations(transaction, {
         actor: currentActor,
+        cursor,
         filter,
-        kind: "conversation",
-        pageSize: query.limit,
-      })
-    : null;
-  const snapshot = cursor?.snapshotDate ?? new Date();
-  if (query.mode === "unread") {
-    return listUnreadConversations({
-      actor: currentActor,
-      cursor,
-      filter,
-      limit: query.limit,
-      search,
-      snapshot,
-    });
-  }
-  const baseWhere = conversationWhereForActor(currentActor);
-  const filteredWhere = conversationFilterWhere(query.mode, search);
-  let anchor = cursor
-    ? { id: cursor.id, lastMessageAt: cursor.sortDate }
-    : null;
-  const visible: Array<{
-    conversation: PresentationConversation;
-    unreadCount: number;
-  }> = [];
-  let exhausted = false;
-
-  while (visible.length <= query.limit && !exhausted) {
-    const batchSize = Math.min(Math.max(query.limit * 3, 50), 150);
-    const rows = await prisma.conversation.findMany({
-      where: {
-        AND: [
-          baseWhere,
-          filteredWhere,
-          { lastMessageAt: { lte: snapshot } },
-          ...(anchor
-            ? [
-                {
-                  OR: [
-                    { lastMessageAt: { lt: anchor.lastMessageAt } },
-                    {
-                      id: { lt: anchor.id },
-                      lastMessageAt: anchor.lastMessageAt,
-                    },
-                  ],
-                } satisfies Prisma.ConversationWhereInput,
-              ]
-            : []),
-        ],
-      },
-      orderBy: [{ lastMessageAt: "desc" }, { id: "desc" }],
-      select: presentationSelect,
-      take: batchSize,
-    });
-    if (rows.length === 0) {
-      exhausted = true;
-      break;
+        limit: query.limit,
+        search,
+        snapshot,
+      });
     }
-    const unread = await unreadCountsForConversations(
-      currentActor,
-      rows.map((row) => row.id),
-    );
-    for (const conversation of rows) {
-      if (!canAccessConversation(conversation, currentActor)) continue;
-      const unreadCount = unread.get(conversation.id) ?? 0;
-      visible.push({ conversation, unreadCount });
-      if (visible.length > query.limit) break;
-    }
-    const last = rows.at(-1)!;
-    anchor = { id: last.id, lastMessageAt: last.lastMessageAt };
-    exhausted = rows.length < batchSize;
-  }
+    const baseWhere = conversationWhereForActor(currentActor);
+    const filteredWhere = conversationFilterWhere(query.mode, search);
+    let anchor = cursor
+      ? { id: cursor.id, lastMessageAt: cursor.sortDate }
+      : null;
+    const visible: Array<{
+      conversation: PresentationConversation;
+      unreadCount: number;
+    }> = [];
+    let exhausted = false;
 
-  const hasNextPage = visible.length > query.limit;
-  const page = visible.slice(0, query.limit);
-  const lastVisible = page.at(-1)?.conversation;
-  return {
-    data: page.map(({ conversation, unreadCount }) =>
-      toConversationSummary(conversation, currentActor, unreadCount),
-    ),
-    nextCursor:
-      hasNextPage && lastVisible
-        ? encodeMessageCursor({
-            filter,
-            id: lastVisible.id,
-            kind: "conversation",
-            pageSize: query.limit,
-            scope: messageActorScopeKey(currentActor),
-            snapshot: snapshot.toISOString(),
-            sortValue: lastVisible.lastMessageAt.toISOString(),
-          })
-        : null,
-    snapshot: snapshot.toISOString(),
-  };
+    while (visible.length <= query.limit && !exhausted) {
+      const batchSize = Math.min(Math.max(query.limit * 3, 50), 150);
+      const rows = await transaction.conversation.findMany({
+        where: {
+          AND: [
+            baseWhere,
+            filteredWhere,
+            { lastMessageAt: { lte: snapshot } },
+            ...(anchor
+              ? [
+                  {
+                    OR: [
+                      { lastMessageAt: { lt: anchor.lastMessageAt } },
+                      {
+                        id: { lt: anchor.id },
+                        lastMessageAt: anchor.lastMessageAt,
+                      },
+                    ],
+                  } satisfies Prisma.ConversationWhereInput,
+                ]
+              : []),
+          ],
+        },
+        orderBy: [{ lastMessageAt: "desc" }, { id: "desc" }],
+        select: presentationSelect,
+        take: batchSize,
+      });
+      if (rows.length === 0) {
+        exhausted = true;
+        break;
+      }
+      const unread = await unreadCountsForConversations(
+        transaction,
+        currentActor,
+        rows.map((row) => row.id),
+      );
+      for (const conversation of rows) {
+        if (!canAccessConversation(conversation, currentActor)) continue;
+        const unreadCount = unread.get(conversation.id) ?? 0;
+        visible.push({ conversation, unreadCount });
+        if (visible.length > query.limit) break;
+      }
+      const last = rows.at(-1)!;
+      anchor = { id: last.id, lastMessageAt: last.lastMessageAt };
+      exhausted = rows.length < batchSize;
+    }
+
+    const hasNextPage = visible.length > query.limit;
+    const page = visible.slice(0, query.limit);
+    const lastVisible = page.at(-1)?.conversation;
+    return {
+      data: page.map(({ conversation, unreadCount }) =>
+        toConversationSummary(conversation, currentActor, unreadCount),
+      ),
+      nextCursor:
+        hasNextPage && lastVisible
+          ? encodeMessageCursor({
+              filter,
+              id: lastVisible.id,
+              kind: "conversation",
+              pageSize: query.limit,
+              scope: messageActorScopeKey(currentActor),
+              snapshot: snapshot.toISOString(),
+              sortValue: lastVisible.lastMessageAt.toISOString(),
+            })
+          : null,
+      snapshot: snapshot.toISOString(),
+    };
+  });
 }
 
 export async function getConversationDetail(
   actor: MessageActor,
   conversationId: string,
 ): Promise<ConversationDetailDto> {
-  const currentActor = await prisma.$transaction((transaction) =>
-    assertMessageActorCurrent(transaction, actor),
-  );
-  const conversation = await prisma.conversation.findUnique({
-    where: { id: conversationId },
-    select: presentationSelect,
+  return messagingSerializable(async (transaction) => {
+    const currentActor = await assertMessageActorCurrent(transaction, actor);
+    const conversation = await transaction.conversation.findUnique({
+      where: { id: conversationId },
+      select: presentationSelect,
+    });
+    if (!conversation || !canAccessConversation(conversation, currentActor)) {
+      messageError("NOT_FOUND", "Conversation was not found in this scope.");
+    }
+    const labels = conversationLabels(conversation, currentActor);
+    return {
+      canReply: currentActor.kind !== "admin" || currentActor.canSend,
+      id: conversation.id,
+      kind: "CONVERSATION_DETAIL",
+      participantLabel: labels.participant,
+      source: conversationSource(conversation),
+      title: labels.title,
+      type: conversation.type,
+    };
   });
-  if (!conversation || !canAccessConversation(conversation, currentActor)) {
-    messageError("NOT_FOUND", "Conversation was not found in this scope.");
-  }
-  const labels = conversationLabels(conversation, currentActor);
-  return {
-    canReply: currentActor.kind !== "admin" || currentActor.canSend,
-    id: conversation.id,
-    kind: "CONVERSATION_DETAIL",
-    participantLabel: labels.participant,
-    source: conversationSource(conversation),
-    title: labels.title,
-    type: conversation.type,
-  };
 }
 
 export async function listMessages(
@@ -217,80 +218,80 @@ export async function listMessages(
   query: MessageHistoryQuery,
 ): Promise<MessagePageDto> {
   assertHistoryQuery(query);
-  const currentActor = await prisma.$transaction((transaction) =>
-    assertMessageActorCurrent(transaction, actor),
-  );
-  const conversation = await prisma.conversation.findUnique({
-    where: { id: conversationId },
-    select: {
-      ...accessSelect,
-      customer: { select: { authUserId: true } },
-    },
-  });
-  if (!conversation || !canAccessConversation(conversation, currentActor)) {
-    messageError("NOT_FOUND", "Conversation was not found in this scope.");
-  }
-  const filter = messageFilterFingerprint({ conversationId });
-  const cursor = query.cursor
-    ? decodeMessageCursor(query.cursor, {
-        actor: currentActor,
+  return messagingSerializable(async (transaction) => {
+    const currentActor = await assertMessageActorCurrent(transaction, actor);
+    const conversation = await transaction.conversation.findUnique({
+      where: { id: conversationId },
+      select: {
+        ...accessSelect,
+        customer: { select: { authUserId: true } },
+      },
+    });
+    if (!conversation || !canAccessConversation(conversation, currentActor)) {
+      messageError("NOT_FOUND", "Conversation was not found in this scope.");
+    }
+    const filter = messageFilterFingerprint({ conversationId });
+    const cursor = query.cursor
+      ? decodeMessageCursor(query.cursor, {
+          actor: currentActor,
+          conversationId,
+          filter,
+          kind: "message",
+          pageSize: query.limit,
+        })
+      : null;
+    const snapshot = cursor?.snapshotDate ?? new Date();
+    const rows = await transaction.message.findMany({
+      where: {
         conversationId,
-        filter,
-        kind: "message",
-        pageSize: query.limit,
-      })
-    : null;
-  const snapshot = cursor?.snapshotDate ?? new Date();
-  const rows = await prisma.message.findMany({
-    where: {
-      conversationId,
-      createdAt: { lte: snapshot },
-      ...(cursor
-        ? {
-            OR: [
-              { createdAt: { lt: cursor.sortDate } },
-              { createdAt: cursor.sortDate, id: { lt: cursor.id } },
-            ],
-          }
-        : {}),
-    },
-    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-    select: { body: true, createdAt: true, id: true, senderUserId: true },
-    take: query.limit + 1,
+        createdAt: { lte: snapshot },
+        ...(cursor
+          ? {
+              OR: [
+                { createdAt: { lt: cursor.sortDate } },
+                { createdAt: cursor.sortDate, id: { lt: cursor.id } },
+              ],
+            }
+          : {}),
+      },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      select: { body: true, createdAt: true, id: true, senderUserId: true },
+      take: query.limit + 1,
+    });
+    const hasNextPage = rows.length > query.limit;
+    const page = rows.slice(0, query.limit);
+    const last = page.at(-1);
+    return {
+      data: page.map((message) =>
+        toMessageSummary(message, currentActor, conversation),
+      ),
+      kind: "MESSAGE_PAGE",
+      nextCursor:
+        hasNextPage && last
+          ? encodeMessageCursor({
+              conversationId,
+              filter,
+              id: last.id,
+              kind: "message",
+              pageSize: query.limit,
+              scope: messageActorScopeKey(currentActor),
+              snapshot: snapshot.toISOString(),
+              sortValue: last.createdAt.toISOString(),
+            })
+          : null,
+      snapshot: snapshot.toISOString(),
+    };
   });
-  const hasNextPage = rows.length > query.limit;
-  const page = rows.slice(0, query.limit);
-  const last = page.at(-1);
-  return {
-    data: page.map((message) =>
-      toMessageSummary(message, currentActor, conversation),
-    ),
-    kind: "MESSAGE_PAGE",
-    nextCursor:
-      hasNextPage && last
-        ? encodeMessageCursor({
-            conversationId,
-            filter,
-            id: last.id,
-            kind: "message",
-            pageSize: query.limit,
-            scope: messageActorScopeKey(currentActor),
-            snapshot: snapshot.toISOString(),
-            sortValue: last.createdAt.toISOString(),
-          })
-        : null,
-    snapshot: snapshot.toISOString(),
-  };
 }
 
 export async function getUnreadMessageCount(
   actor: MessageActor,
 ): Promise<MessageUnreadCountDto> {
-  const currentActor = await prisma.$transaction((transaction) =>
-    assertMessageActorCurrent(transaction, actor),
-  );
-  const scopeKey = messageActorScopeKey(currentActor);
-  const [result] = await prisma.$queryRaw<Array<{ count: number }>>(Prisma.sql`
+  return messagingSerializable(async (transaction) => {
+    const currentActor = await assertMessageActorCurrent(transaction, actor);
+    const scopeKey = messageActorScopeKey(currentActor);
+    const [result] = await transaction.$queryRaw<Array<{ count: number }>>(
+      Prisma.sql`
     SELECT COUNT(*)::integer AS "count"
     FROM "Message" AS message
     JOIN "Conversation" AS conversation
@@ -301,47 +302,54 @@ export async function getUnreadMessageCount(
     WHERE ${conversationAccessSql(currentActor)}
       AND message."senderUserId" <> ${currentActor.userId}
       AND ${unreadBoundarySql()}
-  `);
-  const count = result?.count ?? 0;
-  return {
-    count,
-    display: count > 99 ? "99+" : String(count),
-    kind: "MESSAGE_UNREAD_COUNT",
-  };
+      `,
+    );
+    const count = result?.count ?? 0;
+    return {
+      count,
+      display: count > 99 ? "99+" : String(count),
+      kind: "MESSAGE_UNREAD_COUNT",
+    };
+  });
 }
 
-async function listUnreadConversations({
-  actor,
-  cursor,
-  filter,
-  limit,
-  search,
-  snapshot,
-}: {
-  actor: MessageActor;
-  cursor: { id: string; sortDate: Date } | null;
-  filter: string;
-  limit: number;
-  search: string | undefined;
-  snapshot: Date;
-}) {
+async function listUnreadConversations(
+  transaction: Prisma.TransactionClient,
+  {
+    actor,
+    cursor,
+    filter,
+    limit,
+    search,
+    snapshot,
+  }: {
+    actor: MessageActor;
+    cursor: { id: string; sortDate: Date } | null;
+    filter: string;
+    limit: number;
+    search: string | undefined;
+    snapshot: Date;
+  },
+) {
   const scopeKey = messageActorScopeKey(actor);
-  const rows = await prisma.$queryRaw<
+  const rows = await transaction.$queryRaw<
     Array<{ id: string; lastMessageAt: Date }>
   >(Prisma.sql`
     SELECT conversation."id", conversation."lastMessageAt"
     FROM "Conversation" AS conversation
     WHERE ${conversationAccessSql(actor)}
       AND conversation."lastMessageAt" <= ${snapshot}
-      ${cursor
-        ? Prisma.sql`AND (
+      ${
+        cursor
+          ? Prisma.sql`AND (
             conversation."lastMessageAt" < ${cursor.sortDate}
             OR (
               conversation."lastMessageAt" = ${cursor.sortDate}
               AND conversation."id" < ${cursor.id}::uuid
             )
           )`
-        : Prisma.empty}
+          : Prisma.empty
+      }
       ${conversationSearchSql(search)}
       AND EXISTS (
         SELECT 1
@@ -358,13 +366,16 @@ async function listUnreadConversations({
   `);
   const hasNextPage = rows.length > limit;
   const pageRows = rows.slice(0, limit);
-  const conversations = pageRows.length === 0
-    ? []
-    : await prisma.conversation.findMany({
-        where: { id: { in: pageRows.map((row) => row.id) } },
-        select: presentationSelect,
-      });
-  const byId = new Map(conversations.map((conversation) => [conversation.id, conversation]));
+  const conversations =
+    pageRows.length === 0
+      ? []
+      : await transaction.conversation.findMany({
+          where: { id: { in: pageRows.map((row) => row.id) } },
+          select: presentationSelect,
+        });
+  const byId = new Map(
+    conversations.map((conversation) => [conversation.id, conversation]),
+  );
   const authorized = pageRows.flatMap((row) => {
     const conversation = byId.get(row.id);
     return conversation && canAccessConversation(conversation, actor)
@@ -372,6 +383,7 @@ async function listUnreadConversations({
       : [];
   });
   const unread = await unreadCountsForConversations(
+    transaction,
     actor,
     authorized.map((conversation) => conversation.id),
   );
@@ -382,7 +394,8 @@ async function listUnreadConversations({
         conversation,
         actor,
         unread.get(conversation.id) ?? 0,
-      )),
+      ),
+    ),
     nextCursor:
       hasNextPage && last
         ? encodeMessageCursor({
@@ -493,42 +506,40 @@ export async function searchMessageTargets(
   if (!Number.isInteger(limit) || limit < 1 || limit > 20) {
     messageError("VALIDATION_ERROR", "Message target limit is invalid.");
   }
-  const currentActor = await prisma.$transaction((transaction) =>
-    assertMessageActorCurrent(
-      transaction,
-      actor,
-      actor.kind === "admin" ? "MESSAGES_SEND" : "MESSAGES_VIEW",
-    ),
-  );
   const search = query?.trim();
   if (search && Array.from(search).length > 80) {
     messageError("VALIDATION_ERROR", "Message target search is invalid.");
   }
-  if (currentActor.kind === "customer") {
-    const businesses = await prisma.organization.findMany({
-      where: {
-        bookings: { some: { customerId: currentActor.personId } },
-        deletedAt: null,
-        isActive: true,
-        status: "ACTIVE",
-        ...(search
-          ? { name: { contains: search, mode: "insensitive" } }
-          : {}),
-      },
-      orderBy: [{ name: "asc" }, { id: "asc" }],
-      select: { id: true, name: true },
-      take: limit,
-    });
-    return businesses.map((item) => ({
-      id: item.id,
-      kind: "BUSINESS" as const,
-      label: item.name,
-    }));
-  }
-  if (currentActor.kind !== "admin" || !currentActor.canSend) return [];
-  if (!search || search.length < 2) return [];
-  const [people, businesses] = await Promise.all([
-    prisma.person.findMany({
+  return messagingSerializable(async (transaction) => {
+    const currentActor = await assertMessageActorCurrent(
+      transaction,
+      actor,
+      actor.kind === "admin" ? "MESSAGES_SEND" : "MESSAGES_VIEW",
+    );
+    if (currentActor.kind === "customer") {
+      const businesses = await transaction.organization.findMany({
+        where: {
+          bookings: { some: { customerId: currentActor.personId } },
+          deletedAt: null,
+          isActive: true,
+          status: "ACTIVE",
+          ...(search
+            ? { name: { contains: search, mode: "insensitive" } }
+            : {}),
+        },
+        orderBy: [{ name: "asc" }, { id: "asc" }],
+        select: { id: true, name: true },
+        take: limit,
+      });
+      return businesses.map((item) => ({
+        id: item.id,
+        kind: "BUSINESS" as const,
+        label: item.name,
+      }));
+    }
+    if (currentActor.kind !== "admin" || !currentActor.canSend) return [];
+    if (!search || search.length < 2) return [];
+    const people = await transaction.person.findMany({
       where: {
         deletedAt: null,
         isOnboarded: true,
@@ -541,8 +552,8 @@ export async function searchMessageTargets(
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       select: { displayName: true, firstName: true, id: true },
       take: limit,
-    }),
-    prisma.organization.findMany({
+    });
+    const businesses = await transaction.organization.findMany({
       where: {
         deletedAt: null,
         isActive: true,
@@ -552,20 +563,20 @@ export async function searchMessageTargets(
       orderBy: [{ name: "asc" }, { id: "asc" }],
       select: { id: true, name: true },
       take: limit,
-    }),
-  ]);
-  return [
-    ...people.map((item) => ({
-      id: item.id,
-      kind: "USER" as const,
-      label: item.displayName ?? item.firstName,
-    })),
-    ...businesses.map((item) => ({
-      id: item.id,
-      kind: "BUSINESS" as const,
-      label: item.name,
-    })),
-  ].slice(0, limit);
+    });
+    return [
+      ...people.map((item) => ({
+        id: item.id,
+        kind: "USER" as const,
+        label: item.displayName ?? item.firstName,
+      })),
+      ...businesses.map((item) => ({
+        id: item.id,
+        kind: "BUSINESS" as const,
+        label: item.name,
+      })),
+    ].slice(0, limit);
+  });
 }
 
 export function conversationWhereForActor(
@@ -575,10 +586,7 @@ export function conversationWhereForActor(
     return {
       customerId: actor.personId,
       type: { in: ["CUSTOMER_BUSINESS", "ADMIN_USER"] },
-      OR: [
-        { bookingId: null },
-        { booking: { customerId: actor.personId } },
-      ],
+      OR: [{ bookingId: null }, { booking: { customerId: actor.personId } }],
     };
   }
   if (actor.kind === "admin") {
@@ -611,12 +619,13 @@ export function conversationWhereForActor(
 }
 
 async function unreadCountsForConversations(
+  transaction: Prisma.TransactionClient,
   actor: MessageActor,
   conversationIds: string[],
 ) {
   if (conversationIds.length === 0) return new Map<string, number>();
   const scopeKey = messageActorScopeKey(actor);
-  const rows = await prisma.$queryRaw<
+  const rows = await transaction.$queryRaw<
     Array<{ conversationId: string; unreadCount: number }>
   >(Prisma.sql`
     SELECT
