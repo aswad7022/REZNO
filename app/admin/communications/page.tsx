@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AdminPageHeader } from "@/features/admin/components/admin-shell";
 import { canAdmin, requireAdminPermission } from "@/features/admin/services/admin-auth";
 import { CampaignEditor } from "@/features/communications/components/campaign-editor";
+import { CommunicationDomainError } from "@/features/communications/domain/errors";
 import { ManualDispatch } from "@/features/communications/components/manual-dispatch";
 import { communicationAdminContext } from "@/features/communications/services/admin-actor";
 import { getCampaignPage } from "@/features/communications/services/campaigns";
@@ -19,15 +20,25 @@ export default async function AdminCommunicationsPage({
   const params = await searchParams;
   const status = typeof params.status === "string" && params.status.length > 0 ? params.status : null;
   const cursor = typeof params.cursor === "string" ? params.cursor : null;
-  const [page, canSend, canDispatch] = await Promise.all([
-    getCampaignPage(communicationAdminContext(access), {
-      cursor,
-      pageSize: 20,
-      status,
-    }),
-    canAdmin("NOTIFICATIONS_SEND"),
-    canAdmin("COMMUNICATIONS_DISPATCH"),
-  ]);
+  let page: Awaited<ReturnType<typeof getCampaignPage>>;
+  let canSend: boolean;
+  let canDispatch: boolean;
+  try {
+    [page, canSend, canDispatch] = await Promise.all([
+      getCampaignPage(communicationAdminContext(access), {
+        cursor,
+        pageSize: 20,
+        status,
+      }),
+      canAdmin("NOTIFICATIONS_SEND"),
+      canAdmin("COMMUNICATIONS_DISPATCH"),
+    ]);
+  } catch (error) {
+    if (error instanceof CommunicationDomainError && error.code === "INVALID_CURSOR") {
+      return <InvalidCommunicationCursor />;
+    }
+    throw error;
+  }
 
   return (
     <>
@@ -54,6 +65,23 @@ export default async function AdminCommunicationsPage({
             </article>
           ))}
           {page.nextCursor ? <Button asChild variant="outline"><Link href={campaignPageHref(page.nextCursor, status)}>Next page</Link></Button> : null}
+        </CardContent>
+      </Card>
+    </>
+  );
+}
+
+function InvalidCommunicationCursor() {
+  return (
+    <>
+      <AdminPageHeader
+        title="الاتصالات والتسليم الخارجي"
+        description="حملات موحدة داخل التطبيق مع أساس تسليم خارجي آمن وقابل للتدقيق."
+      />
+      <Card className="border-destructive/20">
+        <CardHeader><CardTitle>Communications reporting request was rejected safely.</CardTitle></CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">Refresh the current reporting scope and try again.</p>
         </CardContent>
       </Card>
     </>

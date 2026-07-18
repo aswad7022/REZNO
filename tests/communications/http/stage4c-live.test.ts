@@ -117,6 +117,10 @@ test("Gate 4C production HTML, RSC, redirect, and Customer Mobile outbound contr
       },
     })),
   });
+  await prisma.communicationCampaign.update({
+    where: { id: campaign.id },
+    data: { createdAt: new Date() },
+  });
   const deliveryRows = deliveryRecipients.map((item) => ({
     campaignId: campaign.id,
     personId: item.personId,
@@ -177,7 +181,7 @@ test("Gate 4C production HTML, RSC, redirect, and Customer Mobile outbound contr
     });
     const malformedText = await malformed.text();
     assert.ok([200, 400, 500].includes(malformed.status));
-    assert.match(malformedText, /Communications reporting is temporarily unavailable/);
+    assert.match(malformedText, /Communications reporting request was rejected safely/);
     assert.doesNotMatch(malformedText, /PrismaClient|postgresql:\/\/|DATABASE_URL|node_modules|at getCampaignPage/);
     const legacy = await fetch(`${baseUrl}/admin/notifications`, {
       headers: protectedHeaders({ cookie: admin.cookie }),
