@@ -13,6 +13,7 @@ model Person {
   lastName                        String?
   displayName                     String?
   phone                           String?
+  phoneVerifiedAt                 DateTime?                           @db.Timestamptz(6)
   avatarUrl                       String?
   gender                          Gender?
   preferredLanguage               LanguageCode                        @default(AR)
@@ -35,6 +36,10 @@ model Person {
   notificationInteractions        NotificationInteraction[]
   notificationPreference          NotificationPreference?
   notificationSuppressions        NotificationPreferenceSuppression[]
+  outboundPreference              OutboundPreference?
+  outboundPreferenceMutations     OutboundPreferenceMutation[]
+  targetedCommunicationCampaigns  CommunicationCampaign[]             @relation("CommunicationCampaignTargetPerson")
+  outboundDeliveries              OutboundDelivery[]
   customerConversations           Conversation[]                      @relation("ConversationCustomer")
   conversationReadStates          ConversationReadState[]
   favoriteBusinesses              CustomerFavoriteBusiness[]
@@ -52,37 +57,38 @@ model Person {
 }
 
 model Organization {
-  id                         String                         @id @default(uuid()) @db.Uuid
-  name                       String
-  slug                       String                         @unique
-  status                     EntityStatus                   @default(ACTIVE)
-  businessType               BusinessType                   @default(PHYSICAL)
-  vertical                   BusinessVertical               @default(OTHER)
-  isVerified                 Boolean                        @default(false)
-  isActive                   Boolean                        @default(true)
-  createdAt                  DateTime                       @default(now()) @db.Timestamptz(6)
-  updatedAt                  DateTime                       @updatedAt @db.Timestamptz(6)
-  deletedAt                  DateTime?                      @db.Timestamptz(6)
-  branches                   Branch[]
-  profile                    BusinessProfile?
-  organizationMembers        OrganizationMember[]
-  settings                   OrganizationSettings?
-  roles                      Role[]
-  services                   Service[]
-  bookings                   Booking[]
-  reviews                    Review[]
-  restaurantTables           RestaurantTable[]
-  menuCategories             MenuCategory[]
-  menuItems                  MenuItem[]
-  restaurantReservations     RestaurantReservationDetails[]
-  businessOperationMutations BusinessOperationMutation[]
-  businessAuditLogs          BusinessAuditLog[]
-  notifications              Notification[]
-  conversations              Conversation[]
-  favoritedBy                CustomerFavoriteBusiness[]
-  favoritedServices          CustomerFavoriteService[]
-  invitations                OrganizationInvitation[]
-  store                      Store?
+  id                             String                         @id @default(uuid()) @db.Uuid
+  name                           String
+  slug                           String                         @unique
+  status                         EntityStatus                   @default(ACTIVE)
+  businessType                   BusinessType                   @default(PHYSICAL)
+  vertical                       BusinessVertical               @default(OTHER)
+  isVerified                     Boolean                        @default(false)
+  isActive                       Boolean                        @default(true)
+  createdAt                      DateTime                       @default(now()) @db.Timestamptz(6)
+  updatedAt                      DateTime                       @updatedAt @db.Timestamptz(6)
+  deletedAt                      DateTime?                      @db.Timestamptz(6)
+  branches                       Branch[]
+  profile                        BusinessProfile?
+  organizationMembers            OrganizationMember[]
+  settings                       OrganizationSettings?
+  roles                          Role[]
+  services                       Service[]
+  bookings                       Booking[]
+  reviews                        Review[]
+  restaurantTables               RestaurantTable[]
+  menuCategories                 MenuCategory[]
+  menuItems                      MenuItem[]
+  restaurantReservations         RestaurantReservationDetails[]
+  businessOperationMutations     BusinessOperationMutation[]
+  businessAuditLogs              BusinessAuditLog[]
+  notifications                  Notification[]
+  targetedCommunicationCampaigns CommunicationCampaign[]        @relation("CommunicationCampaignTargetOrganization")
+  conversations                  Conversation[]
+  favoritedBy                    CustomerFavoriteBusiness[]
+  favoritedServices              CustomerFavoriteService[]
+  invitations                    OrganizationInvitation[]
+  store                          Store?
 
   @@index([vertical])
   @@index([status, isActive, deletedAt])
@@ -674,22 +680,25 @@ model BusinessAuditLog {
 }
 
 model User {
-  id                     String                  @id
-  name                   String
-  email                  String                  @unique
-  emailVerified          Boolean                 @default(false)
-  image                  String?
-  createdAt              DateTime                @default(now())
-  updatedAt              DateTime                @updatedAt
-  accounts               Account[]
-  sessions               Session[]
-  sentMessages           Message[]
-  adminConversations     Conversation[]          @relation("ConversationAdminUser")
-  conversationReadStates ConversationReadState[]
-  createdNotifications   Notification[]          @relation("NotificationCreator")
-  adminAuditLogs         AdminAuditLog[]         @relation("AdminAuditLogUser")
-  adminAccess            AdminAccess?
-  grantedAdminAccesses   AdminAccess[]           @relation("AdminAccessGrantedBy")
+  id                             String                          @id
+  name                           String
+  email                          String                          @unique
+  emailVerified                  Boolean                         @default(false)
+  image                          String?
+  createdAt                      DateTime                        @default(now())
+  updatedAt                      DateTime                        @updatedAt
+  accounts                       Account[]
+  sessions                       Session[]
+  sentMessages                   Message[]
+  adminConversations             Conversation[]                  @relation("ConversationAdminUser")
+  conversationReadStates         ConversationReadState[]
+  createdNotifications           Notification[]                  @relation("NotificationCreator")
+  adminAuditLogs                 AdminAuditLog[]                 @relation("AdminAuditLogUser")
+  createdCommunicationCampaigns  CommunicationCampaign[]         @relation("CommunicationCampaignCreatedBy")
+  updatedCommunicationCampaigns  CommunicationCampaign[]         @relation("CommunicationCampaignUpdatedBy")
+  communicationCampaignMutations CommunicationCampaignMutation[]
+  adminAccess                    AdminAccess?
+  grantedAdminAccesses           AdminAccess[]                   @relation("AdminAccessGrantedBy")
 
   @@map("user")
 }
@@ -751,6 +760,7 @@ model Notification {
   titleKey              String?                      @db.VarChar(160)
   bodyKey               String?                      @db.VarChar(160)
   localizationVariables Json?
+  localizedContent      Json?
   occurredAt            DateTime                     @default(now()) @db.Timestamptz(6)
   expiresAt             DateTime?                    @db.Timestamptz(6)
   mandatory             Boolean                      @default(false)
@@ -764,6 +774,7 @@ model Notification {
   createdBy             User?                        @relation("NotificationCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
   recipientStates       NotificationRecipientState[]
   interactions          NotificationInteraction[]
+  communicationCampaign CommunicationCampaign?
 
   @@index([audience, createdAt])
   @@index([recipientPersonId, createdAt])
@@ -852,6 +863,147 @@ model NotificationPreferenceSuppression {
   person     Person               @relation(fields: [personId], references: [id], onDelete: Cascade)
 
   @@index([personId, category, disabledAt, enabledAt])
+}
+
+model CommunicationCampaign {
+  id                    String                          @id @default(uuid()) @db.Uuid
+  version               Int                             @default(1)
+  createdByAdminUserId  String
+  updatedByAdminUserId  String
+  status                CommunicationCampaignStatus     @default(DRAFT)
+  audience              NotificationAudience
+  targetPersonId        String?                         @db.Uuid
+  targetOrganizationId  String?                         @db.Uuid
+  channels              CommunicationChannel[]
+  category              NotificationCategory
+  priority              NotificationPriority            @default(NORMAL)
+  mandatory             Boolean                         @default(false)
+  destinationKind       NotificationDestinationKind     @default(NOTIFICATIONS)
+  destinationTargetId   String?                         @db.Uuid
+  localizedContent      Json
+  scheduledAt           DateTime?                       @db.Timestamptz(6)
+  recipientEvaluationAt DateTime?                       @db.Timestamptz(6)
+  dispatchStartedAt     DateTime?                       @db.Timestamptz(6)
+  completedAt           DateTime?                       @db.Timestamptz(6)
+  cancelledAt           DateTime?                       @db.Timestamptz(6)
+  cancellationReason    String?                         @db.VarChar(500)
+  inAppNotificationId   String?                         @unique @db.Uuid
+  createdAt             DateTime                        @default(now()) @db.Timestamptz(6)
+  updatedAt             DateTime                        @updatedAt @db.Timestamptz(6)
+  createdByAdmin        User                            @relation("CommunicationCampaignCreatedBy", fields: [createdByAdminUserId], references: [id], onDelete: Restrict)
+  updatedByAdmin        User                            @relation("CommunicationCampaignUpdatedBy", fields: [updatedByAdminUserId], references: [id], onDelete: Restrict)
+  targetPerson          Person?                         @relation("CommunicationCampaignTargetPerson", fields: [targetPersonId], references: [id], onDelete: Restrict)
+  targetOrganization    Organization?                   @relation("CommunicationCampaignTargetOrganization", fields: [targetOrganizationId], references: [id], onDelete: Restrict)
+  inAppNotification     Notification?                   @relation(fields: [inAppNotificationId], references: [id], onDelete: SetNull)
+  mutations             CommunicationCampaignMutation[]
+  deliveries            OutboundDelivery[]
+
+  @@index([createdAt, id])
+  @@index([status, createdAt, id])
+  @@index([status, scheduledAt, id])
+  @@index([targetPersonId])
+  @@index([targetOrganizationId])
+}
+
+model CommunicationCampaignMutation {
+  id              String                @id @default(uuid()) @db.Uuid
+  campaignId      String                @db.Uuid
+  adminUserId     String
+  action          String                @db.VarChar(80)
+  idempotencyKey  String                @db.Uuid
+  requestHash     String                @db.VarChar(64)
+  expectedVersion Int
+  resultVersion   Int
+  result          Json
+  createdAt       DateTime              @default(now()) @db.Timestamptz(6)
+  campaign        CommunicationCampaign @relation(fields: [campaignId], references: [id], onDelete: Restrict)
+  adminUser       User                  @relation(fields: [adminUserId], references: [id], onDelete: Restrict)
+
+  @@unique([adminUserId, idempotencyKey])
+  @@index([campaignId, action, createdAt, id])
+  @@index([adminUserId, action, createdAt, id])
+}
+
+model OutboundPreference {
+  id              String                 @id @default(uuid()) @db.Uuid
+  personId        String                 @unique @db.Uuid
+  version         Int                    @default(1)
+  emailCategories NotificationCategory[] @default([])
+  smsCategories   NotificationCategory[] @default([])
+  pushCategories  NotificationCategory[] @default([])
+  createdAt       DateTime               @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime               @updatedAt @db.Timestamptz(6)
+  person          Person                 @relation(fields: [personId], references: [id], onDelete: Cascade)
+}
+
+model OutboundPreferenceMutation {
+  id              String   @id @default(uuid()) @db.Uuid
+  personId        String   @db.Uuid
+  idempotencyKey  String   @db.Uuid
+  requestHash     String   @db.VarChar(64)
+  expectedVersion Int
+  resultVersion   Int
+  result          Json
+  createdAt       DateTime @default(now()) @db.Timestamptz(6)
+  person          Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@unique([personId, idempotencyKey])
+  @@index([personId, createdAt, id])
+}
+
+model OutboundDelivery {
+  id                  String                    @id @default(uuid()) @db.Uuid
+  campaignId          String                    @db.Uuid
+  personId            String                    @db.Uuid
+  channel             CommunicationChannel
+  locale              String                    @db.VarChar(3)
+  endpointType        String                    @db.VarChar(20)
+  endpointFingerprint String?                   @db.VarChar(64)
+  status              OutboundDeliveryStatus    @default(PENDING)
+  attemptCount        Int                       @default(0)
+  nextAttemptAt       DateTime?                 @db.Timestamptz(6)
+  claimedAt           DateTime?                 @db.Timestamptz(6)
+  claimOwner          String?                   @db.VarChar(100)
+  claimExpiresAt      DateTime?                 @db.Timestamptz(6)
+  acceptedAt          DateTime?                 @db.Timestamptz(6)
+  failedAt            DateTime?                 @db.Timestamptz(6)
+  suppressionReason   String?                   @db.VarChar(80)
+  providerName        String?                   @db.VarChar(80)
+  providerMessageId   String?                   @db.VarChar(191)
+  lastProviderCode    String?                   @db.VarChar(80)
+  createdAt           DateTime                  @default(now()) @db.Timestamptz(6)
+  updatedAt           DateTime                  @updatedAt @db.Timestamptz(6)
+  campaign            CommunicationCampaign     @relation(fields: [campaignId], references: [id], onDelete: Restrict)
+  person              Person                    @relation(fields: [personId], references: [id], onDelete: Restrict)
+  attempts            OutboundDeliveryAttempt[]
+
+  @@unique([campaignId, personId, channel])
+  @@index([status, nextAttemptAt, id])
+  @@index([status, claimExpiresAt, id])
+  @@index([campaignId, createdAt, id])
+  @@index([campaignId, status, createdAt, id])
+  @@index([personId, createdAt, id])
+}
+
+model OutboundDeliveryAttempt {
+  id                String                  @id @default(uuid()) @db.Uuid
+  deliveryId        String                  @db.Uuid
+  attemptNumber     Int
+  claimOwner        String                  @db.VarChar(100)
+  startedAt         DateTime                @db.Timestamptz(6)
+  finishedAt        DateTime?               @db.Timestamptz(6)
+  outcome           OutboundAttemptOutcome?
+  providerName      String?                 @db.VarChar(80)
+  providerMessageId String?                 @db.VarChar(191)
+  safeProviderCode  String?                 @db.VarChar(80)
+  retryable         Boolean?
+  nextAttemptAt     DateTime?               @db.Timestamptz(6)
+  sanitizedMetadata Json?
+  createdAt         DateTime                @default(now()) @db.Timestamptz(6)
+  delivery          OutboundDelivery        @relation(fields: [deliveryId], references: [id], onDelete: Restrict)
+
+  @@unique([deliveryId, attemptNumber])
+  @@index([deliveryId, createdAt, id])
 }
 
 model Conversation {
@@ -1594,6 +1746,41 @@ enum NotificationInteractionAction {
   RESTORE
   MARK_ALL_READ
   UPDATE_PREFERENCES
+}
+
+enum CommunicationCampaignStatus {
+  DRAFT
+  SCHEDULED
+  QUEUED
+  DISPATCHING
+  COMPLETED
+  PARTIAL_FAILURE
+  FAILED
+  CANCELLED
+}
+
+enum CommunicationChannel {
+  IN_APP
+  EMAIL
+  SMS
+  PUSH
+}
+
+enum OutboundDeliveryStatus {
+  PENDING
+  CLAIMED
+  ACCEPTED
+  RETRY_SCHEDULED
+  PERMANENT_FAILURE
+  SUPPRESSED
+  CANCELLED
+}
+
+enum OutboundAttemptOutcome {
+  ACCEPTED
+  TRANSIENT_FAILURE
+  PERMANENT_FAILURE
+  NOT_CONFIGURED
 }
 
 enum ConversationType {

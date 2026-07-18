@@ -6,7 +6,9 @@ export const adminPermissions = [
   "USERS_MANAGE",
   "MESSAGES_VIEW",
   "MESSAGES_SEND",
+  "NOTIFICATIONS_VIEW",
   "NOTIFICATIONS_SEND",
+  "COMMUNICATIONS_DISPATCH",
   "SETTINGS_VIEW",
   "SETTINGS_MANAGE",
   "AUDIT_LOG_VIEW",
@@ -45,12 +47,14 @@ export const commerceAdminPermissions = [
 ] as const satisfies readonly AdminPermission[];
 
 export const adminPermissionDependencies: Readonly<
-  Partial<Record<AdminPermission, AdminPermission>>
+  Partial<Record<AdminPermission, readonly AdminPermission[]>>
 > = {
-  COMMERCE_CATALOG_MODERATE: "COMMERCE_CATALOG_VIEW",
-  COMMERCE_INVENTORY_MANAGE: "COMMERCE_INVENTORY_VIEW",
-  COMMERCE_ORDERS_MANAGE: "COMMERCE_ORDERS_VIEW",
-  COMMERCE_STORES_REVIEW: "COMMERCE_STORES_VIEW",
+  COMMERCE_CATALOG_MODERATE: ["COMMERCE_CATALOG_VIEW"],
+  COMMERCE_INVENTORY_MANAGE: ["COMMERCE_INVENTORY_VIEW"],
+  COMMERCE_ORDERS_MANAGE: ["COMMERCE_ORDERS_VIEW"],
+  COMMERCE_STORES_REVIEW: ["COMMERCE_STORES_VIEW"],
+  NOTIFICATIONS_SEND: ["NOTIFICATIONS_VIEW"],
+  COMMUNICATIONS_DISPATCH: ["NOTIFICATIONS_SEND"],
 };
 
 export function hasAnyCommerceAdminPermission(
@@ -72,9 +76,13 @@ export function invalidAdminPermissionDependencies(
 ): Array<{ permission: AdminPermission; requires: AdminPermission }> {
   const available = new Set(permissions);
   return Object.entries(adminPermissionDependencies).flatMap(
-    ([permission, requires]) =>
-      requires && available.has(permission as AdminPermission) && !available.has(requires)
-        ? [{ permission: permission as AdminPermission, requires }]
+    ([permission, requirements]) =>
+      available.has(permission as AdminPermission)
+        ? (requirements ?? []).flatMap((requires) =>
+            available.has(requires)
+              ? []
+              : [{ permission: permission as AdminPermission, requires }],
+          )
         : [],
   );
 }
@@ -84,10 +92,19 @@ export function effectiveNormalizedAdminPermissions(
 ): AdminPermission[] {
   const normalized = normalizeAdminPermissions(permissions);
   const available = new Set(normalized);
-  return normalized.filter((permission) => {
-    const dependency = adminPermissionDependencies[permission];
-    return !dependency || available.has(dependency);
-  });
+  const effective = new Set<AdminPermission>();
+  const visiting = new Set<AdminPermission>();
+  const include = (permission: AdminPermission): boolean => {
+    if (effective.has(permission)) return true;
+    if (!available.has(permission) || visiting.has(permission)) return false;
+    visiting.add(permission);
+    const valid = (adminPermissionDependencies[permission] ?? []).every(include);
+    visiting.delete(permission);
+    if (valid) effective.add(permission);
+    return valid;
+  };
+  normalized.forEach(include);
+  return normalized.filter((permission) => effective.has(permission));
 }
 
 export const adminPermissionLabels: Record<AdminPermission, string> = {
@@ -98,7 +115,9 @@ export const adminPermissionLabels: Record<AdminPermission, string> = {
   USERS_MANAGE: "Manage users",
   MESSAGES_VIEW: "View messages",
   MESSAGES_SEND: "Send messages",
+  NOTIFICATIONS_VIEW: "View communication campaigns",
   NOTIFICATIONS_SEND: "Send notifications",
+  COMMUNICATIONS_DISPATCH: "Manually dispatch due communications",
   SETTINGS_VIEW: "View settings",
   SETTINGS_MANAGE: "Manage settings",
   AUDIT_LOG_VIEW: "View audit log",
