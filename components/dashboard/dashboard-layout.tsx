@@ -23,6 +23,7 @@ export function DashboardLayout({
   role,
   user,
   notifications,
+  unreadNotifications,
   messagesHref,
   unreadMessages,
   messagePreviews,
@@ -43,6 +44,7 @@ export function DashboardLayout({
   role: DashboardRole;
   user: DashboardUser;
   notifications: DashboardNotification[];
+  unreadNotifications: number;
   messagesHref: string;
   unreadMessages?: number;
   messagePreviews: DashboardMessagePreview[];
@@ -127,6 +129,7 @@ export function DashboardLayout({
           membershipId={membershipId}
           user={user}
           notifications={notifications}
+          unreadNotifications={unreadNotifications}
           messagesHref={messagesHref}
           unreadMessages={unreadMessages}
           messagePreviews={messagePreviews}

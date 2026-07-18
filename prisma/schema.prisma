@@ -7,30 +7,35 @@ datasource db {
 }
 
 model Person {
-  id                              String                          @id @default(uuid()) @db.Uuid
-  authUserId                      String                          @unique
+  id                              String                              @id @default(uuid()) @db.Uuid
+  authUserId                      String                              @unique
   firstName                       String
   lastName                        String?
   displayName                     String?
   phone                           String?
   avatarUrl                       String?
   gender                          Gender?
-  preferredLanguage               LanguageCode                    @default(AR)
-  timezone                        String                          @default("Asia/Baghdad")
-  status                          EntityStatus                    @default(ACTIVE)
-  isOnboarded                     Boolean                         @default(false)
-  createdAt                       DateTime                        @default(now()) @db.Timestamptz(6)
-  updatedAt                       DateTime                        @updatedAt @db.Timestamptz(6)
-  deletedAt                       DateTime?                       @db.Timestamptz(6)
+  preferredLanguage               LanguageCode                        @default(AR)
+  timezone                        String                              @default("Asia/Baghdad")
+  status                          EntityStatus                        @default(ACTIVE)
+  isOnboarded                     Boolean                             @default(false)
+  createdAt                       DateTime                            @default(now()) @db.Timestamptz(6)
+  updatedAt                       DateTime                            @updatedAt @db.Timestamptz(6)
+  deletedAt                       DateTime?                           @db.Timestamptz(6)
   memberships                     OrganizationMember[]
-  customerBookings                Booking[]                       @relation("BookingCustomer")
+  customerBookings                Booking[]                           @relation("BookingCustomer")
   bookingChanges                  BookingStatusHistory[]
-  requestedBookingChanges         BookingChangeRequest[]          @relation("BookingChangeRequester")
-  restaurantReservationMutations  RestaurantReservationMutation[] @relation("RestaurantReservationMutationCustomer")
-  businessAuditLogs               BusinessAuditLog[]              @relation("BusinessAuditLogActorPerson")
-  reviews                         Review[]                        @relation("ReviewCustomer")
+  requestedBookingChanges         BookingChangeRequest[]              @relation("BookingChangeRequester")
+  restaurantReservationMutations  RestaurantReservationMutation[]     @relation("RestaurantReservationMutationCustomer")
+  businessAuditLogs               BusinessAuditLog[]                  @relation("BusinessAuditLogActorPerson")
+  reviews                         Review[]                            @relation("ReviewCustomer")
   notifications                   Notification[]
-  customerConversations           Conversation[]                  @relation("ConversationCustomer")
+  notificationStates              NotificationRecipientState[]
+  notificationInboxStates         NotificationInboxState[]
+  notificationInteractions        NotificationInteraction[]
+  notificationPreference          NotificationPreference?
+  notificationSuppressions        NotificationPreferenceSuppression[]
+  customerConversations           Conversation[]                      @relation("ConversationCustomer")
   favoriteBusinesses              CustomerFavoriteBusiness[]
   favoriteServices                CustomerFavoriteService[]
   commerceAddresses               CustomerAddress[]
@@ -39,8 +44,8 @@ model Person {
   commerceOrders                  Order[]
   favoriteStores                  CustomerFavoriteStore[]
   favoriteProducts                CustomerFavoriteProduct[]
-  sentOrganizationInvitations     OrganizationInvitation[]        @relation("OrganizationInvitationInvitedBy")
-  receivedOrganizationInvitations OrganizationInvitation[]        @relation("OrganizationInvitationRecipient")
+  sentOrganizationInvitations     OrganizationInvitation[]            @relation("OrganizationInvitationInvitedBy")
+  receivedOrganizationInvitations OrganizationInvitation[]            @relation("OrganizationInvitationRecipient")
 
   @@index([phone])
 }
@@ -729,24 +734,122 @@ model AdminAuditLog {
 }
 
 model Notification {
-  id                String               @id @default(uuid()) @db.Uuid
-  title             String
-  body              String
-  audience          NotificationAudience
-  priority          NotificationPriority @default(NORMAL)
-  eventKey          String?              @unique
-  metadata          Json?
-  recipientPersonId String?              @db.Uuid
-  businessId        String?              @db.Uuid
-  createdByUserId   String?
-  createdAt         DateTime             @default(now()) @db.Timestamptz(6)
-  recipientPerson   Person?              @relation(fields: [recipientPersonId], references: [id], onDelete: Cascade)
-  business          Organization?        @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  createdBy         User?                @relation("NotificationCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  id                    String                       @id @default(uuid()) @db.Uuid
+  title                 String
+  body                  String
+  audience              NotificationAudience
+  priority              NotificationPriority         @default(NORMAL)
+  eventKey              String?                      @unique
+  category              NotificationCategory         @default(ADMIN_ANNOUNCEMENT)
+  eventType             String                       @default("legacy.notification") @db.VarChar(100)
+  sourceType            NotificationSourceType       @default(ADMIN_ANNOUNCEMENT)
+  sourceId              String?                      @db.Uuid
+  destinationKind       NotificationDestinationKind  @default(NOTIFICATIONS)
+  destinationTargetId   String?                      @db.Uuid
+  titleKey              String?                      @db.VarChar(160)
+  bodyKey               String?                      @db.VarChar(160)
+  localizationVariables Json?
+  occurredAt            DateTime                     @default(now()) @db.Timestamptz(6)
+  expiresAt             DateTime?                    @db.Timestamptz(6)
+  mandatory             Boolean                      @default(false)
+  metadata              Json?
+  recipientPersonId     String?                      @db.Uuid
+  businessId            String?                      @db.Uuid
+  createdByUserId       String?
+  createdAt             DateTime                     @default(now()) @db.Timestamptz(6)
+  recipientPerson       Person?                      @relation(fields: [recipientPersonId], references: [id], onDelete: Cascade)
+  business              Organization?                @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  createdBy             User?                        @relation("NotificationCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  recipientStates       NotificationRecipientState[]
+  interactions          NotificationInteraction[]
 
   @@index([audience, createdAt])
   @@index([recipientPersonId, createdAt])
   @@index([businessId, createdAt])
+  @@index([createdAt, id])
+  @@index([category, createdAt, id])
+  @@index([recipientPersonId, createdAt, id])
+  @@index([businessId, audience, createdAt, id])
+  @@index([sourceType, sourceId])
+}
+
+model NotificationRecipientState {
+  id                 String                 @id @default(uuid()) @db.Uuid
+  notificationId     String                 @db.Uuid
+  personId           String                 @db.Uuid
+  readState          NotificationReadState?
+  readStateChangedAt DateTime?              @db.Timestamptz(6)
+  archivedAt         DateTime?              @db.Timestamptz(6)
+  version            Int                    @default(1)
+  createdAt          DateTime               @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime               @updatedAt @db.Timestamptz(6)
+  notification       Notification           @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  person             Person                 @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@unique([notificationId, personId])
+  @@index([personId, archivedAt, notificationId])
+  @@index([personId, updatedAt])
+}
+
+model NotificationInboxState {
+  id          String   @id @default(uuid()) @db.Uuid
+  personId    String   @db.Uuid
+  scopeKey    String   @db.VarChar(180)
+  readThrough DateTime @db.Timestamptz(6)
+  readAt      DateTime @db.Timestamptz(6)
+  version     Int      @default(1)
+  createdAt   DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(6)
+  person      Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@unique([personId, scopeKey])
+  @@index([personId, readThrough])
+}
+
+model NotificationInteraction {
+  id              String                        @id @default(uuid()) @db.Uuid
+  personId        String                        @db.Uuid
+  notificationId  String?                       @db.Uuid
+  idempotencyKey  String                        @db.Uuid
+  action          NotificationInteractionAction
+  scopeKey        String                        @db.VarChar(180)
+  requestHash     String                        @db.VarChar(64)
+  expectedVersion Int
+  resultVersion   Int
+  result          Json
+  createdAt       DateTime                      @default(now()) @db.Timestamptz(6)
+  person          Person                        @relation(fields: [personId], references: [id], onDelete: Cascade)
+  notification    Notification?                 @relation(fields: [notificationId], references: [id], onDelete: SetNull)
+
+  @@unique([personId, idempotencyKey])
+  @@index([notificationId, personId])
+  @@index([personId, action, createdAt])
+}
+
+model NotificationPreference {
+  id                        String   @id @default(uuid()) @db.Uuid
+  personId                  String   @unique @db.Uuid
+  bookingsEnabled           Boolean  @default(true)
+  restaurantEnabled         Boolean  @default(true)
+  commerceEnabled           Boolean  @default(true)
+  messagesEnabled           Boolean  @default(true)
+  adminAnnouncementsEnabled Boolean  @default(true)
+  version                   Int      @default(1)
+  createdAt                 DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt                 DateTime @updatedAt @db.Timestamptz(6)
+  person                    Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+}
+
+model NotificationPreferenceSuppression {
+  id         String               @id @default(uuid()) @db.Uuid
+  personId   String               @db.Uuid
+  category   NotificationCategory
+  disabledAt DateTime             @db.Timestamptz(6)
+  enabledAt  DateTime?            @db.Timestamptz(6)
+  createdAt  DateTime             @default(now()) @db.Timestamptz(6)
+  person     Person               @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@index([personId, category, disabledAt, enabledAt])
 }
 
 model Conversation {
@@ -1408,6 +1511,57 @@ enum NotificationAudience {
 enum NotificationPriority {
   NORMAL
   IMPORTANT
+}
+
+enum NotificationCategory {
+  BOOKINGS
+  RESTAURANT
+  COMMERCE
+  MESSAGES
+  ACCOUNT
+  ADMIN_ANNOUNCEMENT
+}
+
+enum NotificationSourceType {
+  BOOKING
+  BOOKING_CHANGE_REQUEST
+  RESTAURANT_RESERVATION
+  COMMERCE_ORDER
+  STORE
+  PRODUCT
+  CONVERSATION
+  ADMIN_ANNOUNCEMENT
+  ACCOUNT
+}
+
+enum NotificationDestinationKind {
+  NOTIFICATIONS
+  CUSTOMER_BOOKING
+  CUSTOMER_RESTAURANT
+  CUSTOMER_COMMERCE_ORDER
+  CUSTOMER_MESSAGES
+  CUSTOMER_ACCOUNT
+  BUSINESS_CALENDAR
+  BUSINESS_BOOKING
+  BUSINESS_RESTAURANT
+  BUSINESS_COMMERCE_ORDER
+  BUSINESS_MESSAGES
+  BUSINESS_NOTIFICATIONS
+  ADMIN_COMMERCE_STORES
+}
+
+enum NotificationReadState {
+  READ
+  UNREAD
+}
+
+enum NotificationInteractionAction {
+  MARK_READ
+  MARK_UNREAD
+  ARCHIVE
+  RESTORE
+  MARK_ALL_READ
+  UPDATE_PREFERENCES
 }
 
 enum ConversationType {

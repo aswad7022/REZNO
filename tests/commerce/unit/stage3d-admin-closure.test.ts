@@ -74,7 +74,7 @@ test("Stage 3D removes obsolete production write exports and preserves deferred 
   const customerService = await readFile(new URL("../../../features/commerce/services/customer-service.ts", import.meta.url), "utf8");
   assert.doesNotMatch(customerService, /export async function (?:favorite|unfavorite)(?:Store|Product)/);
   const registry = await readFile(new URL("../../../features/dashboard/feature-placeholder.tsx", import.meta.url), "utf8");
-  assert.match(registry, /Stage 4 Notifications and Messaging closure/);
+  assert.doesNotMatch(registry, /\/business\/communications/);
   assert.match(registry, /Stage 8 Final Visual Polish/);
   assert.doesNotMatch(registry, /Stage 8[^\n]*AI/i);
 });

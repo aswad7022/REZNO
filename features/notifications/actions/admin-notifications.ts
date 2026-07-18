@@ -1,5 +1,7 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
+
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -9,6 +11,7 @@ import { prisma } from "@/lib/db/prisma";
 import { logServerError } from "@/lib/logging/server";
 import { consumeRateLimit } from "@/lib/security/rate-limit";
 import type { AdminNotificationActionState } from "@/features/notifications/types";
+import { createCanonicalNotifications } from "@/features/notifications/services/producer";
 
 const adminNotificationSchema = z.object({
   title: z.string().trim().min(2).max(160),
@@ -81,19 +84,30 @@ export async function createAdminNotification(
 
   let notificationId: string;
   try {
-    const notification = await prisma.notification.create({
-      data: {
+    const announcementId = randomUUID();
+    const eventKey = `admin-announcement:${announcementId}`;
+    const notification = await prisma.$transaction(async (transaction) => {
+      await createCanonicalNotifications(transaction, [{
         title: data.title,
+        titleKey: "notifications.admin.announcement.title",
         body: data.body,
+        bodyKey: "notifications.admin.announcement.body",
         audience: data.audience,
+        category: "ADMIN_ANNOUNCEMENT",
+        destinationKind: data.audience === "BUSINESS" ? "BUSINESS_NOTIFICATIONS" : "NOTIFICATIONS",
+        eventKey,
+        eventType: "admin.announcement",
+        mandatory: data.priority === "IMPORTANT",
         priority: data.priority,
         businessId:
-          data.audience === "BUSINESS" ? data.businessId || null : null,
+          data.audience === "BUSINESS" ? data.businessId || undefined : undefined,
         recipientPersonId:
-          data.audience === "USER" ? data.recipientPersonId || null : null,
+          data.audience === "USER" ? data.recipientPersonId || undefined : undefined,
         createdByUserId: session.user.id,
-      },
-      select: { id: true },
+        sourceId: announcementId,
+        sourceType: "ADMIN_ANNOUNCEMENT",
+      }]);
+      return transaction.notification.findUniqueOrThrow({ where: { eventKey }, select: { id: true } });
     });
     notificationId = notification.id;
   } catch (error) {

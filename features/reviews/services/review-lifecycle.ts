@@ -26,6 +26,7 @@ import type {
   PublicReviewSummary,
 } from "@/features/reviews/types";
 import { prisma } from "@/lib/db/prisma";
+import { createCanonicalNotifications } from "@/features/notifications/services/producer";
 
 const publicOrganizationWhere = {
   deletedAt: null,
@@ -211,15 +212,24 @@ export async function createOrReplayCustomerReview(input: {
         },
         select: customerReviewSelect,
       });
-      await transaction.notification.create({
-        data: {
+      await createCanonicalNotifications(transaction, [{
           audience: "BUSINESS",
           businessId: booking.organizationId,
+          category: "BOOKINGS",
+          destinationKind: "BUSINESS_BOOKING",
+          destinationTargetId: booking.id,
+          eventKey: `review:${review.id}:created`,
+          eventType: "review.created",
+          mandatory: false,
           priority: "NORMAL",
           title: "New review received",
-          body: `${booking.customerNameSnapshot} rated ${booking.serviceNameSnapshot} ${reviewInput.rating}/5.`,
-        },
-      });
+          titleKey: "notifications.review.created.title",
+          body: `A completed service received a ${reviewInput.rating}/5 review.`,
+          bodyKey: "notifications.review.created.body",
+          localizationVariables: { rating: reviewInput.rating },
+          sourceId: booking.id,
+          sourceType: "BOOKING",
+      }]);
       return {
         review: serializeCustomerReview(review),
         replayed: false,

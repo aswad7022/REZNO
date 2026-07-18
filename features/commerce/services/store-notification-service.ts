@@ -5,6 +5,7 @@ import {
   storeNotificationEventKey,
   type StoreNotificationEvent,
 } from "@/features/commerce/domain/store-notification-events";
+import { createCanonicalNotifications } from "@/features/notifications/services/producer";
 
 export async function notifyStoreLifecycle(
   transaction: Prisma.TransactionClient,
@@ -19,29 +20,30 @@ export async function notifyStoreLifecycle(
     ? await adminReviewRecipients(transaction)
     : await ownerRecipients(transaction, input.organizationId);
   if (recipients.length === 0) return;
-  await transaction.notification.createMany({
-    data: recipients.map((recipient) => {
+  await createCanonicalNotifications(
+    transaction,
+    recipients.map((recipient) => {
       const copy = storeNotificationCopy(input.event, recipient.preferredLanguage);
       return {
         audience: "USER" as const,
         body: copy.body,
+        bodyKey: `commerce.${input.event}.body`,
+        category: "COMMERCE" as const,
+        destinationKind: input.event === "store.submitted" ? "ADMIN_COMMERCE_STORES" as const : "BUSINESS_NOTIFICATIONS" as const,
         eventKey: storeNotificationEventKey({ ...input, recipientPersonId: recipient.id }),
-        metadata: {
-          destination: input.event === "store.submitted"
-            ? "/admin/commerce/stores"
-            : "/business/commerce/store",
-          eventType: input.event,
-          storeId: input.storeId,
-        },
+        eventType: input.event,
+        mandatory: input.event === "store.rejected" || input.event === "store.suspended",
         priority: input.event === "store.rejected" || input.event === "store.suspended"
           ? "IMPORTANT" as const
           : "NORMAL" as const,
         recipientPersonId: recipient.id,
+        sourceId: input.storeId,
+        sourceType: "STORE" as const,
         title: copy.title,
+        titleKey: `commerce.${input.event}.title`,
       };
     }),
-    skipDuplicates: true,
-  });
+  );
 }
 
 async function ownerRecipients(

@@ -446,26 +446,25 @@ test(
         hasCode("MEMBERSHIP_UNAVAILABLE"),
       );
 
-      const rollback = await createFutureGenericBooking(fixture, localDate(instant(10, 0)));
-      const rollbackKey = randomUUID();
-      const rollbackEvent = `business-booking:${fixture.organizationA.id}:${rollbackKey}:cancelled`;
+      const duplicateEventBooking = await createFutureGenericBooking(fixture, localDate(instant(10, 0)));
+      const duplicateEventKey = randomUUID();
+      const duplicateEvent = `business-booking:${fixture.organizationA.id}:${duplicateEventKey}:cancelled`;
       await prisma.notification.create({
-        data: { audience: "USER", body: "collision", eventKey: rollbackEvent, recipientPersonId: fixture.customer.id, title: "collision" },
+        data: { audience: "USER", body: "collision", eventKey: duplicateEvent, recipientPersonId: fixture.customer.id, title: "collision" },
       });
       const beforeCounts = [
-        await prisma.businessAuditLog.count({ where: { targetId: rollback.id } }),
-        await prisma.businessOperationMutation.count({ where: { idempotencyKey: rollbackKey } }),
-        await prisma.bookingStatusHistory.count({ where: { bookingId: rollback.id } }),
+        await prisma.businessAuditLog.count({ where: { targetId: duplicateEventBooking.id } }),
+        await prisma.businessOperationMutation.count({ where: { idempotencyKey: duplicateEventKey } }),
+        await prisma.bookingStatusHistory.count({ where: { bookingId: duplicateEventBooking.id } }),
       ];
-      await assert.rejects(
-        transitionOperationalBooking({ actor: fixture.owner.reference, bookingId: rollback.id, cancellationReason: "Rollback", contextOrganizationId: fixture.organizationA.id, expectedVersion: rollback.updatedAt.toISOString(), idempotencyKey: rollbackKey, nextStatus: "CANCELLED" }),
-      );
-      assert.equal((await prisma.booking.findUniqueOrThrow({ where: { id: rollback.id } })).status, "CONFIRMED");
+      await transitionOperationalBooking({ actor: fixture.owner.reference, bookingId: duplicateEventBooking.id, cancellationReason: "Exact event replay", contextOrganizationId: fixture.organizationA.id, expectedVersion: duplicateEventBooking.updatedAt.toISOString(), idempotencyKey: duplicateEventKey, nextStatus: "CANCELLED" });
+      assert.equal((await prisma.booking.findUniqueOrThrow({ where: { id: duplicateEventBooking.id } })).status, "CANCELLED");
       assert.deepEqual([
-        await prisma.businessAuditLog.count({ where: { targetId: rollback.id } }),
-        await prisma.businessOperationMutation.count({ where: { idempotencyKey: rollbackKey } }),
-        await prisma.bookingStatusHistory.count({ where: { bookingId: rollback.id } }),
-      ], beforeCounts);
+        await prisma.businessAuditLog.count({ where: { targetId: duplicateEventBooking.id } }),
+        await prisma.businessOperationMutation.count({ where: { idempotencyKey: duplicateEventKey } }),
+        await prisma.bookingStatusHistory.count({ where: { bookingId: duplicateEventBooking.id } }),
+      ], beforeCounts.map((count) => count + 1));
+      assert.equal(await prisma.notification.count({ where: { eventKey: duplicateEvent } }), 1);
     });
 
     await t.test("generic customer requests and Business proposals revalidate slots and close races", async () => {

@@ -248,6 +248,7 @@ type ReznoHomeScreenProps = {
   isRtl: boolean;
   locale: MobileLocale;
   marketplaceState: HomeMarketplaceState;
+  notificationUnreadCount: number;
   onOpenBusiness: (business: HomeBusiness) => void;
   onOpenMessages: () => void;
   onOpenNotifications: () => void;
@@ -260,6 +261,7 @@ export function ReznoHomeScreen({
   isRtl,
   locale,
   marketplaceState,
+  notificationUnreadCount,
   onOpenBusiness,
   onOpenMessages,
   onOpenNotifications,
@@ -320,6 +322,7 @@ export function ReznoHomeScreen({
           isRtl={isRtl}
           onOpenMessages={onOpenMessages}
           onOpenNotifications={onOpenNotifications}
+          notificationUnreadCount={notificationUnreadCount}
           styles={styles}
           titleSize={heroTitleSize}
         />
@@ -413,6 +416,7 @@ function HeroSection({
   isRtl,
   onOpenMessages,
   onOpenNotifications,
+  notificationUnreadCount,
   styles,
   titleSize,
 }: {
@@ -420,6 +424,7 @@ function HeroSection({
   isRtl: boolean;
   onOpenMessages: () => void;
   onOpenNotifications: () => void;
+  notificationUnreadCount: number;
   styles: HomeStyles;
   titleSize: number;
 }) {
@@ -428,6 +433,7 @@ function HeroSection({
       <View style={styles.heroTopRow}>
         <View style={styles.heroActionGroup}>
           <HeroQuickAction
+            badgeCount={notificationUnreadCount}
             icon={HOME_ICONS.message}
             label={copy.messages}
             onPress={onOpenMessages}
@@ -516,11 +522,13 @@ function HeroSection({
 }
 
 function HeroQuickAction({
+  badgeCount,
   icon,
   label,
   onPress,
   styles,
 }: {
+  badgeCount?: number;
   icon: ImageSourcePropType;
   label: string;
   onPress: () => void;
@@ -543,7 +551,11 @@ function HeroQuickAction({
           source={icon}
           style={styles.heroActionIcon}
         />
-        <View style={styles.heroActionDot} />
+        {badgeCount === undefined ? <View style={styles.heroActionDot} /> : badgeCount > 0 ? (
+          <View style={styles.heroActionBadge}>
+            <Text style={styles.heroActionBadgeText}>{badgeCount > 99 ? "99+" : badgeCount}</Text>
+          </View>
+        ) : null}
       </View>
       <Text
         adjustsFontSizeToFit
@@ -1988,6 +2000,23 @@ const createStyles = (theme: MobileTheme) => {
       justifyContent: "center",
       position: "relative",
       width: 44,
+    },
+    heroActionBadge: {
+      alignItems: "center",
+      backgroundColor: theme.colors.accent,
+      borderRadius: 999,
+      justifyContent: "center",
+      minHeight: 18,
+      minWidth: 18,
+      paddingHorizontal: 4,
+      position: "absolute",
+      right: -5,
+      top: -5,
+    },
+    heroActionBadgeText: {
+      color: theme.colors.foregroundInverse,
+      fontSize: 9,
+      fontWeight: "800",
     },
     heroActionDot: {
       backgroundColor: palette.goldBright,
