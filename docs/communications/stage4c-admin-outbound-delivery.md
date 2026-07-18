@@ -240,9 +240,10 @@ Every Admin mutation records actor, action, campaign, safe before/after status, 
 - Prisma format, validate, and generate passed;
 - non-incremental root TypeScript, mobile TypeScript, ESLint with zero warnings, Expo dependency validation, Expo Doctor 20/20, Android export, and iOS export passed;
 - production Next.js build passed and produced 69 static-generation entries plus the dynamic application routes;
-- unit tests: 309/309;
-- complete PostgreSQL integration tests: 277/277, including the Gate 4C authorization, snapshot, provider, retry, cancellation, and query-plan suite;
+- unit tests: 323/323, including 27/27 focused authenticated-cursor contracts;
+- complete PostgreSQL integration tests: 281/281, including the Gate 4C authorization, authenticated cursor, 5,000-Person bulk resolution, snapshot, provider, retry, cancellation, and query-plan suites;
 - production HTTP/RSC/API tests against `next start`: 81/81, including Admin campaign pages, legacy redirect, current revocation, and Customer Mobile outbound preferences;
+- complete local regression total: 685/685 across unit, PostgreSQL integration, and production HTTP/RSC/API suites;
 - the post-staging OIDC/protected-Preview test support and bounded Gate 4B smoke harness passed non-incremental TypeScript, zero-warning ESLint, and the affected Gate 4B/Gate 4C unit contracts 26/26;
 - deterministic local fixture ran twice with identical SHA-256 fingerprint `0669236ae62f4f61fbdca6801d525c77ea2f2fffba5fe73032d2619be565fc9e`;
 - local staging smoke proved 39 campaigns, a 24-row multi-page broadcast, 9 accepted sink attempts, transient/permanent/not-configured classification, suppression counts, all audience families, preference DTO safety, cursor pagination, audit redaction, and one canonical in-app event;
@@ -282,6 +283,8 @@ Fixture cleanup deleted exactly 12 attempts, 63 audits, 39 campaigns, 367 delive
 | Stage 3D | `101c94ba87b3c458c707b29ddae24436ee0665d7ab285099782bf8461a8f229e` |
 | Gate 4A | `252f14499ff9fbd373e86755c2ae0e94cb6b04b68eac5b784e38dbc5988eef79` |
 | Gate 4B | `387d550b8a89ed63f287ff816e2d5715aed2e36f91cae7c3eb4019e280d25966` |
+
+The final cursor-authentication staging recheck kept the database at 38/38 and ran the exact Gate 4C fixture twice after exact-ID cleanup. Both executions were byte-identical with 39 campaigns, 367 deliveries, 12 attempts, `sinkIsHumanDelivery=false`, and SHA-256 fingerprint `61d28f4e0cfc452085e8defd6329ebb80cb97084d65fcd34a6dbe821de7f3b77`. The expanded smoke additionally proved valid authenticated Campaign, Delivery, and Attempt continuation plus rejection of version 1, recomputed public-SHA Campaign/Delivery/Attempt forgeries, and a MAC bit flip; it reported `authenticatedCursorRejectionsVerified=true` while retaining the accepted delivery, suppression, provider, retry, in-app, and bulk-query counts. Exact cleanup removed 12 attempts, 63 audits, 39 campaigns, 367 deliveries, 56 mutations, 6 Notifications, 8 People, and 8 Users; the second cleanup was zero in every category. Stage 3A–3D and Gate 4A/4B then reproduced every fingerprint above, the Gate 4B role/PII/replay smoke reported `priorFingerprints=unchanged`, and the canonical Gate 4B fixture was restored.
 
 The Gate 4B role smoke initially exposed a staging-harness pool mismatch: 11 simultaneous serializable reads exceeded the direct PostgreSQL pool's default capacity of 10 and the last transaction timed out before it could start. The smoke was bounded into batches of six and five without reducing role or isolation assertions. It then passed Customer, Owner, Manager, Receptionist, assigned Staff, Admin/read-only Admin/second-Admin isolation, send/replay, current-grant cursors, read reconciliation, exact-once Notification, PII absence, and `priorFingerprints=unchanged`; a final Gate 4B seed restored the fingerprint above.
 
