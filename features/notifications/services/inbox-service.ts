@@ -259,7 +259,12 @@ async function authorizeDestinations(transaction: Prisma.TransactionClient, cont
     }) : [],
     conversationIds.length ? transaction.conversation.findMany({
       where: { id: { in: conversationIds } },
-      select: { businessId: true, customerId: true, id: true },
+      select: {
+        booking: { select: { memberId: true, organizationId: true } },
+        businessId: true,
+        customerId: true,
+        id: true,
+      },
     }) : [],
   ]);
   const result = new Map<string, { href: string; kind: NotificationDestinationKind; targetId: string | null }>();
@@ -277,7 +282,12 @@ function destinationFor(
   targetId: string | null,
   data: {
     bookings: Array<{ customerId: string; id: string; memberId: string | null; organizationId: string; restaurantReservation: { id: string } | null }>;
-    conversations: Array<{ businessId: string | null; customerId: string | null; id: string }>;
+    conversations: Array<{
+      booking: { memberId: string | null; organizationId: string } | null;
+      businessId: string | null;
+      customerId: string | null;
+      id: string;
+    }>;
     orders: Array<{ customerId: string; id: string; store: { organizationId: string } }>;
   },
 ) {
@@ -289,8 +299,11 @@ function destinationFor(
     }
   }
   if (kind === "BUSINESS_MESSAGES" && context.mode === "business") {
-    if (canAccessBusinessMessagesDestination(context) &&
-      (!targetId || data.conversations.some((item) => item.id === targetId && item.businessId === context.organizationId))) {
+    const conversation = targetId
+      ? data.conversations.find((item) => item.id === targetId)
+      : undefined;
+    if (canAccessBusinessMessagesDestination(context, conversation) &&
+      (!targetId || conversation?.businessId === context.organizationId)) {
       return destination(kind, targetId, "/business/messages");
     }
   }

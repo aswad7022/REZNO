@@ -306,6 +306,36 @@ test("Gate 1A onboarding, tenant RBAC, backfill, and conversation boundaries", {
     const customer = await createIdentity("message-customer");
     const business = await createOrganizationWithMember({ label: "message-business" });
     const otherBusiness = await createOrganizationWithMember({ label: "message-business-other" });
+    await prisma.person.updateMany({
+      where: { id: { in: [adminA.person.id, adminB.person.id] } },
+      data: { isOnboarded: true },
+    });
+    await prisma.adminAccess.createMany({
+      data: [adminA, adminB].map((admin) => ({
+        permissions: ["MESSAGES_VIEW"],
+        userId: admin.userId,
+      })),
+    });
+    const staffIdentity = await createIdentity("message-business-staff");
+    await prisma.person.update({
+      where: { id: staffIdentity.person.id },
+      data: { isOnboarded: true },
+    });
+    const staffRole = await prisma.role.create({
+      data: {
+        isSystem: true,
+        name: "STAFF",
+        organizationId: business.organization.id,
+        systemRole: "STAFF",
+      },
+    });
+    const staffMembership = await prisma.organizationMember.create({
+      data: {
+        organizationId: business.organization.id,
+        personId: staffIdentity.person.id,
+        roleId: staffRole.id,
+      },
+    });
 
     const adminConversation = await prisma.conversation.create({
       data: {
@@ -327,54 +357,95 @@ test("Gate 1A onboarding, tenant RBAC, backfill, and conversation boundaries", {
     });
 
     const wrongAdmin = await markConversationReadForActor({
-      actor: { kind: "admin", userId: adminB.userId },
+      actor: {
+        adminSource: "database",
+        canSend: false,
+        canView: true,
+        kind: "admin",
+        personId: adminB.person.id,
+        userId: adminB.userId,
+      },
       conversationId: adminConversation.id,
-      currentUserId: adminB.userId,
     });
-    assert.deepEqual(wrongAdmin, { authorized: false, updatedCount: 0 });
+    assert.equal(wrongAdmin.authorized, false);
+    assert.equal(wrongAdmin.updatedCount, 0);
     assert.equal(
       (await prisma.message.findUniqueOrThrow({ where: { id: adminConversation.messages[0]!.id } })).readAt,
       null,
     );
 
     const ownAdmin = await markConversationReadForActor({
-      actor: { kind: "admin", userId: adminA.userId },
+      actor: {
+        adminSource: "database",
+        canSend: false,
+        canView: true,
+        kind: "admin",
+        personId: adminA.person.id,
+        userId: adminA.userId,
+      },
       conversationId: adminConversation.id,
-      currentUserId: adminA.userId,
     });
-    assert.deepEqual(ownAdmin, { authorized: true, updatedCount: 1 });
+    assert.equal(ownAdmin.authorized, true);
+    assert.equal(ownAdmin.boundary?.id, adminConversation.messages[0]!.id);
+    assert.equal(
+      (await prisma.conversationReadState.findFirstOrThrow({
+        where: { conversationId: adminConversation.id, adminUserId: adminA.userId },
+      })).lastReadMessageId,
+      adminConversation.messages[0]!.id,
+    );
 
     const crossTenant = await markConversationReadForActor({
       actor: {
         kind: "business",
+        membershipId: otherBusiness.membership.id,
         organizationId: otherBusiness.organization.id,
+        personId: otherBusiness.person.id,
+        roleId: otherBusiness.roleId,
         systemRole: "OWNER",
+        userId: otherBusiness.userId,
       },
       conversationId: businessConversation.id,
-      currentUserId: otherBusiness.userId,
     });
-    assert.deepEqual(crossTenant, { authorized: false, updatedCount: 0 });
+    assert.equal(crossTenant.authorized, false);
+    assert.equal(crossTenant.updatedCount, 0);
 
     const staffSameTenant = await markConversationReadForActor({
       actor: {
         kind: "business",
+        membershipId: staffMembership.id,
         organizationId: business.organization.id,
+        personId: staffIdentity.person.id,
+        roleId: staffRole.id,
         systemRole: "STAFF",
+        userId: staffIdentity.userId,
       },
       conversationId: businessConversation.id,
-      currentUserId: business.userId,
     });
-    assert.deepEqual(staffSameTenant, { authorized: false, updatedCount: 0 });
+    assert.equal(staffSameTenant.authorized, false);
+    assert.equal(staffSameTenant.updatedCount, 0);
 
     const owner = await markConversationReadForActor({
       actor: {
         kind: "business",
+        membershipId: business.membership.id,
         organizationId: business.organization.id,
+        personId: business.person.id,
+        roleId: business.roleId,
         systemRole: "OWNER",
+        userId: business.userId,
       },
       conversationId: businessConversation.id,
-      currentUserId: business.userId,
     });
-    assert.deepEqual(owner, { authorized: true, updatedCount: 1 });
+    assert.equal(owner.authorized, true);
+    assert.equal(owner.boundary?.id, businessConversation.messages[0]!.id);
+    assert.equal(
+      (await prisma.conversationReadState.findFirstOrThrow({
+        where: {
+          conversationId: businessConversation.id,
+          scopeKey: `business:${business.person.id}:${business.organization.id}:${business.membership.id}:${business.roleId}:OWNER`,
+        },
+      })).lastReadMessageId,
+      businessConversation.messages[0]!.id,
+    );
   });
 });

@@ -1,222 +1,62 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { forbidden, redirect } from "next/navigation";
-import { z } from "zod";
-import { Prisma } from "@prisma/client";
+import { redirect } from "next/navigation";
 
-import { requireAdminPermission } from "@/features/admin/services/admin-auth";
-import { logAdminAuditEvent } from "@/features/admin/services/admin-audit";
-import {
-  requireBusinessIdentity,
-  requireCustomerIdentity,
-} from "@/features/identity/server";
-import { canAccessOrganizationConversations } from "@/features/identity/policies/authorization";
-import {
-  canAccessConversation,
-  type ConversationActor,
-} from "@/features/messages/policies/conversation-access";
+import { MessageDomainError } from "@/features/messages/domain/errors";
+import { resolveMessageActor } from "@/features/messages/services/web-actor";
 import { markConversationReadForActor } from "@/features/messages/services/conversation-read";
-import { prisma } from "@/lib/db/prisma";
-import { logServerError } from "@/lib/logging/server";
-import { consumeRateLimit } from "@/lib/security/rate-limit";
-import type { DashboardRole } from "@/types/dashboard";
+import {
+  openBookingConversationForActor,
+  sendMessage,
+  startAdminConversation as startAdminConversationCanonical,
+  startCustomerBusinessConversation as startCustomerBusinessConversationCanonical,
+} from "@/features/messages/services/delivery-service";
 import type { MessageActionState } from "@/features/messages/types";
-import { createCanonicalNotifications } from "@/features/notifications/services/producer";
-
-const bodySchema = z.string().trim().min(1).max(1000);
-
-async function findOrCreateBookingConversation({
-  bookingId,
-  businessId,
-  customerId,
-}: {
-  bookingId: string;
-  businessId: string;
-  customerId: string;
-}) {
-  const existing = await prisma.conversation.findFirst({
-    where: { bookingId, businessId, customerId, type: "CUSTOMER_BUSINESS" },
-    select: { id: true },
-  });
-  if (existing) return existing;
-
-  try {
-    return await prisma.conversation.create({
-      data: {
-        type: "CUSTOMER_BUSINESS",
-        businessId,
-        customerId,
-        bookingId,
-      },
-      select: { id: true },
-    });
-  } catch (error) {
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === "P2002"
-    ) {
-      const duplicate = await prisma.conversation.findFirst({
-        where: { bookingId, businessId, customerId, type: "CUSTOMER_BUSINESS" },
-        select: { id: true },
-      });
-      if (duplicate) return duplicate;
-    }
-    throw error;
-  }
-}
+import { logServerError } from "@/lib/logging/server";
+import type { DashboardRole } from "@/types/dashboard";
 
 export async function openBookingConversation(
   role: "business" | "customer",
   bookingId: string,
 ) {
-  if (role === "customer") {
-    const { person } = await requireCustomerIdentity();
-    const booking = await prisma.booking.findFirst({
-      where: {
-        id: bookingId,
-        customerId: person.id,
-        organization: { deletedAt: null, isActive: true, status: "ACTIVE" },
-      },
-      select: { id: true, organizationId: true, customerId: true },
-    });
-    if (!booking) return;
-
-    try {
-      await findOrCreateBookingConversation({
-        bookingId: booking.id,
-        businessId: booking.organizationId,
-        customerId: booking.customerId,
-      });
-    } catch (error) {
-      logServerError("messages.openBookingCustomer", error, {
-        bookingId,
-        customerId: person.id,
-      });
-    }
-    revalidatePath("/customer/messages");
-    redirect("/customer/messages");
-  }
-
-  const { membership } = await requireBusinessIdentity();
-  if (!canAccessOrganizationConversations(membership.role.systemRole)) {
-    forbidden();
-  }
-  const booking = await prisma.booking.findFirst({
-    where: {
-      id: bookingId,
-      organizationId: membership.organizationId,
-    },
-    select: { id: true, organizationId: true, customerId: true },
-  });
-  if (!booking) return;
-
+  const actor = await resolveMessageActor(role);
+  if (actor.kind === "admin") return;
+  let conversationId: string;
   try {
-    await findOrCreateBookingConversation({
-      bookingId: booking.id,
-      businessId: booking.organizationId,
-      customerId: booking.customerId,
-    });
+    const conversation = await openBookingConversationForActor(actor, bookingId);
+    conversationId = conversation.id;
+    revalidateMessaging(role);
   } catch (error) {
-    logServerError("messages.openBookingBusiness", error, {
-      bookingId,
-      organizationId: membership.organizationId,
-    });
+    if (error instanceof MessageDomainError) return;
+    logServerError("messages.openBooking", error, { bookingId, role });
+    return;
   }
-  revalidatePath("/business/messages");
-  redirect("/business/messages");
+  redirect(`/${role}/messages?conversationId=${conversationId}`);
 }
 
 export async function startCustomerBusinessConversation(
   _state: MessageActionState,
   formData: FormData,
 ): Promise<MessageActionState> {
-  const { person, session } = await requireCustomerIdentity();
-  const rateLimit = consumeRateLimit("message:start", person.id, {
-    limit: 10,
-    windowMs: 60_000,
-  });
-  if (!rateLimit.success) {
-    return {
-      status: "error",
-      message:
-        "تم إرسال رسائل كثيرة خلال وقت قصير. انتظر قليلًا ثم حاول مرة أخرى.",
-    };
-  }
-  const parsed = z
-    .object({
-      businessId: z.string().uuid(),
-      body: bodySchema,
-    })
-    .safeParse(Object.fromEntries(formData));
-
-  if (!parsed.success) return { status: "error", message: "تحقق من الرسالة." };
-
-  const business = await prisma.organization.findFirst({
-    where: {
-      id: parsed.data.businessId,
-      deletedAt: null,
-      isActive: true,
-      status: "ACTIVE",
-      bookings: { some: { customerId: person.id } },
-    },
-    select: { id: true },
-  });
-  if (!business) return { status: "error", message: "النشاط غير متاح." };
-
+  const actor = await resolveMessageActor("customer");
+  if (actor.kind !== "customer") return failure("FORBIDDEN");
   try {
-    await prisma.$transaction(async (transaction) => {
-      const conversation = await transaction.conversation.create({
-        data: {
-          type: "CUSTOMER_BUSINESS",
-          businessId: business.id,
-          customerId: person.id,
-        },
-        select: { id: true },
-      });
-      const message = await transaction.message.create({
-        data: {
-          body: parsed.data.body,
-          conversationId: conversation.id,
-          senderUserId: session.user.id,
-        },
-        select: { id: true },
-      });
-      const recipients = await businessMessageRecipients(transaction, business.id);
-      await createCanonicalNotifications(transaction, recipients.map((recipientPersonId) => ({
-        audience: "USER" as const,
-        body: "A customer sent a new message. Open the conversation to read it.",
-        bodyKey: "notifications.message.customer.body",
-        businessId: business.id,
-        category: "MESSAGES" as const,
-        destinationKind: "BUSINESS_MESSAGES" as const,
-        destinationTargetId: conversation.id,
-        eventKey: `message:${message.id}:business:${recipientPersonId}`,
-        eventType: "message.received",
-        mandatory: false,
-        priority: "NORMAL" as const,
-        recipientPersonId,
-        sourceId: conversation.id,
-        sourceType: "CONVERSATION" as const,
-        title: "New customer message",
-        titleKey: "notifications.message.customer.title",
-      })));
+    const result = await startCustomerBusinessConversationCanonical(actor, {
+      body: formData.get("body"),
+      businessId: stringField(formData, "businessId"),
+      idempotencyKey: stringField(formData, "idempotencyKey"),
     });
-  } catch (error) {
-    logServerError("messages.startCustomerBusiness", error, {
-      customerId: person.id,
-      businessId: business.id,
-    });
+    revalidateMessaging("customer");
+    revalidateMessaging("business");
     return {
-      status: "error",
-      message: "تعذر إرسال الرسالة الآن. حاول مرة أخرى بعد قليل.",
+      conversationId: result.conversationId,
+      message: "تم إرسال الرسالة.",
+      status: "success",
     };
+  } catch (error) {
+    return actionFailure("messages.startCustomer", error);
   }
-
-  revalidatePath("/customer/messages");
-  revalidatePath("/business/messages");
-  revalidatePath("/business/notifications");
-  return { status: "success", message: "تم إرسال الرسالة." };
 }
 
 export async function sendConversationMessage(
@@ -225,294 +65,112 @@ export async function sendConversationMessage(
   _state: MessageActionState,
   formData: FormData,
 ): Promise<MessageActionState> {
-  const parsed = bodySchema.safeParse(formData.get("body"));
-
-  if (!parsed.success) return { status: "error", message: "اكتب رسالة صالحة." };
-
-  const conversation = await prisma.conversation.findUnique({
-    where: { id: conversationId },
-    select: {
-      businessId: true,
-      customerId: true,
-      adminUserId: true,
-      bookingId: true,
-      type: true,
-      business: { select: { name: true } },
-      customer: { select: { firstName: true, displayName: true } },
-    },
-  });
-  if (!conversation) return { status: "error", message: "المحادثة غير موجودة." };
-
-  let senderUserId: string;
-  let actor: ConversationActor;
-
-  if (role === "business") {
-    const identity = await requireBusinessIdentity();
-    senderUserId = identity.session.user.id;
-    actor = {
-      kind: "business",
-      organizationId: identity.membership.organizationId,
-      systemRole: identity.membership.role.systemRole,
-    };
-  } else if (role === "customer") {
-    const identity = await requireCustomerIdentity();
-    senderUserId = identity.session.user.id;
-    actor = { kind: "customer", personId: identity.person.id };
-  } else {
-    const { identity } = await requireAdminPermission("MESSAGES_SEND");
-    senderUserId = identity.session.user.id;
-    actor = { kind: "admin", userId: senderUserId };
-  }
-
-  if (!canAccessConversation(conversation, actor)) {
-    return { status: "error", message: "لا تملك صلاحية الرد." };
-  }
-  const rateLimit = consumeRateLimit("message:send", senderUserId, {
-    limit: 20,
-    windowMs: 60_000,
-  });
-  if (!rateLimit.success) {
-    return {
-      status: "error",
-      message:
-        "تم إرسال رسائل كثيرة خلال وقت قصير. انتظر قليلًا ثم حاول مرة أخرى.",
-    };
-  }
-
+  const actor = await resolveMessageActor(
+    role,
+    role === "admin" ? "MESSAGES_SEND" : "MESSAGES_VIEW",
+  );
   try {
-    await prisma.$transaction(async (transaction) => {
-      const message = await transaction.message.create({
-        data: {
-          conversationId,
-          senderUserId,
-          body: parsed.data,
-        },
-        select: { id: true },
-      });
-      await transaction.conversation.update({
-        where: { id: conversationId },
-        data: { updatedAt: new Date() },
-      });
-      if (role === "customer" && conversation.businessId) {
-        const recipients = await businessMessageRecipients(transaction, conversation.businessId);
-        await createCanonicalNotifications(transaction, recipients.map((recipientPersonId) => ({
-          audience: "USER" as const,
-          body: "A customer sent a new message. Open the conversation to read it.",
-          bodyKey: "notifications.message.customer.body",
-          businessId: conversation.businessId!,
-          category: "MESSAGES" as const,
-          destinationKind: "BUSINESS_MESSAGES" as const,
-          destinationTargetId: conversationId,
-          eventKey: `message:${message.id}:business:${recipientPersonId}`,
-          eventType: "message.received",
-          mandatory: false,
-          priority: "NORMAL" as const,
-          recipientPersonId,
-          sourceId: conversationId,
-          sourceType: "CONVERSATION" as const,
-          title: "New customer message",
-          titleKey: "notifications.message.customer.title",
-        })));
-      } else if (role === "business" && conversation.customerId) {
-        await createCanonicalNotifications(transaction, [{
-          audience: "USER",
-          body: "A business sent a new message. Open the conversation to read it.",
-          bodyKey: "notifications.message.business.body",
-          businessId: conversation.businessId ?? undefined,
-          category: "MESSAGES",
-          destinationKind: "CUSTOMER_MESSAGES",
-          destinationTargetId: conversationId,
-          eventKey: `message:${message.id}:customer:${conversation.customerId}`,
-          eventType: "message.received",
-          mandatory: false,
-          priority: "NORMAL",
-          recipientPersonId: conversation.customerId,
-          sourceId: conversationId,
-          sourceType: "CONVERSATION",
-          title: "New business message",
-          titleKey: "notifications.message.business.title",
-        }]);
-      }
+    const result = await sendMessage(actor, {
+      body: formData.get("body"),
+      conversationId,
+      idempotencyKey: stringField(formData, "idempotencyKey"),
     });
-  } catch (error) {
-    logServerError("messages.send", error, { conversationId, role });
+    revalidateMessaging(role);
+    revalidatePath("/customer/notifications");
+    revalidatePath("/business/notifications");
     return {
-      status: "error",
-      message: "تعذر إرسال الرسالة الآن. حاول مرة أخرى بعد قليل.",
+      message: result.replayed ? "تم تأكيد الرسالة السابقة." : "تم الإرسال.",
+      status: "success",
     };
+  } catch (error) {
+    return actionFailure("messages.send", error, { conversationId, role });
   }
-
-  if (role === "admin") {
-    await logAdminAuditEvent({
-      adminUserId: senderUserId,
-      action: "admin.message.send",
-      targetType: conversation.type,
-      targetId: conversationId,
-      metadata: {
-        businessId: conversation.businessId,
-        customerId: conversation.customerId,
-        bookingId: conversation.bookingId,
-      },
-    });
-  }
-
-  revalidatePath(`/${role === "admin" ? "admin" : role}/messages`);
-  if (role === "business") revalidatePath("/customer/notifications");
-  if (role === "customer") revalidatePath("/business/notifications");
-  return { status: "success", message: "تم الإرسال." };
-}
-
-async function businessMessageRecipients(
-  transaction: Prisma.TransactionClient,
-  organizationId: string,
-) {
-  const memberships = await transaction.organizationMember.findMany({
-    where: {
-      deletedAt: null,
-      organizationId,
-      status: "ACTIVE",
-      organization: { deletedAt: null, isActive: true, status: "ACTIVE" },
-      person: { deletedAt: null, isOnboarded: true, status: "ACTIVE" },
-      role: { organizationId },
-    },
-    select: { personId: true, role: { select: { systemRole: true } } },
-  });
-  return memberships
-    .filter((membership) => canAccessOrganizationConversations(membership.role.systemRole))
-    .map((membership) => membership.personId);
 }
 
 export async function startAdminConversation(
   _state: MessageActionState,
   formData: FormData,
 ): Promise<MessageActionState> {
-  const { identity } = await requireAdminPermission("MESSAGES_SEND");
-  const { session } = identity;
-  const rateLimit = consumeRateLimit("message:adminStart", session.user.id, {
-    limit: 20,
-    windowMs: 60_000,
-  });
-  if (!rateLimit.success) {
-    return {
-      status: "error",
-      message:
-        "تم إرسال رسائل كثيرة خلال وقت قصير. انتظر قليلًا ثم حاول مرة أخرى.",
-    };
+  const actor = await resolveMessageActor("admin", "MESSAGES_SEND");
+  if (actor.kind !== "admin") return failure("FORBIDDEN");
+  const [targetType, targetId] = stringField(formData, "target").split(":", 2);
+  if (targetType !== "USER" && targetType !== "BUSINESS") {
+    return failure("VALIDATION_ERROR");
   }
-  const parsed = z
-    .object({
-      targetType: z.enum(["USER", "BUSINESS"]),
-      personId: z.string().uuid().optional().or(z.literal("")),
-      businessId: z.string().uuid().optional().or(z.literal("")),
-      body: bodySchema,
-    })
-    .safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return { status: "error", message: "تحقق من الرسالة." };
-  const hasValidTarget =
-    parsed.data.targetType === "USER"
-      ? Boolean(parsed.data.personId)
-      : Boolean(parsed.data.businessId);
-  if (!hasValidTarget) {
-    return { status: "error", message: "حدد المستلم بشكل صحيح." };
-  }
-
-  const targetExists =
-    parsed.data.targetType === "USER"
-      ? await prisma.person.findFirst({
-          where: {
-            id: parsed.data.personId,
-            deletedAt: null,
-            status: "ACTIVE",
-          },
-          select: { id: true },
-        })
-      : await prisma.organization.findFirst({
-          where: {
-            id: parsed.data.businessId,
-            deletedAt: null,
-            isActive: true,
-            status: "ACTIVE",
-          },
-          select: { id: true },
-        });
-  if (!targetExists) {
-    return { status: "error", message: "المستلم غير متاح." };
-  }
-
-  let conversationId: string;
   try {
-    const conversation = await prisma.conversation.create({
-      data: {
-        type:
-          parsed.data.targetType === "USER" ? "ADMIN_USER" : "ADMIN_BUSINESS",
-        adminUserId: session.user.id,
-        customerId:
-          parsed.data.targetType === "USER" ? parsed.data.personId : null,
-        businessId:
-          parsed.data.targetType === "BUSINESS" ? parsed.data.businessId : null,
-        messages: {
-          create: { senderUserId: session.user.id, body: parsed.data.body },
-        },
-      },
-      select: { id: true },
+    const result = await startAdminConversationCanonical(actor, {
+      body: formData.get("body"),
+      idempotencyKey: stringField(formData, "idempotencyKey"),
+      targetId: targetId ?? "",
+      targetType,
     });
-    conversationId = conversation.id;
-  } catch (error) {
-    logServerError("messages.startAdmin", error, {
-      adminUserId: session.user.id,
-      targetType: parsed.data.targetType,
-    });
+    revalidateMessaging("admin");
+    revalidateMessaging("customer");
+    revalidateMessaging("business");
     return {
-      status: "error",
-      message: "تعذر إرسال الرسالة الآن. حاول مرة أخرى بعد قليل.",
+      conversationId: result.conversationId,
+      message: "تم إرسال الرسالة.",
+      status: "success",
     };
+  } catch (error) {
+    return actionFailure("messages.startAdmin", error);
   }
-
-  await logAdminAuditEvent({
-    adminUserId: session.user.id,
-    action: "admin.message.start",
-    targetType: parsed.data.targetType,
-    targetId:
-      parsed.data.targetType === "USER"
-        ? parsed.data.personId || undefined
-        : parsed.data.businessId || undefined,
-    metadata: { conversationId },
-  });
-
-  revalidatePath("/admin/messages");
-  revalidatePath("/customer/messages");
-  revalidatePath("/business/messages");
-  return { status: "success", message: "تم إرسال الرسالة." };
 }
 
 export async function markConversationRead(
   role: DashboardRole | "admin",
   conversationId: string,
+  throughMessageId?: string,
 ) {
-  let actor: ConversationActor;
-  let currentUserId: string;
-
-  if (role === "admin") {
-    const { identity } = await requireAdminPermission("MESSAGES_VIEW");
-    currentUserId = identity.session.user.id;
-    actor = { kind: "admin", userId: currentUserId };
-  } else if (role === "business") {
-    const identity = await requireBusinessIdentity();
-    currentUserId = identity.session.user.id;
-    actor = {
-      kind: "business",
-      organizationId: identity.membership.organizationId,
-      systemRole: identity.membership.role.systemRole,
-    };
-  } else {
-    const identity = await requireCustomerIdentity();
-    currentUserId = identity.session.user.id;
-    actor = { kind: "customer", personId: identity.person.id };
-  }
-
-  await markConversationReadForActor({
+  const actor = await resolveMessageActor(role);
+  const result = await markConversationReadForActor({
     actor,
     conversationId,
-    currentUserId,
+    throughMessageId,
   });
+  if (!result.authorized) return { ok: false as const };
+  revalidateMessaging(role);
+  revalidatePath("/customer/notifications");
+  revalidatePath("/business/notifications");
+  return { ok: true as const, ...result };
+}
+
+function stringField(formData: FormData, name: string) {
+  const value = formData.get(name);
+  return typeof value === "string" ? value : "";
+}
+
+function actionFailure(
+  label: string,
+  error: unknown,
+  metadata?: Record<string, string | number | boolean | null | undefined>,
+): MessageActionState {
+  if (error instanceof MessageDomainError) return failure(error.code);
+  logServerError(label, error, metadata);
+  return {
+    code: "INTERNAL_ERROR",
+    message: "تعذر تنفيذ عملية الرسائل الآن. حاول مرة أخرى.",
+    status: "error",
+  };
+}
+
+function failure(code: string): MessageActionState {
+  const messages: Record<string, string> = {
+    FORBIDDEN: "لا تملك صلاحية تنفيذ هذه العملية.",
+    IDEMPOTENCY_CONFLICT: "تعذر إعادة استخدام مفتاح الإرسال لهذه الرسالة.",
+    INVALID_CURSOR: "رابط صفحة الرسائل غير صالح.",
+    NOT_FOUND: "المحادثة أو المستلم غير متاح.",
+    RATE_LIMITED: "تم إرسال رسائل كثيرة خلال وقت قصير. انتظر قليلًا.",
+    VALIDATION_ERROR: "تحقق من الرسالة والبيانات المطلوبة.",
+  };
+  return {
+    code,
+    message: messages[code] ?? "تعذر تنفيذ عملية الرسائل.",
+    status: "error",
+  };
+}
+
+function revalidateMessaging(role: DashboardRole | "admin") {
+  revalidatePath(`/${role}/messages`);
+  revalidatePath(`/${role}`);
 }

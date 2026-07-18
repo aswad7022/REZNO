@@ -1,12 +1,20 @@
-import type { ConversationType, SystemRole } from "@prisma/client";
+import type { ConversationType } from "@prisma/client";
 
-import { canAccessOrganizationConversations } from "@/features/identity/policies/authorization";
+import {
+  canAccessOrganizationConversations,
+  canOperateBookings,
+} from "@/features/identity/policies/authorization";
 
 export type ConversationAccessRecord = {
   adminUserId: string | null;
   businessId: string | null;
   customerId: string | null;
   type: ConversationType;
+  booking?: {
+    customerId: string;
+    memberId: string | null;
+    organizationId: string;
+  } | null;
 };
 
 export type ConversationActor =
@@ -14,8 +22,9 @@ export type ConversationActor =
   | { kind: "customer"; personId: string }
   | {
       kind: "business";
+      membershipId?: string;
       organizationId: string;
-      systemRole: SystemRole | null;
+      systemRole: "MANAGER" | "OWNER" | "RECEPTIONIST" | "STAFF";
     };
 
 /**
@@ -37,19 +46,38 @@ export function canAccessConversation(
   }
 
   if (actor.kind === "customer") {
-    return (
+    const participant =
       (conversation.type === "CUSTOMER_BUSINESS" ||
         conversation.type === "ADMIN_USER") &&
-      conversation.customerId === actor.personId
-    );
+      conversation.customerId === actor.personId;
+    if (!participant) return false;
+    return !conversation.booking ||
+      (conversation.booking.customerId === actor.personId &&
+        conversation.booking.organizationId === conversation.businessId);
   }
 
-  return (
-    canAccessOrganizationConversations(actor.systemRole) &&
-    (conversation.type === "CUSTOMER_BUSINESS" ||
-      conversation.type === "ADMIN_BUSINESS") &&
-    conversation.businessId === actor.organizationId
-  );
+  if (conversation.businessId !== actor.organizationId) return false;
+  if (canAccessOrganizationConversations(actor.systemRole)) {
+    return conversation.type === "CUSTOMER_BUSINESS" ||
+      conversation.type === "ADMIN_BUSINESS";
+  }
+  if (
+    actor.systemRole === "RECEPTIONIST" &&
+    canOperateBookings(actor.systemRole)
+  ) {
+    return conversation.type === "CUSTOMER_BUSINESS" &&
+      Boolean(
+        conversation.booking &&
+          conversation.booking.organizationId === actor.organizationId,
+      );
+  }
+  return conversation.type === "CUSTOMER_BUSINESS" &&
+    actor.systemRole === "STAFF" &&
+    Boolean(
+      conversation.booking &&
+        conversation.booking.organizationId === actor.organizationId &&
+        conversation.booking.memberId === actor.membershipId,
+    );
 }
 
 export function adminConversationWhere(userId: string) {

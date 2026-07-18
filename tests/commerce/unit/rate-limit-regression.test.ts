@@ -163,11 +163,11 @@ test("every pre-existing consumer retains its exact scope, limit, window, and re
       [/consumeRateLimit\("booking:create"/, /limit:\s*6/, /windowMs:\s*60_000/, /rateLimited/],
     ],
     [
-      "features/messages/actions/messages.ts",
+      "features/messages/services/delivery-service.ts",
       [
-        /consumeRateLimit\("message:start"/,
-        /consumeRateLimit\("message:send"/,
-        /consumeRateLimit\("message:adminStart"/,
+        /messageRateLimitConsumer\("message:start"/,
+        /messageRateLimitConsumer\("message:send"/,
+        /messageRateLimitConsumer\("message:adminStart"/,
         /limit:\s*10/,
         /limit:\s*20/,
         /windowMs:\s*60_000/,
