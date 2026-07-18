@@ -4,11 +4,17 @@ import { Prisma } from "@prisma/client";
 
 import { CommunicationDomainError } from "../../features/communications/domain/errors";
 import {
+  communicationAdminCursorScope,
+  communicationCursorFilterFingerprint,
+  encodeAttemptCursor,
+} from "../../features/communications/domain/cursor";
+import {
   getCampaignDetail,
   getCampaignPage,
   previewCampaignAudience,
 } from "../../features/communications/services/campaigns";
 import { getOutboundPreferences } from "../../features/communications/services/preferences";
+import { setCommunicationEndpointDiagnosticsTestHook } from "../../features/communications/services/endpoints";
 import {
   getAttemptPage,
   getDeliveryPage,
@@ -192,9 +198,36 @@ async function main() {
     new Set([...firstCampaignPage.items, ...secondCampaignPage.items].map((item) => item.id)).size
       >= Math.min(campaignCount, 40),
   );
+  const draftCampaignPage = await getCampaignPage(fullContext, { cursor: null, pageSize: 10, status: "DRAFT" });
+  assert.ok(draftCampaignPage.nextCursor);
+  assert.ok((await getCampaignPage(fullContext, {
+    cursor: draftCampaignPage.nextCursor, pageSize: 10, status: "DRAFT",
+  })).items.every((item) => item.status === "DRAFT"));
+  await assert.rejects(
+    getCampaignPage(fullContext, { cursor: draftCampaignPage.nextCursor, pageSize: 10, status: null }),
+    (error) => error instanceof CommunicationDomainError && error.code === "INVALID_CURSOR",
+  );
+  await assert.rejects(
+    getCampaignPage(fullContext, { cursor: firstCampaignPage.nextCursor, pageSize: 5, status: null }),
+    (error) => error instanceof CommunicationDomainError && error.code === "INVALID_CURSOR",
+  );
+  await assert.rejects(
+    getCampaignPage(viewContext, { cursor: firstCampaignPage.nextCursor, pageSize: 20, status: null }),
+    (error) => error instanceof CommunicationDomainError && error.code === "INVALID_CURSOR",
+  );
+  const tamperedEnvelope = JSON.parse(
+    Buffer.from(firstCampaignPage.nextCursor, "base64url").toString("utf8"),
+  ) as Record<string, unknown>;
+  const originalChecksum = String(tamperedEnvelope.checksum);
+  tamperedEnvelope.checksum = `${originalChecksum.slice(0, -1)}${originalChecksum.endsWith("0") ? "1" : "0"}`;
+  const tamperedCampaignCursor = Buffer.from(JSON.stringify(tamperedEnvelope), "utf8").toString("base64url");
+  await assert.rejects(
+    getCampaignPage(fullContext, { cursor: tamperedCampaignCursor, pageSize: 20, status: null }),
+    (error) => error instanceof CommunicationDomainError && error.code === "INVALID_CURSOR",
+  );
   assert.ok((await getCampaignPage(viewContext, { cursor: null, pageSize: 5, status: null })).items.length > 0);
   await assert.rejects(
-    getCampaignPage(revokedContext, { cursor: null, pageSize: 5, status: null }),
+    getCampaignPage(revokedContext, { cursor: firstCampaignPage.nextCursor, pageSize: 20, status: null }),
     (error) => error instanceof CommunicationDomainError && error.code === "FORBIDDEN",
   );
 
@@ -218,9 +251,32 @@ async function main() {
     new Set(deliveryPages.flatMap((page) => page.items).map((item) => item.id)).size,
     broadcastDeliveries,
   );
+  const suppressedDeliveryPage = await getDeliveryPage(fullContext, {
+    campaignId: broadcastMutation.campaignId, cursor: null, pageSize: 20, status: "SUPPRESSED",
+  });
+  assert.ok(suppressedDeliveryPage.nextCursor);
+  assert.ok((await getDeliveryPage(fullContext, {
+    campaignId: broadcastMutation.campaignId,
+    cursor: suppressedDeliveryPage.nextCursor,
+    pageSize: 20,
+    status: "SUPPRESSED",
+  })).items.every((item) => item.status === "SUPPRESSED"));
+  await assert.rejects(
+    getDeliveryPage(fullContext, {
+      campaignId: broadcastMutation.campaignId,
+      cursor: suppressedDeliveryPage.nextCursor,
+      pageSize: 20,
+      status: null,
+    }),
+    (error) => error instanceof CommunicationDomainError && error.code === "INVALID_CURSOR",
+  );
   smokeCheckpoint = "attempt-detail";
   const attemptedDelivery = await prisma.outboundDelivery.findFirstOrThrow({
-    where: { campaign: { createdByAdminUserId: FULL_ADMIN_USER_ID }, attempts: { some: {} } },
+    where: {
+      campaign: { createdByAdminUserId: FULL_ADMIN_USER_ID },
+      campaignId: { not: broadcastMutation.campaignId },
+      attempts: { some: {} },
+    },
     select: { id: true, campaignId: true },
   });
   assert.ok((await getAttemptPage(fullContext, {
@@ -229,8 +285,45 @@ async function main() {
     pageSize: 20,
   })).items.length > 0);
   assert.equal((await getCampaignDetail(fullContext, attemptedDelivery.campaignId)).id, attemptedDelivery.campaignId);
+  await assert.rejects(
+    getDeliveryPage(fullContext, {
+      campaignId: attemptedDelivery.campaignId,
+      cursor: firstDeliveryPage.nextCursor,
+      pageSize: 20,
+      status: null,
+    }),
+    (error) => error instanceof CommunicationDomainError && error.code === "INVALID_CURSOR",
+  );
+  const attemptAnchor = await prisma.outboundDeliveryAttempt.findFirstOrThrow({
+    where: { deliveryId: attemptedDelivery.id },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    select: { createdAt: true, id: true },
+  });
+  const otherAttemptedDelivery = await prisma.outboundDelivery.findFirstOrThrow({
+    where: { id: { not: attemptedDelivery.id }, attempts: { some: {} } },
+    select: { id: true },
+  });
+  const syntheticAttemptCursor = encodeAttemptCursor({
+    adminScope: communicationAdminCursorScope(fullContext),
+    filterFingerprint: communicationCursorFilterFingerprint({}),
+    pageSize: 1,
+    parentId: attemptedDelivery.id,
+    snapshot: new Date(),
+    sortTimestamp: attemptAnchor.createdAt,
+    tieBreakerId: attemptAnchor.id,
+  });
+  await assert.rejects(
+    getAttemptPage(fullContext, {
+      deliveryId: otherAttemptedDelivery.id, cursor: syntheticAttemptCursor, pageSize: 1,
+    }),
+    (error) => error instanceof CommunicationDomainError && error.code === "INVALID_CURSOR",
+  );
 
   smokeCheckpoint = "audience-preview";
+  const endpointDiagnostics: Array<{ endpointQueryCount: number; personCount: number; selectedChannels: string[] }> = [];
+  setCommunicationEndpointDiagnosticsTestHook((diagnostics) => {
+    endpointDiagnostics.push(diagnostics);
+  });
   const audiencePreviews = await Promise.all([
     previewCampaignAudience(fullContext, {
       audience: "CUSTOMERS", targetPersonId: null, targetOrganizationId: null,
@@ -249,7 +342,11 @@ async function main() {
       channels: ["IN_APP"], category: "ADMIN_ANNOUNCEMENT", mandatory: false,
     }),
   ]);
+  setCommunicationEndpointDiagnosticsTestHook(undefined);
   assert.ok(audiencePreviews.every((preview) => preview.evaluated > 0 && !preview.tooLarge));
+  const outboundPreviewDiagnostics = endpointDiagnostics.find((item) => item.selectedChannels.length === 3);
+  assert.ok(outboundPreviewDiagnostics);
+  assert.ok(outboundPreviewDiagnostics.endpointQueryCount <= Math.ceil(outboundPreviewDiagnostics.personCount / 1_000));
   smokeCheckpoint = "preference-target-search";
   const preferences = await getOutboundPreferences({ personId: CUSTOMER_PERSON_ID, userId: CUSTOMER_USER_ID });
   assert.equal(preferences.endpoints.EMAIL.eligible, true);
@@ -280,6 +377,8 @@ async function main() {
     inAppExactOnce: inAppCampaigns,
     campaignPagesVerified: 2,
     deliveryPagesVerified: deliveryPages.length,
+    cursorScopeRejectionsVerified: true,
+    bulkEndpointQueries: outboundPreviewDiagnostics.endpointQueryCount,
     audienceFamiliesVerified: audiencePreviews.length,
     preferenceContractVerified: true,
     auditRows: audits,
