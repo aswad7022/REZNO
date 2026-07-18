@@ -16,6 +16,7 @@ import {
   assertAdminPageLimit,
   decodeAdminCursor,
   encodeAdminCursor,
+  isOverduePending,
 } from "@/features/commerce/domain/admin-commerce";
 import { commerceError } from "@/features/commerce/domain/errors";
 import { decimalString } from "@/features/commerce/domain/money";
@@ -55,7 +56,11 @@ const adminOrderListInclude = {
 
 type AdminOrderListRecord = Prisma.OrderGetPayload<{ include: typeof adminOrderListInclude }>;
 
-export async function listAdminOrders(context: CommerceAdminContext, query: AdminOrderListQuery) {
+export async function listAdminOrders(
+  context: CommerceAdminContext,
+  query: AdminOrderListQuery,
+  options: { now?: () => Date } = {},
+) {
   assertAdminPermission(context, "COMMERCE_ORDERS_VIEW");
   assertAdminPageLimit(query.limit);
   assertDateRange(query.createdFrom, query.createdTo);
@@ -63,8 +68,16 @@ export async function listAdminOrders(context: CommerceAdminContext, query: Admi
   for (const [field, value] of [["Organization", query.organizationId], ["Store", query.storeId]] as const) {
     if (value && !uuid.safeParse(value).success) commerceError("VALIDATION_ERROR", `${field} filter must be a UUID.`);
   }
+  if (query.overdue !== undefined && query.orderStatus && query.orderStatus !== "PENDING") {
+    commerceError("VALIDATION_ERROR", "The overdue filter can only be combined with PENDING status.");
+  }
+  if (query.deliveryFailure === true && query.fulfillmentStatus && query.fulfillmentStatus !== "DELIVERY_FAILED") {
+    commerceError("VALIDATION_ERROR", "The delivery-failure filter conflicts with the selected fulfillment status.");
+  }
+  if (query.deliveryFailure === false && query.fulfillmentStatus === "DELIVERY_FAILED") {
+    commerceError("VALIDATION_ERROR", "The non-failure filter conflicts with DELIVERY_FAILED status.");
+  }
   const search = query.query?.trim().slice(0, 120) || undefined;
-  const evaluationTime = new Date();
   const filter = adminFilterFingerprint({
     createdFrom: query.createdFrom?.toISOString(), createdTo: query.createdTo?.toISOString(),
     deliveryFailure: query.deliveryFailure, fulfillmentMethod: query.fulfillmentMethod,
@@ -77,21 +90,23 @@ export async function listAdminOrders(context: CommerceAdminContext, query: Admi
   const cursor = query.cursor
     ? decodeAdminCursor(query.cursor, { actor, filter, kind: "orders", permission: "COMMERCE_ORDERS_VIEW", target: "all" })
     : null;
-  const snapshot = cursor?.snapshotDate ?? evaluationTime;
+  const evaluationTime = cursor?.snapshotDate ?? options.now?.() ?? new Date();
+  const snapshot = evaluationTime;
   const where: Prisma.OrderWhereInput = {
     createdAt: { gte: query.createdFrom, lte: query.createdTo },
     fulfillmentMethod: query.fulfillmentMethod,
     fulfillmentStatus: query.deliveryFailure === true ? "DELIVERY_FAILED" : query.fulfillmentStatus,
     paymentStatus: query.paymentStatus,
-    status: query.orderStatus,
+    status: query.overdue === undefined ? query.orderStatus : "PENDING",
     storeId: query.storeId,
     store: { organizationId: query.organizationId },
     updatedAt: {
       gte: query.updatedFrom,
       lte: query.updatedTo && query.updatedTo.getTime() < snapshot.getTime() ? query.updatedTo : snapshot,
     },
-    ...(query.overdue === true ? { reservationExpiresAt: { lte: evaluationTime }, status: "PENDING" } : {}),
-    ...(query.overdue === false ? { NOT: { reservationExpiresAt: { lte: evaluationTime }, status: "PENDING" } } : {}),
+    ...(query.overdue === true ? { reservationExpiresAt: { lte: evaluationTime } } : {}),
+    ...(query.overdue === false ? { reservationExpiresAt: { gt: evaluationTime } } : {}),
+    ...(query.deliveryFailure === false ? { NOT: { fulfillmentStatus: "DELIVERY_FAILED" } } : {}),
     ...(search ? { orderNumber: { contains: search, mode: "insensitive" } } : {}),
     ...(cursor ? { AND: [{ OR: [
       { updatedAt: { lt: cursor.sortDate } },
@@ -219,7 +234,7 @@ function adminOrderSummary(order: AdminOrderListRecord, evaluationTime: Date) {
     fulfillmentStatus: order.fulfillmentStatus, id: order.id, itemCount: order._count.items,
     orderNumber: order.orderNumber,
     organization: order.store.organization,
-    overdue: order.status === "PENDING" && order.reservationExpiresAt <= evaluationTime,
+    overdue: isOverduePending(order.status, order.reservationExpiresAt, evaluationTime),
     paymentStatus: order.paymentStatus, status: order.status,
     store: { id: order.store.id, name: order.store.name },
     totalQuantity: order.items.reduce((total, item) => total + item.quantity, 0),

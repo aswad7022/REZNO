@@ -109,6 +109,14 @@ export function assertDateRange(
   }
 }
 
+export function isOverduePending(
+  status: string,
+  reservationExpiresAt: Date,
+  evaluationTime: Date,
+) {
+  return status === "PENDING" && reservationExpiresAt.getTime() <= evaluationTime.getTime();
+}
+
 function cursorChecksum(value: AdminCursorCore) {
   return createHash("sha256")
     .update(`rezno-admin-commerce-cursor:${canonicalRequestJson(value)}`)

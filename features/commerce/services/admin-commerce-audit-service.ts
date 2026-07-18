@@ -36,6 +36,9 @@ export async function listAdminCommerceAudit(context: CommerceAdminContext, quer
   if (query.adminUserId && query.adminUserId.length > 200) commerceError("VALIDATION_ERROR", "Admin User filter is too long.");
   if (query.targetId && !uuid.safeParse(query.targetId).success) commerceError("VALIDATION_ERROR", "Audit target ID must be a UUID.");
   const action = query.action?.trim().slice(0, 120) || undefined;
+  if (action && !/^commerce\.[a-z0-9]+(?:[.-][a-z0-9]+)*$/.test(action)) {
+    commerceError("VALIDATION_ERROR", "Commerce audit action must start with commerce. and use a canonical action prefix.");
+  }
   const targetType = query.targetType?.trim().slice(0, 80) || undefined;
   const filter = adminFilterFingerprint({
     action, adminUserId: query.adminUserId, from: query.from?.toISOString(),
@@ -47,7 +50,10 @@ export async function listAdminCommerceAudit(context: CommerceAdminContext, quer
   }) : null;
   const snapshot = cursor?.snapshotDate ?? new Date();
   const where: Prisma.AdminAuditLogWhereInput = {
-    action: action ? { startsWith: action } : { startsWith: "commerce." },
+    AND: [
+      { action: { startsWith: "commerce." } },
+      ...(action ? [{ action: { startsWith: action } }] : []),
+    ],
     adminUserId: query.adminUserId,
     createdAt: { gte: query.from, lte: query.to && query.to < snapshot ? query.to : snapshot },
     targetId: query.targetId,

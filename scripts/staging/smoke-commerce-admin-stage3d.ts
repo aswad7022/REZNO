@@ -10,13 +10,14 @@ import { addCartItem, getCustomerCart } from "../../features/commerce/services/c
 import { createPendingOrder } from "../../features/commerce/services/checkout-service";
 import {
   getAdminCategoryDetail,
+  listAdminCategories,
   transitionAdminCategory,
 } from "../../features/commerce/services/admin-category-service";
 import { listAdminCommerceAudit } from "../../features/commerce/services/admin-commerce-audit-service";
 import { getAdminCommerceOverview } from "../../features/commerce/services/admin-commerce-overview-service";
-import { correctAdminInventory } from "../../features/commerce/services/admin-inventory-service";
+import { correctAdminInventory, getAdminInventoryDetail, listAdminInventory } from "../../features/commerce/services/admin-inventory-service";
 import { getAdminOrderDetail, listAdminOrders } from "../../features/commerce/services/admin-order-query-service";
-import { getAdminProductDetail, moderateAdminProduct } from "../../features/commerce/services/admin-product-service";
+import { getAdminProductDetail, listAdminProducts, moderateAdminProduct } from "../../features/commerce/services/admin-product-service";
 import { getAdminStoreDetail, listAdminStores } from "../../features/commerce/services/admin-store-query-service";
 import type { CommerceAdminContext } from "../../features/commerce/services/authorization";
 import { getMerchantCommerceReports } from "../../features/commerce/services/merchant-report-service";
@@ -41,6 +42,15 @@ const runId = randomUUID().replaceAll("-", "").slice(0, 16);
 const userIds: string[] = [];
 const personIds: string[] = [];
 const cartIds: string[] = [];
+const probeIds = {
+  adminAudit: [] as string[],
+  categories: [] as string[],
+  inventory: [] as string[],
+  movements: [] as string[],
+  orders: [] as string[],
+  products: [] as string[],
+  variants: [] as string[],
+};
 const sideEffectEvidence = {
   adminAuditDelta: 0,
   historyDelta: 0,
@@ -276,6 +286,10 @@ async function main() {
   assert.equal((await page("/business/commerce/reports", merchantCookie)).response.status, 200);
   evidence.add("audit-pagination-merchant-reports");
 
+  phase = "admin-cursor-pagination-probes";
+  await runAdminPaginationProbes(admins);
+  evidence.add("admin-order-clock-filtered-pagination-audit-history");
+
   phase = "restore-and-counts";
   const restored = await resetFixture();
   assert.equal(restored.fingerprint, baselineFingerprint);
@@ -292,6 +306,217 @@ async function main() {
     notifications: sideEffectEvidence.restoredNotifications,
   }, { adminAudits: 4, histories: 8, movements: 8, notifications: 0 });
   evidence.add("deterministic-restore-exact-counts");
+}
+
+async function runAdminPaginationProbes(admins: Record<keyof typeof profiles, AdminSession>) {
+  const categoryRows = [];
+  for (let index = 0; index < 21; index += 1) {
+    const row = await prisma.marketplaceCategory.create({ data: {
+      name: `Stage 3D Pagination Category ${runId} ${index}`,
+      normalizedName: `stage 3d pagination category ${runId} ${index}`,
+      slug: `stage3d-pagination-category-${runId}-${index}`,
+      status: "INACTIVE",
+    } });
+    categoryRows.push(row); probeIds.categories.push(row.id);
+  }
+  const productRows = [];
+  const inventoryRows = [];
+  for (let index = 0; index < 21; index += 1) {
+    const product = await prisma.product.create({ data: {
+      categoryId: FIXTURE.categories.active[0],
+      name: `Stage 3D Pagination Product ${runId} ${index}`,
+      normalizedSearchText: `stage 3d pagination product ${runId} ${index}`,
+      slug: `stage3d-pagination-product-${runId}-${index}`,
+      status: "DRAFT",
+      storeId: FIXTURE.stores.active[0],
+    } });
+    productRows.push(product); probeIds.products.push(product.id);
+    const variant = await prisma.productVariant.create({ data: {
+      currency: "IQD", isDefault: true, optionKey: `pagination-${index}`, optionValues: {}, price: "10000",
+      productId: product.id, sku: `STAGE3D-PAGE-${runId}-${index}`, storeId: FIXTURE.stores.active[0], title: `Pagination ${index}`,
+    } });
+    probeIds.variants.push(variant.id);
+    const inventory = await prisma.inventoryItem.create({ data: { onHand: 5, reserved: 1, variantId: variant.id } });
+    inventoryRows.push(inventory); probeIds.inventory.push(inventory.id);
+  }
+
+  const deadline = new Date("2030-07-18T10:00:00.000Z");
+  const beforeDeadline = new Date("2030-07-18T09:59:59.000Z");
+  const afterDeadline = new Date("2030-07-18T10:00:01.000Z");
+  const orderRows = [];
+  for (let index = 0; index < 21; index += 1) {
+    const order = await prisma.order.create({ data: {
+      currency: "IQD", customerId: FIXTURE.customerId, customerNameSnapshot: `Pagination Customer ${index}`,
+      customerPhoneSnapshot: "+9647500033000", fulfillmentMethod: "CUSTOMER_PICKUP", grandTotal: "10000",
+      orderNumber: `RZ-STAGE3D-PAGE-${runId}-${index}`, paymentMethod: "PAY_AT_PICKUP",
+      reservationExpiresAt: deadline, storeId: FIXTURE.stores.active[0],
+      storeNameSnapshot: "Stage 3D Active Store", storeSlugSnapshot: FIXTURE.stores.active[1], subtotal: "10000",
+    } });
+    orderRows.push(order); probeIds.orders.push(order.id);
+  }
+
+  const orderBase = {
+    limit: 5,
+    orderStatus: "PENDING" as const,
+    organizationId: FIXTURE.organizations.active[0],
+    overdue: false,
+    query: `RZ-STAGE3D-PAGE-${runId}`,
+    storeId: FIXTURE.stores.active[0],
+  };
+  const firstOrders = await listAdminOrders(admins.ordersView.context, orderBase, { now: () => beforeDeadline });
+  assert.ok(firstOrders.pageInfo.nextCursor);
+  assert.equal(firstOrders.evaluationTime, beforeDeadline.toISOString());
+  const orderIds = firstOrders.data.map((item) => item.id);
+  let orderCursor: string | undefined = firstOrders.pageInfo.nextCursor ?? undefined;
+  while (orderCursor) {
+    const next = await listAdminOrders(admins.ordersView.context, { ...orderBase, cursor: orderCursor }, { now: () => afterDeadline });
+    assert.equal(next.evaluationTime, beforeDeadline.toISOString());
+    assert.equal(next.data.every((item) => item.overdue === false), true);
+    orderIds.push(...next.data.map((item) => item.id));
+    orderCursor = next.pageInfo.nextCursor ?? undefined;
+  }
+  assert.equal(new Set(orderIds).size, orderIds.length);
+  assert.deepEqual(new Set(orderIds), new Set(orderRows.map((item) => item.id)));
+  assert.equal((await listAdminOrders(admins.ordersView.context, orderBase, { now: () => afterDeadline })).data.length, 0);
+  assert.equal((await listAdminOrders(admins.ordersView.context, { ...orderBase, overdue: true }, { now: () => afterDeadline })).data.every((item) => item.overdue), true);
+  await assert.rejects(listAdminOrders(admins.ordersView.context, {
+    ...orderBase, cursor: firstOrders.pageInfo.nextCursor!, overdue: true,
+  }, { now: () => afterDeadline }), isCode("INVALID_CURSOR"));
+  await assert.rejects(listAdminOrders(admins.ordersManage.context, {
+    ...orderBase, cursor: firstOrders.pageInfo.nextCursor!,
+  }, { now: () => afterDeadline }), isCode("INVALID_CURSOR"));
+  const changedSize = await listAdminOrders(admins.ordersView.context, {
+    ...orderBase, cursor: firstOrders.pageInfo.nextCursor!, limit: 7,
+  }, { now: () => afterDeadline });
+  assert.equal(changedSize.evaluationTime, beforeDeadline.toISOString());
+  assert.equal(changedSize.data.some((item) => firstOrders.data.some((first) => first.id === item.id)), false);
+
+  await assertServicePagination(
+    categoryRows.map((item) => item.id),
+    (cursor) => listAdminCategories(admins.catalogView.context, { cursor, limit: 7, search: runId, status: "INACTIVE" }),
+  );
+  await assertServicePagination(
+    productRows.map((item) => item.id),
+    (cursor) => listAdminProducts(admins.catalogView.context, { cursor, limit: 7, search: runId, status: "DRAFT", storeStatus: "ACTIVE" }),
+  );
+  await assertServicePagination(
+    inventoryRows.map((item) => item.id),
+    (cursor) => listAdminInventory(admins.inventoryView.context, { availability: "in_stock", cursor, limit: 7, query: runId, reserved: true }),
+  );
+
+  for (let index = 0; index < 35; index += 1) {
+    const audit = await prisma.adminAuditLog.create({ data: {
+      action: `commerce.pagination.${runId}`, adminUserId: admins.auditView.userId,
+      metadata: { authorization: "PRIVATE-STAGING-AUDIT", safe: `row-${index}` },
+      targetId: productRows[0]!.id, targetType: "Product",
+    } });
+    probeIds.adminAudit.push(audit.id);
+  }
+  for (const action of [`admin.pagination.${runId}`, `settings.pagination.${runId}`]) {
+    const audit = await prisma.adminAuditLog.create({ data: {
+      action, adminUserId: admins.auditView.userId, metadata: { sentinel: "NON-COMMERCE-STAGING" },
+      targetId: productRows[0]!.id, targetType: "Product",
+    } });
+    probeIds.adminAudit.push(audit.id);
+  }
+  const auditFirst = await listAdminCommerceAudit(admins.auditView.context, {
+    action: `commerce.pagination.${runId}`, limit: 10, targetId: productRows[0]!.id, targetType: "Product",
+  });
+  assert.ok(auditFirst.pageInfo.nextCursor);
+  assert.equal(auditFirst.data.every((item) => item.action.startsWith("commerce.")), true);
+  assert.equal(JSON.stringify(auditFirst.data).includes("PRIVATE-STAGING-AUDIT"), false);
+  await assert.rejects(listAdminCommerceAudit(admins.auditView.context, { action: "admin.", limit: 10 }), isCode("VALIDATION_ERROR"));
+
+  for (let index = 0; index < 21; index += 1) {
+    const movement = await prisma.stockMovement.create({ data: {
+      actorType: "ADMIN", idempotencyKey: randomUUID(), inventoryItemId: inventoryRows[0]!.id,
+      metadata: { private: "PRIVATE-STAGING-MOVEMENT" }, onHandDelta: 1, quantity: 1,
+      reason: `Stage 3D pagination ${runId} ${index}`, reservedDelta: 0, resultingOnHand: 6,
+      resultingReserved: 1, type: "ADJUSTMENT_IN",
+    } });
+    probeIds.movements.push(movement.id);
+  }
+  const movementFirst = await getAdminInventoryDetail(admins.inventoryView.context, inventoryRows[0]!.id, { limit: 10 });
+  assert.ok(movementFirst.movements.pageInfo.nextCursor);
+  const movementSecond = await getAdminInventoryDetail(admins.inventoryView.context, inventoryRows[0]!.id, {
+    cursor: movementFirst.movements.pageInfo.nextCursor!, limit: 10,
+  });
+  assert.equal(JSON.stringify(movementSecond.movements.data).includes("PRIVATE-STAGING-MOVEMENT"), false);
+  await assert.rejects(getAdminInventoryDetail(admins.inventoryView.context, inventoryRows[1]!.id, {
+    cursor: movementFirst.movements.pageInfo.nextCursor!, limit: 10,
+  }), isCode("INVALID_CURSOR"));
+
+  for (let index = 0; index < 21; index += 1) {
+    const audit = await prisma.adminAuditLog.create({ data: {
+      action: `commerce.store.pagination-${runId}`, adminUserId: admins.storesView.userId,
+      targetId: FIXTURE.stores.active[0], targetType: "Store",
+    } });
+    probeIds.adminAudit.push(audit.id);
+  }
+
+  const htmlQueries = [
+    [`/admin/commerce/categories?q=${runId}&status=INACTIVE`, admins.catalogView, ["q", "status"]],
+    [`/admin/commerce/products?q=${runId}&status=DRAFT&storeStatus=ACTIVE`, admins.catalogView, ["q", "status", "storeStatus"]],
+    [`/admin/commerce/inventory?q=${runId}&availability=in_stock&reserved=true`, admins.inventoryView, ["q", "availability", "reserved"]],
+    [`/admin/commerce/orders?q=${encodeURIComponent(`RZ-STAGE3D-PAGE-${runId}`)}&status=PENDING&overdue=false&organizationId=${FIXTURE.organizations.active[0]}&storeId=${FIXTURE.stores.active[0]}`, admins.ordersView, ["q", "status", "overdue", "organizationId", "storeId"]],
+    [`/admin/commerce/audit?action=commerce.pagination.${runId}&targetType=Product&targetId=${productRows[0]!.id}`, admins.auditView, ["action", "targetType", "targetId"]],
+  ] as const;
+  for (const [path, session, filters] of htmlQueries) {
+    const first = await page(path, session.cookie);
+    const href = nextPageHref(first.text);
+    const next = new URL(href, baseUrl);
+    const original = new URL(path, baseUrl);
+    for (const filter of filters) assert.equal(next.searchParams.get(filter), original.searchParams.get(filter));
+    assert.equal((await page(`${next.pathname}${next.search}`, session.cookie)).response.status, 200);
+    assert.equal((await page(path, session.cookie, true)).response.status, 200);
+  }
+  const changedOrder = new URL(nextPageHref((await page(htmlQueries[3][0], admins.ordersView.cookie)).text), baseUrl);
+  const orderHtmlFirst = await page(htmlQueries[3][0], admins.ordersView.cookie);
+  const orderEvaluation = orderHtmlFirst.text.match(/عند ([0-9T:.\-]+Z)/)?.[1];
+  assert.ok(orderEvaluation);
+  const orderHtmlNext = new URL(nextPageHref(orderHtmlFirst.text), baseUrl);
+  assert.match((await page(`${orderHtmlNext.pathname}${orderHtmlNext.search}`, admins.ordersView.cookie)).text, new RegExp(orderEvaluation));
+  changedOrder.searchParams.set("overdue", "true");
+  assertVisibleValidation(await page(`${changedOrder.pathname}${changedOrder.search}`, admins.ordersView.cookie));
+  assertVisibleValidation(await page(`/admin/commerce/audit?action=admin.pagination.${runId}`, admins.auditView.cookie));
+
+  const movementPage = await page(`/admin/commerce/inventory/${inventoryRows[0]!.id}`, admins.inventoryView.cookie);
+  const movementHref = nextPageHref(movementPage.text);
+  assert.equal((await page(movementHref, admins.inventoryView.cookie)).response.status, 200);
+  assertVisibleValidation(await page(`/admin/commerce/inventory/${inventoryRows[1]!.id}${new URL(movementHref, baseUrl).search}`, admins.inventoryView.cookie));
+  const storePage = await page(`/admin/commerce/stores/${FIXTURE.stores.active[0]}`, admins.storesView.cookie);
+  const storeHref = nextPageHref(storePage.text, "auditCursor");
+  assert.equal((await page(storeHref, admins.storesView.cookie)).response.status, 200);
+
+  await cleanupPaginationProbes();
+  assert.deepEqual(await probeCounts(), { adminAudit: 0, categories: 0, inventory: 0, movements: 0, orders: 0, products: 0, variants: 0 });
+}
+
+async function assertServicePagination(
+  expectedIds: string[],
+  fetchPage: (cursor?: string) => Promise<{ data: Array<{ id: string }>; pageInfo: { nextCursor: string | null } }>,
+) {
+  const actual: string[] = [];
+  let cursor: string | undefined;
+  do {
+    const page = await fetchPage(cursor);
+    actual.push(...page.data.map((item) => item.id));
+    cursor = page.pageInfo.nextCursor ?? undefined;
+  } while (cursor);
+  assert.equal(new Set(actual).size, actual.length);
+  assert.deepEqual(new Set(actual), new Set(expectedIds));
+}
+
+function nextPageHref(html: string, cursorName = "cursor") {
+  const value = html.match(new RegExp(`href="([^"]*${cursorName}=[^"]+)"`))?.[1]
+    ?.replaceAll("&amp;", "&");
+  assert.ok(value, `Expected ${cursorName} pagination link.`);
+  return value;
+}
+
+function assertVisibleValidation(result: { response: Response; text: string }) {
+  assert.equal(result.response.status, 200);
+  assert.match(result.text, /role="alert"|VALIDATION_ERROR|INVALID_CURSOR|digest/);
 }
 
 async function resetFixture() {
@@ -372,7 +597,33 @@ function isCode(expected: CommerceDomainError["code"]) {
   return (error: unknown) => error instanceof CommerceDomainError && error.code === expected;
 }
 
+async function cleanupPaginationProbes() {
+  await prisma.$transaction(async (transaction) => {
+    if (probeIds.movements.length) await transaction.stockMovement.deleteMany({ where: { id: { in: probeIds.movements } } });
+    if (probeIds.adminAudit.length) await transaction.adminAuditLog.deleteMany({ where: { id: { in: probeIds.adminAudit } } });
+    if (probeIds.orders.length) await transaction.order.deleteMany({ where: { id: { in: probeIds.orders } } });
+    if (probeIds.inventory.length) await transaction.inventoryItem.deleteMany({ where: { id: { in: probeIds.inventory } } });
+    if (probeIds.variants.length) await transaction.productVariant.deleteMany({ where: { id: { in: probeIds.variants } } });
+    if (probeIds.products.length) await transaction.product.deleteMany({ where: { id: { in: probeIds.products } } });
+    if (probeIds.categories.length) await transaction.marketplaceCategory.deleteMany({ where: { id: { in: probeIds.categories } } });
+  }, { timeout: 120_000 });
+}
+
+async function probeCounts() {
+  const [adminAudit, categories, inventory, movements, orders, products, variants] = await Promise.all([
+    prisma.adminAuditLog.count({ where: { id: { in: probeIds.adminAudit } } }),
+    prisma.marketplaceCategory.count({ where: { id: { in: probeIds.categories } } }),
+    prisma.inventoryItem.count({ where: { id: { in: probeIds.inventory } } }),
+    prisma.stockMovement.count({ where: { id: { in: probeIds.movements } } }),
+    prisma.order.count({ where: { id: { in: probeIds.orders } } }),
+    prisma.product.count({ where: { id: { in: probeIds.products } } }),
+    prisma.productVariant.count({ where: { id: { in: probeIds.variants } } }),
+  ]);
+  return { adminAudit, categories, inventory, movements, orders, products, variants };
+}
+
 async function cleanup() {
+  await cleanupPaginationProbes();
   if (baselineFingerprint) await resetFixture();
   await prisma.$transaction(async (transaction) => {
     if (cartIds.length) await transaction.cart.deleteMany({ where: { id: { in: cartIds } } });

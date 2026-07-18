@@ -404,6 +404,27 @@ snapshot. Complete ISO-8601 instants must carry `Z` or an explicit offset;
 bounds are inclusive and invalid input is shown as a validation error. Admin and
 report ranges and page sizes are bounded, and totals do not depend on page size.
 
+The PR #116 corrective closure makes that contract explicit at the web boundary:
+
+- an Admin Order list evaluates relative-time predicates once. Page 1 uses one
+  authoritative evaluation timestamp and every continuation page recovers that
+  same timestamp from its cursor. Summary counts, row classification, query
+  predicates, and the next cursor all share it;
+- `overdue=true` means PENDING with `reservationExpiresAt <= evaluationTime`,
+  while `overdue=false` means PENDING with
+  `reservationExpiresAt > evaluationTime`. Omitting `overdue` adds no overdue
+  constraint;
+- Category, Product, Inventory, Order, and Commerce Audit continuation links
+  preserve every active canonical filter. Store target-audit and Inventory
+  movement histories use independent named cursors so their pagination remains
+  reachable without changing the surrounding detail target;
+- Commerce Audit always intersects any optional action prefix with the mandatory
+  `commerce.` namespace. User input can narrow that namespace but can never
+  replace or escape it;
+- unknown, duplicated, malformed, ambiguous, or unsupported list parameters are
+  visible validation errors. They are never silently dropped or coerced into a
+  broader query.
+
 Migration `20260717193000_commerce_admin_stage3d_indexes` is migration 34. It
 adds:
 
@@ -443,7 +464,8 @@ states, unsafe-media sentinels, reserved/near-Int Inventory, Order/Payment/
 reservation states, Business/Admin audits, Merchant reports, and a foreign
 tenant. It resets only its owned namespace.
 
-Local validation completed on 2026-07-17:
+Local validation completed on 2026-07-17 and the PR #116 pagination correction
+was fully revalidated on 2026-07-18:
 
 | Validation | Result |
 | --- | --- |
@@ -451,10 +473,10 @@ Local validation completed on 2026-07-17:
 | ESLint | passed |
 | root non-incremental TypeScript | passed |
 | Prisma format/validate/generate | passed |
-| unit suite | 257/257 |
-| PostgreSQL integration suite | 226/226 |
-| production HTTP/RSC/Server Action suite | 66/66 |
-| focused Stage 3D unit/integration | 17/17 |
+| unit suite | 261/261 |
+| PostgreSQL integration suite | 229/229 |
+| production HTTP/RSC/Server Action suite | 67/67 |
+| focused Stage 3D unit/integration | 24/24 |
 | Next production build | passed; all Stage 3D routes emitted |
 | mobile clean install and TypeScript | passed |
 | Expo dependency validation | up to date |
@@ -470,6 +492,12 @@ the configured threshold; suggested automatic fixes are breaking dependency
 downgrades and were not applied in this gate.
 
 ## Real-staging evidence
+
+The evidence in this section records the previously accepted Stage 3D head and
+is intentionally preserved as historical proof. The exact-head PR #116
+pagination probes, migration preflight, cleanup counts, and repeated fixture
+fingerprints are recorded in the PR body after CI/Vercel and the authenticated
+smoke finish; they are not claimed by this documentation commit in advance.
 
 The exact PR-head `rezno-staging` Vercel Preview was Ready and was exercised
 through the protected branch Preview alias
