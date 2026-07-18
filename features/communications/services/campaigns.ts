@@ -19,14 +19,18 @@ import type {
 } from "@/features/communications/domain/contracts";
 import { communicationError } from "@/features/communications/domain/errors";
 import {
+  communicationAdminCursorScope,
+  communicationCursorFilterFingerprint,
+  decodeCampaignCursor,
+  encodeCampaignCursor,
+} from "@/features/communications/domain/cursor";
+import {
   assertCampaignEditable,
   assertScheduleAllowed,
   communicationRequestHash,
   countersFromGroups,
   createCampaignSchema,
-  decodeCursor,
   emptyDeliveryCounters,
-  encodeCursor,
   listCampaignsSchema,
   localizedContentSchema,
   parseOrValidationError,
@@ -225,16 +229,25 @@ export async function getCampaignPage(
   rawInput: unknown,
 ): Promise<CampaignPageDto> {
   const input = parseOrValidationError(listCampaignsSchema, rawInput);
-  const cursor = input.cursor ? decodeCursor(input.cursor) : null;
   return prisma.$transaction(async (transaction) => {
-    await assertCommunicationAdminCurrent(transaction, context, "NOTIFICATIONS_VIEW");
+    const currentContext = await assertCommunicationAdminCurrent(transaction, context, "NOTIFICATIONS_VIEW");
+    const authoritativeNow = new Date();
+    const adminScope = communicationAdminCursorScope(currentContext);
+    const filterFingerprint = communicationCursorFilterFingerprint({ status: input.status });
+    const cursor = input.cursor ? decodeCampaignCursor(input.cursor, {
+      adminScope,
+      filterFingerprint,
+      pageSize: input.pageSize,
+    }, authoritativeNow) : null;
+    const snapshot = cursor?.snapshotDate ?? authoritativeNow;
     const campaigns = await transaction.communicationCampaign.findMany({
       where: {
         ...(input.status ? { status: input.status } : {}),
+        createdAt: { lte: snapshot },
         ...(cursor ? {
           OR: [
-            { createdAt: { lt: cursor.createdAt } },
-            { createdAt: cursor.createdAt, id: { lt: cursor.id } },
+            { createdAt: { lt: cursor.sortDate } },
+            { createdAt: cursor.sortDate, id: { lt: cursor.tieBreakerId } },
           ],
         } : {}),
       },
@@ -249,7 +262,14 @@ export async function getCampaignPage(
         campaign,
         counters.get(campaign.id) ?? emptyDeliveryCounters(),
       )),
-      nextCursor: next ? encodeCursor(next.createdAt, next.id) : null,
+      nextCursor: next ? encodeCampaignCursor({
+        adminScope,
+        filterFingerprint,
+        pageSize: input.pageSize,
+        snapshot,
+        sortTimestamp: next.createdAt,
+        tieBreakerId: next.id,
+      }) : null,
     };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
 }

@@ -132,14 +132,14 @@ export const preferenceUpdateSchema = z.object({
 }));
 
 export const listCampaignsSchema = z.object({
-  cursor: z.string().max(300).nullable().default(null),
+  cursor: z.string().max(3_000).nullable().default(null),
   pageSize: z.number().int().min(1).max(50).default(20),
   status: z.enum(campaignStatuses).nullable().default(null),
 }).strict();
 
 export const listDeliveriesSchema = z.object({
   campaignId: uuid,
-  cursor: z.string().max(300).nullable().default(null),
+  cursor: z.string().max(3_000).nullable().default(null),
   pageSize: z.number().int().min(1).max(50).default(20),
   status: z.enum([
     "PENDING",
@@ -154,7 +154,7 @@ export const listDeliveriesSchema = z.object({
 
 export const listAttemptsSchema = z.object({
   deliveryId: uuid,
-  cursor: z.string().max(300).nullable().default(null),
+  cursor: z.string().max(3_000).nullable().default(null),
   pageSize: z.number().int().min(1).max(50).default(20),
 }).strict();
 
@@ -240,21 +240,6 @@ export function countersFromGroups(groups: Array<{ status: OutboundDeliveryStatu
     counters[key[group.status]] += group._count._all;
   }
   return counters;
-}
-
-export function encodeCursor(createdAt: Date, id: string): string {
-  return Buffer.from(JSON.stringify([createdAt.toISOString(), id]), "utf8").toString("base64url");
-}
-
-export function decodeCursor(cursor: string): { createdAt: Date; id: string } {
-  try {
-    const parsed: unknown = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8"));
-    if (!Array.isArray(parsed) || parsed.length !== 2 || typeof parsed[0] !== "string" || typeof parsed[1] !== "string") throw new Error("shape");
-    if (!isCanonicalInstant(parsed[0]) || !z.uuid().safeParse(parsed[1]).success) throw new Error("value");
-    return { createdAt: new Date(parsed[0]), id: parsed[1] };
-  } catch {
-    return communicationError("INVALID_CURSOR", "The communication cursor is invalid.");
-  }
 }
 
 export function safeEmailHtml(plainTextBody: string, safeHref: string): string {

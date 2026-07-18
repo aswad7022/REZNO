@@ -15,7 +15,15 @@ export default async function AdminCommunicationDetailPage({
   searchParams,
 }: {
   params: Promise<{ campaignId: string }>;
-  searchParams: Promise<{ cursor?: string; deliveryId?: string }>;
+  searchParams: Promise<{
+    attemptCursor?: string;
+    campaignCursor?: string;
+    campaignStatus?: string;
+    cursor?: string;
+    deliveryCursor?: string;
+    deliveryId?: string;
+    deliveryStatus?: string;
+  }>;
 }) {
   const [{ campaignId }, query, access] = await Promise.all([
     params,
@@ -23,24 +31,32 @@ export default async function AdminCommunicationDetailPage({
     requireAdminPermission("NOTIFICATIONS_VIEW"),
   ]);
   const context = communicationAdminContext(access);
+  const deliveryCursor = typeof query.deliveryCursor === "string"
+    ? query.deliveryCursor
+    : typeof query.cursor === "string" ? query.cursor : null;
+  const deliveryStatus = typeof query.deliveryStatus === "string" && query.deliveryStatus.length > 0
+    ? query.deliveryStatus
+    : null;
+  const deliveryId = typeof query.deliveryId === "string" ? query.deliveryId : null;
+  const attemptCursor = typeof query.attemptCursor === "string" ? query.attemptCursor : null;
   const [campaign, deliveries, canSend] = await Promise.all([
     getCampaignDetail(context, campaignId),
     getDeliveryPage(context, {
       campaignId,
-      cursor: typeof query.cursor === "string" ? query.cursor : null,
+      cursor: deliveryCursor,
       pageSize: 20,
-      status: null,
+      status: deliveryStatus,
     }),
     canAdmin("NOTIFICATIONS_SEND"),
   ]);
-  const attempts = query.deliveryId
-    ? await getAttemptPage(context, { deliveryId: query.deliveryId, cursor: null, pageSize: 20 })
+  const attempts = deliveryId
+    ? await getAttemptPage(context, { deliveryId, cursor: attemptCursor, pageSize: 20 })
     : null;
 
   return (
     <>
       <AdminPageHeader title="Campaign detail" description="Immutable snapshot, provider-acceptance reporting, and sanitized attempt evidence." />
-      <Button asChild variant="outline" className="mb-4"><Link href="/admin/communications">Back to campaigns</Link></Button>
+      <Button asChild variant="outline" className="mb-4"><Link href={campaignBackHref(query.campaignStatus, query.campaignCursor)}>Back to campaigns</Link></Button>
       {canSend ? <CampaignEditor initial={campaign} /> : (
         <Card><CardContent className="pt-6"><p className="font-mono text-sm">{campaign.id}</p><Badge>{campaign.status}</Badge></CardContent></Card>
       )}
@@ -56,10 +72,23 @@ export default async function AdminCommunicationDetailPage({
               </div>
               <p className="mt-2">Person {delivery.personId} · {delivery.channel} · locale {delivery.locale} · attempts {delivery.attemptCount}</p>
               <p className="mt-1">Provider {delivery.providerName ?? "—"} · code {delivery.safeProviderCode ?? "—"} · suppression {delivery.suppressionReason ?? "—"}</p>
-              <Link className="mt-2 inline-block underline" href={`/admin/communications/${campaignId}?deliveryId=${delivery.id}`}>Inspect sanitized attempts</Link>
+              <Link className="mt-2 inline-block underline" href={detailPageHref(campaignId, {
+                campaignCursor: query.campaignCursor,
+                campaignStatus: query.campaignStatus,
+                deliveryCursor,
+                deliveryId: delivery.id,
+                deliveryStatus,
+              })}>Inspect sanitized attempts</Link>
             </article>
           ))}
-          {deliveries.nextCursor ? <Button asChild variant="outline"><Link href={`/admin/communications/${campaignId}?cursor=${encodeURIComponent(deliveries.nextCursor)}`}>Next deliveries</Link></Button> : null}
+          {deliveries.nextCursor ? <Button asChild variant="outline"><Link href={detailPageHref(campaignId, {
+            attemptCursor,
+            campaignCursor: query.campaignCursor,
+            campaignStatus: query.campaignStatus,
+            deliveryCursor: deliveries.nextCursor,
+            deliveryId,
+            deliveryStatus,
+          })}>Next deliveries</Link></Button> : null}
         </CardContent>
       </Card>
       {attempts ? (
@@ -71,9 +100,43 @@ export default async function AdminCommunicationDetailPage({
                 Attempt {attempt.attemptNumber} · {attempt.outcome ?? "IN_PROGRESS"} · {attempt.providerName ?? "—"} · {attempt.safeProviderCode ?? "—"} · retryable {String(attempt.retryable)}
               </article>
             ))}
+            {attempts.nextCursor && deliveryId ? <Button asChild variant="outline"><Link href={detailPageHref(campaignId, {
+              attemptCursor: attempts.nextCursor,
+              campaignCursor: query.campaignCursor,
+              campaignStatus: query.campaignStatus,
+              deliveryCursor,
+              deliveryId,
+              deliveryStatus,
+            })}>Next attempts</Link></Button> : null}
           </CardContent>
         </Card>
       ) : null}
     </>
   );
+}
+
+type DetailQuery = {
+  attemptCursor?: string | null;
+  campaignCursor?: string | null;
+  campaignStatus?: string | null;
+  deliveryCursor?: string | null;
+  deliveryId?: string | null;
+  deliveryStatus?: string | null;
+};
+
+function detailPageHref(campaignId: string, values: DetailQuery) {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(values)) {
+    if (value) query.set(key, value);
+  }
+  const suffix = query.size > 0 ? `?${query.toString()}` : "";
+  return `/admin/communications/${campaignId}${suffix}`;
+}
+
+function campaignBackHref(status?: string, cursor?: string) {
+  const query = new URLSearchParams();
+  if (status) query.set("status", status);
+  if (cursor) query.set("cursor", cursor);
+  const suffix = query.size > 0 ? `?${query.toString()}` : "";
+  return `/admin/communications${suffix}`;
 }

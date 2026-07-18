@@ -6,10 +6,16 @@ import type {
   AttemptSummaryDto,
   DeliverySummaryDto,
 } from "@/features/communications/domain/contracts";
+import {
+  communicationAdminCursorScope,
+  communicationCursorFilterFingerprint,
+  decodeAttemptCursor,
+  decodeDeliveryCursor,
+  encodeAttemptCursor,
+  encodeDeliveryCursor,
+} from "@/features/communications/domain/cursor";
 import { communicationError } from "@/features/communications/domain/errors";
 import {
-  decodeCursor,
-  encodeCursor,
   listAttemptsSchema,
   listDeliveriesSchema,
   parseOrValidationError,
@@ -26,9 +32,18 @@ export async function getDeliveryPage(
   rawInput: unknown,
 ): Promise<{ kind: "DELIVERY_PAGE"; items: DeliverySummaryDto[]; nextCursor: string | null }> {
   const input = parseOrValidationError(listDeliveriesSchema, rawInput);
-  const cursor = input.cursor ? decodeCursor(input.cursor) : null;
   return prisma.$transaction(async (transaction) => {
-    await assertCommunicationAdminCurrent(transaction, context, "NOTIFICATIONS_VIEW");
+    const currentContext = await assertCommunicationAdminCurrent(transaction, context, "NOTIFICATIONS_VIEW");
+    const authoritativeNow = new Date();
+    const adminScope = communicationAdminCursorScope(currentContext);
+    const filterFingerprint = communicationCursorFilterFingerprint({ status: input.status });
+    const cursor = input.cursor ? decodeDeliveryCursor(input.cursor, {
+      adminScope,
+      filterFingerprint,
+      pageSize: input.pageSize,
+      parentId: input.campaignId,
+    }, authoritativeNow) : null;
+    const snapshot = cursor?.snapshotDate ?? authoritativeNow;
     const campaign = await transaction.communicationCampaign.findUnique({
       where: { id: input.campaignId },
       select: { id: true },
@@ -38,10 +53,11 @@ export async function getDeliveryPage(
       where: {
         campaignId: input.campaignId,
         ...(input.status ? { status: input.status } : {}),
+        createdAt: { lte: snapshot },
         ...(cursor ? {
           OR: [
-            { createdAt: { lt: cursor.createdAt } },
-            { createdAt: cursor.createdAt, id: { lt: cursor.id } },
+            { createdAt: { lt: cursor.sortDate } },
+            { createdAt: cursor.sortDate, id: { lt: cursor.tieBreakerId } },
           ],
         } : {}),
       },
@@ -68,7 +84,15 @@ export async function getDeliveryPage(
         suppressionReason: delivery.suppressionReason,
         createdAt: delivery.createdAt.toISOString(),
       })),
-      nextCursor: next ? encodeCursor(next.createdAt, next.id) : null,
+      nextCursor: next ? encodeDeliveryCursor({
+        adminScope,
+        filterFingerprint,
+        pageSize: input.pageSize,
+        parentId: input.campaignId,
+        snapshot,
+        sortTimestamp: next.createdAt,
+        tieBreakerId: next.id,
+      }) : null,
     };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
 }
@@ -78,9 +102,18 @@ export async function getAttemptPage(
   rawInput: unknown,
 ): Promise<{ items: AttemptSummaryDto[]; nextCursor: string | null }> {
   const input = parseOrValidationError(listAttemptsSchema, rawInput);
-  const cursor = input.cursor ? decodeCursor(input.cursor) : null;
   return prisma.$transaction(async (transaction) => {
-    await assertCommunicationAdminCurrent(transaction, context, "NOTIFICATIONS_VIEW");
+    const currentContext = await assertCommunicationAdminCurrent(transaction, context, "NOTIFICATIONS_VIEW");
+    const authoritativeNow = new Date();
+    const adminScope = communicationAdminCursorScope(currentContext);
+    const filterFingerprint = communicationCursorFilterFingerprint({});
+    const cursor = input.cursor ? decodeAttemptCursor(input.cursor, {
+      adminScope,
+      filterFingerprint,
+      pageSize: input.pageSize,
+      parentId: input.deliveryId,
+    }, authoritativeNow) : null;
+    const snapshot = cursor?.snapshotDate ?? authoritativeNow;
     const delivery = await transaction.outboundDelivery.findUnique({
       where: { id: input.deliveryId },
       select: { id: true },
@@ -89,10 +122,11 @@ export async function getAttemptPage(
     const rows = await transaction.outboundDeliveryAttempt.findMany({
       where: {
         deliveryId: input.deliveryId,
+        createdAt: { lte: snapshot },
         ...(cursor ? {
           OR: [
-            { createdAt: { lt: cursor.createdAt } },
-            { createdAt: cursor.createdAt, id: { lt: cursor.id } },
+            { createdAt: { lt: cursor.sortDate } },
+            { createdAt: cursor.sortDate, id: { lt: cursor.tieBreakerId } },
           ],
         } : {}),
       },
@@ -115,7 +149,15 @@ export async function getAttemptPage(
         finishedAt: attempt.finishedAt?.toISOString() ?? null,
         nextAttemptAt: attempt.nextAttemptAt?.toISOString() ?? null,
       })),
-      nextCursor: next ? encodeCursor(next.createdAt, next.id) : null,
+      nextCursor: next ? encodeAttemptCursor({
+        adminScope,
+        filterFingerprint,
+        pageSize: input.pageSize,
+        parentId: input.deliveryId,
+        snapshot,
+        sortTimestamp: next.createdAt,
+        tieBreakerId: next.id,
+      }) : null,
     };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
 }

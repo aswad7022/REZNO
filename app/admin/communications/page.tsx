@@ -17,11 +17,13 @@ export default async function AdminCommunicationsPage({
 }) {
   const access = await requireAdminPermission("NOTIFICATIONS_VIEW");
   const params = await searchParams;
+  const status = typeof params.status === "string" && params.status.length > 0 ? params.status : null;
+  const cursor = typeof params.cursor === "string" ? params.cursor : null;
   const [page, canSend, canDispatch] = await Promise.all([
     getCampaignPage(communicationAdminContext(access), {
-      cursor: typeof params.cursor === "string" ? params.cursor : null,
+      cursor,
       pageSize: 20,
-      status: typeof params.status === "string" && params.status.length > 0 ? params.status : null,
+      status,
     }),
     canAdmin("NOTIFICATIONS_SEND"),
     canAdmin("COMMUNICATIONS_DISPATCH"),
@@ -42,7 +44,7 @@ export default async function AdminCommunicationsPage({
             <article key={campaign.id} className="rounded-xl border p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <Link className="font-mono text-sm font-semibold underline" href={`/admin/communications/${campaign.id}`}>{campaign.id}</Link>
+                  <Link className="font-mono text-sm font-semibold underline" href={campaignDetailHref(campaign.id, status, cursor)}>{campaign.id}</Link>
                   <p className="mt-1 text-xs text-muted-foreground">{campaign.audience} · {campaign.category} · {campaign.channels.join(", ")}</p>
                   <p className="mt-1 text-xs text-muted-foreground">Created {campaign.createdAt}{campaign.scheduledAt ? ` · scheduled ${campaign.scheduledAt}` : ""}</p>
                 </div>
@@ -51,9 +53,23 @@ export default async function AdminCommunicationsPage({
               <p className="mt-3 text-xs">Accepted {campaign.counts.accepted} · retry {campaign.counts.retryScheduled} · failed {campaign.counts.permanentFailure} · suppressed {campaign.counts.suppressed}</p>
             </article>
           ))}
-          {page.nextCursor ? <Button asChild variant="outline"><Link href={`/admin/communications?cursor=${encodeURIComponent(page.nextCursor)}`}>Next page</Link></Button> : null}
+          {page.nextCursor ? <Button asChild variant="outline"><Link href={campaignPageHref(page.nextCursor, status)}>Next page</Link></Button> : null}
         </CardContent>
       </Card>
     </>
   );
+}
+
+function campaignPageHref(cursor: string, status: string | null) {
+  const query = new URLSearchParams({ cursor });
+  if (status) query.set("status", status);
+  return `/admin/communications?${query.toString()}`;
+}
+
+function campaignDetailHref(campaignId: string, status: string | null, cursor: string | null) {
+  const query = new URLSearchParams();
+  if (status) query.set("campaignStatus", status);
+  if (cursor) query.set("campaignCursor", cursor);
+  const suffix = query.size > 0 ? `?${query.toString()}` : "";
+  return `/admin/communications/${campaignId}${suffix}`;
 }
