@@ -4,7 +4,7 @@ import test from "node:test";
 import type { CommercePermission, SystemRole } from "@prisma/client";
 
 import { CommerceDomainError } from "../../../features/commerce/domain/errors";
-import { ownerManagementStoreDto } from "../../../features/commerce/domain/store-dto";
+import { merchantStoreInclude, ownerManagementStoreDto } from "../../../features/commerce/domain/store-dto";
 import { OWNER_DEFAULT_COMMERCE_PERMISSIONS } from "../../../features/identity/policies/authorization";
 import { updateCommerceRolePermissions } from "../../../features/commerce/services/commerce-access-service";
 import { resolveMerchantCommerceContext, type CommerceAdminContext, type MerchantActorReference } from "../../../features/commerce/services/authorization";
@@ -331,11 +331,15 @@ test("Gate 3A Merchant Store PostgreSQL end-to-end", { concurrency: false }, asy
   await t.test("24 Admin can suspend an ACTIVE Store", () => assert.equal(suspended.status, "SUSPENDED"));
   const reactivated = await reactivateStore(reviewer.context, adminInput(suspended));
   await t.test("25 Admin can safely reactivate a SUSPENDED Store", () => assert.equal(reactivated.status, "ACTIVE"));
+  const reactivatedOwnerView = ownerManagementStoreDto(await prisma.store.findUniqueOrThrow({
+    where: { id: reactivated.id },
+    include: merchantStoreInclude,
+  }));
   await t.test("ACTIVE operational updates cannot make a public Store unready", async () => {
     const auditBefore = await prisma.businessAuditLog.count({ where: { organizationId: owner.organization.id } });
     const ledgerBefore = await prisma.businessOperationMutation.count({ where: { organizationId: owner.organization.id } });
     await assert.rejects(
-      updateStoreProfile(owner.reference, updateInput(owner, reactivated, {
+      updateStoreProfile(owner.reference, updateInput(owner, reactivatedOwnerView, {
         deliveryEnabled: false,
         pickupEnabled: false,
       })),
@@ -363,7 +367,7 @@ test("Gate 3A Merchant Store PostgreSQL end-to-end", { concurrency: false }, asy
   });
   await t.test("29 Admin identity cannot perform Merchant update without membership", async () => {
     const forged = { contextOrganizationId: owner.organization.id, membershipId: randomUUID(), personId: reviewer.person.id };
-    await assert.rejects(updateStoreProfile(forged, updateInput(owner, reactivated)), code("FORBIDDEN"));
+    await assert.rejects(updateStoreProfile(forged, updateInput(owner, reactivatedOwnerView)), code("FORBIDDEN"));
   });
   await t.test("30 archive is blocked by an active Order", async () => {
     const merchant = await createMerchant("active-order-archive");

@@ -21,6 +21,11 @@ import {
   type MerchantStoreRecord,
 } from "@/features/commerce/domain/store-dto";
 import {
+  objectReplay,
+  recordAdminMutation,
+  resolveAdminMutationReplay,
+} from "@/features/commerce/services/admin-mutation";
+import {
   assertCommerceAdminCurrent,
   assertMerchantCommerceContextCurrent,
   assertRenderedMerchantOrganization,
@@ -41,7 +46,6 @@ import {
   lockStore,
   runCommerceSerializable,
 } from "@/features/commerce/services/transaction";
-import { sanitizeAuditValue } from "@/features/business-operations/domain/validation";
 import { prisma } from "@/lib/db/prisma";
 import { isSafePublicImageUrl } from "@/lib/security/public-image-url";
 
@@ -246,14 +250,12 @@ export async function archiveStore(
       status: "ARCHIVED",
     }),
     validate: async (store, transaction) => {
-      const [activeOrders, activeReservations] = await Promise.all([
-        transaction.order.count({
-          where: { storeId: store.id, status: { in: ["PENDING", "CONFIRMED"] } },
-        }),
-        transaction.inventoryReservation.count({
-          where: { productVariant: { storeId: store.id }, status: "ACTIVE" },
-        }),
-      ]);
+      const activeOrders = await transaction.order.count({
+        where: { storeId: store.id, status: { in: ["PENDING", "CONFIRMED"] } },
+      });
+      const activeReservations = await transaction.inventoryReservation.count({
+        where: { productVariant: { storeId: store.id }, status: "ACTIVE" },
+      });
       if (activeOrders > 0) {
         commerceError("CONFLICT", "Store with active Orders cannot be archived.");
       }
@@ -430,21 +432,17 @@ async function adminLifecycleMutation(
   }
   const requestHash = hashCheckoutRequest({ action, ...input });
   return runCommerceSerializable(async (transaction) => {
-    await assertCommerceAdminCurrent(transaction, context, "COMMERCE_STORES_REVIEW");
-    const replay = await transaction.adminAuditLog.findUnique({
-      where: {
-        adminUserId_idempotencyKey: {
-          adminUserId: context.userId,
-          idempotencyKey: input.idempotencyKey,
-        },
-      },
+    const replay = await resolveAdminMutationReplay(transaction, {
+      action,
+      context,
+      idempotencyKey: input.idempotencyKey,
+      permission: "COMMERCE_STORES_REVIEW",
+      requestHash,
+      targetId: input.storeId,
+      targetType: "Store",
+      validateResult: objectReplay<ReturnType<typeof adminStoreMutationDto>>,
     });
-    if (replay) {
-      if (replay.requestHash !== requestHash || replay.targetId !== input.storeId) {
-        commerceError("IDEMPOTENCY_CONFLICT", "The Admin idempotency key was already used.");
-      }
-      return loadAdminReplayStore(replay, input.storeId);
-    }
+    if (replay) return replay;
 
     await lockStore(transaction, input.storeId);
     await assertCommerceAdminCurrent(transaction, context, "COMMERCE_STORES_REVIEW");
@@ -479,23 +477,20 @@ async function adminLifecycleMutation(
       },
       include: merchantStoreInclude,
     });
-    const result = ownerManagementStoreDto(updated);
-    await transaction.adminAuditLog.create({
-      data: {
-        action,
-        adminUserId: context.userId,
-        idempotencyKey: input.idempotencyKey,
-        metadata: sanitizeAuditValue({
-          after: auditStoreSnapshot(updated),
-          before: auditStoreSnapshot(store),
-          reason: input.reason,
-        }) as Prisma.InputJsonValue,
-        requestHash,
-        result: result as Prisma.InputJsonValue,
-        resultVersion: updated.updatedAt,
-        targetId: updated.id,
-        targetType: "Store",
-      },
+    const result = adminStoreMutationDto(updated);
+    await recordAdminMutation(transaction, {
+      action,
+      after: auditStoreSnapshot(updated),
+      before: auditStoreSnapshot(store),
+      context,
+      idempotencyKey: input.idempotencyKey,
+      permission: "COMMERCE_STORES_REVIEW",
+      reason: input.reason,
+      requestHash,
+      result: result as Prisma.InputJsonValue,
+      resultVersion: updated.updatedAt,
+      targetId: updated.id,
+      targetType: "Store",
     });
     await notifyStoreLifecycle(transaction, {
       event: next === "REJECTED"
@@ -509,7 +504,7 @@ async function adminLifecycleMutation(
       resultVersion: updated.updatedAt,
       storeId: updated.id,
     });
-    return ownerManagementStoreDto(updated);
+    return result;
   });
 }
 
@@ -538,16 +533,6 @@ async function loadReplayStore(
     commerceError("CONFLICT", "Store replay result is unavailable.");
   }
   void actor;
-  return replay.result as ReturnType<typeof ownerManagementStoreDto>;
-}
-
-function loadAdminReplayStore(
-  replay: { result: Prisma.JsonValue | null; targetId: string | null },
-  storeId: string,
-) {
-  if (replay.targetId !== storeId || !replay.result || typeof replay.result !== "object" || Array.isArray(replay.result)) {
-    commerceError("CONFLICT", "Store replay result is unavailable.");
-  }
   return replay.result as ReturnType<typeof ownerManagementStoreDto>;
 }
 
@@ -638,6 +623,18 @@ function auditStoreSnapshot(store: MerchantStoreRecord) {
     ),
     unsafeLogoPresent: Boolean(store.logoUrl && !isSafePublicImageUrl(store.logoUrl)),
     version: store.updatedAt.toISOString(),
+  };
+}
+
+function adminStoreMutationDto(store: MerchantStoreRecord) {
+  return {
+    expectedVersion: store.updatedAt.toISOString(),
+    id: store.id,
+    name: store.name,
+    publishedAt: store.publishedAt?.toISOString() ?? null,
+    reviewReason: store.reviewReason,
+    slug: store.slug,
+    status: store.status,
   };
 }
 

@@ -14,7 +14,8 @@ export type CommerceNotificationEvent =
   | "order.cancelled"
   | "order.expired"
   | "order.new"
-  | "order.customer_cancelled";
+  | "order.customer_cancelled"
+  | "order.admin_cancelled";
 
 type CommerceNotificationLocale = "AR" | "EN" | "KU";
 
@@ -38,6 +39,14 @@ const COPY: Record<CommerceNotificationEvent, Record<CommerceNotificationLocale,
   title: string;
   titleKey: string;
 }>> = {
+  "order.admin_cancelled": localized(
+    "إلغاء إداري للطلب",
+    "Order administratively cancelled",
+    "داواکاری بە بەڕێوەبەرایەتی هەڵوەشێنرایەوە",
+    (number) => `تم إلغاء الطلب ${number} إداريًا بعد مراجعة تشغيلية.`,
+    (number) => `Order ${number} was administratively cancelled after an operational review.`,
+    (number) => `داواکاری ${number} دوای پێداچوونەوەی کارگێڕی بە بەڕێوەبەرایەتی هەڵوەشێنرایەوە.`,
+  ),
   "order.cancelled": localized(
     "تم إلغاء الطلب",
     "Order cancelled",

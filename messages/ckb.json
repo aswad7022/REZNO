@@ -1182,7 +1182,8 @@
       "commerceAccess": "دەسەڵاتی بازرگانی",
       "commerceProducts": "بەرهەمەکان",
       "commerceInventory": "کۆگا",
-      "commerceOrders": "داواکارییەکان"
+      "commerceOrders": "داواکارییەکان",
+      "commerceReports": "ڕاپۆرتی کارگێڕی"
     },
     "customer": {
       "dashboard": "داشبۆرد",
@@ -1242,7 +1243,8 @@
         "commerceAccess": "دەسەڵاتی بازرگانی",
         "commerceProducts": "بەرهەمەکان",
         "commerceInventory": "کۆگا",
-        "commerceOrders": "داواکارییەکان"
+        "commerceOrders": "داواکارییەکان",
+        "commerceReports": "ڕاپۆرتی کارگێڕی"
       }
     },
     "openMenu": "کردنەوەی لیستی ڕێنیشاندان",
@@ -1701,6 +1703,8 @@
   "Commerce": {
     "hubTitle": "بازرگانی",
     "hubDescription": "بەڕێوەبردنی بنەمای فرۆشگا و دەسەڵاتی ڕوونی بازرگانی.",
+    "reportsTitle": "ڕاپۆرتی کارگێڕی بازرگانی",
+    "reportsDescription": "نیشاندەرەکانی داواکاری و گەیاندن و بەرهەم و کۆگا بەبێ زانیاری دارایی یان کڕیار.",
     "currentAccess": "دەسەڵاتی ئێستای بازرگانی",
     "storePresent": "پڕۆفایل و ئامادەیی و دۆخی فرۆشگا بکەرەوە.",
     "storeAbsent": "تەنها فرۆشگای ئەم کارە دروست بکە.",

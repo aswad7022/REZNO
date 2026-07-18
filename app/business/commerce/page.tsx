@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { forbidden } from "next/navigation";
 import { getTranslations } from "next-intl/server";
-import { ShoppingBag, ShieldCheck, Package, ClipboardList } from "lucide-react";
+import { ShoppingBag, ShieldCheck, Package, ClipboardList, ChartNoAxesCombined } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -51,6 +51,13 @@ export default async function BusinessCommercePage() {
       href: "/business/commerce/orders",
       icon: ClipboardList,
       title: t("ordersFulfillment"),
+    },
+    {
+      active: actor.permissions.includes("REPORTS_VIEW"),
+      description: t("reportsDescription"),
+      href: "/business/commerce/reports",
+      icon: ChartNoAxesCombined,
+      title: t("reportsTitle"),
     },
   ];
   return (

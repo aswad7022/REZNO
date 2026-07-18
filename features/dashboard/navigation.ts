@@ -158,6 +158,9 @@ function businessNavigation(input: {
             ...(input.commercePermissions.includes("ORDER_VIEW")
               ? [{ title: "commerceOrders" as const, href: "/business/commerce/orders", icon: ClipboardList }]
               : []),
+            ...(input.commercePermissions.includes("REPORTS_VIEW")
+              ? [{ title: "commerceReports" as const, href: "/business/commerce/reports", icon: ChartNoAxesCombined }]
+              : []),
             ...(input.role === "OWNER"
               ? [{ title: "commerceAccess" as const, href: "/business/commerce/access", icon: ShieldCheck }]
               : []),

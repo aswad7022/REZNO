@@ -1193,7 +1193,8 @@
       "commerceAccess": "صلاحيات التجارة",
       "commerceProducts": "المنتجات",
       "commerceInventory": "المخزون",
-      "commerceOrders": "الطلبات"
+      "commerceOrders": "الطلبات",
+      "commerceReports": "التقارير التشغيلية"
     },
     "customer": {
       "dashboard": "لوحة التحكم",
@@ -1253,7 +1254,8 @@
         "commerceAccess": "صلاحيات التجارة",
         "commerceProducts": "المنتجات",
         "commerceInventory": "المخزون",
-        "commerceOrders": "الطلبات"
+        "commerceOrders": "الطلبات",
+        "commerceReports": "التقارير التشغيلية"
       }
     },
     "openMenu": "فتح قائمة التنقل",
@@ -1712,6 +1714,8 @@
   "Commerce": {
     "hubTitle": "التجارة",
     "hubDescription": "إدارة أساس المتجر وصلاحيات التجارة الصريحة لهذا النشاط.",
+    "reportsTitle": "تقارير التجارة التشغيلية",
+    "reportsDescription": "مؤشرات الطلبات والتنفيذ والمنتجات والمخزون دون بيانات مالية أو شخصية.",
     "currentAccess": "صلاحيات التجارة الحالية",
     "storePresent": "افتح ملف المتجر والجاهزية ودورة المراجعة.",
     "storeAbsent": "أنشئ المتجر الوحيد المملوك لهذا النشاط.",

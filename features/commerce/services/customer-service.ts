@@ -1,6 +1,5 @@
 import { commerceError } from "@/features/commerce/domain/errors";
 import { requireActiveCommerceCustomer } from "@/features/commerce/services/authorization";
-import { publicProductWhere, publicStoreWhere } from "@/features/commerce/services/catalog-service";
 import { runCommerceSerializable } from "@/features/commerce/services/transaction";
 import { prisma } from "@/lib/db/prisma";
 
@@ -196,38 +195,4 @@ export async function getCustomerAddress(customerId: string, addressId: string) 
   return address;
 }
 
-export async function favoriteStore(customerId: string, storeId: string) {
-  await requireActiveCommerceCustomer(customerId);
-  const store = await prisma.store.findFirst({ where: { id: storeId, ...publicStoreWhere }, select: { id: true } });
-  if (!store) commerceError("STORE_UNAVAILABLE", "Store is not available.");
-  return prisma.customerFavoriteStore.upsert({
-    where: { customerId_storeId: { customerId, storeId: store.id } },
-    create: { customerId, storeId: store.id },
-    update: {},
-  });
-}
-
-export async function unfavoriteStore(customerId: string, storeId: string) {
-  await requireActiveCommerceCustomer(customerId);
-  await prisma.customerFavoriteStore.deleteMany({ where: { customerId, storeId } });
-}
-
-export async function favoriteProduct(customerId: string, productId: string) {
-  await requireActiveCommerceCustomer(customerId);
-  const product = await prisma.product.findFirst({
-    where: { id: productId, ...publicProductWhere },
-    select: { id: true },
-  });
-  if (!product) commerceError("PRODUCT_UNAVAILABLE", "Product is not available.");
-  return prisma.customerFavoriteProduct.upsert({
-    where: { customerId_productId: { customerId, productId: product.id } },
-    create: { customerId, productId: product.id },
-    update: {},
-  });
-}
-
-export async function unfavoriteProduct(customerId: string, productId: string) {
-  await requireActiveCommerceCustomer(customerId);
-  await prisma.customerFavoriteProduct.deleteMany({ where: { customerId, productId } });
-}
 import type { Prisma } from "@prisma/client";

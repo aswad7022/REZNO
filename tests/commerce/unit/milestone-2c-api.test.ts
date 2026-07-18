@@ -118,6 +118,7 @@ test("Cart DTO serializes Decimal money and excludes inventory, SKU, Organizatio
         price: new Prisma.Decimal("10000"),
         product: {
           archivedAt: null,
+          category: { status: "ACTIVE" },
           categoryId: "category",
           createdAt: new Date(),
           description: null,

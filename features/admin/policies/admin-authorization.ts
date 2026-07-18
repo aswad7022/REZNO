@@ -2,8 +2,8 @@ import type { AdminAccess, AdminAccessRole } from "@prisma/client";
 
 import {
   allAdminPermissions,
+  effectiveNormalizedAdminPermissions,
   type AdminPermission,
-  normalizeAdminPermissions,
 } from "@/features/admin/config/permissions";
 
 export type AdminGrant = Pick<
@@ -58,7 +58,7 @@ export function resolveAdminGrant({
     isSuperAdmin,
     permissions: isSuperAdmin
       ? allAdminPermissions
-      : normalizeAdminPermissions(databaseAccess.permissions),
+      : effectiveNormalizedAdminPermissions(databaseAccess.permissions),
     role: databaseAccess.role,
     source: "database",
   };

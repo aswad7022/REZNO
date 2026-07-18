@@ -724,6 +724,8 @@ model AdminAuditLog {
   @@index([adminUserId, createdAt])
   @@index([action, createdAt])
   @@index([targetType, targetId])
+  @@index([createdAt, id])
+  @@index([targetType, targetId, createdAt, id])
 }
 
 model Notification {
@@ -892,6 +894,7 @@ model MarketplaceCategory {
   products       Product[]
 
   @@index([status, displayOrder])
+  @@index([updatedAt, id])
   @@index([normalizedName])
 }
 
@@ -924,6 +927,8 @@ model Product {
   @@index([normalizedSearchText])
   @@index([createdAt, id])
   @@index([storeId, updatedAt, id])
+  @@index([status, updatedAt, id])
+  @@index([categoryId, status, updatedAt, id])
 }
 
 model ProductVariant {
@@ -1165,6 +1170,7 @@ model Order {
   @@index([storeId, status, reservationExpiresAt, id])
   @@index([storeId, status, updatedAt, id])
   @@index([status, reservationExpiresAt, id])
+  @@index([status, updatedAt, id])
 }
 
 model OrderItem {
