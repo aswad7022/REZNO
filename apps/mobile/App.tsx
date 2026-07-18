@@ -24,6 +24,7 @@ import {
 import { commerceApi } from "./src/api/commerce";
 import { MobileApiRequestError } from "./src/api/client";
 import { notificationApi } from "./src/api/notifications";
+import { messageApi } from "./src/api/messages";
 import {
   getMobileSession,
   signOutMobile,
@@ -96,6 +97,7 @@ import {
   CustomerNotificationCenter,
   type MobileNotificationDestination,
 } from "./src/screens/customer-notification-center";
+import { CustomerMessagingCenter } from "./src/screens/customer-messaging-center";
 import type { MobileMarketplaceBusiness } from "./src/types/marketplace";
 import type { CommerceNotification } from "./src/types/commerce";
 
@@ -616,6 +618,8 @@ export default function App() {
   const [themeMode, setThemeMode] = useState<MobileThemeMode>("dark");
   const [notificationOrderId, setNotificationOrderId] = useState<string | null>(null);
   const [notificationUnreadCount, setNotificationUnreadCount] = useState(0);
+  const [messageConversationId, setMessageConversationId] = useState<string | null>(null);
+  const [messageUnreadCount, setMessageUnreadCount] = useState(0);
   const [marketplaceState, setMarketplaceState] = useState<MarketplaceState>({
     status: "idle",
   });
@@ -640,9 +644,18 @@ export default function App() {
     if (!authenticatedUserId) {
       return () => { active = false; };
     }
-    void notificationApi.count()
-      .then((count) => { if (active) setNotificationUnreadCount(count); })
-      .catch(() => { if (active) setNotificationUnreadCount(0); });
+    void Promise.allSettled([
+      notificationApi.count(),
+      messageApi.unreadCount(),
+    ]).then(([notificationResult, messageResult]) => {
+      if (!active) return;
+      setNotificationUnreadCount(
+        notificationResult.status === "fulfilled" ? notificationResult.value : 0,
+      );
+      setMessageUnreadCount(
+        messageResult.status === "fulfilled" ? messageResult.value.count : 0,
+      );
+    });
     return () => { active = false; };
   }, [activeTab, authenticatedUserId]);
 
@@ -782,6 +795,7 @@ export default function App() {
     setSelectedBusiness(null);
     setBookingFlowStep(null);
     setNotificationOrderId(null);
+    if (tabId !== "messages") setMessageConversationId(null);
 
     if (tabId === "serviceDiscovery" && marketplaceState.status === "idle") {
       loadMarketplace();
@@ -1132,7 +1146,7 @@ export default function App() {
             isRtl={isRtl}
             locale={locale}
             marketplaceState={marketplaceState}
-            notificationUnreadCount={authenticatedUserId ? notificationUnreadCount : 0}
+            notificationUnreadCount={authenticatedUserId ? notificationUnreadCount + messageUnreadCount : 0}
             onOpenBusiness={setSelectedBusiness}
             onOpenMessages={() => handleTabPress("messages")}
             onOpenNotifications={() => handleTabPress("messages")}
@@ -1205,12 +1219,16 @@ export default function App() {
 
         {!selectedBusiness && activeTab === "messages" ? (
           <MessagesNotificationsPreviewScreen
+            initialConversationId={messageConversationId}
             isRtl={isRtl}
             locale={locale}
             onOpenNotificationDestination={(destination) => {
               if (destination.kind === "CUSTOMER_COMMERCE_ORDER" && destination.targetId) {
                 setNotificationOrderId(destination.targetId);
                 setActiveTab("orders");
+              } else if (destination.kind === "CUSTOMER_MESSAGES" && destination.targetId) {
+                setMessageConversationId(destination.targetId);
+                setActiveTab("messages");
               } else if (destination.kind === "CUSTOMER_BOOKING" || destination.kind === "CUSTOMER_RESTAURANT") {
                 setActiveTab("bookings");
               } else if (destination.kind === "CUSTOMER_ACCOUNT") {
@@ -1218,6 +1236,10 @@ export default function App() {
               } else {
                 setActiveTab("messages");
               }
+            }}
+            onOpenSource={() => {
+              setMessageConversationId(null);
+              setActiveTab("bookings");
             }}
             styles={styles}
             theme={theme}
@@ -3063,35 +3085,39 @@ function BookingConfirmationStep({
 
 /* eslint-enable @typescript-eslint/no-unused-vars */
 function MessagesNotificationsPreviewScreen({
+  initialConversationId,
   isRtl,
   locale,
   onOpenNotificationDestination,
+  onOpenSource,
   styles,
   theme,
 }: {
+  initialConversationId?: string | null;
   isRtl: boolean;
   locale: MobileLocale;
   onOpenNotificationDestination: (destination: MobileNotificationDestination) => void;
+  onOpenSource: () => void;
   styles: MobileStyles;
   theme: MobileTheme;
 }) {
   const heroCopy = locale === "en"
     ? {
         badge: "Safe preview",
-        body: "The unified Notification Center below is fully connected, including read state, archive, filters, preferences, pagination, and safe destinations. Messaging completion remains in Stage 4B.",
+        body: "Customer conversations and the unified Notification Center are connected with scoped read state, stable pagination, safe destinations, and retry-safe sends.",
         eyebrow: "Messages and notifications",
         title: "One operational inbox across REZNO",
       }
     : locale === "ckb"
       ? {
           badge: "پێشبینینی پارێزراو",
-          body: "ناوەندی ئاگادارکردنەوە بە خوێندراوە، ئەرشیف، پاڵاوتن، هەڵبژاردە و شوێنی پارێزراوەوە پەیوەستە. تەواوکردنی پەیام لە Stage 4B ـە.",
+          body: "گفتوگۆی کڕیار و ناوەندی ئاگادارکردنەوە بە خوێندنەوەی تایبەت، لاپەڕەبەندی و ناردنی دووبارەی پارێزراو پەیوەستن.",
           eyebrow: "پەیام و ئاگادارکردنەوەکان",
           title: "سندوقێکی کارا بۆ هەموو REZNO",
         }
       : {
           badge: "معاينة آمنة",
-          body: "مركز الإشعارات أدناه متصل بالكامل، ويشمل حالة القراءة والأرشفة والمرشحات والتفضيلات والترقيم والوجهات الآمنة. يظل إكمال الرسائل ضمن Stage 4B.",
+          body: "محادثات العميل ومركز الإشعارات متصلان بحالة قراءة نطاقية، وترقيم ثابت، ووجهات آمنة، وإعادة إرسال محمية بالمفتاح نفسه.",
           eyebrow: "الرسائل والإشعارات",
           title: "صندوق تشغيلي موحد عبر REZNO",
         };
@@ -3122,17 +3148,17 @@ function MessagesNotificationsPreviewScreen({
         </Text>
       </View>
 
+      <CustomerMessagingCenter
+        initialConversationId={initialConversationId}
+        locale={locale}
+        onOpenSource={onOpenSource}
+        theme={theme}
+      />
       <CustomerNotificationCenter
         locale={locale}
         onOpenDestination={onOpenNotificationDestination}
         theme={theme}
       />
-      {locale === "ar" ? (
-        <>
-          <ConversationListPreview isRtl={isRtl} styles={styles} />
-          <MessageDetailPreview isRtl={isRtl} styles={styles} />
-        </>
-      ) : null}
     </>
   );
 }
