@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 
 import { Prisma } from "@prisma/client";
 
@@ -215,14 +216,25 @@ async function main() {
     getCampaignPage(viewContext, { cursor: firstCampaignPage.nextCursor, pageSize: 20, status: null }),
     (error) => error instanceof CommunicationDomainError && error.code === "INVALID_CURSOR",
   );
-  const tamperedEnvelope = JSON.parse(
-    Buffer.from(firstCampaignPage.nextCursor, "base64url").toString("utf8"),
-  ) as Record<string, unknown>;
-  const originalChecksum = String(tamperedEnvelope.checksum);
-  tamperedEnvelope.checksum = `${originalChecksum.slice(0, -1)}${originalChecksum.endsWith("0") ? "1" : "0"}`;
-  const tamperedCampaignCursor = Buffer.from(JSON.stringify(tamperedEnvelope), "utf8").toString("base64url");
+  const tamperedCampaignCursor = bitFlipCursorMac(firstCampaignPage.nextCursor);
   await assert.rejects(
     getCampaignPage(fullContext, { cursor: tamperedCampaignCursor, pageSize: 20, status: null }),
+    (error) => error instanceof CommunicationDomainError && error.code === "INVALID_CURSOR",
+  );
+  await assert.rejects(
+    getCampaignPage(fullContext, {
+      cursor: versionOneCursor(firstCampaignPage.nextCursor), pageSize: 20, status: null,
+    }),
+    (error) => error instanceof CommunicationDomainError && error.code === "INVALID_CURSOR",
+  );
+  await assert.rejects(
+    getCampaignPage(fullContext, {
+      cursor: forgeWithOldPublicChecksum(firstCampaignPage.nextCursor, {
+        filterFingerprint: "0".repeat(64),
+      }),
+      pageSize: 20,
+      status: null,
+    }),
     (error) => error instanceof CommunicationDomainError && error.code === "INVALID_CURSOR",
   );
   assert.ok((await getCampaignPage(viewContext, { cursor: null, pageSize: 5, status: null })).items.length > 0);
@@ -294,6 +306,17 @@ async function main() {
     }),
     (error) => error instanceof CommunicationDomainError && error.code === "INVALID_CURSOR",
   );
+  await assert.rejects(
+    getDeliveryPage(fullContext, {
+      campaignId: attemptedDelivery.campaignId,
+      cursor: forgeWithOldPublicChecksum(firstDeliveryPage.nextCursor!, {
+        parentId: attemptedDelivery.campaignId,
+      }),
+      pageSize: 20,
+      status: null,
+    }),
+    (error) => error instanceof CommunicationDomainError && error.code === "INVALID_CURSOR",
+  );
   const attemptAnchor = await prisma.outboundDeliveryAttempt.findFirstOrThrow({
     where: { deliveryId: attemptedDelivery.id },
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
@@ -315,6 +338,16 @@ async function main() {
   await assert.rejects(
     getAttemptPage(fullContext, {
       deliveryId: otherAttemptedDelivery.id, cursor: syntheticAttemptCursor, pageSize: 1,
+    }),
+    (error) => error instanceof CommunicationDomainError && error.code === "INVALID_CURSOR",
+  );
+  await assert.rejects(
+    getAttemptPage(fullContext, {
+      deliveryId: otherAttemptedDelivery.id,
+      cursor: forgeWithOldPublicChecksum(syntheticAttemptCursor, {
+        parentId: otherAttemptedDelivery.id,
+      }),
+      pageSize: 1,
     }),
     (error) => error instanceof CommunicationDomainError && error.code === "INVALID_CURSOR",
   );
@@ -378,6 +411,7 @@ async function main() {
     campaignPagesVerified: 2,
     deliveryPagesVerified: deliveryPages.length,
     cursorScopeRejectionsVerified: true,
+    authenticatedCursorRejectionsVerified: true,
     bulkEndpointQueries: outboundPreviewDiagnostics.endpointQueryCount,
     audienceFamiliesVerified: audiencePreviews.length,
     preferenceContractVerified: true,
@@ -397,3 +431,51 @@ main()
     process.exitCode = 1;
   })
   .finally(async () => prisma.$disconnect());
+
+function versionOneCursor(cursor: string) {
+  const envelope = decodeCursorEnvelope(cursor);
+  delete envelope.mac;
+  envelope.version = 1;
+  envelope.checksum = oldPublicChecksum(envelope);
+  return encodeCursorEnvelope(envelope);
+}
+
+function bitFlipCursorMac(cursor: string) {
+  const envelope = decodeCursorEnvelope(cursor);
+  const mac = String(envelope.mac);
+  envelope.mac = `${mac[0] === "0" ? "1" : "0"}${mac.slice(1)}`;
+  return encodeCursorEnvelope(envelope);
+}
+
+function forgeWithOldPublicChecksum(
+  cursor: string,
+  changes: Record<string, unknown>,
+) {
+  const envelope = { ...decodeCursorEnvelope(cursor), ...changes };
+  envelope.mac = oldPublicChecksum(envelope);
+  return encodeCursorEnvelope(envelope);
+}
+
+function oldPublicChecksum(envelope: Record<string, unknown>) {
+  const legacyCore = {
+    adminScope: envelope.adminScope,
+    filterFingerprint: envelope.filterFingerprint,
+    kind: envelope.kind,
+    pageSize: envelope.pageSize,
+    parentId: envelope.parentId,
+    snapshotTimestamp: envelope.snapshotTimestamp,
+    sortTimestamp: envelope.sortTimestamp,
+    tieBreakerId: envelope.tieBreakerId,
+  };
+  return createHash("sha256")
+    .update(`rezno-communications-cursor:${JSON.stringify(legacyCore)}`)
+    .digest("hex");
+}
+
+function decodeCursorEnvelope(cursor: string) {
+  return JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")) as Record<string, unknown>;
+}
+
+function encodeCursorEnvelope(envelope: Record<string, unknown>) {
+  return Buffer.from(JSON.stringify(envelope), "utf8").toString("base64url");
+}

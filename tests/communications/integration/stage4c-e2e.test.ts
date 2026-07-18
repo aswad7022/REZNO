@@ -5,6 +5,7 @@ import test from "node:test";
 import { Prisma } from "@prisma/client";
 
 import { CommunicationDomainError } from "../../../features/communications/domain/errors";
+import { setCommunicationCursorSigningSecretForTests } from "../../../features/communications/domain/cursor-signing";
 import { DeterministicSinkProvider, setCommunicationTestProviderFactory } from "../../../features/communications/providers/provider";
 import { setCommunicationAuthorizationTestHook } from "../../../features/communications/services/admin-actor";
 import {
@@ -32,12 +33,14 @@ import {
   createCommunicationFixture,
   resetCommunicationTestDatabase,
 } from "../helpers/fixture";
+import { TEST_COMMUNICATION_CURSOR_SECRET } from "../helpers/cursor-secret";
 
 function rejectsWith(code: string) {
   return (error: unknown) => error instanceof CommunicationDomainError && error.code === code;
 }
 
 test("Gate 4C campaigns, authorization, snapshot, and deterministic delivery are PostgreSQL exact", { concurrency: false }, async (t) => {
+  setCommunicationCursorSigningSecretForTests(TEST_COMMUNICATION_CURSOR_SECRET);
   await resetCommunicationTestDatabase();
   const fixture = await createCommunicationFixture();
   setCommunicationTestPushEndpointResolver((personIds) => new Map(
@@ -46,6 +49,7 @@ test("Gate 4C campaigns, authorization, snapshot, and deterministic delivery are
   setCommunicationTestProviderFactory((channel) => new DeterministicSinkProvider(channel));
 
   t.after(async () => {
+    setCommunicationCursorSigningSecretForTests(undefined);
     setCommunicationAuthorizationTestHook(undefined);
     setCommunicationTestProviderFactory(undefined);
     setCommunicationTestPushEndpointResolver(undefined);

@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import test from "node:test";
 
 import { Prisma } from "@prisma/client";
 
 import { CommunicationDomainError } from "../../../features/communications/domain/errors";
+import { setCommunicationCursorSigningSecretForTests } from "../../../features/communications/domain/cursor-signing";
 import {
   createCampaign,
   getCampaignPage,
@@ -27,6 +28,10 @@ import {
   createCommunicationFixture,
   resetCommunicationTestDatabase,
 } from "../helpers/fixture";
+import {
+  ROTATED_COMMUNICATION_CURSOR_SECRET,
+  TEST_COMMUNICATION_CURSOR_SECRET,
+} from "../helpers/cursor-secret";
 
 function rejectsWith(code: string) {
   return (error: unknown) => error instanceof CommunicationDomainError && error.code === code;
@@ -42,7 +47,32 @@ function allCampaignInput(overrides: Record<string, unknown> = {}) {
   });
 }
 
+function forgeWithOldPublicChecksum(
+  cursor: string,
+  changes: Record<string, unknown>,
+) {
+  const envelope = {
+    ...JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")) as Record<string, unknown>,
+    ...changes,
+  };
+  const legacyCore = {
+    adminScope: envelope.adminScope,
+    filterFingerprint: envelope.filterFingerprint,
+    kind: envelope.kind,
+    pageSize: envelope.pageSize,
+    parentId: envelope.parentId,
+    snapshotTimestamp: envelope.snapshotTimestamp,
+    sortTimestamp: envelope.sortTimestamp,
+    tieBreakerId: envelope.tieBreakerId,
+  };
+  envelope.mac = createHash("sha256")
+    .update(`rezno-communications-cursor:${JSON.stringify(legacyCore)}`)
+    .digest("hex");
+  return Buffer.from(JSON.stringify(envelope), "utf8").toString("base64url");
+}
+
 test("Gate 4C review fixes are bounded and scope-exact in PostgreSQL", { concurrency: false }, async (t) => {
+  setCommunicationCursorSigningSecretForTests(TEST_COMMUNICATION_CURSOR_SECRET);
   await resetCommunicationTestDatabase();
   const fixture = await createCommunicationFixture("gate4c-review");
   const endpointDiagnostics: Array<{
@@ -57,6 +87,7 @@ test("Gate 4C review fixes are bounded and scope-exact in PostgreSQL", { concurr
   });
 
   t.after(async () => {
+    setCommunicationCursorSigningSecretForTests(undefined);
     setCommunicationEndpointDiagnosticsTestHook(undefined);
     setCommunicationSnapshotDiagnosticsTestHook(undefined);
     await resetCommunicationTestDatabase();
@@ -299,6 +330,21 @@ test("Gate 4C review fixes are bounded and scope-exact in PostgreSQL", { concurr
     await assert.rejects(getCampaignPage(fixture.actors.view, {
       cursor: campaignCursor, pageSize: 2, status: null,
     }), rejectsWith("INVALID_CURSOR"));
+    await assert.rejects(getCampaignPage(fixture.actors.full, {
+      cursor: forgeWithOldPublicChecksum(campaignCursor, {
+        filterFingerprint: "0".repeat(64),
+      }),
+      pageSize: 2,
+      status: null,
+    }), rejectsWith("INVALID_CURSOR"));
+    setCommunicationCursorSigningSecretForTests(ROTATED_COMMUNICATION_CURSOR_SECRET);
+    try {
+      await assert.rejects(getCampaignPage(fixture.actors.full, {
+        cursor: campaignCursor, pageSize: 2, status: null,
+      }), rejectsWith("INVALID_CURSOR"));
+    } finally {
+      setCommunicationCursorSigningSecretForTests(TEST_COMMUNICATION_CURSOR_SECRET);
+    }
 
     const viewPage = await getCampaignPage(fixture.actors.view, { cursor: null, pageSize: 1, status: null });
     assert.ok(viewPage.nextCursor);
@@ -368,6 +414,12 @@ test("Gate 4C review fixes are bounded and scope-exact in PostgreSQL", { concurr
     await assert.rejects(getDeliveryPage(fixture.actors.view, {
       campaignId: bulkCampaignId, cursor: deliveryCursor, pageSize: 50, status: null,
     }), rejectsWith("INVALID_CURSOR"));
+    await assert.rejects(getDeliveryPage(fixture.actors.full, {
+      campaignId: rollbackCampaignId,
+      cursor: forgeWithOldPublicChecksum(deliveryCursor, { parentId: rollbackCampaignId }),
+      pageSize: 50,
+      status: null,
+    }), rejectsWith("INVALID_CURSOR"));
 
     const attemptDelivery = await prisma.outboundDelivery.findFirstOrThrow({
       where: { campaignId: bulkCampaignId }, orderBy: { id: "asc" },
@@ -414,6 +466,11 @@ test("Gate 4C review fixes are bounded and scope-exact in PostgreSQL", { concurr
     }), rejectsWith("INVALID_CURSOR"));
     await assert.rejects(getAttemptPage(fixture.actors.full, {
       deliveryId: attemptDelivery.id, cursor: attemptCursor, pageSize: 2,
+    }), rejectsWith("INVALID_CURSOR"));
+    await assert.rejects(getAttemptPage(fixture.actors.full, {
+      deliveryId: otherDelivery.id,
+      cursor: forgeWithOldPublicChecksum(attemptCursor, { parentId: otherDelivery.id }),
+      pageSize: 1,
     }), rejectsWith("INVALID_CURSOR"));
   });
 });

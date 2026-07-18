@@ -27,9 +27,13 @@ import {
   encodeCampaignCursor,
   encodeDeliveryCursor,
 } from "../../../features/communications/domain/cursor";
+import { setCommunicationCursorSigningSecretForTests } from "../../../features/communications/domain/cursor-signing";
 import { deterministicSinkEnabled } from "../../../features/communications/providers/provider";
 import { GATE_4D_BOUNDARY } from "../../../features/communications/domain/contracts";
 import { validateCanonicalNotificationEvent } from "../../../features/notifications/domain/contracts";
+import { TEST_COMMUNICATION_CURSOR_SECRET } from "../helpers/cursor-secret";
+
+setCommunicationCursorSigningSecretForTests(TEST_COMMUNICATION_CURSOR_SECRET);
 
 const localizedContent = {
   AR: { inApp: { title: "عنوان", body: "نص" }, email: { subject: "عنوان", plainText: "نص" }, sms: { text: "نص" }, push: { title: "عنوان", body: "نص" } },
@@ -187,7 +191,7 @@ test("Gate 4C domain contracts are strict, bounded, and deterministic", async (t
     assert.throws(() => decodeCampaignCursor(Buffer.from(JSON.stringify(tampered)).toString("base64url"), {
       adminScope, filterFingerprint, pageSize: 20,
     }, authoritativeNow), invalid);
-    const unsupported = { ...tampered, version: 2 };
+    const unsupported = { ...tampered, version: 3 };
     assert.throws(() => decodeCampaignCursor(Buffer.from(JSON.stringify(unsupported)).toString("base64url"), {
       adminScope, filterFingerprint, pageSize: 20,
     }, authoritativeNow), invalid);

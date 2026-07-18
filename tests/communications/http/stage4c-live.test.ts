@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import test from "node:test";
 
 import { prisma } from "../../../lib/db/prisma";
@@ -8,6 +8,62 @@ const baseUrl = process.env.COMMUNICATION_HTTP_BASE_URL ?? process.env.COMMERCE_
 const bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET ?? "";
 const oidcToken = process.env.VERCEL_OIDC_TOKEN ?? "";
 const marker = `stage4c-http-${randomUUID().slice(0, 8)}`;
+
+function cursorFromHtml(html: string, parameter: string) {
+  const normalized = html.replaceAll("&amp;", "&");
+  const match = normalized.match(new RegExp(`[?&]${parameter}=([A-Za-z0-9_-]+)`));
+  assert.ok(match?.[1], `${parameter} continuation was not rendered`);
+  return decodeURIComponent(match[1]);
+}
+
+function forgeWithOldPublicChecksum(cursor: string, changes: Record<string, unknown>) {
+  const envelope = {
+    ...JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")) as Record<string, unknown>,
+    ...changes,
+  };
+  const legacyCore = {
+    adminScope: envelope.adminScope,
+    filterFingerprint: envelope.filterFingerprint,
+    kind: envelope.kind,
+    pageSize: envelope.pageSize,
+    parentId: envelope.parentId,
+    snapshotTimestamp: envelope.snapshotTimestamp,
+    sortTimestamp: envelope.sortTimestamp,
+    tieBreakerId: envelope.tieBreakerId,
+  };
+  envelope.mac = createHash("sha256")
+    .update(`rezno-communications-cursor:${JSON.stringify(legacyCore)}`)
+    .digest("hex");
+  return Buffer.from(JSON.stringify(envelope), "utf8").toString("base64url");
+}
+
+function versionOneCursor(cursor: string) {
+  const envelope = JSON.parse(
+    Buffer.from(cursor, "base64url").toString("utf8"),
+  ) as Record<string, unknown>;
+  delete envelope.mac;
+  envelope.version = 1;
+  envelope.checksum = "0".repeat(64);
+  return Buffer.from(JSON.stringify(envelope), "utf8").toString("base64url");
+}
+
+function tamperMac(cursor: string) {
+  const envelope = JSON.parse(
+    Buffer.from(cursor, "base64url").toString("utf8"),
+  ) as Record<string, unknown>;
+  const mac = String(envelope.mac);
+  envelope.mac = `${mac[0] === "0" ? "1" : "0"}${mac.slice(1)}`;
+  return Buffer.from(JSON.stringify(envelope), "utf8").toString("base64url");
+}
+
+function assertSafeCursorFallback(status: number, html: string) {
+  assert.ok([200, 400, 500].includes(status));
+  assert.match(html, /Communications reporting request was rejected safely/);
+  assert.doesNotMatch(
+    html,
+    /PrismaClient|postgresql:\/\/|DATABASE_URL|BETTER_AUTH_SECRET|node_modules|adminScope|filterFingerprint|snapshotTimestamp|sortTimestamp|tieBreakerId|rezno:communications:cursor-signing|HMAC|HKDF/i,
+  );
+}
 
 function protectedHeaders(initial?: HeadersInit) {
   const headers = new Headers(initial);
@@ -133,8 +189,19 @@ test("Gate 4C production HTML, RSC, redirect, and Customer Mobile outbound contr
   const selectedDelivery = await prisma.outboundDelivery.findFirstOrThrow({
     where: { campaignId: campaign.id }, orderBy: { id: "asc" },
   });
+  await prisma.outboundDeliveryAttempt.createMany({
+    data: Array.from({ length: 5 }, (_, index) => ({
+      attemptNumber: index + 1,
+      claimOwner: `${marker}:cursor-http`,
+      deliveryId: selectedDelivery.id,
+      startedAt: new Date(Date.now() - index * 1_000),
+    })),
+  });
 
   t.after(async () => {
+    await prisma.outboundDeliveryAttempt.deleteMany({
+      where: { delivery: { campaign: { createdByAdminUserId: admin.userId } } },
+    });
     await prisma.outboundDelivery.deleteMany({ where: { campaign: { createdByAdminUserId: admin.userId } } });
     await prisma.communicationCampaign.deleteMany({ where: { createdByAdminUserId: admin.userId } });
     await prisma.person.deleteMany({ where: { id: { in: deliveryRecipients.map((item) => item.personId) } } });
@@ -163,6 +230,13 @@ test("Gate 4C production HTML, RSC, redirect, and Customer Mobile outbound contr
     assert.equal(filtered.status, 200);
     assert.match(filteredText, /cursor=/);
     assert.match(filteredText, /status=DRAFT/);
+    const campaignCursor = cursorFromHtml(filteredText, "cursor");
+    const validCampaignContinuation = await fetch(
+      `${baseUrl}/admin/communications?status=DRAFT&cursor=${encodeURIComponent(campaignCursor)}`,
+      { headers: protectedHeaders({ cookie: admin.cookie }), redirect: "manual" },
+    );
+    assert.equal(validCampaignContinuation.status, 200);
+    assert.doesNotMatch(await validCampaignContinuation.text(), /rejected safely/i);
 
     const detail = await fetch(`${baseUrl}/admin/communications/${campaign.id}?deliveryStatus=PENDING&deliveryId=${selectedDelivery.id}`, {
       headers: protectedHeaders({ cookie: admin.cookie }),
@@ -174,15 +248,37 @@ test("Gate 4C production HTML, RSC, redirect, and Customer Mobile outbound contr
     assert.match(detailText, /deliveryCursor=/);
     assert.match(detailText, /deliveryStatus=PENDING/);
     assert.match(detailText, new RegExp(`deliveryId=${selectedDelivery.id}`));
+    const deliveryCursor = cursorFromHtml(detailText, "deliveryCursor");
+
+    const forgedCases = [
+      `/admin/communications?status=DRAFT&cursor=${encodeURIComponent(versionOneCursor(campaignCursor))}`,
+      `/admin/communications?status=DRAFT&cursor=${encodeURIComponent(forgeWithOldPublicChecksum(campaignCursor, { filterFingerprint: "0".repeat(64) }))}`,
+      `/admin/communications?status=DRAFT&cursor=${encodeURIComponent(tamperMac(campaignCursor))}`,
+      `/admin/communications/${campaign.id}?deliveryCursor=${encodeURIComponent(forgeWithOldPublicChecksum(deliveryCursor, { parentId: randomUUID() }))}`,
+      `/admin/communications/${campaign.id}?deliveryId=${selectedDelivery.id}&attemptCursor=${encodeURIComponent(forgeWithOldPublicChecksum(deliveryCursor, {
+        kind: "OUTBOUND_ATTEMPT_CURSOR",
+        parentId: selectedDelivery.id,
+      }))}`,
+    ];
+    for (const path of forgedCases) {
+      for (const rsc of [false, true]) {
+        const rejected = await fetch(`${baseUrl}${path}`, {
+          headers: protectedHeaders({
+            cookie: admin.cookie,
+            ...(rsc ? { accept: "text/x-component", rsc: "1" } : {}),
+          }),
+          redirect: "manual",
+        });
+        assertSafeCursorFallback(rejected.status, await rejected.text());
+      }
+    }
 
     const malformed = await fetch(`${baseUrl}/admin/communications?status=DRAFT&cursor=malformed`, {
       headers: protectedHeaders({ cookie: admin.cookie }),
       redirect: "manual",
     });
     const malformedText = await malformed.text();
-    assert.ok([200, 400, 500].includes(malformed.status));
-    assert.match(malformedText, /Communications reporting request was rejected safely/);
-    assert.doesNotMatch(malformedText, /PrismaClient|postgresql:\/\/|DATABASE_URL|node_modules|at getCampaignPage/);
+    assertSafeCursorFallback(malformed.status, malformedText);
     const legacy = await fetch(`${baseUrl}/admin/notifications`, {
       headers: protectedHeaders({ cookie: admin.cookie }),
       redirect: "manual",
