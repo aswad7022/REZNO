@@ -5,6 +5,8 @@ import { MessageDomainError } from "../../features/messages/domain/errors";
 import { markConversationReadForActor } from "../../features/messages/services/conversation-read";
 import {
   sendMessage,
+  setMessageRateLimitConsumerForTests,
+  startAdminConversation,
   startCustomerBusinessConversation,
 } from "../../features/messages/services/delivery-service";
 import {
@@ -22,6 +24,9 @@ import { MESSAGING_STAGE4B_FIXTURE } from "./messaging-lifecycle-stage4b-fixture
 import { seedNotificationCenterStage4aFixture } from "./notification-center-stage4a-fixture";
 
 const { id, userId } = MESSAGING_STAGE4B_FIXTURE;
+const readOnlyConversationId = id(4_954);
+const readOnlyConversationIdentity = `admin-user:${userId(11)}:${id(4_100)}`;
+let cleanupReadOnlyConversation = false;
 
 async function main() {
   const databaseUrl = process.env.DATABASE_URL;
@@ -47,7 +52,7 @@ async function main() {
     role: number,
     systemRole: "MANAGER" | "OWNER" | "RECEPTIONIST" | "STAFF",
     user: number,
-  ): MessageActor => ({
+  ): Extract<MessageActor, { kind: "business" }> => ({
     kind: "business",
     membershipId: id(membership),
     organizationId: id(4_201),
@@ -79,6 +84,7 @@ async function main() {
   const admin: MessageActor = {
     adminSource: "database",
     canSend: true,
+    canView: true,
     kind: "admin",
     personId: id(4_107),
     userId: userId(8),
@@ -86,6 +92,7 @@ async function main() {
   const readOnlyAdmin: MessageActor = {
     adminSource: "database",
     canSend: false,
+    canView: true,
     kind: "admin",
     personId: id(4_110),
     userId: userId(11),
@@ -93,6 +100,7 @@ async function main() {
   const secondAdmin: MessageActor = {
     adminSource: "database",
     canSend: true,
+    canView: true,
     kind: "admin",
     personId: id(4_111),
     userId: userId(12),
@@ -102,6 +110,36 @@ async function main() {
   const adminUserConversationId = id(4_952);
   const adminBusinessConversationId = id(4_953);
   const priorBaseline = await priorFixtureFingerprints();
+  const existingReadOnlyConversation = await prisma.conversation.findUnique({
+    where: { id: readOnlyConversationId },
+    select: { adminUserId: true, identityKey: true },
+  });
+  if (existingReadOnlyConversation && (
+    existingReadOnlyConversation.adminUserId !== userId(11) ||
+    existingReadOnlyConversation.identityKey !== readOnlyConversationIdentity
+  )) {
+    throw new Error("Stage 4B smoke read-only fixture ownership collision.");
+  }
+  if (existingReadOnlyConversation) {
+    await prisma.conversation.delete({ where: { id: readOnlyConversationId } });
+  }
+  await prisma.conversation.create({
+    data: {
+      adminUserId: userId(11),
+      customerId: id(4_100),
+      id: readOnlyConversationId,
+      identityKey: readOnlyConversationIdentity,
+      messages: {
+        create: {
+          body: "Stage 4B read-only Admin fixture message",
+          id: id(6_203),
+          senderUserId: userId(11),
+        },
+      },
+      type: "ADMIN_USER",
+    },
+  });
+  cleanupReadOnlyConversation = true;
 
   const [
     customerPage,
@@ -136,12 +174,25 @@ async function main() {
   assert.equal(unassignedPage.data.length, 0);
   assert.equal(foreignPage.data.length, 0);
   assert.equal(secondCustomerPage.data.length, 0);
-  assert.equal(readOnlyAdminPage.data.length, 0);
+  assert.deepEqual(
+    readOnlyAdminPage.data.map((item) => item.id),
+    [readOnlyConversationId],
+  );
   assert.equal(secondAdminPage.data.length, 0);
   assert.deepEqual(new Set(adminPage.data.map((item) => item.id)), new Set([
     adminUserConversationId,
     adminBusinessConversationId,
   ]));
+  const readOnlyDetail = await getConversationDetail(
+    readOnlyAdmin,
+    readOnlyConversationId,
+  );
+  assert.equal(readOnlyDetail.canReply, false);
+  assert.equal(
+    (await listMessages(readOnlyAdmin, readOnlyConversationId, { limit: 20 }))
+      .data.length,
+    1,
+  );
   assert.equal((await getConversationDetail(customer, bookingConversationId)).source?.kind, "RESTAURANT_RESERVATION");
   assert.equal((await getConversationDetail(owner, generalConversationId)).id, generalConversationId);
   await assert.rejects(
@@ -189,6 +240,83 @@ async function main() {
     new Set([...customerPage.data, ...customerSecondPage.data].map((item) => item.id)).size,
     customerPage.data.length + customerSecondPage.data.length,
   );
+  await prisma.organizationMember.update({
+    where: { id: owner.membershipId },
+    data: { status: "INACTIVE" },
+  });
+  try {
+    await assert.rejects(
+      listConversations(owner, {
+        cursor: ownerPage.nextCursor!,
+        limit: 20,
+        mode: "all",
+      }),
+      (error) => error instanceof MessageDomainError && error.code === "FORBIDDEN",
+    );
+  } finally {
+    await prisma.organizationMember.update({
+      where: { id: owner.membershipId },
+      data: { status: "ACTIVE" },
+    });
+  }
+  await prisma.organizationMember.update({
+    where: { id: owner.membershipId },
+    data: { roleId: id(4_302) },
+  });
+  try {
+    await assert.rejects(
+      listConversations(
+        { ...owner, roleId: id(4_302), systemRole: "MANAGER" },
+        { cursor: ownerPage.nextCursor!, limit: 20, mode: "all" },
+      ),
+      (error) => error instanceof MessageDomainError && error.code === "INVALID_CURSOR",
+    );
+  } finally {
+    await prisma.organizationMember.update({
+      where: { id: owner.membershipId },
+      data: { roleId: owner.roleId },
+    });
+  }
+  await prisma.person.update({
+    where: { id: customer.personId },
+    data: { status: "INACTIVE" },
+  });
+  try {
+    await assert.rejects(
+      listConversations(customer, {
+        cursor: customerPage.nextCursor!,
+        limit: 20,
+        mode: "all",
+      }),
+      (error) => error instanceof MessageDomainError && error.code === "FORBIDDEN",
+    );
+  } finally {
+    await prisma.person.update({
+      where: { id: customer.personId },
+      data: { status: "ACTIVE" },
+    });
+  }
+  const adminCursor = await listConversations(admin, { limit: 1, mode: "all" });
+  assert.ok(adminCursor.nextCursor);
+  await prisma.adminAccess.update({
+    where: { userId: admin.userId },
+    data: { status: "REVOKED" },
+  });
+  try {
+    await assert.rejects(
+      listConversations(admin, {
+        cursor: adminCursor.nextCursor!,
+        limit: 1,
+        mode: "all",
+      }),
+      (error) => error instanceof MessageDomainError && error.code === "FORBIDDEN",
+    );
+  } finally {
+    await prisma.adminAccess.update({
+      where: { userId: admin.userId },
+      data: { status: "ACTIVE" },
+    });
+  }
   const serializedLists = JSON.stringify({
     adminPage,
     customerPage,
@@ -236,28 +364,54 @@ async function main() {
   assert.equal(notifications.every((item) =>
     item.recipientStates.some((state) => state.personId === id(4_102) && state.readState === "READ")), true);
 
-  const customerSend = await startCustomerBusinessConversation(customer, {
-    body: "Stage 4B staging customer replay sentinel",
-    businessId: id(4_201),
-    idempotencyKey: id(8_001),
-  });
-  assert.equal(customerSend.conversationId, generalConversationId);
-  assert.equal(customerSend.replayed, false);
-  const customerReplay = await startCustomerBusinessConversation(customer, {
-    body: "Stage 4B staging customer replay sentinel",
-    businessId: id(4_201),
-    idempotencyKey: id(8_001),
-  });
-  assert.equal(customerReplay.replayed, true);
-  assert.equal(customerReplay.message.id, customerSend.message.id);
-  await assert.rejects(
-    startCustomerBusinessConversation(customer, {
-      body: "Stage 4B changed replay sentinel",
+  let customerSend: Awaited<ReturnType<typeof startCustomerBusinessConversation>>;
+  setMessageRateLimitConsumerForTests((() => {
+    let starts = 0;
+    return (scope) => {
+      if (scope !== "message:start") {
+        return { retryAfterSeconds: 0, success: true };
+      }
+      starts += 1;
+      return {
+        retryAfterSeconds: starts > 1 ? 60 : 0,
+        success: starts <= 1,
+      };
+    };
+  })());
+  try {
+    customerSend = await startCustomerBusinessConversation(customer, {
+      body: "Stage 4B staging customer replay sentinel",
       businessId: id(4_201),
       idempotencyKey: id(8_001),
-    }),
-    (error) => error instanceof MessageDomainError && error.code === "IDEMPOTENCY_CONFLICT",
-  );
+    });
+    assert.equal(customerSend.conversationId, generalConversationId);
+    assert.equal(customerSend.replayed, false);
+    const customerReplay = await startCustomerBusinessConversation(customer, {
+      body: "Stage 4B staging customer replay sentinel",
+      businessId: id(4_201),
+      idempotencyKey: id(8_001),
+    });
+    assert.equal(customerReplay.replayed, true);
+    assert.equal(customerReplay.message.id, customerSend.message.id);
+    await assert.rejects(
+      startCustomerBusinessConversation(customer, {
+        body: "Stage 4B changed replay sentinel",
+        businessId: id(4_201),
+        idempotencyKey: id(8_001),
+      }),
+      (error) => error instanceof MessageDomainError && error.code === "IDEMPOTENCY_CONFLICT",
+    );
+    await assert.rejects(
+      startCustomerBusinessConversation(customer, {
+        body: "Stage 4B customer start beyond quota",
+        businessId: id(4_201),
+        idempotencyKey: id(8_013),
+      }),
+      (error) => error instanceof MessageDomainError && error.code === "RATE_LIMITED",
+    );
+  } finally {
+    setMessageRateLimitConsumerForTests(undefined);
+  }
   assert.equal((await getUnreadMessageCount(owner)).count, ownerUnreadAfterRead + 1);
 
   const ownerSend = await sendMessage(owner, {
@@ -281,6 +435,59 @@ async function main() {
     idempotencyKey: id(8_005),
   });
   assert.equal((await getUnreadMessageCount(customer)).count, customerUnreadBeforeSends + 4);
+
+  let adminUserStart: Awaited<ReturnType<typeof startAdminConversation>>;
+  let adminBusinessStart: Awaited<ReturnType<typeof startAdminConversation>>;
+  setMessageRateLimitConsumerForTests((() => {
+    let starts = 0;
+    return (scope) => {
+      if (scope !== "message:adminStart") {
+        return { retryAfterSeconds: 0, success: true };
+      }
+      starts += 1;
+      return {
+        retryAfterSeconds: starts > 2 ? 60 : 0,
+        success: starts <= 2,
+      };
+    };
+  })());
+  try {
+    adminUserStart = await startAdminConversation(admin, {
+      body: "Stage 4B Admin User start replay sentinel",
+      idempotencyKey: id(8_010),
+      targetId: id(4_100),
+      targetType: "USER",
+    });
+    adminBusinessStart = await startAdminConversation(admin, {
+      body: "Stage 4B Admin Business start replay sentinel",
+      idempotencyKey: id(8_011),
+      targetId: id(4_201),
+      targetType: "BUSINESS",
+    });
+    assert.equal((await startAdminConversation(admin, {
+      body: "Stage 4B Admin User start replay sentinel",
+      idempotencyKey: id(8_010),
+      targetId: id(4_100),
+      targetType: "USER",
+    })).replayed, true);
+    assert.equal((await startAdminConversation(admin, {
+      body: "Stage 4B Admin Business start replay sentinel",
+      idempotencyKey: id(8_011),
+      targetId: id(4_201),
+      targetType: "BUSINESS",
+    })).replayed, true);
+    await assert.rejects(
+      startAdminConversation(admin, {
+        body: "Stage 4B Admin start beyond quota",
+        idempotencyKey: id(8_012),
+        targetId: id(4_100),
+        targetType: "USER",
+      }),
+      (error) => error instanceof MessageDomainError && error.code === "RATE_LIMITED",
+    );
+  } finally {
+    setMessageRateLimitConsumerForTests(undefined);
+  }
 
   const adminUserSend = await sendMessage(admin, {
     body: "Stage 4B Admin User staging send",
@@ -346,10 +553,24 @@ async function main() {
   assert.equal(serializedAudits.includes("Admin/User fixture message"), false);
   assert.equal(serializedAudits.includes("Stage 4B Admin User staging send"), false);
   assert.equal(serializedAudits.includes("Stage 4B Admin Business staging send"), false);
+  for (const [key, messageId] of [
+    [id(8_010), adminUserStart.message.id],
+    [id(8_011), adminBusinessStart.message.id],
+  ]) {
+    assert.equal(await prisma.message.count({
+      where: { idempotencyKey: key, senderUserId: admin.userId },
+    }), 1);
+    assert.equal(await prisma.adminAuditLog.count({
+      where: { adminUserId: admin.userId, idempotencyKey: key },
+    }), 1);
+    assert.ok(await prisma.notification.count({
+      where: { eventKey: { startsWith: `message:${messageId}:recipient:` } },
+    }) > 0);
+  }
   assert.deepEqual(await priorFixtureFingerprints(), priorBaseline);
 
   process.stdout.write(
-    `Stage 4B smoke passed. customer=${customerPage.data.length} owner=${ownerPage.data.length} manager=${managerPage.data.length} receptionist=${receptionistPage.data.length} assignedStaff=${staffPage.data.length} unassigned=denied foreign=isolated revoked=denied inactive=denied admin=${adminPage.data.length} readOnlyAdmin=denied secondAdmin=isolated messages=${firstMessages.data.length + olderMessages.data.length} sends=${[customerSend, ownerSend, managerSend, receptionistSend, staffSend, adminUserSend, adminBusinessSend].length} replay=exact reconciled=${read.updatedCount} notification=exact-once pii=absent priorFingerprints=unchanged\n`,
+    `Stage 4B smoke passed. customer=${customerPage.data.length} owner=${ownerPage.data.length} manager=${managerPage.data.length} receptionist=${receptionistPage.data.length} assignedStaff=${staffPage.data.length} unassigned=denied foreign=isolated revoked=denied inactive=denied admin=${adminPage.data.length} readOnlyAdmin=read-only secondAdmin=isolated messages=${firstMessages.data.length + olderMessages.data.length} sends=${[customerSend, ownerSend, managerSend, receptionistSend, staffSend, adminUserStart, adminBusinessStart, adminUserSend, adminBusinessSend].length} replay=exact-after-rate-exhaustion cursors=current-grant-bound reconciled=${read.updatedCount} notification=exact-once pii=absent priorFingerprints=unchanged\n`,
   );
 }
 
@@ -369,6 +590,15 @@ async function priorFixtureFingerprints() {
 }
 
 void main().finally(async () => {
+  if (cleanupReadOnlyConversation) {
+    await prisma.conversation.deleteMany({
+      where: {
+        adminUserId: userId(11),
+        id: readOnlyConversationId,
+        identityKey: readOnlyConversationIdentity,
+      },
+    });
+  }
   await prisma.$disconnect();
 }).catch((error) => {
   const message = error instanceof Error &&

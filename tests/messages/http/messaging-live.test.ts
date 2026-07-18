@@ -169,7 +169,11 @@ test("Gate 4B production RSC and Customer Mobile messaging contracts", {
       method: "POST",
     });
     assert.equal(started.response.status, 201);
-    conversationId = (started.body.data as { conversationId: string }).conversationId;
+    const startedData = started.body.data as {
+      conversationId: string;
+      message: { id: string };
+    };
+    conversationId = startedData.conversationId;
     const replay = await jsonRequest("/api/mobile/messages/conversations", {
       body: { body: `${marker} FIRST MESSAGE`, businessId: organization.id },
       cookie: customer.cookie,
@@ -198,6 +202,64 @@ test("Gate 4B production RSC and Customer Mobile messaging contracts", {
     });
     assert.equal(history.response.status, 200);
     assert.equal((history.body.data as { data: unknown[] }).data.length, 1);
+
+    for (let index = 1; index < 10; index += 1) {
+      const quotaMessage = await jsonRequest("/api/mobile/messages/conversations", {
+        body: { body: `${marker} QUOTA MESSAGE ${index}`, businessId: organization.id },
+        cookie: customer.cookie,
+        idempotencyKey: randomUUID(),
+        method: "POST",
+      });
+      assert.equal(quotaMessage.response.status, 201);
+    }
+    const exhausted = await jsonRequest("/api/mobile/messages/conversations", {
+      body: { body: `${marker} OVER QUOTA`, businessId: organization.id },
+      cookie: customer.cookie,
+      idempotencyKey: randomUUID(),
+      method: "POST",
+    });
+    assert.equal(exhausted.response.status, 429);
+    assert.equal((exhausted.body.error as { code: string }).code, "RATE_LIMITED");
+    const replayAfterExhaustion = await jsonRequest("/api/mobile/messages/conversations", {
+      body: { body: `${marker} FIRST MESSAGE`, businessId: organization.id },
+      cookie: customer.cookie,
+      idempotencyKey: startKey,
+      method: "POST",
+    });
+    assert.equal(replayAfterExhaustion.response.status, 200);
+    assert.equal((replayAfterExhaustion.body.data as { replayed: boolean }).replayed, true);
+    const changedReplay = await jsonRequest("/api/mobile/messages/conversations", {
+      body: { body: "changed replay", businessId: organization.id },
+      cookie: customer.cookie,
+      idempotencyKey: startKey,
+      method: "POST",
+    });
+    assert.equal(changedReplay.response.status, 409);
+    assert.equal((changedReplay.body.error as { code: string }).code, "IDEMPOTENCY_CONFLICT");
+    const changedTargetReplay = await jsonRequest("/api/mobile/messages/conversations", {
+      body: { body: `${marker} FIRST MESSAGE`, businessId: foreignOrganization.id },
+      cookie: customer.cookie,
+      idempotencyKey: startKey,
+      method: "POST",
+    });
+    assert.equal(changedTargetReplay.response.status, 409);
+    const crossActor = await jsonRequest("/api/mobile/messages/conversations", {
+      body: { body: `${marker} CROSS ACTOR`, businessId: foreignOrganization.id },
+      cookie: foreignCustomer.cookie,
+      idempotencyKey: startKey,
+      method: "POST",
+    });
+    assert.equal(crossActor.response.status, 201);
+    assert.notEqual(
+      (crossActor.body.data as { message: { id: string } }).message.id,
+      startedData.message.id,
+    );
+    assert.equal(await prisma.message.count({
+      where: { idempotencyKey: startKey, senderUserId: customer.userId },
+    }), 1);
+    assert.equal(await prisma.notification.count({
+      where: { eventKey: { startsWith: `message:${startedData.message.id}:recipient:` } },
+    }), 1);
 
     const sendKey = randomUUID();
     const sent = await jsonRequest(`/api/mobile/messages/conversations/${conversationId}/messages`, {
@@ -282,6 +344,35 @@ test("Gate 4B production RSC and Customer Mobile messaging contracts", {
       method: "POST",
     });
     assert.equal(noRelationship.response.status, 404);
+  });
+
+  await t.test("a cursor cannot outlive the current Customer identity", async () => {
+    await prisma.conversation.create({ data: {
+      businessId: organization.id,
+      customerId: customer.person.id,
+      identityKey: `cursor:${randomUUID()}`,
+      type: "CUSTOMER_BUSINESS",
+    } });
+    const firstPage = await jsonRequest("/api/mobile/messages/conversations?mode=all&limit=1", {
+      cookie: customer.cookie,
+    });
+    assert.equal(firstPage.response.status, 200);
+    const cursor = (firstPage.body.data as { nextCursor: string | null }).nextCursor;
+    assert.ok(cursor);
+    await prisma.person.update({
+      where: { id: customer.person.id },
+      data: { status: "INACTIVE" },
+    });
+    const staleCursor = await jsonRequest(
+      `/api/mobile/messages/conversations?mode=all&limit=1&cursor=${encodeURIComponent(cursor)}`,
+      { cookie: customer.cookie },
+    );
+    assert.equal(staleCursor.response.status, 403);
+    assert.notEqual((staleCursor.body.error as { code: string }).code, "INVALID_CURSOR");
+    await prisma.person.update({
+      where: { id: customer.person.id },
+      data: { status: "ACTIVE" },
+    });
   });
 
   await t.test("Customer, Business and Admin HTML/RSC expose only legal Conversations and escape Message HTML", async () => {

@@ -230,11 +230,21 @@ test("mobile production wiring exposes list, thread, read, send, unread, source 
 });
 
 test("Stage 4B staging fixture is confirmation-gated, production-refusing, bounded and rerunnable", async () => {
-  const [fixture, seed, smoke] = await Promise.all([
+  const [actorService, deliveryService, fixture, queryService, seed, smoke] = await Promise.all([
+    readFile(new URL("../../../features/messages/services/actor.ts", import.meta.url), "utf8"),
+    readFile(new URL("../../../features/messages/services/delivery-service.ts", import.meta.url), "utf8"),
     readFile(new URL("../../../scripts/staging/messaging-lifecycle-stage4b-fixture.ts", import.meta.url), "utf8"),
+    readFile(new URL("../../../features/messages/services/query-service.ts", import.meta.url), "utf8"),
     readFile(new URL("../../../scripts/staging/seed-messaging-lifecycle-stage4b.ts", import.meta.url), "utf8"),
     readFile(new URL("../../../scripts/staging/smoke-messaging-lifecycle-stage4b.ts", import.meta.url), "utf8"),
   ]);
+  assert.match(actorService, /FOR SHARE OF membership, person, organization, role/);
+  assert.match(actorService, /FOR SHARE OF access/);
+  assert.match(actorService, /test hooks are unavailable in production/);
+  assert.match(deliveryService, /Messaging rate-limit test hooks are unavailable in production/);
+  assert.match(deliveryService, /findReplayCandidate[\s\S]+if \(!existing\) enforceStartRate/);
+  assert.doesNotMatch(queryService, /\bprisma\./);
+  assert.match(queryService, /messagingSerializable/);
   assert.match(fixture, /ownership collision/);
   assert.match(fixture, /fingerprint/);
   assert.match(fixture, /length: 12/);
