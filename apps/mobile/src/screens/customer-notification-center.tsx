@@ -17,6 +17,8 @@ import type {
   MobileNotificationInbox,
   MobileNotificationItem,
   MobileNotificationPreferences,
+  MobileOutboundChannel,
+  MobileOutboundPreferences,
 } from "../types/notifications";
 
 export type MobileNotificationDestination = {
@@ -34,6 +36,7 @@ export function CustomerNotificationCenter({ locale, onOpenDestination, theme }:
   const [filter, setFilter] = useState<MobileNotificationInboxFilter>("all");
   const [inbox, setInbox] = useState<MobileNotificationInbox | null>(null);
   const [preferences, setPreferences] = useState<MobileNotificationPreferences | null>(null);
+  const [outboundPreferences, setOutboundPreferences] = useState<MobileOutboundPreferences | null>(null);
   const [status, setStatus] = useState<"error" | "loading" | "ready" | "unauthenticated">("loading");
   const [pendingId, setPendingId] = useState<string | null>(null);
   const requestSequence = useRef(0);
@@ -42,19 +45,21 @@ export function CustomerNotificationCenter({ locale, onOpenDestination, theme }:
     const requestId = ++requestSequence.current;
     setStatus("loading");
     try {
-      const [result, nextPreferences] = await Promise.all([
+      const [result, nextPreferences, nextOutboundPreferences] = await Promise.all([
         notificationApi.list({ cursor, filter: nextFilter }),
         preferences ? Promise.resolve(preferences) : notificationApi.preferences(),
+        outboundPreferences ? Promise.resolve(outboundPreferences) : notificationApi.outboundPreferences(),
       ]);
       if (requestSequence.current !== requestId) return;
       setInbox((current) => append && current ? mergeNotificationPage(current, result, nextFilter) : result);
       setPreferences(nextPreferences);
+      setOutboundPreferences(nextOutboundPreferences);
       setStatus("ready");
     } catch (error) {
       if (requestSequence.current !== requestId) return;
       setStatus(error instanceof MobileApiRequestError && error.status === 401 ? "unauthenticated" : "error");
     }
-  }, [preferences]);
+  }, [outboundPreferences, preferences]);
 
   useEffect(() => {
     const timer = setTimeout(() => void load(filter), 0);
@@ -102,6 +107,21 @@ export function CustomerNotificationCenter({ locale, onOpenDestination, theme }:
       }, preferences.version, randomUUID());
       setPreferences(result);
       await load(filter);
+    } catch { await load(filter); }
+  }
+
+  async function toggleOutboundPreference(channel: MobileOutboundChannel, category: keyof typeof copy.categories) {
+    if (!outboundPreferences) return;
+    const selected = new Set(outboundPreferences.categories[channel]);
+    if (selected.has(category)) selected.delete(category);
+    else selected.add(category);
+    const categories = {
+      ...outboundPreferences.categories,
+      [channel]: Object.keys(copy.categories).filter((item) => selected.has(item as keyof typeof copy.categories)),
+    } as MobileOutboundPreferences["categories"];
+    try {
+      const result = await notificationApi.updateOutboundPreferences(categories, outboundPreferences.version, randomUUID());
+      setOutboundPreferences(result);
     } catch { await load(filter); }
   }
 
@@ -176,14 +196,37 @@ export function CustomerNotificationCenter({ locale, onOpenDestination, theme }:
           <Text style={styles.note}>{copy.mandatory}</Text>
         </View>
       ) : null}
+      {outboundPreferences ? (
+        <View style={styles.preferences}>
+          <Text style={styles.title}>{copy.outboundPreferences}</Text>
+          <Text style={styles.note}>{copy.outboundHelp}</Text>
+          {(["EMAIL", "SMS", "PUSH"] as const).map((channel) => (
+            <View key={channel} style={styles.outboundGroup}>
+              <Text style={styles.itemTitle}>{channel}</Text>
+              <Text style={styles.note}>{outboundPreferences.endpoints[channel].eligible ? copy.endpointAvailable : outboundPreferences.endpoints[channel].reason}</Text>
+              {(Object.keys(copy.categories) as Array<keyof typeof copy.categories>).map((category) => {
+                const checked = outboundPreferences.categories[channel].includes(category);
+                return (
+                  <Pressable accessibilityRole="switch" accessibilityState={{ checked }} key={`${channel}:${category}`}
+                    onPress={() => void toggleOutboundPreference(channel, category)} style={styles.preferenceRow}>
+                    <Text style={styles.body}>{copy.categories[category]}</Text>
+                    <View style={[styles.toggle, checked && styles.toggleActive]}><View style={[styles.knob, checked && styles.knobActive]} /></View>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ))}
+          <Text style={styles.note}>{copy.outboundMandatory}</Text>
+        </View>
+      ) : null}
     </View>
   );
 }
 
 const COPY = {
-  ar: { action: "", archive: "أرشفة", categories: { ACCOUNT: "الحساب", ADMIN_ANNOUNCEMENT: "إعلانات المنصة", BOOKINGS: "الحجوزات", COMMERCE: "التجارة", MESSAGES: "الرسائل", RESTAURANT: "المطاعم" }, empty: "لا توجد إشعارات ضمن هذا المرشح.", error: "تعذر تحميل الإشعارات.", eyebrow: "مركز موحد وآمن", filters: { all: "الكل", archived: "المؤرشف", important: "المهم", read: "مقروء", unread: "غير مقروء" }, mandatory: "تظل إشعارات الأمان وحالات الطلب الإلزامية مفعّلة.", markAll: "تحديد الكل كمقروء", more: "تحميل المزيد", preferences: "التفضيلات", read: "مقروء", restore: "استعادة", retry: "إعادة المحاولة", signIn: "سجّل الدخول لعرض إشعاراتك.", title: "الإشعارات", unread: "غير مقروء" },
-  ckb: { action: "", archive: "ئەرشیف", categories: { ACCOUNT: "هەژمار", ADMIN_ANNOUNCEMENT: "ڕاگەیاندن", BOOKINGS: "حجزەکان", COMMERCE: "بازرگانی", MESSAGES: "پەیامەکان", RESTAURANT: "چێشتخانە" }, empty: "هیچ ئاگادارکردنەوەیەک نییە.", error: "بارکردن سەرکەوتوو نەبوو.", eyebrow: "ناوەندی یەکگرتوو", filters: { all: "هەموو", archived: "ئەرشیف", important: "گرنگ", read: "خوێندراوە", unread: "نەخوێندراوە" }, mandatory: "ئاگادارکردنەوە پێویستەکان چالاک دەمێنن.", markAll: "هەمووی خوێندراوە", more: "زیاتر", preferences: "هەڵبژاردەکان", read: "خوێندراوە", restore: "گەڕاندنەوە", retry: "دووبارە", signIn: "بچۆرە ژوورەوە.", title: "ئاگادارکردنەوەکان", unread: "نەخوێندراوە" },
-  en: { action: "", archive: "Archive", categories: { ACCOUNT: "Account", ADMIN_ANNOUNCEMENT: "Platform", BOOKINGS: "Bookings", COMMERCE: "Commerce", MESSAGES: "Messages", RESTAURANT: "Restaurant" }, empty: "No notifications match this filter.", error: "Notifications could not be loaded.", eyebrow: "Unified and safe", filters: { all: "All", archived: "Archived", important: "Important", read: "Read", unread: "Unread" }, mandatory: "Mandatory security and order-state notifications remain enabled.", markAll: "Mark all read", more: "Load more", preferences: "Preferences", read: "Read", restore: "Restore", retry: "Retry", signIn: "Sign in to view your notifications.", title: "Notifications", unread: "Unread" },
+  ar: { action: "", archive: "أرشفة", categories: { ACCOUNT: "الحساب", ADMIN_ANNOUNCEMENT: "إعلانات المنصة", BOOKINGS: "الحجوزات", COMMERCE: "التجارة", MESSAGES: "الرسائل", RESTAURANT: "المطاعم" }, empty: "لا توجد إشعارات ضمن هذا المرشح.", endpointAvailable: "نقطة اتصال موثقة متاحة", error: "تعذر تحميل الإشعارات.", eyebrow: "مركز موحد وآمن", filters: { all: "الكل", archived: "المؤرشف", important: "المهم", read: "مقروء", unread: "غير مقروء" }, mandatory: "تظل إشعارات الأمان وحالات الطلب الإلزامية مفعّلة.", markAll: "تحديد الكل كمقروء", more: "تحميل المزيد", outboundHelp: "التسليم الاختياري يحتاج موافقة صريحة ونقطة اتصال موثقة.", outboundMandatory: "أحداث الحساب الإلزامية تتجاوز التفضيل فقط؛ ولا تتجاوز التحقق أو توفر المزوّد.", outboundPreferences: "تفضيلات القنوات الخارجية", preferences: "التفضيلات", read: "مقروء", restore: "استعادة", retry: "إعادة المحاولة", signIn: "سجّل الدخول لعرض إشعاراتك.", title: "الإشعارات", unread: "غير مقروء" },
+  ckb: { action: "", archive: "ئەرشیف", categories: { ACCOUNT: "هەژمار", ADMIN_ANNOUNCEMENT: "ڕاگەیاندن", BOOKINGS: "حجزەکان", COMMERCE: "بازرگانی", MESSAGES: "پەیامەکان", RESTAURANT: "چێشتخانە" }, empty: "هیچ ئاگادارکردنەوەیەک نییە.", endpointAvailable: "خاڵی پەیوەندی پشتڕاستکراو هەیە", error: "بارکردن سەرکەوتوو نەبوو.", eyebrow: "ناوەندی یەکگرتوو", filters: { all: "هەموو", archived: "ئەرشیف", important: "گرنگ", read: "خوێندراوە", unread: "نەخوێندراوە" }, mandatory: "ئاگادارکردنەوە پێویستەکان چالاک دەمێنن.", markAll: "هەمووی خوێندراوە", more: "زیاتر", outboundHelp: "ناردنی ئارەزوومەندانە پێویستی بە ڕەزامەندی و خاڵی پشتڕاستکراو هەیە.", outboundMandatory: "ڕووداوە پێویستەکانی هەژمار تەنها هەڵبژاردە تێدەپەڕێنن.", outboundPreferences: "هەڵبژاردەکانی کەناڵە دەرەکییەکان", preferences: "هەڵبژاردەکان", read: "خوێندراوە", restore: "گەڕاندنەوە", retry: "دووبارە", signIn: "بچۆرە ژوورەوە.", title: "ئاگادارکردنەوەکان", unread: "نەخوێندراوە" },
+  en: { action: "", archive: "Archive", categories: { ACCOUNT: "Account", ADMIN_ANNOUNCEMENT: "Platform", BOOKINGS: "Bookings", COMMERCE: "Commerce", MESSAGES: "Messages", RESTAURANT: "Restaurant" }, empty: "No notifications match this filter.", endpointAvailable: "Verified endpoint available", error: "Notifications could not be loaded.", eyebrow: "Unified and safe", filters: { all: "All", archived: "Archived", important: "Important", read: "Read", unread: "Unread" }, mandatory: "Mandatory security and order-state notifications remain enabled.", markAll: "Mark all read", more: "Load more", outboundHelp: "Optional delivery requires explicit opt-in and a verified endpoint.", outboundMandatory: "Mandatory Account events bypass preference only; verification and provider availability still apply.", outboundPreferences: "Outbound channel preferences", preferences: "Preferences", read: "Read", restore: "Restore", retry: "Retry", signIn: "Sign in to view your notifications.", title: "Notifications", unread: "Unread" },
 } as const;
 
 function createStyles(theme: MobileTheme) {
@@ -211,6 +254,7 @@ function createStyles(theme: MobileTheme) {
     more: { alignItems: "center", borderColor: theme.colors.accent, borderRadius: 16, borderWidth: 1, padding: 13 },
     moreText: { color: theme.colors.accent, fontWeight: "700" },
     note: { color: theme.colors.mutedForeground, fontSize: 11, lineHeight: 17 },
+    outboundGroup: { borderColor: theme.colors.border, borderRadius: 16, borderWidth: 1, gap: 2, padding: 12 },
     panel: { backgroundColor: theme.colors.card, borderColor: theme.colors.border, borderRadius: 28, borderWidth: 1, gap: 14, padding: 18 },
     preferenceRow: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", paddingVertical: 8 },
     preferences: { borderTopColor: theme.colors.border, borderTopWidth: 1, gap: 4, paddingTop: 16 },

@@ -2,6 +2,7 @@ import type { NotificationCategory, Prisma } from "@prisma/client";
 
 import {
   sanitizeLocalizationVariables,
+  sanitizeLocalizedNotificationContent,
   type CanonicalNotificationEvent,
   validateCanonicalNotificationEvent,
 } from "@/features/notifications/domain/contracts";
@@ -47,6 +48,7 @@ export async function createCanonicalNotifications(
         eventType: event.eventType,
         expiresAt: event.expiresAt,
         localizationVariables: sanitizeLocalizationVariables(event.localizationVariables),
+        localizedContent: sanitizeLocalizedNotificationContent(event.localizedContent),
         mandatory: event.mandatory,
         metadata: compatibilityMetadata(event),
         occurredAt,

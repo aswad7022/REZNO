@@ -19,6 +19,9 @@ import { resolveNotificationActor } from "@/features/notifications/services/cont
 import { listNotificationInbox } from "@/features/notifications/services/inbox-service";
 import { getNotificationPreferences } from "@/features/notifications/services/interaction-service";
 import type { DashboardRole } from "@/types/dashboard";
+import { OutboundPreferences } from "@/features/communications/components/outbound-preferences";
+import { getOutboundPreferences } from "@/features/communications/services/preferences";
+import { requireActiveIdentity } from "@/features/identity/server";
 
 type RawSearchParams = Record<string, string | string[] | undefined>;
 
@@ -27,9 +30,11 @@ export async function NotificationsPage({ role, searchParams = {} }: { role: Das
   const params = toUrlSearchParams(searchParams);
   const query = parseNotificationInboxQuery(params);
   const context = await resolveNotificationActor(mode);
-  const [result, preferences, t, format, locale] = await Promise.all([
+  const identity = await requireActiveIdentity();
+  const [result, preferences, outboundPreferences, t, format, locale] = await Promise.all([
     listNotificationInbox(context, query),
     getNotificationPreferences(context.personId),
+    getOutboundPreferences({ personId: context.personId, userId: identity.session.user.id }),
     getTranslations("Notifications"),
     getFormatter(),
     getLocale(),
@@ -124,6 +129,7 @@ export async function NotificationsPage({ role, searchParams = {} }: { role: Das
           </form>
         </CardContent>
       </Card>
+      <OutboundPreferences initial={outboundPreferences} />
     </DashboardShell>
   );
 }
