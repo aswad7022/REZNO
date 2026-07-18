@@ -148,7 +148,7 @@ test("buckets isolate clients, reset after the window, clean expired state, and 
   assert.equal(bounded.size, 2);
 });
 
-test("every pre-existing consumer retains its exact scope, limit, window, and response contract", () => {
+test("every active consumer retains its exact scope, limit, window, and response contract", () => {
   const contracts: Array<[string, RegExp[]]> = [
     [
       "app/api/auth/[...all]/route.ts",
@@ -174,8 +174,8 @@ test("every pre-existing consumer retains its exact scope, limit, window, and re
       ],
     ],
     [
-      "features/notifications/actions/admin-notifications.ts",
-      [/"adminNotification:create"/, /limit:\s*10/, /windowMs:\s*60_000/],
+      "features/communications/actions/admin-communications.ts",
+      [/`adminCommunications:\$\{scope\}`/, /windowMs:\s*60_000/, /"RATE_LIMITED"/],
     ],
     [
       "features/restaurants/actions/create-reservation.ts",
@@ -187,4 +187,9 @@ test("every pre-existing consumer retains its exact scope, limit, window, and re
     const source = readFileSync(resolve(process.cwd(), file), "utf8");
     for (const pattern of patterns) assert.match(source, pattern, `${file}: ${pattern}`);
   }
+  const retiredAnnouncement = readFileSync(
+    resolve(process.cwd(), "features/notifications/actions/admin-notifications.ts"),
+    "utf8",
+  );
+  assert.doesNotMatch(retiredAnnouncement, /consumeRateLimit|createCanonicalNotifications/);
 });
