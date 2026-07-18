@@ -18,9 +18,11 @@ import type { DashboardRole } from "@/types/dashboard";
 export function DashboardNotifications({
   role,
   items,
+  unreadCount,
 }: {
   role: DashboardRole;
   items: DashboardNotification[];
+  unreadCount: number;
 }) {
   const t = useTranslations("Notifications");
   const format = useFormatter();
@@ -36,11 +38,11 @@ export function DashboardNotifications({
           className="relative hover:bg-primary/10"
         >
           <Bell />
-          {items.length > 0 ? (
+          {unreadCount > 0 ? (
             <span
-              className="absolute end-2 top-2 size-2 rounded-full bg-primary ring-2 ring-background"
-              aria-hidden="true"
-            />
+              className="absolute -end-1 -top-1 min-w-5 rounded-full bg-primary px-1 text-center text-[10px] font-bold leading-5 text-primary-foreground ring-2 ring-background"
+              aria-label={`${Math.min(unreadCount, 100)} unread notifications`}
+            >{unreadCount > 99 ? "99+" : unreadCount}</span>
           ) : null}
         </Button>
       </DropdownMenuTrigger>

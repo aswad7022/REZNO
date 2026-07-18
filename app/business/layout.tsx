@@ -9,7 +9,7 @@ import {
   getDashboardMessagePreviews,
   getUnreadMessageCount,
 } from "@/features/messages/services/messages";
-import { getDashboardNotifications } from "@/features/notifications/services/notifications";
+import { getDashboardNotificationSummary } from "@/features/notifications/services/notifications";
 import { canPerformBusinessOperation } from "@/features/business-operations/domain/policy";
 import { effectiveCommercePermissions } from "@/features/commerce/domain/merchant-access";
 
@@ -18,9 +18,9 @@ export default async function BusinessDashboardLayout({
 }: {
   children: ReactNode;
 }) {
-  const [identity, notifications] = await Promise.all([
+  const [identity, notificationSummary] = await Promise.all([
     requireBusinessIdentity(),
-    getDashboardNotifications("business"),
+    getDashboardNotificationSummary("business"),
   ]);
   const { session, membership } = identity;
   const adminAccess = await getCurrentAdminAccess();
@@ -47,7 +47,8 @@ export default async function BusinessDashboardLayout({
     <DashboardLayout
       role="business"
       user={toDashboardUser(session.user)}
-      notifications={notifications}
+      notifications={notificationSummary.items}
+      unreadNotifications={notificationSummary.unreadCount}
       messagesHref={
         canViewAdminMessages
           ? "/admin/messages"

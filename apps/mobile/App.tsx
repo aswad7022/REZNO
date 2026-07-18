@@ -23,6 +23,7 @@ import {
 } from "./src/api/onboarding";
 import { commerceApi } from "./src/api/commerce";
 import { MobileApiRequestError } from "./src/api/client";
+import { notificationApi } from "./src/api/notifications";
 import {
   getMobileSession,
   signOutMobile,
@@ -91,6 +92,10 @@ import { ReznoNearbySearchScreen } from "./src/screens/rezno-nearby-search-scree
 import { CustomerBookingCreationScreen } from "./src/screens/customer-booking-creation-screen";
 import { CustomerRestaurantReservationCreationScreen } from "./src/screens/customer-restaurant-reservation-creation-screen";
 import { CustomerBookingsHubScreen } from "./src/screens/customer-bookings-hub-screen";
+import {
+  CustomerNotificationCenter,
+  type MobileNotificationDestination,
+} from "./src/screens/customer-notification-center";
 import type { MobileMarketplaceBusiness } from "./src/types/marketplace";
 import type { CommerceNotification } from "./src/types/commerce";
 
@@ -610,6 +615,7 @@ export default function App() {
   const [signOutPending, setSignOutPending] = useState(false);
   const [themeMode, setThemeMode] = useState<MobileThemeMode>("dark");
   const [notificationOrderId, setNotificationOrderId] = useState<string | null>(null);
+  const [notificationUnreadCount, setNotificationUnreadCount] = useState(0);
   const [marketplaceState, setMarketplaceState] = useState<MarketplaceState>({
     status: "idle",
   });
@@ -621,12 +627,24 @@ export default function App() {
   const text = labels[locale];
   const isRtl = getTextDirection(locale) === "rtl";
   const authSession = toMobileAuthSession(startupState);
+  const authenticatedUserId = authSession.status === "authenticated" ? authSession.user.id : null;
   const authSetupUser =
     startupState.kind === "AUTHENTICATED_PROFILE_INCOMPLETE"
       ? startupState.user
       : null;
   const showOnboarding =
     startupState.kind === "GUEST_WELCOME_NOT_COMPLETED";
+
+  useEffect(() => {
+    let active = true;
+    if (!authenticatedUserId) {
+      return () => { active = false; };
+    }
+    void notificationApi.count()
+      .then((count) => { if (active) setNotificationUnreadCount(count); })
+      .catch(() => { if (active) setNotificationUnreadCount(0); });
+    return () => { active = false; };
+  }, [activeTab, authenticatedUserId]);
 
   const restoreStartup = useCallback(async () => {
     // Keep the effect as an external-session synchronization boundary. State
@@ -1114,6 +1132,7 @@ export default function App() {
             isRtl={isRtl}
             locale={locale}
             marketplaceState={marketplaceState}
+            notificationUnreadCount={authenticatedUserId ? notificationUnreadCount : 0}
             onOpenBusiness={setSelectedBusiness}
             onOpenMessages={() => handleTabPress("messages")}
             onOpenNotifications={() => handleTabPress("messages")}
@@ -1188,11 +1207,20 @@ export default function App() {
           <MessagesNotificationsPreviewScreen
             isRtl={isRtl}
             locale={locale}
-            onOpenCommerceOrder={(orderId) => {
-              setNotificationOrderId(orderId);
-              setActiveTab("orders");
+            onOpenNotificationDestination={(destination) => {
+              if (destination.kind === "CUSTOMER_COMMERCE_ORDER" && destination.targetId) {
+                setNotificationOrderId(destination.targetId);
+                setActiveTab("orders");
+              } else if (destination.kind === "CUSTOMER_BOOKING" || destination.kind === "CUSTOMER_RESTAURANT") {
+                setActiveTab("bookings");
+              } else if (destination.kind === "CUSTOMER_ACCOUNT") {
+                setActiveTab("account");
+              } else {
+                setActiveTab("messages");
+              }
             }}
             styles={styles}
+            theme={theme}
           />
         ) : null}
 
@@ -3037,33 +3065,35 @@ function BookingConfirmationStep({
 function MessagesNotificationsPreviewScreen({
   isRtl,
   locale,
-  onOpenCommerceOrder,
+  onOpenNotificationDestination,
   styles,
+  theme,
 }: {
   isRtl: boolean;
   locale: MobileLocale;
-  onOpenCommerceOrder: (orderId: string) => void;
+  onOpenNotificationDestination: (destination: MobileNotificationDestination) => void;
   styles: MobileStyles;
+  theme: MobileTheme;
 }) {
   const heroCopy = locale === "en"
     ? {
         badge: "Safe preview",
-        body: "Order notifications below use the real read-only API. Messages remain a preview; Push, device permissions, WebSocket, and send APIs are not enabled.",
+        body: "The unified Notification Center below is fully connected, including read state, archive, filters, preferences, pagination, and safe destinations. Messaging completion remains in Stage 4B.",
         eyebrow: "Messages and notifications",
-        title: "Clear order updates without enabling outbound messaging",
+        title: "One operational inbox across REZNO",
       }
     : locale === "ckb"
       ? {
           badge: "پێشبینینی پارێزراو",
-          body: "ئاگادارکردنەوەکانی داواکاری لە API ـی ڕاستەقینەی تەنها خوێندنەوەوە دێن. پەیامەکان هێشتا پێشبینینن؛ Push و WebSocket و API ـی ناردن چالاک نین.",
+          body: "ناوەندی ئاگادارکردنەوە بە خوێندراوە، ئەرشیف، پاڵاوتن، هەڵبژاردە و شوێنی پارێزراوەوە پەیوەستە. تەواوکردنی پەیام لە Stage 4B ـە.",
           eyebrow: "پەیام و ئاگادارکردنەوەکان",
-          title: "نوێکارییە ڕوونەکانی داواکاری بەبێ ناردنی پەیام",
+          title: "سندوقێکی کارا بۆ هەموو REZNO",
         }
       : {
           badge: "معاينة آمنة",
-          body: "إشعارات الطلبات أدناه تأتي من واجهة القراءة الحقيقية. تبقى الرسائل معاينة فقط؛ ولا توجد إشعارات دفع أو WebSocket أو واجهة إرسال.",
+          body: "مركز الإشعارات أدناه متصل بالكامل، ويشمل حالة القراءة والأرشفة والمرشحات والتفضيلات والترقيم والوجهات الآمنة. يظل إكمال الرسائل ضمن Stage 4B.",
           eyebrow: "الرسائل والإشعارات",
-          title: "تحديثات طلب واضحة بدون تفعيل إرسال الرسائل",
+          title: "صندوق تشغيلي موحد عبر REZNO",
         };
 
   return (
@@ -3092,24 +3122,22 @@ function MessagesNotificationsPreviewScreen({
         </Text>
       </View>
 
-      <CommerceNotificationsCenter
-        isRtl={isRtl}
+      <CustomerNotificationCenter
         locale={locale}
-        onOpenOrder={onOpenCommerceOrder}
-        styles={styles}
+        onOpenDestination={onOpenNotificationDestination}
+        theme={theme}
       />
       {locale === "ar" ? (
         <>
-          <NotificationsCenterPreview isRtl={isRtl} styles={styles} />
           <ConversationListPreview isRtl={isRtl} styles={styles} />
           <MessageDetailPreview isRtl={isRtl} styles={styles} />
-          <NotificationPreferencesPreview isRtl={isRtl} styles={styles} />
         </>
       ) : null}
     </>
   );
 }
 
+/* eslint-disable @typescript-eslint/no-unused-vars -- Retained visual references are no longer rendered by the operational Stage 4A center. */
 function CommerceNotificationsCenter({
   isRtl,
   locale,
@@ -3433,6 +3461,7 @@ function NotificationPreferencesPreview({
     </View>
   );
 }
+/* eslint-enable @typescript-eslint/no-unused-vars */
 
 function BusinessOwnerPreviewScreen({
   isRtl,

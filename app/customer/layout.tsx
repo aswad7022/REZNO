@@ -11,16 +11,16 @@ import {
   getDashboardMessagePreviews,
   getUnreadMessageCount,
 } from "@/features/messages/services/messages";
-import { getDashboardNotifications } from "@/features/notifications/services/notifications";
+import { getDashboardNotificationSummary } from "@/features/notifications/services/notifications";
 
 export default async function CustomerDashboardLayout({
   children,
 }: {
   children: ReactNode;
 }) {
-  const [{ person, session }, notifications] = await Promise.all([
+  const [{ person, session }, notificationSummary] = await Promise.all([
     requireCustomerIdentity(),
-    getDashboardNotifications("customer"),
+    getDashboardNotificationSummary("customer"),
   ]);
   const businessMembership = await getAnyBusinessMembership(person.id);
   const adminAccess = await getCurrentAdminAccess();
@@ -41,7 +41,8 @@ export default async function CustomerDashboardLayout({
     <DashboardLayout
       role="customer"
       user={toDashboardUser(session.user)}
-      notifications={notifications}
+      notifications={notificationSummary.items}
+      unreadNotifications={notificationSummary.unreadCount}
       messagesHref={canViewAdminMessages ? "/admin/messages" : "/customer/messages"}
       unreadMessages={unreadMessages}
       messagePreviews={messagePreviews}

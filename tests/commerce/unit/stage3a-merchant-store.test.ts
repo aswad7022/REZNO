@@ -234,8 +234,8 @@ test("Stage 3A Merchant Store domain contracts", async (t) => {
     assert.equal(staffHrefs.includes("/business/commerce/access"), false);
   });
 
-  await t.test("Concrete Commerce hub is removed from the deferred route registry", () => {
+  await t.test("Concrete Commerce and Gate 4A communications hubs are removed from the deferred route registry", () => {
     assert.equal("/business/commerce" in deferredBusinessRouteRegistry, false);
-    assert.equal("/business/communications" in deferredBusinessRouteRegistry, true);
+    assert.equal("/business/communications" in deferredBusinessRouteRegistry, false);
   });
 });

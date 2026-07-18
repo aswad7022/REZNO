@@ -20,6 +20,7 @@ export function DashboardHeader({
   role,
   user,
   notifications,
+  unreadNotifications,
   messagesHref,
   unreadMessages,
   messagePreviews,
@@ -38,6 +39,7 @@ export function DashboardHeader({
   role: DashboardRole;
   user: DashboardUser;
   notifications: DashboardNotification[];
+  unreadNotifications: number;
   messagesHref: string;
   unreadMessages?: number;
   messagePreviews: DashboardMessagePreview[];
@@ -97,7 +99,7 @@ export function DashboardHeader({
               items={messagePreviews}
             />
           ) : null}
-          <DashboardNotifications role={role} items={notifications} />
+          <DashboardNotifications role={role} items={notifications} unreadCount={unreadNotifications} />
           <DashboardLanguageSwitcher />
           <DashboardThemeToggle />
           <DashboardUserNav
