@@ -79,9 +79,62 @@ test("Gate 4C production HTML, RSC, redirect, and Customer Mobile outbound contr
       },
     },
   });
+  const deliveryRecipients = Array.from({ length: 21 }, (_, index) => ({
+    personId: randomUUID(),
+    userId: randomUUID(),
+    index,
+  }));
+  await prisma.user.createMany({
+    data: deliveryRecipients.map((item) => ({
+      id: item.userId,
+      name: `Stage 4C delivery ${item.index}`,
+      email: `${marker}-delivery-${item.index}@rezno.invalid`,
+      emailVerified: true,
+    })),
+  });
+  await prisma.person.createMany({
+    data: deliveryRecipients.map((item) => ({
+      id: item.personId,
+      authUserId: item.userId,
+      firstName: "Stage 4C delivery",
+      isOnboarded: true,
+      status: "ACTIVE",
+    })),
+  });
+  await prisma.communicationCampaign.createMany({
+    data: Array.from({ length: 20 }, () => ({
+      createdByAdminUserId: admin.userId,
+      updatedByAdminUserId: admin.userId,
+      audience: "USER" as const,
+      targetPersonId: customer.person.id,
+      channels: ["IN_APP" as const],
+      category: "ADMIN_ANNOUNCEMENT" as const,
+      destinationKind: "NOTIFICATIONS" as const,
+      localizedContent: {
+        AR: { inApp: { title: "اختبار", body: "محتوى" } },
+        EN: { inApp: { title: "Test", body: "Content" } },
+        CKB: { inApp: { title: "تاقیکردنەوە", body: "ناوەڕۆک" } },
+      },
+    })),
+  });
+  const deliveryRows = deliveryRecipients.map((item) => ({
+    campaignId: campaign.id,
+    personId: item.personId,
+    channel: "EMAIL" as const,
+    locale: "EN",
+    endpointType: "EMAIL",
+    status: "PENDING" as const,
+  }));
+  await prisma.outboundDelivery.createMany({ data: deliveryRows });
+  const selectedDelivery = await prisma.outboundDelivery.findFirstOrThrow({
+    where: { campaignId: campaign.id }, orderBy: { id: "asc" },
+  });
 
   t.after(async () => {
-    await prisma.communicationCampaign.deleteMany({ where: { id: campaign.id } });
+    await prisma.outboundDelivery.deleteMany({ where: { campaign: { createdByAdminUserId: admin.userId } } });
+    await prisma.communicationCampaign.deleteMany({ where: { createdByAdminUserId: admin.userId } });
+    await prisma.person.deleteMany({ where: { id: { in: deliveryRecipients.map((item) => item.personId) } } });
+    await prisma.user.deleteMany({ where: { id: { in: deliveryRecipients.map((item) => item.userId) } } });
     await prisma.person.deleteMany({ where: { id: { in: [admin.person.id, customer.person.id] } } });
     await prisma.user.deleteMany({ where: { id: { in: [admin.userId, customer.userId] } } });
     await prisma.$disconnect();
@@ -98,12 +151,34 @@ test("Gate 4C production HTML, RSC, redirect, and Customer Mobile outbound contr
       assert.match(text, new RegExp(campaign.id));
       assert.doesNotMatch(text, /@rezno\.invalid|postgresql:\/\/|DATABASE_URL|PrismaClient/);
     }
-    const detail = await fetch(`${baseUrl}/admin/communications/${campaign.id}`, {
+    const filtered = await fetch(`${baseUrl}/admin/communications?status=DRAFT`, {
+      headers: protectedHeaders({ cookie: admin.cookie }),
+      redirect: "manual",
+    });
+    const filteredText = await filtered.text();
+    assert.equal(filtered.status, 200);
+    assert.match(filteredText, /cursor=/);
+    assert.match(filteredText, /status=DRAFT/);
+
+    const detail = await fetch(`${baseUrl}/admin/communications/${campaign.id}?deliveryStatus=PENDING&deliveryId=${selectedDelivery.id}`, {
       headers: protectedHeaders({ cookie: admin.cookie }),
       redirect: "manual",
     });
     assert.equal(detail.status, 200);
-    assert.match(await detail.text(), /Campaign detail/);
+    const detailText = await detail.text();
+    assert.match(detailText, /Campaign detail/);
+    assert.match(detailText, /deliveryCursor=/);
+    assert.match(detailText, /deliveryStatus=PENDING/);
+    assert.match(detailText, new RegExp(`deliveryId=${selectedDelivery.id}`));
+
+    const malformed = await fetch(`${baseUrl}/admin/communications?status=DRAFT&cursor=malformed`, {
+      headers: protectedHeaders({ cookie: admin.cookie }),
+      redirect: "manual",
+    });
+    const malformedText = await malformed.text();
+    assert.ok([200, 400, 500].includes(malformed.status));
+    assert.match(malformedText, /Communications reporting is temporarily unavailable/);
+    assert.doesNotMatch(malformedText, /PrismaClient|postgresql:\/\/|DATABASE_URL|node_modules|at getCampaignPage/);
     const legacy = await fetch(`${baseUrl}/admin/notifications`, {
       headers: protectedHeaders({ cookie: admin.cookie }),
       redirect: "manual",

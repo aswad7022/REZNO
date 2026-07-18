@@ -10,8 +10,6 @@ import {
   campaignFinalStatus,
   communicationRequestHash,
   createCampaignSchema,
-  decodeCursor,
-  encodeCursor,
   hasUnsafeContent,
   localeFromPersonLanguage,
   preferenceUpdateSchema,
@@ -19,6 +17,16 @@ import {
   safeEmailHtml,
   scheduleCampaignSchema,
 } from "../../../features/communications/domain/validation";
+import {
+  communicationAdminCursorScope,
+  communicationCursorFilterFingerprint,
+  decodeAttemptCursor,
+  decodeCampaignCursor,
+  decodeDeliveryCursor,
+  encodeAttemptCursor,
+  encodeCampaignCursor,
+  encodeDeliveryCursor,
+} from "../../../features/communications/domain/cursor";
 import { deterministicSinkEnabled } from "../../../features/communications/providers/provider";
 import { GATE_4D_BOUNDARY } from "../../../features/communications/domain/contracts";
 import { validateCanonicalNotificationEvent } from "../../../features/notifications/domain/contracts";
@@ -121,11 +129,80 @@ test("Gate 4C domain contracts are strict, bounded, and deterministic", async (t
     assert.equal(localeFromPersonLanguage("TR"), "EN");
   });
 
-  await t.test("cursor is exact and malformed values fail closed", () => {
-    const id = randomUUID();
-    const date = new Date("2026-07-18T12:00:00.000Z");
-    assert.deepEqual(decodeCursor(encodeCursor(date, id)), { createdAt: date, id });
-    assert.throws(() => decodeCursor("not-a-cursor"), /cursor is invalid/i);
+  await t.test("typed reporting cursors bind kind, Admin, parent, filter, page size, and snapshot", () => {
+    const campaignId = randomUUID();
+    const deliveryId = randomUUID();
+    const adminScope = communicationAdminCursorScope({
+      adminAccessId: randomUUID(), personId: randomUUID(), source: "database", userId: randomUUID(),
+    });
+    const otherAdminScope = communicationAdminCursorScope({
+      adminAccessId: randomUUID(), personId: randomUUID(), source: "database", userId: randomUUID(),
+    });
+    const filterFingerprint = communicationCursorFilterFingerprint({ status: "DRAFT" });
+    const snapshot = new Date("2026-07-18T12:00:00.000Z");
+    const sortTimestamp = new Date("2026-07-18T11:00:00.000Z");
+    const authoritativeNow = new Date("2026-07-18T13:00:00.000Z");
+    const common = {
+      adminScope, filterFingerprint, pageSize: 20, snapshot, sortTimestamp, tieBreakerId: randomUUID(),
+    };
+    const campaignCursor = encodeCampaignCursor(common);
+    const deliveryCursor = encodeDeliveryCursor({ ...common, parentId: campaignId });
+    const attemptCursor = encodeAttemptCursor({ ...common, parentId: deliveryId });
+
+    assert.equal(decodeCampaignCursor(campaignCursor, {
+      adminScope, filterFingerprint, pageSize: 20,
+    }, authoritativeNow).snapshotDate.toISOString(), snapshot.toISOString());
+    assert.equal(decodeDeliveryCursor(deliveryCursor, {
+      adminScope, filterFingerprint, pageSize: 20, parentId: campaignId,
+    }, authoritativeNow).parentId, campaignId);
+    assert.equal(decodeAttemptCursor(attemptCursor, {
+      adminScope, filterFingerprint, pageSize: 20, parentId: deliveryId,
+    }, authoritativeNow).parentId, deliveryId);
+
+    const invalid = /cursor is invalid/i;
+    assert.throws(() => decodeDeliveryCursor(campaignCursor, {
+      adminScope, filterFingerprint, pageSize: 20, parentId: campaignId,
+    }, authoritativeNow), invalid);
+    assert.throws(() => decodeDeliveryCursor(deliveryCursor, {
+      adminScope, filterFingerprint, pageSize: 20, parentId: randomUUID(),
+    }, authoritativeNow), invalid);
+    assert.throws(() => decodeAttemptCursor(attemptCursor, {
+      adminScope, filterFingerprint, pageSize: 20, parentId: randomUUID(),
+    }, authoritativeNow), invalid);
+    assert.throws(() => decodeCampaignCursor(campaignCursor, {
+      adminScope: otherAdminScope, filterFingerprint, pageSize: 20,
+    }, authoritativeNow), invalid);
+    assert.throws(() => decodeCampaignCursor(campaignCursor, {
+      adminScope, filterFingerprint: communicationCursorFilterFingerprint({ status: null }), pageSize: 20,
+    }, authoritativeNow), invalid);
+    assert.throws(() => decodeCampaignCursor(campaignCursor, {
+      adminScope, filterFingerprint, pageSize: 50,
+    }, authoritativeNow), invalid);
+    assert.throws(() => decodeCampaignCursor("not-a-cursor", {
+      adminScope, filterFingerprint, pageSize: 20,
+    }, authoritativeNow), invalid);
+
+    const tampered = JSON.parse(Buffer.from(campaignCursor, "base64url").toString("utf8")) as Record<string, unknown>;
+    tampered.tieBreakerId = randomUUID();
+    assert.throws(() => decodeCampaignCursor(Buffer.from(JSON.stringify(tampered)).toString("base64url"), {
+      adminScope, filterFingerprint, pageSize: 20,
+    }, authoritativeNow), invalid);
+    const unsupported = { ...tampered, version: 2 };
+    assert.throws(() => decodeCampaignCursor(Buffer.from(JSON.stringify(unsupported)).toString("base64url"), {
+      adminScope, filterFingerprint, pageSize: 20,
+    }, authoritativeNow), invalid);
+    const futureCursor = encodeCampaignCursor({
+      ...common,
+      snapshot: new Date("2026-07-18T14:00:00.000Z"),
+      sortTimestamp: new Date("2026-07-18T13:30:00.000Z"),
+    });
+    assert.throws(() => decodeCampaignCursor(futureCursor, {
+      adminScope, filterFingerprint, pageSize: 20,
+    }, authoritativeNow), invalid);
+    assert.equal(
+      communicationCursorFilterFingerprint({ status: "DRAFT", channel: "EMAIL" }),
+      communicationCursorFilterFingerprint({ channel: "EMAIL", status: "DRAFT" }),
+    );
   });
 
   await t.test("safe email HTML escapes plain text", () => {

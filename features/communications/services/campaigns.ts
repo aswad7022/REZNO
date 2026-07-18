@@ -231,7 +231,10 @@ export async function getCampaignPage(
   const input = parseOrValidationError(listCampaignsSchema, rawInput);
   return prisma.$transaction(async (transaction) => {
     const currentContext = await assertCommunicationAdminCurrent(transaction, context, "NOTIFICATIONS_VIEW");
-    const authoritativeNow = new Date();
+    const [{ authoritativeNow }] = await transaction.$queryRaw<Array<{ authoritativeNow: Date }>>(Prisma.sql`
+      SELECT CURRENT_TIMESTAMP AS "authoritativeNow"
+    `);
+    if (!authoritativeNow) throw new Error("Communication snapshot time is unavailable.");
     const adminScope = communicationAdminCursorScope(currentContext);
     const filterFingerprint = communicationCursorFilterFingerprint({ status: input.status });
     const cursor = input.cursor ? decodeCampaignCursor(input.cursor, {

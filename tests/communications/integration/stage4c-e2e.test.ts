@@ -334,6 +334,61 @@ test("Gate 4C campaigns, authorization, snapshot, and deterministic delivery are
     assert.equal(await prisma.outboundDeliveryAttempt.count({ where: { delivery: { campaignId: created.id } } }), 0);
   });
 
+  await t.test("pre-provider revalidation suppresses changed endpoints and inactive recipients", async () => {
+    await prisma.outboundPreference.update({
+      where: { personId: fixture.people.customer.person.id },
+      data: { emailCategories: ["ADMIN_ANNOUNCEMENT"] },
+    });
+    const originalUser = await prisma.user.findUniqueOrThrow({ where: { id: fixture.people.customer.userId } });
+    const endpointCampaign = await createCampaign(fixture.actors.full, campaignInput({
+      targetPersonId: fixture.people.customer.person.id,
+      channels: ["EMAIL"],
+    }));
+    await sendCampaignNow(fixture.actors.full, {
+      campaignId: endpointCampaign.id,
+      expectedVersion: endpointCampaign.version,
+      idempotencyKey: randomUUID(),
+    });
+    await prisma.user.update({
+      where: { id: fixture.people.customer.userId },
+      data: { email: `changed-${randomUUID()}@rezno.invalid`, emailVerified: true },
+    });
+    const endpointClaim = await claimDueDeliveries("dispatcher:endpoint-recheck", 10);
+    assert.equal(endpointClaim.length, 1);
+    const endpointResult = await processClaimedDeliveries("dispatcher:endpoint-recheck", endpointClaim);
+    assert.equal(endpointResult.suppressed, 1);
+    assert.equal((await prisma.outboundDelivery.findFirstOrThrow({
+      where: { campaignId: endpointCampaign.id },
+    })).suppressionReason, "ENDPOINT_CHANGED");
+    await prisma.user.update({
+      where: { id: fixture.people.customer.userId },
+      data: { email: originalUser.email, emailVerified: originalUser.emailVerified },
+    });
+
+    const inactiveCampaign = await createCampaign(fixture.actors.full, campaignInput({
+      targetPersonId: fixture.people.customer.person.id,
+      channels: ["EMAIL"],
+    }));
+    await sendCampaignNow(fixture.actors.full, {
+      campaignId: inactiveCampaign.id,
+      expectedVersion: inactiveCampaign.version,
+      idempotencyKey: randomUUID(),
+    });
+    await prisma.person.update({
+      where: { id: fixture.people.customer.person.id }, data: { status: "INACTIVE" },
+    });
+    const inactiveClaim = await claimDueDeliveries("dispatcher:recipient-recheck", 10);
+    assert.equal(inactiveClaim.length, 1);
+    const inactiveResult = await processClaimedDeliveries("dispatcher:recipient-recheck", inactiveClaim);
+    assert.equal(inactiveResult.suppressed, 1);
+    assert.equal((await prisma.outboundDelivery.findFirstOrThrow({
+      where: { campaignId: inactiveCampaign.id },
+    })).suppressionReason, "RECIPIENT_INVALIDATED");
+    await prisma.person.update({
+      where: { id: fixture.people.customer.person.id }, data: { status: "ACTIVE" },
+    });
+  });
+
   await t.test("unsafe provider metadata is replaced by a bounded generic classification", async () => {
     await prisma.outboundPreference.update({
       where: { personId: fixture.people.customer.person.id },

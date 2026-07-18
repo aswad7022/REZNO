@@ -43,6 +43,10 @@ type EndpointRow = {
 };
 
 let testPushResolver: PushEndpointResolver | undefined;
+type EndpointDiagnosticsTestHook = (
+  diagnostics: BulkEndpointResolution["diagnostics"],
+) => Promise<void> | void;
+let endpointDiagnosticsTestHook: EndpointDiagnosticsTestHook | undefined;
 
 export function setCommunicationTestPushEndpointResolver(
   resolver: PushEndpointResolver | undefined,
@@ -51,6 +55,15 @@ export function setCommunicationTestPushEndpointResolver(
     throw new Error("Push endpoint test injection is unavailable in production.");
   }
   testPushResolver = resolver;
+}
+
+export function setCommunicationEndpointDiagnosticsTestHook(
+  hook: EndpointDiagnosticsTestHook | undefined,
+) {
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("Communication endpoint diagnostics hooks are unavailable in production.");
+  }
+  endpointDiagnosticsTestHook = hook;
 }
 
 export async function resolvePersonEndpoint(
@@ -118,16 +131,15 @@ export async function resolvePersonEndpointsBulk(
     }
   }
 
-  return {
-    byPerson,
-    diagnostics: {
-      endpointQueryCount,
-      personCount: uniquePersonIds.length,
-      pushResolverCallCount,
-      queryChunkCount,
-      selectedChannels,
-    },
+  const diagnostics = {
+    endpointQueryCount,
+    personCount: uniquePersonIds.length,
+    pushResolverCallCount,
+    queryChunkCount,
+    selectedChannels,
   };
+  await endpointDiagnosticsTestHook?.(diagnostics);
+  return { byPerson, diagnostics };
 }
 
 export function publicEndpointEligibility(endpoint: ResolvedEndpoint): EndpointEligibility {
