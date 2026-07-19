@@ -5,7 +5,16 @@ import test from "node:test";
 import { prisma } from "../../../lib/db/prisma";
 
 const baseUrl = process.env.MESSAGE_HTTP_BASE_URL ?? process.env.COMMERCE_HTTP_BASE_URL;
+const bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET ?? "";
+const oidcToken = process.env.VERCEL_OIDC_TOKEN ?? "";
 const marker = `stage4b-http-${randomUUID().slice(0, 8)}`;
+
+function protectedHeaders(initial?: HeadersInit) {
+  const headers = new Headers(initial);
+  if (bypass) headers.set("x-vercel-protection-bypass", bypass);
+  else if (oidcToken) headers.set("x-vercel-trusted-oidc-idp-token", oidcToken);
+  return headers;
+}
 
 function forgePublicShaCursor(cursor: string, changes: Record<string, unknown>) {
   const decoded = {
@@ -27,7 +36,7 @@ async function signUp(label: string) {
       name: `${marker}-${label}`,
       password: "password123",
     }),
-    headers: { "content-type": "application/json", origin: baseUrl! },
+    headers: protectedHeaders({ "content-type": "application/json", origin: baseUrl! }),
     method: "POST",
   });
   assert.equal(response.status, 200);
@@ -54,14 +63,14 @@ async function jsonRequest(
   const mutation = options.method === "PATCH" || options.method === "POST";
   const response = await fetch(`${baseUrl}${path}`, {
     body: options.body === undefined ? undefined : JSON.stringify(options.body),
-    headers: {
+    headers: protectedHeaders({
       ...(options.body === undefined ? {} : { "content-type": "application/json" }),
       ...(options.cookie ? { cookie: options.cookie } : {}),
       ...(options.idempotencyKey ? { "idempotency-key": options.idempotencyKey } : {}),
       ...(mutation && options.expoOrigin !== null
         ? { "expo-origin": options.expoOrigin ?? "rezno://" }
         : {}),
-    },
+    }),
     method: options.method ?? "GET",
     redirect: "manual",
   });
@@ -72,10 +81,10 @@ async function jsonRequest(
 
 async function page(path: string, cookie: string, rsc = false) {
   const response = await fetch(`${baseUrl}${path}`, {
-    headers: {
+    headers: protectedHeaders({
       cookie,
       ...(rsc ? { accept: "text/x-component", rsc: "1" } : {}),
-    },
+    }),
     redirect: "manual",
   });
   return { response, text: await response.text() };

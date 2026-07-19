@@ -3,6 +3,15 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const baseUrl = process.env.COMMUNICATION_HTTP_BASE_URL ?? process.env.COMMERCE_HTTP_BASE_URL;
+const bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET ?? "";
+const oidcToken = process.env.VERCEL_OIDC_TOKEN ?? "";
+
+function protectedHeaders() {
+  const headers = new Headers();
+  if (bypass) headers.set("x-vercel-protection-bypass", bypass);
+  else if (oidcToken) headers.set("x-vercel-trusted-oidc-idp-token", oidcToken);
+  return headers;
+}
 
 test("Gate 4D production-route closure matrix remains executable in the Gate 4A–4C live suites", async () => {
   const [notifications, messages, communications] = await Promise.all([
@@ -68,7 +77,10 @@ test("unauthenticated live Stage 4 mobile endpoints fail closed", {
     "/api/mobile/messages/conversations?mode=all&limit=1",
     "/api/mobile/messages/unread-count",
   ]) {
-    const response = await fetch(`${baseUrl}${path}`, { redirect: "manual" });
+    const response = await fetch(`${baseUrl}${path}`, {
+      headers: protectedHeaders(),
+      redirect: "manual",
+    });
     assert.equal(response.status, 401);
     assert.equal(response.headers.get("cache-control"), "no-store, max-age=0");
     const body = await response.text();

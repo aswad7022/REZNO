@@ -478,6 +478,11 @@ model:
   did not promise row order, so the auxiliary Delivery-status evidence hash
   could vary while the rows were identical. The smoke now orders status groups
   explicitly before hashing, with a source contract that prevents regression.
+- G4D-06, discovered on the protected exact-head Preview: the older Gate 4A/4B
+  live harnesses did not forward Vercel OIDC/automation protection headers, so
+  requests stopped at Preview protection instead of reaching REZNO. All Stage
+  4 live helpers now support the same in-memory protection contract; the full
+  focused Preview suite then passed 15/15 without weakening application checks.
 - the unreachable Admin Notification form/action/fixed-list service and the
   unused `CONVERSATION_CLOSED` contract were removed; the required legacy
   `/admin/notifications` redirect remains.
