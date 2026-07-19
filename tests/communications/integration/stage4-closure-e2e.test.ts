@@ -494,19 +494,20 @@ test("Gate 4D scenarios A–J close Stage 4 as one PostgreSQL communications sys
     const retryIds = await claimDueDeliveries("gate4d:retry", 1);
     assert.equal((await processClaimedDeliveries("gate4d:retry", retryIds)).retryScheduled, 1);
     const retryDelivery = await prisma.outboundDelivery.findFirstOrThrow({ where: { campaignId: retryCampaign.id } });
+    const retryAt = new Date("2027-01-01T10:00:00.000Z");
     await prisma.outboundDelivery.update({
       where: { id: retryDelivery.id },
-      data: { nextAttemptAt: new Date("2026-07-19T09:00:00.000Z") },
+      data: { nextAttemptAt: new Date(retryAt.getTime() - 1_000) },
     });
     setCommunicationTestProviderFactory((channel) => new DeterministicSinkProvider(channel, "PERMANENT_FAILURE"));
-    const permanentIds = await claimDueDeliveries("gate4d:permanent", 1, new Date("2026-07-19T10:00:00.000Z"));
-    await processClaimedDeliveries("gate4d:permanent", permanentIds, new Date("2026-07-19T10:00:00.000Z"));
+    const permanentIds = await claimDueDeliveries("gate4d:permanent", 1, retryAt);
+    await processClaimedDeliveries("gate4d:permanent", permanentIds, retryAt);
     assert.equal((await prisma.outboundDelivery.findUniqueOrThrow({ where: { id: retryDelivery.id } })).status, "PERMANENT_FAILURE");
 
     setCommunicationTestProviderFactory((channel) => new DeterministicSinkProvider(channel));
     const expiring = await createCampaign(admin, campaignInput({ channels: ["EMAIL"], targetPersonId: fixture.customer.person.id }));
     await sendCampaignNow(admin, { campaignId: expiring.id, expectedVersion: expiring.version, idempotencyKey: randomUUID() });
-    const claimAt = new Date("2026-07-19T10:00:00.000Z");
+    const claimAt = new Date("2027-01-02T10:00:00.000Z");
     assert.equal((await claimDueDeliveries("gate4d:expiry", 1, claimAt)).length, 1);
     assert.equal(await releaseExpiredClaims(new Date(claimAt.getTime() + 6 * 60_000)), 1);
 

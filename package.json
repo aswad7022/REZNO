@@ -49,6 +49,7 @@
     "cleanup:staging:outbound-communications-stage4c": "NODE_OPTIONS=--conditions=react-server tsx scripts/staging/cleanup-outbound-communications-stage4c.ts",
     "seed:staging:stage4-communications-closure": "NODE_OPTIONS=--conditions=react-server tsx scripts/staging/seed-stage4-communications-closure.ts",
     "smoke:staging:stage4-communications-closure": "NODE_OPTIONS=--conditions=react-server tsx scripts/staging/smoke-stage4-communications-closure.ts",
+    "smoke:staging:stage4-microsecond-pagination": "NODE_OPTIONS=--conditions=react-server tsx scripts/staging/smoke-stage4-microsecond-pagination.ts",
     "cleanup:staging:stage4-communications-closure": "NODE_OPTIONS=--conditions=react-server tsx scripts/staging/cleanup-stage4-communications-closure.ts",
     "smoke:staging:commerce-admin-stage3d": "NODE_OPTIONS=--conditions=react-server tsx scripts/staging/smoke-commerce-admin-stage3d.ts",
     "test:commerce-stage3d": "tsx --test tests/commerce/unit/stage3d-admin-closure.test.ts tests/commerce/unit/commerce-admin-stage3d-seed.test.ts tests/commerce/unit/admin-commerce-pagination.test.ts && NODE_OPTIONS=--conditions=react-server tsx --test --test-concurrency=1 tests/commerce/integration/stage3d-admin-closure-e2e.test.ts",

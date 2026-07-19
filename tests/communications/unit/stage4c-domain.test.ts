@@ -143,9 +143,9 @@ test("Gate 4C domain contracts are strict, bounded, and deterministic", async (t
       adminAccessId: randomUUID(), personId: randomUUID(), source: "database", userId: randomUUID(),
     });
     const filterFingerprint = communicationCursorFilterFingerprint({ status: "DRAFT" });
-    const snapshot = new Date("2026-07-18T12:00:00.000Z");
-    const sortTimestamp = new Date("2026-07-18T11:00:00.000Z");
-    const authoritativeNow = new Date("2026-07-18T13:00:00.000Z");
+    const snapshot = "2026-07-18T12:00:00.000000Z";
+    const sortTimestamp = "2026-07-18T11:00:00.000000Z";
+    const authoritativeNow = "2026-07-18T13:00:00.000000Z";
     const common = {
       adminScope, filterFingerprint, pageSize: 20, snapshot, sortTimestamp, tieBreakerId: randomUUID(),
     };
@@ -155,7 +155,7 @@ test("Gate 4C domain contracts are strict, bounded, and deterministic", async (t
 
     assert.equal(decodeCampaignCursor(campaignCursor, {
       adminScope, filterFingerprint, pageSize: 20,
-    }, authoritativeNow).snapshotDate.toISOString(), snapshot.toISOString());
+    }, authoritativeNow).snapshotTimestamp, snapshot);
     assert.equal(decodeDeliveryCursor(deliveryCursor, {
       adminScope, filterFingerprint, pageSize: 20, parentId: campaignId,
     }, authoritativeNow).parentId, campaignId);
@@ -191,14 +191,14 @@ test("Gate 4C domain contracts are strict, bounded, and deterministic", async (t
     assert.throws(() => decodeCampaignCursor(Buffer.from(JSON.stringify(tampered)).toString("base64url"), {
       adminScope, filterFingerprint, pageSize: 20,
     }, authoritativeNow), invalid);
-    const unsupported = { ...tampered, version: 3 };
+    const unsupported = { ...tampered, version: 2 };
     assert.throws(() => decodeCampaignCursor(Buffer.from(JSON.stringify(unsupported)).toString("base64url"), {
       adminScope, filterFingerprint, pageSize: 20,
     }, authoritativeNow), invalid);
     const futureCursor = encodeCampaignCursor({
       ...common,
-      snapshot: new Date("2026-07-18T14:00:00.000Z"),
-      sortTimestamp: new Date("2026-07-18T13:30:00.000Z"),
+      snapshot: "2026-07-18T14:00:00.000000Z",
+      sortTimestamp: "2026-07-18T13:30:00.000000Z",
     });
     assert.throws(() => decodeCampaignCursor(futureCursor, {
       adminScope, filterFingerprint, pageSize: 20,

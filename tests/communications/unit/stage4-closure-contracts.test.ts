@@ -48,7 +48,7 @@ import {
 } from "../../../scripts/staging/stage4-communications-closure-fixture";
 
 const ids = Array.from({ length: 12 }, () => randomUUID());
-const now = new Date("2026-07-19T12:00:00.000Z");
+const now = "2026-07-19T12:00:00.000000Z";
 const customer = {
   mode: "customer" as const,
   personId: ids[0]!,
@@ -151,9 +151,12 @@ test("all Stage 4 cursor signers are server-only and domain-separated", async ()
     MESSAGE_CURSOR_SIGNING_INFO,
     COMMUNICATION_CURSOR_SIGNING_INFO,
   ]).size, 3);
+  assert.equal(NOTIFICATION_CURSOR_SIGNING_INFO, "rezno:notifications:cursor-signing:v3");
+  assert.equal(MESSAGE_CURSOR_SIGNING_INFO, "rezno:messages:cursor-signing:v3");
+  assert.equal(COMMUNICATION_CURSOR_SIGNING_INFO, "rezno:communications:cursor-signing:v3");
 });
 
-test("Notification cursor v2 rejects public-SHA forgery, tamper, scope reuse, future time, and key rotation", { concurrency: false }, (t) => {
+test("Notification cursor v3 rejects public-SHA forgery, tamper, scope reuse, future time, and key rotation", { concurrency: false }, (t) => {
   setNotificationCursorSigningSecretForTests(TEST_NOTIFICATION_CURSOR_SECRET);
   t.after(() => setNotificationCursorSigningSecretForTests(undefined));
   const filter = notificationFilterFingerprint({ category: "MESSAGES", filter: "unread" });
@@ -163,17 +166,18 @@ test("Notification cursor v2 rejects public-SHA forgery, tamper, scope reuse, fu
     id: ids[5]!,
     pageSize: 20,
     scope: notificationScopeKey(customer),
-    snapshot: "2026-07-19T11:00:00.000Z",
-    sortValue: "2026-07-19T10:00:00.000Z",
+    snapshot: "2026-07-19T11:00:00.000000Z",
+    sortValue: "2026-07-19T10:00:00.000000Z",
   });
-  assert.equal(decodeNotificationCursor(cursor, expectation, now).version, 2);
+  assert.equal(decodeNotificationCursor(cursor, expectation, now).version, 3);
   for (const attack of [
     forgeSha(cursor, { scope: `customer:${ids[6]}` }),
     forgeSha(cursor, { pageSize: 10 }),
     forgeSha(cursor, { filter: notificationFilterFingerprint({ filter: "read" }) }),
-    forgeSha(cursor, { snapshot: "2026-07-19T11:30:00.000Z" }),
+    forgeSha(cursor, { snapshot: "2026-07-19T11:30:00.000000Z" }),
     forge(cursor, { kind: "MESSAGE_CURSOR" }),
     forge(cursor, { version: 1 }),
+    forge(cursor, { version: 2 }),
     forge(cursor, { mac: flipMac(cursor) }),
     "malformed",
   ]) assert.throws(() => decodeNotificationCursor(attack, expectation, now), NotificationDomainError);
@@ -182,15 +186,15 @@ test("Notification cursor v2 rejects public-SHA forgery, tamper, scope reuse, fu
     id: ids[5]!,
     pageSize: 20,
     scope: notificationScopeKey(customer),
-    snapshot: "2026-07-19T12:00:00.001Z",
-    sortValue: "2026-07-19T11:00:00.000Z",
+    snapshot: "2026-07-19T12:00:00.001000Z",
+    sortValue: "2026-07-19T11:00:00.000000Z",
   });
   assert.throws(() => decodeNotificationCursor(future, expectation, now), NotificationDomainError);
   setNotificationCursorSigningSecretForTests(ROTATED_NOTIFICATION_CURSOR_SECRET);
   assert.throws(() => decodeNotificationCursor(cursor, expectation, now), NotificationDomainError);
 });
 
-test("Conversation and Message cursor v2 rejects actor, role, resource, kind, public-SHA, and wrong-key reuse", { concurrency: false }, (t) => {
+test("Conversation and Message cursor v3 rejects actor, role, resource, kind, public-SHA, and wrong-key reuse", { concurrency: false }, (t) => {
   setMessageCursorSigningSecretForTests(TEST_MESSAGE_CURSOR_SECRET);
   t.after(() => setMessageCursorSigningSecretForTests(undefined));
   const filter = messageFilterFingerprint({ mode: "unread" });
@@ -201,10 +205,10 @@ test("Conversation and Message cursor v2 rejects actor, role, resource, kind, pu
     kind: "conversation",
     pageSize: 20,
     scope: "customer:" + ids[0],
-    snapshot: "2026-07-19T11:00:00.000Z",
-    sortValue: "2026-07-19T10:00:00.000Z",
+    snapshot: "2026-07-19T11:00:00.000000Z",
+    sortValue: "2026-07-19T10:00:00.000000Z",
   });
-  assert.equal(decodeMessageCursor(cursor, expectation, now).version, 2);
+  assert.equal(decodeMessageCursor(cursor, expectation, now).version, 3);
   assert.throws(() => decodeMessageCursor(cursor, { ...expectation, actor: business }, now), MessageDomainError);
   assert.throws(() => decodeMessageCursor(cursor, { ...expectation, pageSize: 10 }, now), MessageDomainError);
   assert.throws(() => decodeMessageCursor(cursor, { ...expectation, filter: messageFilterFingerprint({ mode: "all" }) }, now), MessageDomainError);
@@ -212,6 +216,7 @@ test("Conversation and Message cursor v2 rejects actor, role, resource, kind, pu
     forgeSha(cursor, { scope: "customer:" + ids[6] }),
     forgeSha(cursor, { kind: "MESSAGE_CURSOR", conversationId: ids[7] }),
     forge(cursor, { version: 1 }),
+    forge(cursor, { version: 2 }),
     forge(cursor, { mac: flipMac(cursor) }),
     "malformed",
   ]) assert.throws(() => decodeMessageCursor(attack, expectation, now), MessageDomainError);

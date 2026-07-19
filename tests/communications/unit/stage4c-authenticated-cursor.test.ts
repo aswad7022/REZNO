@@ -44,9 +44,9 @@ const otherAdminScope = communicationAdminCursorScope({
 });
 const filterFingerprint = communicationCursorFilterFingerprint({ status: "DRAFT" });
 const otherFilterFingerprint = communicationCursorFilterFingerprint({ status: null });
-const snapshot = new Date("2026-07-19T12:00:00.000Z");
-const sortTimestamp = new Date("2026-07-19T11:00:00.000Z");
-const authoritativeNow = new Date("2026-07-19T13:00:00.000Z");
+const snapshot = "2026-07-19T12:00:00.000000Z";
+const sortTimestamp = "2026-07-19T11:00:00.000000Z";
+const authoritativeNow = "2026-07-19T13:00:00.000000Z";
 const common = {
   adminScope,
   filterFingerprint,
@@ -56,7 +56,7 @@ const common = {
   tieBreakerId: randomUUID(),
 };
 
-test("communication cursor v2 uses authenticated canonical envelopes", { concurrency: false }, async (t) => {
+test("communication cursor v3 uses authenticated canonical envelopes", { concurrency: false }, async (t) => {
   setCommunicationCursorSigningSecretForTests(TEST_COMMUNICATION_CURSOR_SECRET);
   t.after(() => setCommunicationCursorSigningSecretForTests(undefined));
 
@@ -64,7 +64,7 @@ test("communication cursor v2 uses authenticated canonical envelopes", { concurr
   const deliveryCursor = encodeDeliveryCursor({ ...common, parentId: campaignId });
   const attemptCursor = encodeAttemptCursor({ ...common, parentId: deliveryId });
 
-  await t.test("valid Campaign, Delivery, and Attempt cursors use fixed-length version-2 MACs", () => {
+  await t.test("valid Campaign, Delivery, and Attempt cursors use fixed-length version-3 MACs", () => {
     for (const cursor of [campaignCursor, deliveryCursor, attemptCursor]) {
       const envelope = decodeEnvelope(cursor);
       assert.equal(envelope.version, COMMUNICATION_CURSOR_ENVELOPE_VERSION);
@@ -72,8 +72,8 @@ test("communication cursor v2 uses authenticated canonical envelopes", { concurr
       assert.match(envelope.mac, /^[a-f0-9]{64}$/);
       assert.equal("checksum" in envelope, false);
     }
-    assert.equal(COMMUNICATION_CURSOR_SIGNING_INFO, "rezno:communications:cursor-signing:v2");
-    assert.equal(decodeCampaignCursor(campaignCursor, campaignExpectation(), authoritativeNow).version, 2);
+    assert.equal(COMMUNICATION_CURSOR_SIGNING_INFO, "rezno:communications:cursor-signing:v3");
+    assert.equal(decodeCampaignCursor(campaignCursor, campaignExpectation(), authoritativeNow).version, 3);
     assert.equal(decodeDeliveryCursor(deliveryCursor, deliveryExpectation(), authoritativeNow).parentId, campaignId);
     assert.equal(decodeAttemptCursor(attemptCursor, attemptExpectation(), authoritativeNow).parentId, deliveryId);
   });
@@ -104,15 +104,15 @@ test("communication cursor v2 uses authenticated canonical envelopes", { concurr
     legacy.version = 1;
     legacy.checksum = oldPublicChecksum(legacy);
     assert.throws(() => decodeCampaignCursor(encodeEnvelope(legacy), campaignExpectation(), authoritativeNow), invalid);
-    assert.throws(() => decodeCampaignCursor(forge(campaignCursor, { version: 3 }), campaignExpectation(), authoritativeNow), invalid);
+    assert.throws(() => decodeCampaignCursor(forge(campaignCursor, { version: 2 }), campaignExpectation(), authoritativeNow), invalid);
   });
 
   await t.test("a recomputed public SHA cannot forge any authenticated cursor field", () => {
     const campaignForgeries = [
       { filterFingerprint: otherFilterFingerprint },
       { pageSize: 50 },
-      { snapshotTimestamp: "2026-07-19T12:30:00.000Z" },
-      { sortTimestamp: "2026-07-19T10:30:00.000Z" },
+      { snapshotTimestamp: "2026-07-19T12:30:00.000000Z" },
+      { sortTimestamp: "2026-07-19T10:30:00.000000Z" },
       { kind: "OUTBOUND_DELIVERY_CURSOR" },
       { adminScope: otherAdminScope },
     ];
@@ -195,8 +195,8 @@ test("communication cursor v2 uses authenticated canonical envelopes", { concurr
     }, authoritativeNow), invalid);
     const futureCursor = encodeCampaignCursor({
       ...common,
-      snapshot: new Date("2026-07-19T14:00:00.000Z"),
-      sortTimestamp: new Date("2026-07-19T13:30:00.000Z"),
+      snapshot: "2026-07-19T14:00:00.000000Z",
+      sortTimestamp: "2026-07-19T13:30:00.000000Z",
     });
     assert.throws(() => decodeCampaignCursor(futureCursor, campaignExpectation(), authoritativeNow), invalid);
     assert.throws(() => decodeCampaignCursor("malformed", campaignExpectation(), authoritativeNow), invalid);

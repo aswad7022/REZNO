@@ -61,18 +61,19 @@ test("canonical event validation rejects unsafe identities and localization PII"
 });
 
 test("opaque cursor rejects filter, page-size, actor, role, organization and tamper reuse", () => {
+  const authoritativeNow = "2026-07-18T11:00:00.000000Z";
   const filter = notificationFilterFingerprint({ filter: "all" });
   const cursor = encodeNotificationCursor({
     filter, id: "55555555-5555-4555-8555-555555555555", pageSize: 20,
-    scope: `customer:${customer.personId}`, snapshot: "2026-07-18T10:00:00.000Z", sortValue: "2026-07-18T09:00:00.000Z",
+    scope: `customer:${customer.personId}`, snapshot: "2026-07-18T10:00:00.000000Z", sortValue: "2026-07-18T09:00:00.000000Z",
   });
-  assert.equal(decodeNotificationCursor(cursor, { context: customer, filter, pageSize: 20 }).id, "55555555-5555-4555-8555-555555555555");
+  assert.equal(decodeNotificationCursor(cursor, { context: customer, filter, pageSize: 20 }, authoritativeNow).id, "55555555-5555-4555-8555-555555555555");
   for (const expected of [
     { context: customer, filter: notificationFilterFingerprint({ filter: "read" }), pageSize: 20 },
     { context: customer, filter, pageSize: 10 },
     { context: owner, filter, pageSize: 20 },
-  ]) assert.throws(() => decodeNotificationCursor(cursor, expected), NotificationDomainError);
-  assert.throws(() => decodeNotificationCursor(`${cursor.slice(0, -1)}A`, { context: customer, filter, pageSize: 20 }), NotificationDomainError);
+  ]) assert.throws(() => decodeNotificationCursor(cursor, expected, authoritativeNow), NotificationDomainError);
+  assert.throws(() => decodeNotificationCursor(`${cursor.slice(0, -1)}A`, { context: customer, filter, pageSize: 20 }, authoritativeNow), NotificationDomainError);
 });
 
 test("query parser rejects duplicate, unknown, excessive and reversed filters", () => {
