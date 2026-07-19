@@ -1,5 +1,4 @@
 export type MessageErrorCode =
-  | "CONVERSATION_CLOSED"
   | "FORBIDDEN"
   | "IDEMPOTENCY_CONFLICT"
   | "INVALID_CURSOR"
@@ -20,7 +19,6 @@ export class MessageDomainError extends Error {
 }
 
 const STATUS_BY_CODE: Record<MessageErrorCode, number> = {
-  CONVERSATION_CLOSED: 409,
   FORBIDDEN: 403,
   IDEMPOTENCY_CONFLICT: 409,
   INVALID_CURSOR: 400,

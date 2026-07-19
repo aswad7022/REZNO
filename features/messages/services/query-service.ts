@@ -22,6 +22,10 @@ import { messageError } from "@/features/messages/domain/errors";
 import { canAccessConversation } from "@/features/messages/policies/conversation-access";
 import { assertMessageActorCurrent } from "@/features/messages/services/actor";
 import { messagingSerializable } from "@/features/messages/services/transaction";
+import {
+  type ExactPostgresTimestamp,
+  getExactPostgresTime,
+} from "@/lib/db/postgres-timestamp";
 
 export type ConversationListMode = "admin" | "all" | "booking" | "unread";
 
@@ -83,6 +87,7 @@ export async function listConversations(
   assertListQuery(query);
   return messagingSerializable(async (transaction) => {
     const currentActor = await assertMessageActorCurrent(transaction, actor);
+    const authoritativeNow = await getExactPostgresTime(transaction);
     const search = query.search?.trim() || undefined;
     const filter = messageFilterFingerprint({ mode: query.mode, search });
     const cursor = query.cursor
@@ -91,9 +96,9 @@ export async function listConversations(
           filter,
           kind: "conversation",
           pageSize: query.limit,
-        })
+        }, authoritativeNow)
       : null;
-    const snapshot = cursor?.snapshotDate ?? new Date();
+    const snapshot = cursor?.snapshotTimestamp ?? authoritativeNow;
     if (query.mode === "unread") {
       return listUnreadConversations(transaction, {
         actor: currentActor,
@@ -104,84 +109,66 @@ export async function listConversations(
         snapshot,
       });
     }
-    const baseWhere = conversationWhereForActor(currentActor);
-    const filteredWhere = conversationFilterWhere(query.mode, search);
-    let anchor = cursor
-      ? { id: cursor.id, lastMessageAt: cursor.sortDate }
-      : null;
-    const visible: Array<{
-      conversation: PresentationConversation;
-      unreadCount: number;
-    }> = [];
-    let exhausted = false;
-
-    while (visible.length <= query.limit && !exhausted) {
-      const batchSize = Math.min(Math.max(query.limit * 3, 50), 150);
-      const rows = await transaction.conversation.findMany({
-        where: {
-          AND: [
-            baseWhere,
-            filteredWhere,
-            { lastMessageAt: { lte: snapshot } },
-            ...(anchor
-              ? [
-                  {
-                    OR: [
-                      { lastMessageAt: { lt: anchor.lastMessageAt } },
-                      {
-                        id: { lt: anchor.id },
-                        lastMessageAt: anchor.lastMessageAt,
-                      },
-                    ],
-                  } satisfies Prisma.ConversationWhereInput,
-                ]
-              : []),
-          ],
-        },
-        orderBy: [{ lastMessageAt: "desc" }, { id: "desc" }],
-        select: presentationSelect,
-        take: batchSize,
-      });
-      if (rows.length === 0) {
-        exhausted = true;
-        break;
-      }
-      const unread = await unreadCountsForConversations(
-        transaction,
-        currentActor,
-        rows.map((row) => row.id),
-      );
-      for (const conversation of rows) {
-        if (!canAccessConversation(conversation, currentActor)) continue;
-        const unreadCount = unread.get(conversation.id) ?? 0;
-        visible.push({ conversation, unreadCount });
-        if (visible.length > query.limit) break;
-      }
-      const last = rows.at(-1)!;
-      anchor = { id: last.id, lastMessageAt: last.lastMessageAt };
-      exhausted = rows.length < batchSize;
-    }
-
-    const hasNextPage = visible.length > query.limit;
-    const page = visible.slice(0, query.limit);
-    const lastVisible = page.at(-1)?.conversation;
+    const pageRows = await transaction.$queryRaw<Array<{
+      id: string;
+      sortTimestamp: string;
+    }>>(Prisma.sql`
+      SELECT conversation."id", to_char(
+        conversation."lastMessageAt" AT TIME ZONE 'UTC',
+        'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
+      ) AS "sortTimestamp"
+      FROM "Conversation" AS conversation
+      WHERE ${conversationAccessSql(currentActor)}
+        AND ${conversationFilterSql(query.mode, search)}
+        AND conversation."lastMessageAt" <= ${snapshot}::timestamptz
+        ${cursor ? Prisma.sql`
+          AND (conversation."lastMessageAt", conversation."id") <
+            (${cursor.sortTimestamp}::timestamptz, ${cursor.id}::uuid)
+        ` : Prisma.empty}
+      ORDER BY conversation."lastMessageAt" DESC, conversation."id" DESC
+      LIMIT ${query.limit + 1}
+    `);
+    const visibleRows = pageRows.slice(0, query.limit);
+    const conversations = visibleRows.length
+      ? await transaction.conversation.findMany({
+          where: { id: { in: visibleRows.map((row) => row.id) } },
+          select: presentationSelect,
+        })
+      : [];
+    const byId = new Map(conversations.map((conversation) => [conversation.id, conversation]));
+    const page = visibleRows.flatMap((row) => {
+      const conversation = byId.get(row.id);
+      return conversation && canAccessConversation(conversation, currentActor)
+        ? [conversation]
+        : [];
+    });
+    const unread = await unreadCountsForConversations(
+      transaction,
+      currentActor,
+      page.map((conversation) => conversation.id),
+    );
+    const lastVisible = visibleRows.at(-1);
     return {
-      data: page.map(({ conversation, unreadCount }) =>
-        toConversationSummary(conversation, currentActor, unreadCount),
+      data: page.map((conversation) =>
+        toConversationSummary(
+          conversation,
+          currentActor,
+          unread.get(conversation.id) ?? 0,
+        ),
       ),
       nextCursor:
-        hasNextPage && lastVisible
+        pageRows.length > query.limit && lastVisible
           ? encodeMessageCursor({
               filter,
               id: lastVisible.id,
               kind: "conversation",
               pageSize: query.limit,
               scope: messageActorScopeKey(currentActor),
-              snapshot: snapshot.toISOString(),
-              sortValue: lastVisible.lastMessageAt.toISOString(),
+              snapshot,
+              sortValue: lastVisible.sortTimestamp,
             })
           : null,
-      snapshot: snapshot.toISOString(),
+      snapshot,
     };
   });
 }
@@ -220,6 +207,7 @@ export async function listMessages(
   assertHistoryQuery(query);
   return messagingSerializable(async (transaction) => {
     const currentActor = await assertMessageActorCurrent(transaction, actor);
+    const authoritativeNow = await getExactPostgresTime(transaction);
     const conversation = await transaction.conversation.findUnique({
       where: { id: conversationId },
       select: {
@@ -238,36 +226,47 @@ export async function listMessages(
           filter,
           kind: "message",
           pageSize: query.limit,
-        })
+        }, authoritativeNow)
       : null;
-    const snapshot = cursor?.snapshotDate ?? new Date();
-    const rows = await transaction.message.findMany({
-      where: {
-        conversationId,
-        createdAt: { lte: snapshot },
-        ...(cursor
-          ? {
-              OR: [
-                { createdAt: { lt: cursor.sortDate } },
-                { createdAt: cursor.sortDate, id: { lt: cursor.id } },
-              ],
-            }
-          : {}),
-      },
-      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-      select: { body: true, createdAt: true, id: true, senderUserId: true },
-      take: query.limit + 1,
+    const snapshot = cursor?.snapshotTimestamp ?? authoritativeNow;
+    const pageRows = await transaction.$queryRaw<Array<{
+      id: string;
+      sortTimestamp: string;
+    }>>(Prisma.sql`
+      SELECT message."id", to_char(
+        message."createdAt" AT TIME ZONE 'UTC',
+        'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
+      ) AS "sortTimestamp"
+      FROM "Message" AS message
+      WHERE message."conversationId" = ${conversationId}::uuid
+        AND message."createdAt" <= ${snapshot}::timestamptz
+        ${cursor ? Prisma.sql`
+          AND (message."createdAt", message."id") <
+            (${cursor.sortTimestamp}::timestamptz, ${cursor.id}::uuid)
+        ` : Prisma.empty}
+      ORDER BY message."createdAt" DESC, message."id" DESC
+      LIMIT ${query.limit + 1}
+    `);
+    const visibleRows = pageRows.slice(0, query.limit);
+    const messages = visibleRows.length
+      ? await transaction.message.findMany({
+          where: { id: { in: visibleRows.map((row) => row.id) } },
+          select: { body: true, createdAt: true, id: true, senderUserId: true },
+        })
+      : [];
+    const byId = new Map(messages.map((message) => [message.id, message]));
+    const page = visibleRows.flatMap((row) => {
+      const message = byId.get(row.id);
+      return message ? [message] : [];
     });
-    const hasNextPage = rows.length > query.limit;
-    const page = rows.slice(0, query.limit);
-    const last = page.at(-1);
+    const last = visibleRows.at(-1);
     return {
       data: page.map((message) =>
         toMessageSummary(message, currentActor, conversation),
       ),
       kind: "MESSAGE_PAGE",
       nextCursor:
-        hasNextPage && last
+        pageRows.length > query.limit && last
           ? encodeMessageCursor({
               conversationId,
               filter,
@@ -275,11 +274,11 @@ export async function listMessages(
               kind: "message",
               pageSize: query.limit,
               scope: messageActorScopeKey(currentActor),
-              snapshot: snapshot.toISOString(),
-              sortValue: last.createdAt.toISOString(),
+              snapshot,
+              sortValue: last.sortTimestamp,
             })
           : null,
-      snapshot: snapshot.toISOString(),
+      snapshot,
     };
   });
 }
@@ -324,30 +323,28 @@ async function listUnreadConversations(
     snapshot,
   }: {
     actor: MessageActor;
-    cursor: { id: string; sortDate: Date } | null;
+    cursor: { id: string; sortTimestamp: ExactPostgresTimestamp } | null;
     filter: string;
     limit: number;
     search: string | undefined;
-    snapshot: Date;
+    snapshot: ExactPostgresTimestamp;
   },
 ) {
   const scopeKey = messageActorScopeKey(actor);
   const rows = await transaction.$queryRaw<
-    Array<{ id: string; lastMessageAt: Date }>
+    Array<{ id: string; sortTimestamp: string }>
   >(Prisma.sql`
-    SELECT conversation."id", conversation."lastMessageAt"
+    SELECT conversation."id", to_char(
+      conversation."lastMessageAt" AT TIME ZONE 'UTC',
+      'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
+    ) AS "sortTimestamp"
     FROM "Conversation" AS conversation
     WHERE ${conversationAccessSql(actor)}
-      AND conversation."lastMessageAt" <= ${snapshot}
+      AND conversation."lastMessageAt" <= ${snapshot}::timestamptz
       ${
         cursor
-          ? Prisma.sql`AND (
-            conversation."lastMessageAt" < ${cursor.sortDate}
-            OR (
-              conversation."lastMessageAt" = ${cursor.sortDate}
-              AND conversation."id" < ${cursor.id}::uuid
-            )
-          )`
+          ? Prisma.sql`AND (conversation."lastMessageAt", conversation."id") <
+            (${cursor.sortTimestamp}::timestamptz, ${cursor.id}::uuid)`
           : Prisma.empty
       }
       ${conversationSearchSql(search)}
@@ -387,7 +384,7 @@ async function listUnreadConversations(
     actor,
     authorized.map((conversation) => conversation.id),
   );
-  const last = authorized.at(-1);
+  const last = pageRows.at(-1);
   return {
     data: authorized.map((conversation) =>
       toConversationSummary(
@@ -404,11 +401,11 @@ async function listUnreadConversations(
             kind: "conversation",
             pageSize: limit,
             scope: messageActorScopeKey(actor),
-            snapshot: snapshot.toISOString(),
-            sortValue: last.lastMessageAt.toISOString(),
+            snapshot,
+            sortValue: last.sortTimestamp,
           })
         : null,
-    snapshot: snapshot.toISOString(),
+    snapshot,
   };
 }
 
@@ -423,6 +420,7 @@ function conversationAccessSql(actor: MessageActor) {
           SELECT 1 FROM "Booking" AS booking
           WHERE booking."id" = conversation."bookingId"
             AND booking."customerId" = ${actor.personId}::uuid
+            AND booking."organizationId" = conversation."businessId"
         )
       )
     `;
@@ -483,6 +481,41 @@ function conversationSearchSql(search: string | undefined) {
       )
     )
   `;
+}
+
+function conversationFilterSql(
+  mode: ConversationListMode,
+  search: string | undefined,
+) {
+  const conditions: Prisma.Sql[] = [Prisma.sql`true`];
+  if (mode === "booking") {
+    conditions.push(Prisma.sql`conversation."bookingId" IS NOT NULL`);
+  }
+  if (mode === "admin") {
+    conditions.push(Prisma.sql`
+      conversation."type" IN ('ADMIN_USER', 'ADMIN_BUSINESS')
+    `);
+  }
+  if (search) {
+    const pattern = `%${search}%`;
+    conditions.push(Prisma.sql`(
+      conversation."subject" ILIKE ${pattern}
+      OR EXISTS (
+        SELECT 1 FROM "Organization" AS business
+        WHERE business."id" = conversation."businessId"
+          AND business."name" ILIKE ${pattern}
+      )
+      OR EXISTS (
+        SELECT 1 FROM "Person" AS customer
+        WHERE customer."id" = conversation."customerId"
+          AND (
+            customer."displayName" ILIKE ${pattern}
+            OR customer."firstName" ILIKE ${pattern}
+          )
+      )
+    )`);
+  }
+  return Prisma.join(conditions, " AND ");
 }
 
 function unreadBoundarySql() {
@@ -650,39 +683,6 @@ async function unreadCountsForConversations(
     GROUP BY message."conversationId"
   `);
   return new Map(rows.map((row) => [row.conversationId, row.unreadCount]));
-}
-
-function conversationFilterWhere(
-  mode: ConversationListMode,
-  search: string | undefined,
-): Prisma.ConversationWhereInput {
-  return {
-    ...(mode === "booking" ? { bookingId: { not: null } } : {}),
-    ...(mode === "admin"
-      ? { type: { in: ["ADMIN_USER", "ADMIN_BUSINESS"] } }
-      : {}),
-    ...(search
-      ? {
-          OR: [
-            { subject: { contains: search, mode: "insensitive" } },
-            { business: { name: { contains: search, mode: "insensitive" } } },
-            {
-              customer: {
-                OR: [
-                  {
-                    displayName: {
-                      contains: search,
-                      mode: "insensitive",
-                    },
-                  },
-                  { firstName: { contains: search, mode: "insensitive" } },
-                ],
-              },
-            },
-          ],
-        }
-      : {}),
-  };
 }
 
 function toConversationSummary(

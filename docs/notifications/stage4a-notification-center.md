@@ -254,8 +254,12 @@ routes; it does not accept a caller-provided path.
 
 The query layer revalidates an active Person and, for Business mode, the exact
 active membership, Organization, role, and Organization state before reading.
-It uses one snapshot-bound `createdAt DESC, id DESC` cursor, a checksum and a
-scope/filter/page-size fingerprint. All/read/unread/important/archived,
+It uses one authenticated version 3 HMAC-SHA-256 cursor, a lossless PostgreSQL
+`timestamptz(6)` snapshot/anchor in canonical
+`YYYY-MM-DDTHH:mm:ss.ffffffZ` form, and an indexed
+`(createdAt, id)` continuation tuple. Versions 1 and 2 are rejected without
+downgrade. The MAC binds the scope/filter/page-size fingerprint.
+All/read/unread/important/archived,
 category, and bounded date filters share the same canonical source. The unread
 count is scoped and capped at 100,000 rather than depending on preview length.
 

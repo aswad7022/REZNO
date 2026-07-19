@@ -21,6 +21,10 @@ import {
   notificationEffectiveRead,
 } from "@/features/notifications/domain/state";
 import { assertNotificationActorCurrent } from "@/features/notifications/services/actor-current";
+import {
+  type ExactPostgresTimestamp,
+  getExactPostgresTime,
+} from "@/lib/db/postgres-timestamp";
 import { prisma } from "@/lib/db/prisma";
 
 export type NotificationInboxFilter = "all" | "archived" | "important" | "read" | "unread";
@@ -67,6 +71,7 @@ export async function listNotificationInbox(
       where: { id: currentContext.personId },
       select: { preferredLanguage: true },
     });
+    const authoritativeNow = await getExactPostgresTime(transaction);
     const scopeKey = notificationScopeKey(currentContext);
     const fingerprint = notificationFilterFingerprint({
       category: query.category,
@@ -75,15 +80,25 @@ export async function listNotificationInbox(
       to: query.to?.toISOString(),
     });
     const cursor = query.cursor
-      ? decodeNotificationCursor(query.cursor, { context: currentContext, filter: fingerprint, pageSize: query.limit })
+      ? decodeNotificationCursor(
+          query.cursor,
+          { context: currentContext, filter: fingerprint, pageSize: query.limit },
+          authoritativeNow,
+        )
       : null;
-    const snapshot = cursor?.snapshotDate ?? new Date();
+    const snapshot = cursor?.snapshotTimestamp ?? authoritativeNow;
     const inboxState = await transaction.notificationInboxState.findUnique({
       where: { personId_scopeKey: { personId: currentContext.personId, scopeKey } },
     });
     const conditions = baseConditions(currentContext, query, snapshot, inboxState, cursor);
-    const ids = await transaction.$queryRaw<Array<{ id: string }>>(Prisma.sql`
-      SELECT n."id"
+    const pageRows = await transaction.$queryRaw<Array<{
+      id: string;
+      sortTimestamp: string;
+    }>>(Prisma.sql`
+      SELECT n."id", to_char(
+        n."createdAt" AT TIME ZONE 'UTC',
+        'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
+      ) AS "sortTimestamp"
       FROM "Notification" n
       LEFT JOIN "NotificationRecipientState" s
         ON s."notificationId" = n."id" AND s."personId" = ${currentContext.personId}::uuid
@@ -91,7 +106,8 @@ export async function listNotificationInbox(
       ORDER BY n."createdAt" DESC, n."id" DESC
       LIMIT ${query.limit + 1}
     `);
-    const pageIds = ids.slice(0, query.limit).map((item) => item.id);
+    const visibleRows = pageRows.slice(0, query.limit);
+    const pageIds = visibleRows.map((item) => item.id);
     const [records, states] = await Promise.all([
       pageIds.length
         ? transaction.notification.findMany({ where: { id: { in: pageIds } }, select: inboxSelect })
@@ -106,7 +122,7 @@ export async function listNotificationInbox(
     const stateById = new Map(states.map((state) => [state.notificationId, state]));
     const ordered = pageIds.map((id) => recordById.get(id)).filter((item): item is InboxRecord => Boolean(item));
     const destinationById = await authorizeDestinations(transaction, currentContext, ordered);
-    const last = ordered.at(-1);
+    const last = visibleRows.at(-1);
     return {
       data: ordered.map((record) => {
         const state = stateById.get(record.id);
@@ -131,19 +147,22 @@ export async function listNotificationInbox(
       }),
       inboxVersion: inboxState?.version ?? 0,
       pageInfo: {
-        hasNextPage: ids.length > query.limit,
-        nextCursor: ids.length > query.limit && last
+        hasNextPage: pageRows.length > query.limit,
+        nextCursor: pageRows.length > query.limit && last
           ? encodeNotificationCursor({
               filter: fingerprint,
               id: last.id,
               pageSize: query.limit,
               scope: scopeKey,
-              snapshot: snapshot.toISOString(),
-              sortValue: last.createdAt.toISOString(),
+              snapshot,
+              sortValue: last.sortTimestamp,
             })
           : null,
       },
-      snapshot: snapshot.toISOString(),
+      // This public value is the existing mark-all watermark contract. Cursor
+      // pagination persists the lossless six-digit snapshot above; converting
+      // here is display/input compatibility only and never decides membership.
+      snapshot: new Date(snapshot).toISOString(),
       unreadCount: await countUnreadNotificationsInTransaction(transaction, currentContext, snapshot),
     };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
@@ -165,18 +184,22 @@ function localizedCopy(
 
 export async function countUnreadNotifications(
   context: NotificationActorContext,
-  snapshot = new Date(),
+  snapshot?: ExactPostgresTimestamp,
 ) {
   return prisma.$transaction(async (transaction) => {
     const currentContext = await assertNotificationActorCurrent(transaction, context);
-    return countUnreadNotificationsInTransaction(transaction, currentContext, snapshot);
+    return countUnreadNotificationsInTransaction(
+      transaction,
+      currentContext,
+      snapshot ?? await getExactPostgresTime(transaction),
+    );
   }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
 }
 
 async function countUnreadNotificationsInTransaction(
   transaction: Prisma.TransactionClient,
   context: NotificationActorContext,
-  snapshot: Date,
+  snapshot: ExactPostgresTimestamp,
 ) {
   const scopeKey = notificationScopeKey(context);
   const inboxState = await transaction.notificationInboxState.findUnique({
@@ -205,14 +228,14 @@ async function countUnreadNotificationsInTransaction(
 function baseConditions(
   context: NotificationActorContext,
   query: Pick<NotificationInboxQuery, "category" | "filter" | "from" | "to">,
-  snapshot: Date,
+  snapshot: ExactPostgresTimestamp,
   inboxState: { readAt: Date; readThrough: Date } | null,
-  cursor: { id: string; sortDate: Date } | null,
+  cursor: { id: string; sortTimestamp: ExactPostgresTimestamp } | null,
 ) {
   const conditions: Prisma.Sql[] = [
     visibilitySql(context),
-    Prisma.sql`n."createdAt" <= ${snapshot}`,
-    Prisma.sql`(n."expiresAt" IS NULL OR n."expiresAt" > ${snapshot})`,
+    Prisma.sql`n."createdAt" <= ${snapshot}::timestamptz`,
+    Prisma.sql`(n."expiresAt" IS NULL OR n."expiresAt" > ${snapshot}::timestamptz)`,
     Prisma.sql`(
       n."mandatory" = true OR NOT EXISTS (
         SELECT 1 FROM "NotificationPreferenceSuppression" ps
@@ -231,10 +254,9 @@ function baseConditions(
   if (query.filter === "important") conditions.push(Prisma.sql`n."priority" = 'IMPORTANT'::"NotificationPriority"`);
   if (query.filter === "read") conditions.push(readSql(inboxState));
   if (query.filter === "unread") conditions.push(Prisma.sql`NOT (${readSql(inboxState)})`);
-  if (cursor) conditions.push(Prisma.sql`(
-    n."createdAt" < ${cursor.sortDate} OR
-    (n."createdAt" = ${cursor.sortDate} AND n."id" < ${cursor.id}::uuid)
-  )`);
+  if (cursor) conditions.push(Prisma.sql`
+    (n."createdAt", n."id") < (${cursor.sortTimestamp}::timestamptz, ${cursor.id}::uuid)
+  `);
   return conditions;
 }
 

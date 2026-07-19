@@ -25,6 +25,7 @@ import {
   assertCommunicationAdminCurrent,
   type CommunicationAdminContext,
 } from "@/features/communications/services/admin-actor";
+import { getExactPostgresTime } from "@/lib/db/postgres-timestamp";
 import { prisma } from "@/lib/db/prisma";
 
 export async function getDeliveryPage(
@@ -34,10 +35,7 @@ export async function getDeliveryPage(
   const input = parseOrValidationError(listDeliveriesSchema, rawInput);
   return prisma.$transaction(async (transaction) => {
     const currentContext = await assertCommunicationAdminCurrent(transaction, context, "NOTIFICATIONS_VIEW");
-    const [{ authoritativeNow }] = await transaction.$queryRaw<Array<{ authoritativeNow: Date }>>(Prisma.sql`
-      SELECT CURRENT_TIMESTAMP AS "authoritativeNow"
-    `);
-    if (!authoritativeNow) throw new Error("Communication snapshot time is unavailable.");
+    const authoritativeNow = await getExactPostgresTime(transaction);
     const adminScope = communicationAdminCursorScope(currentContext);
     const filterFingerprint = communicationCursorFilterFingerprint({ status: input.status });
     const cursor = input.cursor ? decodeDeliveryCursor(input.cursor, {
@@ -46,29 +44,45 @@ export async function getDeliveryPage(
       pageSize: input.pageSize,
       parentId: input.campaignId,
     }, authoritativeNow) : null;
-    const snapshot = cursor?.snapshotDate ?? authoritativeNow;
+    const snapshot = cursor?.snapshotTimestamp ?? authoritativeNow;
     const campaign = await transaction.communicationCampaign.findUnique({
       where: { id: input.campaignId },
       select: { id: true },
     });
     if (!campaign) communicationError("NOT_FOUND", "Campaign was not found.");
-    const rows = await transaction.outboundDelivery.findMany({
-      where: {
-        campaignId: input.campaignId,
-        ...(input.status ? { status: input.status } : {}),
-        createdAt: { lte: snapshot },
-        ...(cursor ? {
-          OR: [
-            { createdAt: { lt: cursor.sortDate } },
-            { createdAt: cursor.sortDate, id: { lt: cursor.tieBreakerId } },
-          ],
-        } : {}),
-      },
-      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-      take: input.pageSize + 1,
+    const pageRows = await transaction.$queryRaw<Array<{
+      id: string;
+      sortTimestamp: string;
+    }>>(Prisma.sql`
+      SELECT delivery."id", to_char(
+        delivery."createdAt" AT TIME ZONE 'UTC',
+        'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
+      ) AS "sortTimestamp"
+      FROM "OutboundDelivery" AS delivery
+      WHERE delivery."campaignId" = ${input.campaignId}::uuid
+        AND delivery."createdAt" <= ${snapshot}::timestamptz
+        ${input.status ? Prisma.sql`
+          AND delivery."status" = ${input.status}::"OutboundDeliveryStatus"
+        ` : Prisma.empty}
+        ${cursor ? Prisma.sql`
+          AND (delivery."createdAt", delivery."id") <
+            (${cursor.sortTimestamp}::timestamptz, ${cursor.tieBreakerId}::uuid)
+        ` : Prisma.empty}
+      ORDER BY delivery."createdAt" DESC, delivery."id" DESC
+      LIMIT ${input.pageSize + 1}
+    `);
+    const visibleRows = pageRows.slice(0, input.pageSize);
+    const hydrated = visibleRows.length
+      ? await transaction.outboundDelivery.findMany({
+          where: { id: { in: visibleRows.map((row) => row.id) } },
+        })
+      : [];
+    const byId = new Map(hydrated.map((delivery) => [delivery.id, delivery]));
+    const visible = visibleRows.flatMap((row) => {
+      const delivery = byId.get(row.id);
+      return delivery ? [delivery] : [];
     });
-    const visible = rows.slice(0, input.pageSize);
-    const next = rows.length > input.pageSize ? visible.at(-1) : null;
+    const next = pageRows.length > input.pageSize ? visibleRows.at(-1) : null;
     return {
       kind: "DELIVERY_PAGE",
       items: visible.map((delivery): DeliverySummaryDto => ({
@@ -93,7 +107,7 @@ export async function getDeliveryPage(
         pageSize: input.pageSize,
         parentId: input.campaignId,
         snapshot,
-        sortTimestamp: next.createdAt,
+        sortTimestamp: next.sortTimestamp,
         tieBreakerId: next.id,
       }) : null,
     };
@@ -107,10 +121,7 @@ export async function getAttemptPage(
   const input = parseOrValidationError(listAttemptsSchema, rawInput);
   return prisma.$transaction(async (transaction) => {
     const currentContext = await assertCommunicationAdminCurrent(transaction, context, "NOTIFICATIONS_VIEW");
-    const [{ authoritativeNow }] = await transaction.$queryRaw<Array<{ authoritativeNow: Date }>>(Prisma.sql`
-      SELECT CURRENT_TIMESTAMP AS "authoritativeNow"
-    `);
-    if (!authoritativeNow) throw new Error("Communication snapshot time is unavailable.");
+    const authoritativeNow = await getExactPostgresTime(transaction);
     const adminScope = communicationAdminCursorScope(currentContext);
     const filterFingerprint = communicationCursorFilterFingerprint({});
     const cursor = input.cursor ? decodeAttemptCursor(input.cursor, {
@@ -119,28 +130,42 @@ export async function getAttemptPage(
       pageSize: input.pageSize,
       parentId: input.deliveryId,
     }, authoritativeNow) : null;
-    const snapshot = cursor?.snapshotDate ?? authoritativeNow;
+    const snapshot = cursor?.snapshotTimestamp ?? authoritativeNow;
     const delivery = await transaction.outboundDelivery.findUnique({
       where: { id: input.deliveryId },
       select: { id: true },
     });
     if (!delivery) communicationError("NOT_FOUND", "Delivery was not found.");
-    const rows = await transaction.outboundDeliveryAttempt.findMany({
-      where: {
-        deliveryId: input.deliveryId,
-        createdAt: { lte: snapshot },
-        ...(cursor ? {
-          OR: [
-            { createdAt: { lt: cursor.sortDate } },
-            { createdAt: cursor.sortDate, id: { lt: cursor.tieBreakerId } },
-          ],
-        } : {}),
-      },
-      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-      take: input.pageSize + 1,
+    const pageRows = await transaction.$queryRaw<Array<{
+      id: string;
+      sortTimestamp: string;
+    }>>(Prisma.sql`
+      SELECT attempt."id", to_char(
+        attempt."createdAt" AT TIME ZONE 'UTC',
+        'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
+      ) AS "sortTimestamp"
+      FROM "OutboundDeliveryAttempt" AS attempt
+      WHERE attempt."deliveryId" = ${input.deliveryId}::uuid
+        AND attempt."createdAt" <= ${snapshot}::timestamptz
+        ${cursor ? Prisma.sql`
+          AND (attempt."createdAt", attempt."id") <
+            (${cursor.sortTimestamp}::timestamptz, ${cursor.tieBreakerId}::uuid)
+        ` : Prisma.empty}
+      ORDER BY attempt."createdAt" DESC, attempt."id" DESC
+      LIMIT ${input.pageSize + 1}
+    `);
+    const visibleRows = pageRows.slice(0, input.pageSize);
+    const hydrated = visibleRows.length
+      ? await transaction.outboundDeliveryAttempt.findMany({
+          where: { id: { in: visibleRows.map((row) => row.id) } },
+        })
+      : [];
+    const byId = new Map(hydrated.map((attempt) => [attempt.id, attempt]));
+    const visible = visibleRows.flatMap((row) => {
+      const attempt = byId.get(row.id);
+      return attempt ? [attempt] : [];
     });
-    const visible = rows.slice(0, input.pageSize);
-    const next = rows.length > input.pageSize ? visible.at(-1) : null;
+    const next = pageRows.length > input.pageSize ? visibleRows.at(-1) : null;
     return {
       items: visible.map((attempt): AttemptSummaryDto => ({
         kind: "ATTEMPT_SUMMARY",
@@ -161,7 +186,7 @@ export async function getAttemptPage(
         pageSize: input.pageSize,
         parentId: input.deliveryId,
         snapshot,
-        sortTimestamp: next.createdAt,
+        sortTimestamp: next.sortTimestamp,
         tieBreakerId: next.id,
       }) : null,
     };

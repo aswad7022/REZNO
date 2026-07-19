@@ -113,10 +113,13 @@ jobs:
       - name: Confirm migration status
         run: npx --no-install prisma migrate status
 
+      - name: Run focused Gate 4D closure contracts
+        run: npm run test:stage4-closure:unit
+
       - name: Run complete unit suite
         run: npm run test:unit
 
-      - name: Run PostgreSQL, concurrency, pagination, Identity, Commerce, and Booking regressions
+      - name: Run PostgreSQL regressions including Gate 4D scenarios A–J
         run: npm run test:integration
 
       - name: Confirm database validation did not modify tracked files
@@ -165,7 +168,7 @@ jobs:
       - name: Build Next.js production application
         run: npm run build
 
-      - name: Run complete HTTP suite against production server
+      - name: Run complete HTTP suite including Gate 4D closure routes
         shell: bash
         env:
           COMMERCE_HTTP_BASE_URL: http://127.0.0.1:3000

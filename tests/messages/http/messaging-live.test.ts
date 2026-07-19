@@ -1,11 +1,33 @@
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import test from "node:test";
 
 import { prisma } from "../../../lib/db/prisma";
 
 const baseUrl = process.env.MESSAGE_HTTP_BASE_URL ?? process.env.COMMERCE_HTTP_BASE_URL;
+const bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET ?? "";
+const oidcToken = process.env.VERCEL_OIDC_TOKEN ?? "";
 const marker = `stage4b-http-${randomUUID().slice(0, 8)}`;
+
+function protectedHeaders(initial?: HeadersInit) {
+  const headers = new Headers(initial);
+  if (bypass) headers.set("x-vercel-protection-bypass", bypass);
+  else if (oidcToken) headers.set("x-vercel-trusted-oidc-idp-token", oidcToken);
+  return headers;
+}
+
+function forgePublicShaCursor(cursor: string, changes: Record<string, unknown>) {
+  const decoded = {
+    ...JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")) as Record<string, unknown>,
+    ...changes,
+  };
+  const { mac: _mac, ...core } = decoded;
+  void _mac;
+  return Buffer.from(JSON.stringify({
+    ...decoded,
+    mac: createHash("sha256").update(JSON.stringify(core)).digest("hex"),
+  }), "utf8").toString("base64url");
+}
 
 async function signUp(label: string) {
   const response = await fetch(`${baseUrl}/api/auth/sign-up/email`, {
@@ -14,7 +36,7 @@ async function signUp(label: string) {
       name: `${marker}-${label}`,
       password: "password123",
     }),
-    headers: { "content-type": "application/json", origin: baseUrl! },
+    headers: protectedHeaders({ "content-type": "application/json", origin: baseUrl! }),
     method: "POST",
   });
   assert.equal(response.status, 200);
@@ -41,14 +63,14 @@ async function jsonRequest(
   const mutation = options.method === "PATCH" || options.method === "POST";
   const response = await fetch(`${baseUrl}${path}`, {
     body: options.body === undefined ? undefined : JSON.stringify(options.body),
-    headers: {
+    headers: protectedHeaders({
       ...(options.body === undefined ? {} : { "content-type": "application/json" }),
       ...(options.cookie ? { cookie: options.cookie } : {}),
       ...(options.idempotencyKey ? { "idempotency-key": options.idempotencyKey } : {}),
       ...(mutation && options.expoOrigin !== null
         ? { "expo-origin": options.expoOrigin ?? "rezno://" }
         : {}),
-    },
+    }),
     method: options.method ?? "GET",
     redirect: "manual",
   });
@@ -59,10 +81,10 @@ async function jsonRequest(
 
 async function page(path: string, cookie: string, rsc = false) {
   const response = await fetch(`${baseUrl}${path}`, {
-    headers: {
+    headers: protectedHeaders({
       cookie,
       ...(rsc ? { accept: "text/x-component", rsc: "1" } : {}),
-    },
+    }),
     redirect: "manual",
   });
   return { response, text: await response.text() };
@@ -359,6 +381,13 @@ test("Gate 4B production RSC and Customer Mobile messaging contracts", {
     assert.equal(firstPage.response.status, 200);
     const cursor = (firstPage.body.data as { nextCursor: string | null }).nextCursor;
     assert.ok(cursor);
+    const forged = await jsonRequest(
+      `/api/mobile/messages/conversations?mode=all&limit=1&cursor=${encodeURIComponent(forgePublicShaCursor(cursor, { pageSize: 10 }))}`,
+      { cookie: customer.cookie },
+    );
+    assert.equal(forged.response.status, 400);
+    assert.equal((forged.body.error as { code: string }).code, "INVALID_CURSOR");
+    assert.doesNotMatch(JSON.stringify(forged.body), /mac|scope|snapshot|BETTER_AUTH_SECRET|HMAC|HKDF/i);
     await prisma.person.update({
       where: { id: customer.person.id },
       data: { status: "INACTIVE" },

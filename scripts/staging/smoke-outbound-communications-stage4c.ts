@@ -21,6 +21,7 @@ import {
   getDeliveryPage,
   searchCommunicationTargets,
 } from "../../features/communications/services/reporting";
+import { getExactPostgresTime } from "../../lib/db/postgres-timestamp";
 import { prisma } from "../../lib/db/prisma";
 import {
   OUTBOUND_STAGE4C_FIXTURE,
@@ -317,11 +318,20 @@ async function main() {
     }),
     (error) => error instanceof CommunicationDomainError && error.code === "INVALID_CURSOR",
   );
-  const attemptAnchor = await prisma.outboundDeliveryAttempt.findFirstOrThrow({
-    where: { deliveryId: attemptedDelivery.id },
-    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-    select: { createdAt: true, id: true },
-  });
+  const [attemptAnchor] = await prisma.$queryRaw<Array<{
+    id: string;
+    sortTimestamp: string;
+  }>>(Prisma.sql`
+    SELECT attempt."id", to_char(
+      attempt."createdAt" AT TIME ZONE 'UTC',
+      'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
+    ) AS "sortTimestamp"
+    FROM "OutboundDeliveryAttempt" AS attempt
+    WHERE attempt."deliveryId" = ${attemptedDelivery.id}::uuid
+    ORDER BY attempt."createdAt" DESC, attempt."id" DESC
+    LIMIT 1
+  `);
+  assert.ok(attemptAnchor);
   const otherAttemptedDelivery = await prisma.outboundDelivery.findFirstOrThrow({
     where: { id: { not: attemptedDelivery.id }, attempts: { some: {} } },
     select: { id: true },
@@ -331,8 +341,8 @@ async function main() {
     filterFingerprint: communicationCursorFilterFingerprint({}),
     pageSize: 1,
     parentId: attemptedDelivery.id,
-    snapshot: new Date(),
-    sortTimestamp: attemptAnchor.createdAt,
+    snapshot: await prisma.$transaction((transaction) => getExactPostgresTime(transaction)),
+    sortTimestamp: attemptAnchor.sortTimestamp,
     tieBreakerId: attemptAnchor.id,
   });
   await assert.rejects(

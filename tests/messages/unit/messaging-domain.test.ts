@@ -18,6 +18,7 @@ import {
   messageFilterFingerprint,
 } from "../../../features/messages/domain/cursor";
 import { MessageDomainError } from "../../../features/messages/domain/errors";
+import { setMessageCursorSigningSecretForTests } from "../../../features/messages/domain/cursor-signing";
 import {
   adminBusinessConversationIdentity,
   adminUserConversationIdentity,
@@ -26,6 +27,9 @@ import {
 } from "../../../features/messages/domain/identity";
 import { canAccessConversation } from "../../../features/messages/policies/conversation-access";
 import { canAccessBusinessMessagesDestination } from "../../../features/notifications/domain/destination-policy";
+import { TEST_MESSAGE_CURSOR_SECRET } from "../../helpers/stage4-cursor-secret";
+
+setMessageCursorSigningSecretForTests(TEST_MESSAGE_CURSOR_SECRET);
 
 const ids = Array.from({ length: 10 }, () => randomUUID());
 const customer: MessageActor = {
@@ -130,6 +134,7 @@ test("typed Business Message destinations follow the same booking assignment pol
 });
 
 test("conversation and Message cursors bind page size, filter, actor and Conversation", () => {
+  const authoritativeNow = "2026-07-18T11:00:00.000000Z";
   const filter = messageFilterFingerprint({ mode: "all" });
   const cursor = encodeMessageCursor({
     filter,
@@ -137,21 +142,21 @@ test("conversation and Message cursors bind page size, filter, actor and Convers
     kind: "conversation",
     pageSize: 20,
     scope: `customer:${ids[0]}`,
-    snapshot: "2026-07-18T10:00:00.000Z",
-    sortValue: "2026-07-18T09:00:00.000Z",
+    snapshot: "2026-07-18T10:00:00.000000Z",
+    sortValue: "2026-07-18T09:00:00.000000Z",
   });
   assert.equal(decodeMessageCursor(cursor, {
     actor: customer,
     filter,
     kind: "conversation",
     pageSize: 20,
-  }).id, ids[5]);
+  }, authoritativeNow).id, ids[5]);
   for (const expected of [
     { actor: { ...customer, personId: ids[6]! }, filter, kind: "conversation" as const, pageSize: 20 },
     { actor: customer, filter: messageFilterFingerprint({ mode: "unread" }), kind: "conversation" as const, pageSize: 20 },
     { actor: customer, filter, kind: "conversation" as const, pageSize: 10 },
   ]) {
-    assert.throws(() => decodeMessageCursor(cursor, expected), MessageDomainError);
+    assert.throws(() => decodeMessageCursor(cursor, expected, authoritativeNow), MessageDomainError);
   }
   const messageCursor = encodeMessageCursor({
     conversationId: ids[8]!,
@@ -160,8 +165,8 @@ test("conversation and Message cursors bind page size, filter, actor and Convers
     kind: "message",
     pageSize: 30,
     scope: `customer:${ids[0]}`,
-    snapshot: "2026-07-18T10:00:00.000Z",
-    sortValue: "2026-07-18T09:00:00.000Z",
+    snapshot: "2026-07-18T10:00:00.000000Z",
+    sortValue: "2026-07-18T09:00:00.000000Z",
   });
   assert.throws(() => decodeMessageCursor(messageCursor, {
     actor: customer,
@@ -169,7 +174,7 @@ test("conversation and Message cursors bind page size, filter, actor and Convers
     filter: messageFilterFingerprint({ conversationId: ids[7] }),
     kind: "message",
     pageSize: 30,
-  }), MessageDomainError);
+  }, authoritativeNow), MessageDomainError);
 });
 
 test("HTTP validation rejects duplicate fields, actor IDs, malformed UUIDs/cursors and unsafe mutation origins", async () => {

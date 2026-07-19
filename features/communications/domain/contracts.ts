@@ -200,5 +200,6 @@ export const GATE_4D_BOUNDARY = {
     "cross-gate communications QA",
     "closure documentation",
   ],
-  gate4cMustNotStart: true,
+  gate4cAccepted: true,
+  stage5MustNotStart: true,
 } as const;
