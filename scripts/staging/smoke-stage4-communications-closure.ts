@@ -132,6 +132,7 @@ async function main() {
     by: ["status"],
     where: { campaignId: { in: Object.values(stage4ClosureIds.campaigns) } },
     _count: { _all: true },
+    orderBy: { status: "asc" },
   });
   process.stdout.write(`${JSON.stringify({
     fixture: STAGE4_CLOSURE_FIXTURE,

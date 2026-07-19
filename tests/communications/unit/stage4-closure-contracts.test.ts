@@ -283,6 +283,8 @@ test("Gate 4D staging fixture is exact-ID, deterministic, confirmation-gated, an
   assert.match(source, /localizedContent: fixtureNotificationLocalizedContent/);
   assert.match(source, /const fixtureNotificationLocalizedContent = \{\s*AR: \{ title:/);
   assert.match(source, /const fixtureLocalizedContent = \{\s*AR: \{ inApp:/);
+  const smokeSource = await readFile(new URL("../../../scripts/staging/smoke-stage4-communications-closure.ts", import.meta.url), "utf8");
+  assert.match(smokeSource, /groupBy\(\{[\s\S]*orderBy: \{ status: "asc" \}/);
 });
 
 function envelope(cursor: string) {

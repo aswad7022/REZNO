@@ -474,6 +474,10 @@ model:
   Notification had reused the nested campaign-content shape. It now has a
   separate flat Gate 4A localized-Notification shape, and a source contract
   prevents regression.
+- G4D-05, discovered during the first real-staging rehearsal: Prisma `groupBy`
+  did not promise row order, so the auxiliary Delivery-status evidence hash
+  could vary while the rows were identical. The smoke now orders status groups
+  explicitly before hashing, with a source contract that prevents regression.
 - the unreachable Admin Notification form/action/fixed-list service and the
   unused `CONVERSATION_CLOSED` contract were removed; the required legacy
   `/admin/notifications` redirect remains.
@@ -584,8 +588,8 @@ fixture twice with the identical fingerprint
 The smoke repeated Customer/Business scopes, Restaurant Conversation,
 role/membership and Admin revocation, all six authenticated cursor families,
 in-app campaign, Message pages, provider/scheduler truth, and PII/error
-absence. Delivery-state fingerprint was
-`1b649236adcaebcf91bc9d101b72c8b50abdd0261c6f5c8f4886d984feb96dad`.
+absence. The canonical ordered Delivery-state fingerprint is
+`0c1dee39142337f46ba2cea50ef323c7353f4c9a3f5f044682309f1f6e11548d`.
 Exact cleanup removed 8 Attempts, 30 Deliveries, 32 mutations, one audit, 32
 Campaigns, 26 Notifications, 36 Messages, four Conversations, two Bookings,
 and every other fixture-owned row. A second cleanup returned zero in every
