@@ -39,3 +39,16 @@ export type MobileNotificationPreferences = {
   restaurantEnabled: boolean;
   version: number;
 };
+
+export type MobileOutboundChannel = "EMAIL" | "SMS" | "PUSH";
+
+export type MobileOutboundPreferences = {
+  kind: "OUTBOUND_PREFERENCES";
+  version: number;
+  categories: Record<MobileOutboundChannel, MobileNotificationCategory[]>;
+  endpoints: Record<MobileOutboundChannel, {
+    eligible: boolean;
+    reason: "ELIGIBLE" | "INVALID_ENDPOINT" | "MISSING_ENDPOINT" | "UNVERIFIED_ENDPOINT";
+  }>;
+  mandatoryAccountEnabled: true;
+};

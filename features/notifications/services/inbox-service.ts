@@ -44,6 +44,7 @@ const inboxSelect = {
   eventType: true,
   id: true,
   localizationVariables: true,
+  localizedContent: true,
   mandatory: true,
   occurredAt: true,
   priority: true,
@@ -62,6 +63,10 @@ export async function listNotificationInbox(
   assertQuery(query);
   return prisma.$transaction(async (transaction) => {
     const currentContext = await assertNotificationActorCurrent(transaction, context);
+    const currentPerson = await transaction.person.findUnique({
+      where: { id: currentContext.personId },
+      select: { preferredLanguage: true },
+    });
     const scopeKey = notificationScopeKey(currentContext);
     const fingerprint = notificationFilterFingerprint({
       category: query.category,
@@ -105,9 +110,10 @@ export async function listNotificationInbox(
     return {
       data: ordered.map((record) => {
         const state = stateById.get(record.id);
+        const localized = localizedCopy(record.localizedContent, currentPerson?.preferredLanguage);
         return {
           archived: notificationEffectiveArchived(state),
-          body: record.body,
+          body: localized?.body ?? record.body,
           bodyKey: record.bodyKey,
           category: record.category,
           createdAt: record.createdAt.toISOString(),
@@ -119,7 +125,7 @@ export async function listNotificationInbox(
           priority: record.priority,
           read: notificationEffectiveRead(record.createdAt, state, inboxState),
           stateVersion: state?.version ?? 0,
-          title: record.title,
+          title: localized?.title ?? record.title,
           titleKey: record.titleKey,
         };
       }),
@@ -141,6 +147,20 @@ export async function listNotificationInbox(
       unreadCount: await countUnreadNotificationsInTransaction(transaction, currentContext, snapshot),
     };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
+}
+
+function localizedCopy(
+  value: Prisma.JsonValue,
+  language: "AR" | "EN" | "TR" | "KU" | undefined,
+) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const locale = language === "AR" ? "AR" : language === "KU" ? "CKB" : "EN";
+  const copy = (value as Record<string, Prisma.JsonValue>)[locale];
+  if (!copy || typeof copy !== "object" || Array.isArray(copy)) return null;
+  const record = copy as Record<string, Prisma.JsonValue>;
+  return typeof record.title === "string" && typeof record.body === "string"
+    ? { title: record.title, body: record.body }
+    : null;
 }
 
 export async function countUnreadNotifications(

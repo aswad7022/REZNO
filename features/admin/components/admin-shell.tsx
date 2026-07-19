@@ -15,7 +15,7 @@ const links = [
   ["/admin/restaurants", "المطاعم والكافيهات", "BUSINESSES_VIEW"],
   ["/admin/reviews", "المراجعات", "BUSINESSES_VIEW"],
   ["/admin/commerce", "التجارة", "COMMERCE_ANY"],
-  ["/admin/notifications", "الإشعارات", "NOTIFICATIONS_SEND"],
+  ["/admin/communications", "الاتصالات", "NOTIFICATIONS_VIEW"],
   ["/admin/messages", "الرسائل", "MESSAGES_VIEW"],
   ["/admin/access", "صلاحيات الأدمن", "SUPER_ADMIN"],
   ["/admin/settings", "الإعدادات", "SETTINGS_VIEW"],

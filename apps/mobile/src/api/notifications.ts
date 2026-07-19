@@ -2,6 +2,7 @@ import { mobileApiRequest } from "./client";
 import type {
   MobileNotificationInbox,
   MobileNotificationItem,
+  MobileOutboundPreferences,
   MobileNotificationPreferences,
 } from "../types/notifications";
 
@@ -18,6 +19,17 @@ export const notificationApi = {
       "/api/mobile/notifications/mark-all-read", "POST", { expectedVersion, snapshot }, { "Idempotency-Key": idempotencyKey },
     ),
   preferences: () => authenticated<MobileNotificationPreferences>("/api/mobile/notifications/preferences"),
+  outboundPreferences: () => authenticated<MobileOutboundPreferences>("/api/mobile/notifications/outbound-preferences"),
+  updateOutboundPreferences: (
+    preferences: MobileOutboundPreferences["categories"],
+    expectedVersion: number,
+    idempotencyKey: string,
+  ) => authenticated<MobileOutboundPreferences>(
+    "/api/mobile/notifications/outbound-preferences",
+    "PATCH",
+    { categories: preferences, expectedVersion },
+    { "Idempotency-Key": idempotencyKey },
+  ),
   updatePreferences: (
     preferences: Omit<MobileNotificationPreferences, "version">,
     expectedVersion: number,

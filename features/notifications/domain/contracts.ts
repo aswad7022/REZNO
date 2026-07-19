@@ -28,6 +28,7 @@ export interface CanonicalNotificationEvent {
   eventType: string;
   expiresAt?: Date;
   localizationVariables?: Record<string, boolean | number | string>;
+  localizedContent?: Partial<Record<"AR" | "EN" | "CKB", { title: string; body: string }>>;
   mandatory: boolean;
   occurredAt?: Date;
   priority: NotificationPriority;
@@ -128,8 +129,28 @@ export function validateCanonicalNotificationEvent(event: CanonicalNotificationE
   if (event.audience !== "USER" && event.recipientPersonId) notificationError("VALIDATION_ERROR", "Only direct Notifications may bind a Person.");
   if (event.audience === "BUSINESS" && !event.businessId) notificationError("VALIDATION_ERROR", "Business Notification requires an Organization.");
   if (event.businessId && !UUID_PATTERN.test(event.businessId)) notificationError("VALIDATION_ERROR", "Notification Organization is invalid.");
-  if (event.createdByUserId && !UUID_PATTERN.test(event.createdByUserId)) notificationError("VALIDATION_ERROR", "Notification creator is invalid.");
+  if (event.createdByUserId && !/^[A-Za-z0-9_-]{1,128}$/.test(event.createdByUserId)) {
+    notificationError("VALIDATION_ERROR", "Notification creator is invalid.");
+  }
   sanitizeLocalizationVariables(event.localizationVariables);
+  sanitizeLocalizedNotificationContent(event.localizedContent);
+}
+
+export function sanitizeLocalizedNotificationContent(
+  value: CanonicalNotificationEvent["localizedContent"],
+) {
+  if (!value) return undefined;
+  const allowed = new Set(["AR", "EN", "CKB"]);
+  const entries = Object.entries(value);
+  if (entries.length === 0 || entries.some(([locale]) => !allowed.has(locale))) {
+    notificationError("VALIDATION_ERROR", "Notification localized content is invalid.");
+  }
+  return Object.fromEntries(entries.map(([locale, copy]) => {
+    if (!copy || !copy.title.trim() || !copy.body.trim() || [...copy.title].length > 160 || [...copy.body].length > 2_000) {
+      notificationError("VALIDATION_ERROR", "Notification localized copy is invalid.");
+    }
+    return [locale, { title: copy.title.trim(), body: copy.body.trim() }];
+  }));
 }
 
 export function sanitizeLocalizationVariables(
