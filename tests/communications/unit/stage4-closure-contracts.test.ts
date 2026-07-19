@@ -280,6 +280,9 @@ test("Gate 4D staging fixture is exact-ID, deterministic, confirmation-gated, an
   assert.match(source, /stage4ClosureFingerprint/);
   assert.match(source, /The exact rezno_staging database is required/);
   assert.match(source, /cleanupStage4ClosureFixture/);
+  assert.match(source, /localizedContent: fixtureNotificationLocalizedContent/);
+  assert.match(source, /const fixtureNotificationLocalizedContent = \{\s*AR: \{ title:/);
+  assert.match(source, /const fixtureLocalizedContent = \{\s*AR: \{ inApp:/);
 });
 
 function envelope(cursor: string) {
