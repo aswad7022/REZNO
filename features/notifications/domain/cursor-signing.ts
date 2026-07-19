@@ -3,7 +3,7 @@ import "server-only";
 import { createHmac, hkdfSync, timingSafeEqual } from "node:crypto";
 
 export const NOTIFICATION_CURSOR_SIGNING_INFO =
-  "rezno:notifications:cursor-signing:v2";
+  "rezno:notifications:cursor-signing:v3";
 export const NOTIFICATION_CURSOR_MAC_BYTES = 32;
 
 const MINIMUM_AUTH_SECRET_LENGTH = 32;

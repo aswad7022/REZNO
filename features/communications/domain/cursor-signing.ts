@@ -7,7 +7,7 @@ import {
 } from "node:crypto";
 
 export const COMMUNICATION_CURSOR_SIGNING_INFO =
-  "rezno:communications:cursor-signing:v2";
+  "rezno:communications:cursor-signing:v3";
 export const COMMUNICATION_CURSOR_MAC_BYTES = 32;
 
 const MINIMUM_AUTH_SECRET_LENGTH = 32;

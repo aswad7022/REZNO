@@ -230,12 +230,16 @@ unchanged.
 ## Pagination and DTO contracts
 
 Conversation order is `(lastMessageAt DESC, id DESC)` and Message history order
-is `(createdAt DESC, id DESC)`. Both use opaque versioned SHA-256 checksummed
-cursors with a fixed snapshot. Conversation cursors bind actor, mode, active
+is `(createdAt DESC, id DESC)`. Both use opaque authenticated version 3
+HMAC-SHA-256 cursors with a fixed, exact PostgreSQL `timestamptz(6)` snapshot.
+Snapshot and sort anchors use canonical `YYYY-MM-DDTHH:mm:ss.ffffffZ` text and
+never pass through JavaScript `Date`; continuation uses the indexed tuple
+`(timestamp, id) < (anchor::timestamptz, id::uuid)`. Conversation cursors bind actor, mode, active
 Organization, membership, Role ID, system role, filters, and page size. Message
 cursors additionally bind Conversation ID. Cross-actor, cross-role,
 cross-Organization, cross-filter, or cross-Conversation reuse is
-`INVALID_CURSOR`. Page sizes are 1-50.
+`INVALID_CURSOR`. Versions 1 and 2 are intentionally invalidated without
+downgrade because cursors are transient. Page sizes are 1-50.
 
 Canonical DTO kinds are `CONVERSATION_SUMMARY`, `CONVERSATION_DETAIL`,
 `MESSAGE_SUMMARY`, `MESSAGE_PAGE`, `MESSAGE_SEND_RESULT`, and

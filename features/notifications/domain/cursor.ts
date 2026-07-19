@@ -7,8 +7,12 @@ import {
   signNotificationCursor,
   verifyNotificationCursorMac,
 } from "@/features/notifications/domain/cursor-signing";
+import {
+  compareExactPostgresTimestamps,
+  parseExactPostgresTimestamp,
+} from "@/lib/db/postgres-timestamp";
 
-export const NOTIFICATION_CURSOR_ENVELOPE_VERSION = 2;
+export const NOTIFICATION_CURSOR_ENVELOPE_VERSION = 3;
 export const NOTIFICATION_CURSOR_MAX_LENGTH = 3_000;
 
 interface NotificationCursorCore {
@@ -30,6 +34,13 @@ export function notificationFilterFingerprint(value: unknown) {
 }
 
 export function encodeNotificationCursor(value: NotificationCursorValue) {
+  const snapshot = parseExactPostgresTimestamp(value.snapshot);
+  const sortValue = parseExactPostgresTimestamp(value.sortValue);
+  if (
+    !snapshot
+    || !sortValue
+    || compareExactPostgresTimestamps(sortValue, snapshot) > 0
+  ) invalid();
   const core: NotificationCursorCore = {
     version: NOTIFICATION_CURSOR_ENVELOPE_VERSION,
     kind: "NOTIFICATION_CURSOR",
@@ -37,8 +48,8 @@ export function encodeNotificationCursor(value: NotificationCursorValue) {
     id: value.id,
     pageSize: value.pageSize,
     scope: value.scope,
-    snapshot: value.snapshot,
-    sortValue: value.sortValue,
+    snapshot,
+    sortValue,
   };
   let mac: string;
   try {
@@ -52,7 +63,7 @@ export function encodeNotificationCursor(value: NotificationCursorValue) {
 export function decodeNotificationCursor(
   encoded: string,
   expected: { context: NotificationActorContext; filter: string; pageSize: number },
-  authoritativeNow = new Date(),
+  authoritativeNow: string,
 ) {
   if (
     !encoded
@@ -88,14 +99,17 @@ export function decodeNotificationCursor(
     || core.pageSize !== expected.pageSize
     || core.scope !== notificationScopeKey(expected.context)
   ) invalid();
-  const snapshotDate = exactDate(core.snapshot);
-  const sortDate = exactDate(core.sortValue);
+  const snapshotTimestamp = parseExactPostgresTimestamp(core.snapshot);
+  const sortTimestamp = parseExactPostgresTimestamp(core.sortValue);
+  const exactAuthoritativeNow = parseExactPostgresTimestamp(authoritativeNow);
   if (
-    !Number.isFinite(authoritativeNow.getTime())
-    || snapshotDate > authoritativeNow
-    || sortDate > snapshotDate
+    !snapshotTimestamp
+    || !sortTimestamp
+    || !exactAuthoritativeNow
+    || compareExactPostgresTimestamps(snapshotTimestamp, exactAuthoritativeNow) > 0
+    || compareExactPostgresTimestamps(sortTimestamp, snapshotTimestamp) > 0
   ) invalid();
-  return { ...core, snapshotDate, sortDate };
+  return { ...core, snapshotTimestamp, sortTimestamp };
 }
 
 function canonicalMacInput(value: NotificationCursorCore) {
@@ -131,12 +145,6 @@ function isEnvelope(value: unknown): value is NotificationCursorEnvelope {
     && typeof item.snapshot === "string" && item.snapshot.length <= 64
     && typeof item.sortValue === "string" && item.sortValue.length <= 64
     && typeof item.mac === "string" && item.mac.length <= 128;
-}
-
-function exactDate(value: string) {
-  const date = new Date(value);
-  if (!Number.isFinite(date.getTime()) || date.toISOString() !== value) invalid();
-  return date;
 }
 
 function isUuid(value: string) {

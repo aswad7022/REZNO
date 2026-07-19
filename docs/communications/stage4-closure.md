@@ -155,13 +155,13 @@ accepted historical attempt.
 
 | Cursor | Audit-point envelope | Scope binding | Finding |
 | --- | --- | --- | --- |
-| Gate 4A Notification | version 1 Base64URL plus public SHA-256 checksum | Person, Customer/Business scope, filter, page size | current tenant checks fail closed, but the client can recompute checksum after changing snapshot/sort/id |
-| Gate 4B Conversation/Message | version 1 Base64URL plus public SHA-256 checksum | actor scope, active Business membership/Role, filter, page size, kind, Conversation | current tenant checks fail closed, but the client can recompute checksum after changing snapshot/sort/id |
-| Gate 4C Campaign/Delivery/Attempt | strict version 2 HMAC-SHA-256 | current Admin grant, kind, parent, filter, page size, fixed snapshot | authenticated with a dedicated HKDF key and timing-safe comparison |
+| Gate 4A Notification | strict version 3 HMAC-SHA-256 | Person, Customer/Business scope, filter, page size, exact snapshot | authenticated exact-microsecond timestamp and UUID tuple |
+| Gate 4B Conversation/Message | strict version 3 HMAC-SHA-256 | actor scope, active Business membership/Role, filter, page size, kind, Conversation, exact snapshot | authenticated exact-microsecond timestamp and UUID tuple |
+| Gate 4C Campaign/Delivery/Attempt | strict version 3 HMAC-SHA-256 | current Admin grant, kind, parent, filter, page size, exact snapshot | authenticated exact-microsecond timestamp and UUID tuple |
 
 The Gate 4C signer is `server-only`, derives 32 bytes from the existing
 `BETTER_AUTH_SECRET` with HKDF-SHA-256 info
-`rezno:communications:cursor-signing:v2`, rejects weak/default secrets, and
+`rezno:communications:cursor-signing:v3`, rejects weak/default secrets, and
 never exposes the secret or derived key. Rotation invalidates transient
 cursors.
 
@@ -173,8 +173,8 @@ anchor, recompute the repository-known SHA-256 checksum, and obtain an accepted
 cursor for the same legal actor scope. This does not bypass Person/tenant
 authorization, but it violates the locked fixed-snapshot invariant and the
 closure requirement to reject snapshot manipulation. Gate 4D must replace
-those envelopes with strict authenticated version 2 cursors, use distinct
-HKDF domains, reject v1 without downgrade, validate against authoritative
+those envelopes with strict authenticated cursors, use distinct
+HKDF domains, reject earlier versions without downgrade, validate against authoritative
 transaction time, and expose only `INVALID_CURSOR`. No schema change is needed.
 
 ## Producers and content policy
@@ -451,11 +451,11 @@ any later-stage work.
 All audit findings were remediated without a migration or a second domain
 model:
 
-- G4D-01: Notification, Conversation, and Message cursors are strict version 2
+- G4D-01: Notification, Conversation, and Message cursors are strict version 3
   HMAC-SHA-256 envelopes. Their server-only signers derive separate 32-byte
   HKDF keys with the exact domains
-  `rezno:notifications:cursor-signing:v2` and
-  `rezno:messages:cursor-signing:v2`. Version 1, public-SHA recomputation, MAC
+  `rezno:notifications:cursor-signing:v3` and
+  `rezno:messages:cursor-signing:v3`. Versions 1/2, public-SHA recomputation, MAC
   bit flips, wrong resource/kind/filter/page/actor, rotation, and future fences
   are rejected only as the generic `INVALID_CURSOR` contract.
 - G4D-02: reachable Business/Admin communications, outbound preferences,
@@ -464,12 +464,13 @@ model:
   Gate 4A/4B/4C behavior and still says providers/scheduling are unconnected.
   Client failures show a stable code and localized safe copy, never a raw
   service message.
-- G4D-03, discovered by repeated production HTTP validation: PostgreSQL keeps
-  microseconds while JavaScript `Date` keeps milliseconds. A truncated cursor
-  fence could briefly hide a row committed in the same millisecond. List
-  transactions now use a PostgreSQL-derived millisecond ceiling, so the
-  database remains authoritative without a lossy boundary. The previously
-  intermittent tests then passed both focused and complete HTTP runs.
+- G4D-03, completed after independent exact-head review: PostgreSQL keeps
+  microseconds while JavaScript `Date` keeps milliseconds. The former
+  millisecond ceiling could admit a post-page-one row, while a truncated sort
+  anchor could skip a legitimate row. All six cursor envelopes now use version
+  3 and canonical `YYYY-MM-DDTHH:mm:ss.ffffffZ` values obtained from PostgreSQL.
+  Page membership uses direct indexed `(timestamp, id)` tuple predicates before
+  bounded hydration; no pagination fence or anchor passes through `Date`.
 - G4D-04, discovered in independent fixture review: the synthetic campaign
   Notification had reused the nested campaign-content shape. It now has a
   separate flat Gate 4A localized-Notification shape, and a source contract
@@ -507,13 +508,14 @@ PostgreSQL databases. No command accessed the protected checkout.
 | root non-incremental TypeScript | passed |
 | Mobile TypeScript | passed |
 | Prisma format / validate / generate | passed; no schema diff |
-| complete unit suite | 333/333 |
+| complete unit suite | 334/334 |
 | focused Gate 4D unit contracts | 10/10 |
-| complete PostgreSQL suite | 292/292 |
+| focused PostgreSQL microsecond pagination | 8/8 |
+| complete PostgreSQL suite | 300/300 |
 | focused PostgreSQL scenarios A–J | 11/11 including the enclosing suite |
 | complete production HTTP/RSC/API suite | 84/84 |
 | focused Stage 4 production HTTP/RSC/API | 15/15 |
-| complete local automated regression total | 709/709 |
+| complete local automated regression total | 718/718 |
 | Next.js 16.2.9 production build | passed; 69 generated application entries |
 | Expo dependency validation | dependencies up to date |
 | Expo Doctor | 20/20 |
@@ -607,6 +609,18 @@ exact `rezno_staging` database. The read-only preflight reported 38 total and
 38 successfully applied migrations with zero failed or rolled-back row. The
 connection string stayed in process memory; its URL, host, password, and
 derived secrets were never printed or persisted.
+
+The focused exact-timestamp smoke paged seven Notifications, seven
+Conversations (including unread mode), seven Messages, seven Campaigns, seven
+Deliveries, and five Attempts with page size one. It proved no skip, no
+duplicate, complete microsecond ordering, exact-equal timestamp UUID
+continuation, inclusion of the committed partial-millisecond rows, exclusion
+of the synthetic snapshot-plus-one-microsecond Notification, and safe
+rejection of version 1, version 2, HMAC tampering, cross-scope, and
+cross-resource cursors. Its `finally` cleanup removed all 47 fixture-owned
+rows. The integrated fixture then reproduced the same fingerprint twice;
+exact cleanup removed 235 fixture-owned rows, and a second cleanup removed
+zero. Staging finished at 38/38 with zero failed or rolled-back migration.
 
 The immutable final PR-head Preview, two real-staging fixture runs, identical
 fingerprint, role/cross-gate matrix, historical Stage 3A–3D and Gate 4A/4B/4C

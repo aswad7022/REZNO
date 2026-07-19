@@ -7,9 +7,13 @@ import {
   signCommunicationCursor,
   verifyCommunicationCursorMac,
 } from "@/features/communications/domain/cursor-signing";
+import {
+  compareExactPostgresTimestamps,
+  parseExactPostgresTimestamp,
+} from "@/lib/db/postgres-timestamp";
 
 export const COMMUNICATION_CURSOR_MAX_LENGTH = 3_000;
-export const COMMUNICATION_CURSOR_ENVELOPE_VERSION = 2;
+export const COMMUNICATION_CURSOR_ENVELOPE_VERSION = 3;
 
 type CommunicationCursorKind =
   | "COMMUNICATION_CAMPAIGN_CURSOR"
@@ -35,8 +39,8 @@ type CursorValue = {
   filterFingerprint: string;
   pageSize: number;
   parentId: string | null;
-  snapshot: Date;
-  sortTimestamp: Date;
+  snapshot: string;
+  sortTimestamp: string;
   tieBreakerId: string;
 };
 
@@ -63,7 +67,7 @@ export function encodeCampaignCursor(value: Omit<CursorValue, "parentId">) {
 export function decodeCampaignCursor(
   encoded: string,
   expected: Omit<CursorExpectation, "parentId">,
-  authoritativeNow: Date,
+  authoritativeNow: string,
 ) {
   return decodeCursor(
     encoded,
@@ -80,7 +84,7 @@ export function encodeDeliveryCursor(value: CursorValue & { parentId: string }) 
 export function decodeDeliveryCursor(
   encoded: string,
   expected: CursorExpectation & { parentId: string },
-  authoritativeNow: Date,
+  authoritativeNow: string,
 ) {
   return decodeCursor(encoded, "OUTBOUND_DELIVERY_CURSOR", expected, authoritativeNow);
 }
@@ -92,12 +96,19 @@ export function encodeAttemptCursor(value: CursorValue & { parentId: string }) {
 export function decodeAttemptCursor(
   encoded: string,
   expected: CursorExpectation & { parentId: string },
-  authoritativeNow: Date,
+  authoritativeNow: string,
 ) {
   return decodeCursor(encoded, "OUTBOUND_ATTEMPT_CURSOR", expected, authoritativeNow);
 }
 
 function encodeCursor(kind: CommunicationCursorKind, value: CursorValue) {
+  const snapshotTimestamp = parseExactPostgresTimestamp(value.snapshot);
+  const sortTimestamp = parseExactPostgresTimestamp(value.sortTimestamp);
+  if (
+    !snapshotTimestamp
+    || !sortTimestamp
+    || compareExactPostgresTimestamps(sortTimestamp, snapshotTimestamp) > 0
+  ) invalidCursor();
   const core: CursorCore = {
     version: COMMUNICATION_CURSOR_ENVELOPE_VERSION,
     kind,
@@ -105,8 +116,8 @@ function encodeCursor(kind: CommunicationCursorKind, value: CursorValue) {
     filterFingerprint: value.filterFingerprint,
     pageSize: value.pageSize,
     parentId: value.parentId,
-    snapshotTimestamp: value.snapshot.toISOString(),
-    sortTimestamp: value.sortTimestamp.toISOString(),
+    snapshotTimestamp,
+    sortTimestamp,
     tieBreakerId: value.tieBreakerId,
   };
   let mac: string;
@@ -122,7 +133,7 @@ function decodeCursor(
   encoded: string,
   kind: CommunicationCursorKind,
   expected: CursorExpectation,
-  authoritativeNow: Date,
+  authoritativeNow: string,
 ) {
   if (
     !encoded
@@ -164,12 +175,19 @@ function decodeCursor(
     || core.pageSize !== expected.pageSize
     || core.parentId !== expected.parentId
   ) invalidCursor();
-  const snapshotDate = exactDate(core.snapshotTimestamp);
-  const sortDate = exactDate(core.sortTimestamp);
-  if (!Number.isFinite(authoritativeNow.getTime()) || snapshotDate > authoritativeNow || sortDate > snapshotDate) {
+  const snapshotTimestamp = parseExactPostgresTimestamp(core.snapshotTimestamp);
+  const sortTimestamp = parseExactPostgresTimestamp(core.sortTimestamp);
+  const exactAuthoritativeNow = parseExactPostgresTimestamp(authoritativeNow);
+  if (
+    !snapshotTimestamp
+    || !sortTimestamp
+    || !exactAuthoritativeNow
+    || compareExactPostgresTimestamps(snapshotTimestamp, exactAuthoritativeNow) > 0
+    || compareExactPostgresTimestamps(sortTimestamp, snapshotTimestamp) > 0
+  ) {
     invalidCursor();
   }
-  return { ...core, snapshotDate, sortDate };
+  return { ...core, snapshotTimestamp, sortTimestamp };
 }
 
 function canonicalCursorMacInput(value: CursorCore) {
@@ -219,12 +237,6 @@ function isCursorEnvelope(value: unknown): value is CursorEnvelope {
     && typeof item.sortTimestamp === "string" && item.sortTimestamp.length <= 64
     && typeof item.tieBreakerId === "string" && isUuid(item.tieBreakerId)
     && typeof item.mac === "string" && item.mac.length <= 128;
-}
-
-function exactDate(value: string) {
-  const date = new Date(value);
-  if (!Number.isFinite(date.getTime()) || date.toISOString() !== value) invalidCursor();
-  return date;
 }
 
 function isUuid(value: string) {

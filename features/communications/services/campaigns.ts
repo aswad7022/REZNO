@@ -45,6 +45,7 @@ import {
 } from "@/features/communications/services/admin-actor";
 import { previewAudience as evaluatePreview } from "@/features/communications/services/audience";
 import { communicationSerializable } from "@/features/communications/services/transaction";
+import { getExactPostgresTime } from "@/lib/db/postgres-timestamp";
 import { prisma } from "@/lib/db/prisma";
 
 const CAMPAIGN_TARGET_TYPE = "CommunicationCampaign";
@@ -231,10 +232,7 @@ export async function getCampaignPage(
   const input = parseOrValidationError(listCampaignsSchema, rawInput);
   return prisma.$transaction(async (transaction) => {
     const currentContext = await assertCommunicationAdminCurrent(transaction, context, "NOTIFICATIONS_VIEW");
-    const [{ authoritativeNow }] = await transaction.$queryRaw<Array<{ authoritativeNow: Date }>>(Prisma.sql`
-      SELECT CURRENT_TIMESTAMP AS "authoritativeNow"
-    `);
-    if (!authoritativeNow) throw new Error("Communication snapshot time is unavailable.");
+    const authoritativeNow = await getExactPostgresTime(transaction);
     const adminScope = communicationAdminCursorScope(currentContext);
     const filterFingerprint = communicationCursorFilterFingerprint({ status: input.status });
     const cursor = input.cursor ? decodeCampaignCursor(input.cursor, {
@@ -242,24 +240,40 @@ export async function getCampaignPage(
       filterFingerprint,
       pageSize: input.pageSize,
     }, authoritativeNow) : null;
-    const snapshot = cursor?.snapshotDate ?? authoritativeNow;
-    const campaigns = await transaction.communicationCampaign.findMany({
-      where: {
-        ...(input.status ? { status: input.status } : {}),
-        createdAt: { lte: snapshot },
-        ...(cursor ? {
-          OR: [
-            { createdAt: { lt: cursor.sortDate } },
-            { createdAt: cursor.sortDate, id: { lt: cursor.tieBreakerId } },
-          ],
-        } : {}),
-      },
-      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-      take: input.pageSize + 1,
+    const snapshot = cursor?.snapshotTimestamp ?? authoritativeNow;
+    const pageRows = await transaction.$queryRaw<Array<{
+      id: string;
+      sortTimestamp: string;
+    }>>(Prisma.sql`
+      SELECT campaign."id", to_char(
+        campaign."createdAt" AT TIME ZONE 'UTC',
+        'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
+      ) AS "sortTimestamp"
+      FROM "CommunicationCampaign" AS campaign
+      WHERE campaign."createdAt" <= ${snapshot}::timestamptz
+        ${input.status ? Prisma.sql`
+          AND campaign."status" = ${input.status}::"CommunicationCampaignStatus"
+        ` : Prisma.empty}
+        ${cursor ? Prisma.sql`
+          AND (campaign."createdAt", campaign."id") <
+            (${cursor.sortTimestamp}::timestamptz, ${cursor.tieBreakerId}::uuid)
+        ` : Prisma.empty}
+      ORDER BY campaign."createdAt" DESC, campaign."id" DESC
+      LIMIT ${input.pageSize + 1}
+    `);
+    const visibleRows = pageRows.slice(0, input.pageSize);
+    const hydrated = visibleRows.length
+      ? await transaction.communicationCampaign.findMany({
+          where: { id: { in: visibleRows.map((row) => row.id) } },
+        })
+      : [];
+    const byId = new Map(hydrated.map((campaign) => [campaign.id, campaign]));
+    const visible = visibleRows.flatMap((row) => {
+      const campaign = byId.get(row.id);
+      return campaign ? [campaign] : [];
     });
-    const visible = campaigns.slice(0, input.pageSize);
     const counters = await deliveryCountersForCampaigns(transaction, visible.map((campaign) => campaign.id));
-    const next = campaigns.length > input.pageSize ? visible.at(-1) : null;
+    const next = pageRows.length > input.pageSize ? visibleRows.at(-1) : null;
     return {
       items: visible.map((campaign) => campaignSummary(
         campaign,
@@ -270,7 +284,7 @@ export async function getCampaignPage(
         filterFingerprint,
         pageSize: input.pageSize,
         snapshot,
-        sortTimestamp: next.createdAt,
+        sortTimestamp: next.sortTimestamp,
         tieBreakerId: next.id,
       }) : null,
     };
