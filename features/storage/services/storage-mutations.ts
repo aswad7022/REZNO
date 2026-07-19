@@ -10,6 +10,10 @@ import {
 import { storedAssetDetailDto, uploadSessionDto } from "@/features/storage/domain/contracts";
 import { storageError } from "@/features/storage/domain/errors";
 import {
+  ACTIVE_SESSION_RESERVATION_STATES,
+  purposeQuotaPermits,
+} from "@/features/storage/domain/quota";
+import {
   STORAGE_SESSION_TTL_MS,
   STORAGE_TARGET_TTL_SECONDS,
   STORAGE_QUOTA_LIMITS,
@@ -38,6 +42,10 @@ import {
   type StorageActor,
   type StorageAdminActor,
 } from "@/features/storage/services/actor";
+import {
+  readPurposeQuotaUsage,
+  storageQuotaOwnerFilter,
+} from "@/features/storage/services/storage-quota";
 import { storageSerializable } from "@/features/storage/services/transaction";
 
 export type StorageOperationActor = StorageActor | StorageAdminActor;
@@ -57,11 +65,6 @@ export type CreateUploadSessionInput = {
   idempotencyKey: string;
   purpose: StoragePurpose;
 };
-
-const ACTIVE_SESSION_STATES = ["CREATED", "TARGET_ISSUED", "UPLOADED"] as const;
-const ACTIVE_ASSET_STATES = [
-  "PENDING_UPLOAD", "UPLOADED", "PENDING_INSPECTION", "READY", "QUARANTINED", "DELETE_PENDING",
-] as const;
 
 let malwareScanner: MalwareScanner = new NotConfiguredMalwareScanner();
 
@@ -96,9 +99,6 @@ export async function createUploadSession(
   const displayName = sanitizeStorageDisplayName(input.displayName);
   const expectedChecksumSha256 = normalizeChecksum(input.expectedChecksumSha256);
   const provider = configuredStorageProvider();
-  if (provider.kind === "NOT_CONFIGURED") {
-    storageError("STORAGE_PROVIDER_NOT_CONFIGURED", "Managed storage provider is not configured.");
-  }
   const requestHash = storageRequestHash({
     action: "CREATE_SESSION",
     actor: actorScope(actor),
@@ -117,6 +117,9 @@ export async function createUploadSession(
     if (replay) return replay as UploadSessionDto;
     const now = await databaseNow(transaction);
     await assertCreateQuota(transaction, actor, input.purpose, expectedSizeBytes, now);
+    if (provider.kind === "NOT_CONFIGURED") {
+      storageError("STORAGE_PROVIDER_NOT_CONFIGURED", "Managed storage provider is not configured.");
+    }
     const session = await transaction.uploadSession.create({
       data: {
         actorMembershipId: actor.kind === "business" ? actor.membershipId : null,
@@ -313,7 +316,7 @@ export async function finalizeUpload(
     const current = await ownedSession(transaction, actor, session.id);
     const now = await databaseNow(transaction);
     assertSessionActive(current, input.expectedVersion, ["TARGET_ISSUED", "UPLOADED"], now);
-    await assertFinalizeQuota(transaction, actor, metadata.sizeBytes, now);
+    await assertFinalizeQuota(transaction, actor, current, metadata.sizeBytes, now);
     const existingAsset = await transaction.storedAsset.findUnique({ where: { uploadSessionId: session.id } });
     if (existingAsset) storageError("UPLOAD_SESSION_NOT_ACTIVE", "Upload session already produced an asset.");
     const asset = await transaction.storedAsset.create({
@@ -451,21 +454,26 @@ async function assertCreateQuota(
   now: Date,
 ) {
   const limits = quotaFor(actor);
-  const owner = ownerFilter(actor);
+  const owner = storageQuotaOwnerFilter(actor);
   const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-  const [activeSessions, pending, dailySessions, activeAssets] = await Promise.all([
-    transaction.uploadSession.count({ where: { ...owner.session, expiresAt: { gt: now }, state: { in: [...ACTIVE_SESSION_STATES] } } }),
+  const [activeSessions, pending, dailySessions, purposeUsage] = await Promise.all([
+    transaction.uploadSession.count({ where: { ...owner.session, expiresAt: { gt: now }, state: { in: [...ACTIVE_SESSION_RESERVATION_STATES] } } }),
     transaction.uploadSession.aggregate({
-      where: { ...owner.session, expiresAt: { gt: now }, state: { in: [...ACTIVE_SESSION_STATES] } },
+      where: { ...owner.session, expiresAt: { gt: now }, state: { in: [...ACTIVE_SESSION_RESERVATION_STATES] } },
       _sum: { expectedSizeBytes: true },
     }),
     transaction.uploadSession.count({ where: { ...owner.session, createdAt: { gte: dayAgo } } }),
-    transaction.storedAsset.count({ where: { ...owner.asset, purpose, state: { in: [...ACTIVE_ASSET_STATES] } } }),
+    readPurposeQuotaUsage(transaction, actor, purpose, now),
   ]);
   if (activeSessions >= limits.activeSessions
     || Number(pending._sum.expectedSizeBytes ?? BigInt(0)) + newBytes > limits.pendingBytes
     || dailySessions >= limits.dailySessions
-    || activeAssets >= storagePurposePolicy(purpose).maxActiveAssets) {
+    || !purposeQuotaPermits({
+      additionalReservations: 1,
+      limit: storagePurposePolicy(purpose).maxActiveAssets,
+      reserved: purposeUsage.reserved,
+      stored: purposeUsage.stored,
+    })) {
     storageError("STORAGE_QUOTA_EXCEEDED", "Storage quota is exceeded.");
   }
 }
@@ -473,32 +481,28 @@ async function assertCreateQuota(
 async function assertFinalizeQuota(
   transaction: Prisma.TransactionClient,
   actor: StorageOperationActor,
+  session: UploadSession,
   bytes: number,
   now: Date,
 ) {
   const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-  const result = await transaction.storedAsset.aggregate({
-    where: { ...ownerFilter(actor).asset, createdAt: { gte: dayAgo } },
-    _sum: { sizeBytes: true },
-  });
+  const [result, purposeUsage] = await Promise.all([
+    transaction.storedAsset.aggregate({
+      where: { ...storageQuotaOwnerFilter(actor).asset, createdAt: { gte: dayAgo } },
+      _sum: { sizeBytes: true },
+    }),
+    readPurposeQuotaUsage(transaction, actor, session.purpose, now),
+  ]);
+  if (!purposeQuotaPermits({
+    limit: storagePurposePolicy(session.purpose).maxActiveAssets,
+    reserved: purposeUsage.reserved,
+    stored: purposeUsage.stored,
+  })) {
+    storageError("STORAGE_QUOTA_EXCEEDED", "Persistent storage purpose quota is exceeded.");
+  }
   if (Number(result._sum.sizeBytes ?? BigInt(0)) + bytes > quotaFor(actor).dailyFinalizedBytes) {
     storageError("STORAGE_QUOTA_EXCEEDED", "Daily finalized storage quota is exceeded.");
   }
-}
-
-function ownerFilter(actor: StorageOperationActor) {
-  if (actor.kind === "customer") return {
-    asset: { ownerPersonId: actor.personId },
-    session: { ownerPersonId: actor.personId },
-  };
-  if (actor.kind === "business") return {
-    asset: { organizationId: actor.organizationId },
-    session: { organizationId: actor.organizationId },
-  };
-  return {
-    asset: { createdByPersonId: actor.personId, organizationId: null, ownerPersonId: null },
-    session: { actorPersonId: actor.personId, organizationId: null, ownerPersonId: null },
-  };
 }
 
 function quotaFor(actor: StorageOperationActor) {

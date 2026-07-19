@@ -17,7 +17,13 @@ import {
 import { storageError } from "@/features/storage/domain/errors";
 import { STORAGE_QUOTA_LIMITS } from "@/features/storage/domain/policy";
 import { STORAGE_PURPOSE_REGISTRY } from "@/features/storage/domain/purpose-registry";
+import {
+  ACTIVE_SESSION_RESERVATION_STATES,
+  PROVIDER_RESIDENT_ASSET_STATES,
+  purposeQuotaUsage,
+} from "@/features/storage/domain/quota";
 import { assertStorageActorCurrent, assertStorageAdminCurrent, type StorageActor, type StorageAdminActor } from "@/features/storage/services/actor";
+import { storageQuotaOwnerFilter } from "@/features/storage/services/storage-quota";
 import { storageSerializable } from "@/features/storage/services/transaction";
 import { getExactPostgresTime } from "@/lib/db/postgres-timestamp";
 
@@ -27,23 +33,19 @@ type PageInput = {
   limit?: number;
 };
 
-const ACTIVE_SESSION_STATES = ["CREATED", "TARGET_ISSUED", "UPLOADED"] as const;
-const ACTIVE_ASSET_STATES = [
-  "PENDING_UPLOAD", "UPLOADED", "PENDING_INSPECTION", "READY", "QUARANTINED", "DELETE_PENDING",
-] as const;
-
 export async function getStorageQuotaStatus(actor: QueryActor) {
   return storageSerializable(async (transaction) => {
     await assertActor(transaction, actor);
     const now = await databaseNow(transaction);
     const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    const scope = quotaOwnerFilter(actor);
-    const [activeSessions, pending, dailySessions, finalized, groupedAssets] = await Promise.all([
+    const scope = storageQuotaOwnerFilter(actor);
+    const purposes = legalPurposes(actor);
+    const [activeSessions, pending, dailySessions, finalized, groupedAssets, groupedReservations] = await Promise.all([
       transaction.uploadSession.count({
-        where: { ...scope.session, expiresAt: { gt: now }, state: { in: [...ACTIVE_SESSION_STATES] } },
+        where: { ...scope.session, expiresAt: { gt: now }, state: { in: [...ACTIVE_SESSION_RESERVATION_STATES] } },
       }),
       transaction.uploadSession.aggregate({
-        where: { ...scope.session, expiresAt: { gt: now }, state: { in: [...ACTIVE_SESSION_STATES] } },
+        where: { ...scope.session, expiresAt: { gt: now }, state: { in: [...ACTIVE_SESSION_RESERVATION_STATES] } },
         _sum: { expectedSizeBytes: true },
       }),
       transaction.uploadSession.count({ where: { ...scope.session, createdAt: { gte: dayAgo } } }),
@@ -53,23 +55,40 @@ export async function getStorageQuotaStatus(actor: QueryActor) {
       }),
       transaction.storedAsset.groupBy({
         by: ["purpose"],
-        where: { ...scope.asset, purpose: { in: legalPurposes(actor) }, state: { in: [...ACTIVE_ASSET_STATES] } },
+        where: { ...scope.asset, purpose: { in: purposes }, state: { in: [...PROVIDER_RESIDENT_ASSET_STATES] } },
+        _count: { _all: true },
+      }),
+      transaction.uploadSession.groupBy({
+        by: ["purpose"],
+        where: {
+          ...scope.session,
+          expiresAt: { gt: now },
+          purpose: { in: purposes },
+          state: { in: [...ACTIVE_SESSION_RESERVATION_STATES] },
+        },
         _count: { _all: true },
       }),
     ]);
     const limits = quotaLimits(actor);
-    const counts = new Map(groupedAssets.map((row) => [row.purpose, row._count._all]));
+    const storedCounts = new Map(groupedAssets.map((row) => [row.purpose, row._count._all]));
+    const reservedCounts = new Map(groupedReservations.map((row) => [row.purpose, row._count._all]));
     return {
       type: "STORAGE_QUOTA_STATUS" as const,
       activeSessions: { limit: limits.activeSessions, used: activeSessions },
       dailyFinalizedBytes: { limit: limits.dailyFinalizedBytes, used: Number(finalized._sum.sizeBytes ?? BigInt(0)) },
       dailySessions: { limit: limits.dailySessions, used: dailySessions },
       pendingBytes: { limit: limits.pendingBytes, used: Number(pending._sum.expectedSizeBytes ?? BigInt(0)) },
-      purposeAssets: legalPurposes(actor).map((purpose) => ({
-        limit: STORAGE_PURPOSE_REGISTRY[purpose].maxActiveAssets,
-        purpose,
-        used: counts.get(purpose) ?? 0,
-      })),
+      purposeAssets: purposes.map((purpose) => {
+        const stored = storedCounts.get(purpose) ?? 0;
+        const reserved = reservedCounts.get(purpose) ?? 0;
+        return {
+          limit: STORAGE_PURPOSE_REGISTRY[purpose].maxActiveAssets,
+          purpose,
+          reserved,
+          stored,
+          used: purposeQuotaUsage(stored, reserved),
+        };
+      }),
     };
   });
 }
@@ -239,21 +258,6 @@ function pageSizeValue(value: number | undefined) {
     storageError("VALIDATION_ERROR", "limit must be an integer between 1 and 50.");
   }
   return result;
-}
-
-function quotaOwnerFilter(actor: QueryActor) {
-  if (actor.kind === "customer") return {
-    asset: { ownerPersonId: actor.personId },
-    session: { ownerPersonId: actor.personId },
-  };
-  if (actor.kind === "business") return {
-    asset: { organizationId: actor.organizationId },
-    session: { organizationId: actor.organizationId },
-  };
-  return {
-    asset: { createdByPersonId: actor.personId, organizationId: null, ownerPersonId: null },
-    session: { actorPersonId: actor.personId, organizationId: null, ownerPersonId: null },
-  };
 }
 
 function legalPurposes(actor: QueryActor) {

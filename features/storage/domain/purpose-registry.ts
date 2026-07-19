@@ -13,6 +13,7 @@ export type StoragePurposePolicy = Readonly<{
   allowedMimeTypes: readonly StorageMimeType[];
   inspectionRequired: true;
   laterOwner: "GATE_5A" | "GATE_5B";
+  /** Compatibility name: enforced against provider-resident assets plus active same-purpose reservations. */
   maxActiveAssets: number;
   maxBytes: number;
   ownerFamily: StorageOwnerFamily;
