@@ -16,6 +16,15 @@ import {
   storageRequestHash,
 } from "../../../features/storage/domain/policy";
 import {
+  ACTIVE_SESSION_RESERVATION_STATES,
+  PROVIDER_RESIDENT_ASSET_STATES,
+  isActiveSessionReservationState,
+  isProviderResidentAssetState,
+  purposeQuotaPermits,
+  purposeQuotaUsage,
+  sessionReservesPurposeSlot,
+} from "../../../features/storage/domain/quota";
+import {
   STORAGE_MIME_TYPES,
   STORAGE_PURPOSE_REGISTRY,
   canManageOrganizationStorage,
@@ -114,4 +123,47 @@ test("asset lifecycle delivers READY only and makes deletion immediate", () => {
 
 test("storage Admin manage permission depends on view permission", () => {
   assert.deepEqual(adminPermissionDependencies.STORAGE_RECORDS_MANAGE, ["STORAGE_RECORDS_VIEW"]);
+});
+
+test("provider-resident asset states retain quota until confirmed deletion", () => {
+  assert.deepEqual(PROVIDER_RESIDENT_ASSET_STATES, [
+    "PENDING_UPLOAD",
+    "UPLOADED",
+    "PENDING_INSPECTION",
+    "READY",
+    "QUARANTINED",
+    "REJECTED",
+    "DELETE_PENDING",
+  ]);
+  for (const state of PROVIDER_RESIDENT_ASSET_STATES) {
+    assert.equal(isProviderResidentAssetState(state), true);
+  }
+  assert.equal(isProviderResidentAssetState("REJECTED"), true);
+  assert.equal(isProviderResidentAssetState("QUARANTINED"), true);
+  assert.equal(isProviderResidentAssetState("DELETE_PENDING"), true);
+  assert.equal(isProviderResidentAssetState("DELETED"), false);
+});
+
+test("only live pre-finalization session states reserve a purpose slot", () => {
+  assert.deepEqual(ACTIVE_SESSION_RESERVATION_STATES, ["CREATED", "TARGET_ISSUED", "UPLOADED"]);
+  for (const state of ACTIVE_SESSION_RESERVATION_STATES) {
+    assert.equal(isActiveSessionReservationState(state), true);
+  }
+  for (const state of ["FINALIZED", "ABORTED", "EXPIRED", "FAILED"] as const) {
+    assert.equal(isActiveSessionReservationState(state), false);
+  }
+  const now = new Date("2026-07-19T12:00:00.000Z");
+  assert.equal(sessionReservesPurposeSlot("CREATED", new Date("2026-07-19T12:00:00.001Z"), now), true);
+  assert.equal(sessionReservesPurposeSlot("CREATED", now, now), false);
+  assert.equal(sessionReservesPurposeSlot("ABORTED", new Date("2026-07-19T12:00:00.001Z"), now), false);
+  assert.equal(sessionReservesPurposeSlot("FINALIZED", new Date("2026-07-19T12:00:00.001Z"), now), false);
+});
+
+test("persistent purpose quota formula permits N-1, rejects the limit, and fails closed above it", () => {
+  assert.equal(purposeQuotaUsage(3, 1), 4);
+  assert.equal(purposeQuotaPermits({ additionalReservations: 1, limit: 5, reserved: 1, stored: 3 }), true);
+  assert.equal(purposeQuotaPermits({ additionalReservations: 1, limit: 5, reserved: 1, stored: 4 }), false);
+  assert.equal(purposeQuotaPermits({ limit: 5, reserved: 1, stored: 4 }), true);
+  assert.equal(purposeQuotaPermits({ limit: 5, reserved: 2, stored: 4 }), false);
+  assert.throws(() => purposeQuotaUsage(-1, 0), /non-negative safe integers/);
 });

@@ -105,7 +105,7 @@ Migration 39 is required. It adds `StoredAsset`, `UploadSession`, and `StorageMu
 Required indexes cover:
 
 - owner/scope asset pagination: `(ownerPersonId, createdAt, id)` and `(organizationId, createdAt, id)`;
-- purpose/owner active-asset quota and lookup;
+- purpose/owner provider-resident asset quota and same-purpose reservation lookup;
 - Admin status/purpose/created pagination;
 - actor/Organization session pagination;
 - active session and pending-byte quota predicates;
@@ -141,7 +141,7 @@ Admin visibility does not impersonate an owner: storage-view may inspect safe me
 
 The registry is server-only and rejects unknown strings. The initial matrix is:
 
-| Purpose | Owner/actors | Visibility | MIME | Max bytes | Max active assets | Later owner |
+| Purpose | Owner/actors | Visibility | MIME | Max bytes | Max provider-resident assets plus reservations | Later owner |
 | --- | --- | --- | --- | ---: | ---: | --- |
 | `CUSTOMER_AVATAR` | Person/customer | PRIVATE | JPEG/PNG/WebP | 5 MiB | 5 | Gate 5B |
 | `BUSINESS_LOGO` | Organization Owner/Manager | PUBLIC | JPEG/PNG/WebP | 5 MiB | 5 | Gate 5B |
@@ -159,6 +159,8 @@ All allowed images require structural inspection. Public permission means only t
 ### Lifecycle
 
 Asset states are `PENDING_UPLOAD`, `UPLOADED`, `PENDING_INSPECTION`, `READY`, `QUARANTINED`, `REJECTED`, `DELETE_PENDING`, and `DELETED`. Finalization records and inspects the uploaded object. Structurally valid static raster images become READY even when an optional malware scanner reports `SCANNER_NOT_CONFIGURED`; this is truthful because READY means the currently required policy passed, not that the file is virus-free. Invalid or undecodable content becomes REJECTED; inspection/provider uncertainty becomes QUARANTINED. QUARANTINED, REJECTED, DELETE_PENDING, and DELETED are never deliverable.
+
+`PROVIDER_RESIDENT_ASSET_STATES` is the canonical persistent-cap set: `PENDING_UPLOAD`, `UPLOADED`, `PENDING_INSPECTION`, `READY`, `QUARANTINED`, `REJECTED`, and `DELETE_PENDING`. Only confirmed `DELETED` releases capacity. `ACTIVE_SESSION_RESERVATION_STATES` is `CREATED`, `TARGET_ISSUED`, and `UPLOADED`, and only a non-expired session reserves a future asset slot. `FINALIZED`, `ABORTED`, `EXPIRED`, and `FAILED` do not reserve.
 
 Session states are `CREATED`, `TARGET_ISSUED`, `UPLOADED`, `FINALIZED`, `ABORTED`, `EXPIRED`, and `FAILED`. A session has immutable expected MIME/size/checksum, provider/object identity, expiry, version, and one optional asset. Expired/aborted/finalized sessions cannot issue/finalize again. Exact replay returns the original result; changed reuse conflicts.
 
@@ -185,10 +187,10 @@ Upload/download targets expire in five minutes. Targets and signed query paramet
 ### Direct-upload and transaction boundaries
 
 1. An authenticated caller submits purpose, expected MIME/size, optional SHA-256 checksum, bounded display filename, a UUID idempotency key, and (for Business) the rendered active Organization context only for confusion detection.
-2. A serializable transaction revalidates Person/membership/Role, takes a transaction-scoped advisory lock for the owner quota scope, enforces persistent active-session/pending-byte/daily/asset quotas, and creates the session/mutation atomically.
+2. A serializable transaction revalidates Person/membership/Role, takes a transaction-scoped advisory lock for the owner quota scope, enforces persistent active-session/pending-byte/daily/provider-resident quotas, and creates the session/mutation atomically.
 3. Target issuance revalidates authority/version in a short transaction, calls the provider outside database locks, validates HTTPS expiry/header/reference output and the provider's write-once guarantee, then conditionally records `TARGET_ISSUED`. Provider network calls are never held inside row-lock transactions.
 4. The client uploads directly to that exact provider target. REZNO never accepts file bytes/base64/multipart.
-5. Finalization revalidates authority/version, captures immutable provider/object identity, performs HEAD and bounded object inspection outside locks, then uses a serializable transaction/conditional version to atomically create one asset, finalize the session, and complete the mutation. A failed check creates no READY asset.
+5. Finalization revalidates authority/version, captures immutable provider/object identity, performs HEAD and bounded object inspection outside locks, then takes the same owner quota advisory lock and reloads the session/actor. It fails closed if the persistent purpose invariant is already violated; otherwise one transaction atomically replaces that session reservation with one asset, finalizes the session, and completes the mutation. A failed check creates no asset and leaves the session legally retryable after capacity is freed.
 
 ### Integrity and inspection
 
@@ -206,7 +208,19 @@ Persistent quota checks are authoritative and serialized per owner:
 - pending bytes at most 25 MiB per Person and 100 MiB per Organization;
 - at most 30 Person or 100 Organization sessions created in a rolling UTC day;
 - finalized bytes at most 100 MiB per Person or 1 GiB per Organization per rolling UTC day;
-- per-purpose active assets as listed in the registry.
+- per-purpose provider-resident assets plus active, non-expired same-purpose reservations as listed in the registry.
+
+Creation uses the exact owner and purpose under the owner quota advisory lock:
+
+`providerResidentAssets + activeReservations + 1 <= maxActiveAssets`
+
+Finalization uses the same database time, owner scope, purpose, and lock. The current active session is included exactly once in `activeReservations`:
+
+`providerResidentAssets + activeReservations <= maxActiveAssets`
+
+Replacing that reservation with one `StoredAsset` leaves the total unchanged. Historical or manually inserted over-allocation fails with `STORAGE_QUOTA_EXCEEDED`; no partial asset/session transition is committed. For Organization storage, Owner and Manager share the same Organization-wide counter. Person, Organization, and platform-internal counters never cross scopes.
+
+The rolling 24-hour finalized-byte quota is a separate abuse limit, not the persistent capacity definition. READY, QUARANTINED, and REJECTED finalizations all consume that daily byte limit because the provider bytes were accepted and inspected. Moving an asset timestamp outside the daily window never releases its persistent purpose slot.
 
 Process-local endpoint rate limits are additional defense only. Concurrent database transactions cannot silently exceed persistent quotas. Failure is `STORAGE_QUOTA_EXCEEDED`.
 
@@ -218,7 +232,9 @@ Every mutation requires a UUID key and stores SHA-256 of canonical JSON bound to
 
 One service issues bounded download targets. PUBLIC requires READY and a public-permitted purpose. PRIVATE requires the current Person owner or current Owner/Manager membership in the owning Organization. INTERNAL requires current storage Admin view permission. Foreign records are hidden as NOT_FOUND where appropriate. No caller supplies a redirect/destination. Raw object keys are not returned by asset DTOs.
 
-Deletion first authorizes and transitions to DELETE_PENDING, making the asset inaccessible immediately. Provider deletion runs outside the transaction; confirmed absence/deletion transitions to DELETED. Transient failure remains DELETE_PENDING for explicit retry. Normal product paths never hard-delete canonical records.
+Deletion first authorizes and transitions to DELETE_PENDING, making the asset inaccessible immediately while keeping it quota-counted. Provider deletion runs outside the transaction; only confirmed absence/deletion transitions to DELETED and releases the slot. Transient failure remains DELETE_PENDING for explicit retry. Normal product paths never hard-delete canonical records.
+
+REJECTED assets retain their audit identity and possible provider object, remain owner-visible and owner-deletable, and stay quota-counted without a time exception. They do not become free after the rolling 24-hour byte window and are not silently claimed as deleted. QUARANTINED follows the same persistent-cap rule. The minimum Gate 5A retention contract is explicit canonical deletion; no automatic rejected-object cleanup or unsupported provider-deletion claim was added.
 
 Manual commands cover expired sessions/orphan candidates and DELETE_PENDING retry. They operate only in the exact server-generated namespace, use bounded batches/cursors, never list/delete an entire bucket, and are ready for Stage 6 to schedule later. Orphan retention is 24 hours after session expiry; DELETE_PENDING retries are immediately eligible. No Cron/background worker is added.
 
@@ -234,7 +250,7 @@ Audit metadata may contain state, purpose, visibility, safe size, safe provider 
 
 Production JSON handlers cover create session; issue target; finalize; abort; list sessions/assets; asset detail; download target; delete; Admin list/detail; and authorized manual cleanup/retry. Strict schemas reject unknown fields, malformed UUIDs, duplicate query parameters, unexpected providers/keys/URLs/owners/visibility/roles, unsupported MIME, negative/oversized size, long names, and JSON bodies over 32 KiB. Stable errors redact Prisma/PostgreSQL/provider details.
 
-DTOs are explicit `UPLOAD_SESSION`, `UPLOAD_TARGET`, `UPLOAD_FINALIZE_RESULT`, `STORED_ASSET_SUMMARY`, `STORED_ASSET_DETAIL`, `STORED_ASSET_PAGE`, `DOWNLOAD_TARGET`, `STORAGE_QUOTA_STATUS`, and `STORAGE_CLEANUP_RESULT`. They never expose credentials, buckets, raw keys/checksums, authorization headers, permanent signed URLs, audit internals, session cookies, database URLs, content, or foreign owner identifiers.
+DTOs are explicit `UPLOAD_SESSION`, `UPLOAD_TARGET`, `UPLOAD_FINALIZE_RESULT`, `STORED_ASSET_SUMMARY`, `STORED_ASSET_DETAIL`, `STORED_ASSET_PAGE`, `DOWNLOAD_TARGET`, `STORAGE_QUOTA_STATUS`, and `STORAGE_CLEANUP_RESULT`. Each purpose row in quota status reports `stored`, `reserved`, combined `used`, and `limit` from the same enforcement definitions, so the API never advertises capacity that finalization would reject. DTOs never expose credentials, buckets, raw keys/checksums, authorization headers, permanent signed URLs, audit internals, session cookies, database URLs, content, or foreign owner identifiers.
 
 ### Pagination
 
@@ -269,7 +285,7 @@ Finalization performs first HEAD, bounded object retrieval, SHA-256 and structur
 - final fresh rehearsal A: migrations 1→39, 39 applied, three storage tables and four cleanup-claim columns present;
 - final fresh rehearsal B: migrations 1→39, same result;
 - populated rehearsal: raw migrations 1→38, deterministic legacy User/Person/Business media rows, then exact migration 39;
-- legacy fingerprint before/after: `e8b5d62771d5d932db6f0fc1707dd2b0` unchanged;
+- populated legacy fingerprint before/after: `63ce5acb8ad77e37ec95741e0272f6bcfe264915dec83b7d8eacf19612e6ad01` unchanged;
 - managed-asset backfill count: `0`;
 - migrations 1–38 remained byte-untouched and no legacy field was removed.
 
@@ -283,6 +299,10 @@ PostgreSQL plans with sequential/bitmap alternatives disabled prove the intended
 | Organization asset page | `StoredAsset_organizationId_createdAt_id_idx` |
 | unfiltered Admin asset page | `StoredAsset_createdAt_id_idx` |
 | active session/pending-byte quota | `UploadSession_ownerPersonId_state_expiresAt_idx` or owner pagination index |
+| Person purpose reservations | `UploadSession_ownerPersonId_state_expiresAt_idx`, with exact purpose filtering |
+| Organization purpose reservations | `UploadSession_organizationId_state_expiresAt_idx`, with exact purpose filtering |
+| Person provider-resident purpose assets | `StoredAsset_ownerPersonId_purpose_state_idx` |
+| Organization provider-resident purpose assets | `StoredAsset_organizationId_purpose_state_idx` |
 | expired-session batch | `UploadSession_state_expiresAt_id_idx` |
 | delete-pending batch | `StoredAsset_state_deleteRequestedAt_id_idx` |
 | exact mutation replay | `StorageMutation_actorPersonId_idempotencyKey_key` |
@@ -298,20 +318,20 @@ List hydration is two bounded queries, quota aggregation is a fixed query set, p
 - ESLint: zero warnings/errors;
 - root non-incremental TypeScript and Mobile TypeScript: passed;
 - Prisma format/validate/generate: passed;
-- Gate 5A unit: 19/19;
-- Gate 5A PostgreSQL: 18/18 after the final security hardening;
-- complete unit suites on the final local tree: 353/353;
-- complete PostgreSQL suites on a fresh 39/39 database with the CI signing environment: 318/318;
+- Gate 5A unit: 22/22;
+- Gate 5A PostgreSQL: 26/26 after the persistent-purpose-quota remediation;
+- complete unit suites on the final local tree: 356/356;
+- complete PostgreSQL suites on a fresh 39/39 database with the CI signing environment: 326/326;
 - production HTTP/RSC/API against the final Next production build: 88/88;
 - Next 16.2.9 production build, Expo dependencies, Expo Doctor 20/20, public config, Android Hermes export, and iOS Hermes export: passed; physical devices were not used.
 
-The guarded local `rezno_staging` operator rehearsal is 39/39. Fixture run one and run two both produced `3bebae60d7efb88d890b301b6efd9c80f0ab6efeb1aa9c1031dd9ecb415636ee`; smoke passed 32 checks. Exact cleanup removed 22 assets, 30 sessions, three Admin grants, six memberships, six Roles, two Organizations, 12 People, and 12 Users, with zero remaining mutation/audit rows. The second cleanup returned zero for every category.
+The guarded local `rezno_staging` operator remediation rehearsal is 39/39. Fixture run one and run two both preserved `3bebae60d7efb88d890b301b6efd9c80f0ab6efeb1aa9c1031dd9ecb415636ee`; the expanded smoke passed 75 checks, including Customer and Organization N−1 concurrency, Owner/Manager sharing, cross-Organization isolation, rejected retention beyond 24 hours, transient deletion retention, confirmed deletion release, and quota DTO equality. Exact cleanup removed 22 assets, 30 sessions, three Admin grants, six memberships, six Roles, two Organizations, 12 People, and 12 Users, with zero remaining mutation/audit rows. The second cleanup returned zero for every category.
 
 ### Real-staging evidence
 
-Draft PR #121 supplied an immutable Vercel staging Preview for head `0cd83100cf89099762d9386a15eaf356db2c33c3` before the operator touched real staging. Authenticated Neon discovery selected exactly the `rezno-staging` project, exact `rezno_staging` database, verified owner role, direct non-pooler endpoint, and required SSL. The database URL and credentials stayed in process memory and were not persisted.
+Draft PR #121 supplied accepted Vercel staging evidence before the remediation operator touched real staging; the remediation's final exact-head Preview is intentionally deferred until after its commits are pushed. Authenticated Neon discovery selected exactly the `rezno-staging` project, exact `rezno_staging` database, verified owner role, direct non-pooler endpoint, and required SSL. The database URL and credentials stayed in process memory and were not persisted.
 
-Read-only preflight reported 38 total, 38 successfully applied, and zero failed migrations. Forward-only `prisma migrate deploy` applied migration 39 only; postflight and final status reported 39/39 with zero failed migrations. Two fixture executions produced the identical fingerprint `3bebae60d7efb88d890b301b6efd9c80f0ab6efeb1aa9c1031dd9ecb415636ee`. The guarded in-memory deterministic-provider smoke passed 32 checks and made no persistent-provider or human-delivery claim.
+The original Gate 5A real-staging proof applied migration 39 from its accepted 38/38 baseline. The remediation recheck's read-only preflight reported 39 total, 39 successfully applied, and zero failed migrations; `prisma migrate deploy` was a no-op and final status remained 39/39. Two fixture executions produced the identical fingerprint `3bebae60d7efb88d890b301b6efd9c80f0ab6efeb1aa9c1031dd9ecb415636ee`. The guarded in-memory deterministic-provider smoke passed 75 checks, including the persistent-quota concurrency and retention cases, and made no persistent-provider or human-delivery claim.
 
 Exact cleanup removed 22 assets, 30 sessions, three Admin grants, six memberships, six Roles, two Organizations, 12 People, and 12 Users; the smoke had already removed its own mutation/audit rows. A second cleanup returned zero for every category, and all three storage tables ended at zero rows. A whole-database pre/post fingerprint over every non-storage, non-migration public table remained `15596b840153cedca59f65e851adb6e08a5477e767806086f45c75b79f242590`, proving that Stage 1–4 data—including the retained Stage 3/4 fixtures—was unchanged.
 
@@ -319,11 +339,11 @@ Exact cleanup removed 22 assets, 30 sessions, three Admin grants, six membership
 
 The review covered asset/session IDOR, active-Business and Person/Organization confusion, membership/Role/Admin revocation races, object-key injection/path traversal/bucket escape, provider and URL injection, SSRF, MIME/extension/polyglot/SVG/animation bypass, decompression/pixel/request-body amplification, replay/cross-actor idempotency/concurrent finalization/stale versions/quota races, signed-target/provider/checksum/foreign-metadata leakage, deletion/cleanup races and overreach, deterministic-provider production activation, fixture production guards, and PII in keys/logs/audits.
 
-Hardening performed during review included actor-global mutation keys, database-authoritative expiry, write-once upload targets, bounded/safe provider target and metadata validation, provider-throw classification, a second immutable metadata check, exact raster boundaries, 40,000,000-pixel decoding, scanner-failure quarantine, authenticated scope-bound cursors, public download rate limiting, dedicated cleanup claims, batch-bounded expiration, one-time orphan reconciliation, exact-key-only delete retry, and a general Admin pagination index. No known P0/P1/P2 remains locally. This finding must be rechecked against review threads and exact-head CI before Ready for Review.
+Hardening performed during review included actor-global mutation keys, database-authoritative expiry, write-once upload targets, bounded/safe provider target and metadata validation, provider-throw classification, a second immutable metadata check, exact raster boundaries, 40,000,000-pixel decoding, scanner-failure quarantine, authenticated scope-bound cursors, public download rate limiting, dedicated cleanup claims, batch-bounded expiration, one-time orphan reconciliation, exact-key-only delete retry, and a general Admin pagination index. A subsequent P2 found that active same-purpose sessions did not reserve asset capacity and REJECTED objects were omitted from the persistent counter. The remediation centralizes both state registries, serializes create/finalize enforcement under one owner lock, keeps REJECTED/QUARANTINED/DELETE_PENDING counted, and releases capacity only at DELETED. No known P0/P1/P2 remains locally after the complete unit/PostgreSQL/HTTP regressions and 75-check real-staging rehearsal; exact-head CI and independent review still must confirm closure.
 
 ### Pending final immutable-head closure
 
-The documentation-only evidence commit intentionally changes the PR head after the first real-staging proof. Its exact-head GitHub Actions, both Vercel checks, final 39/39 fixture/smoke/cleanup recheck, unresolved review-thread count, and Ready-for-review transition must therefore be recorded against the final pushed SHA rather than claimed in advance here.
+The remediation commits intentionally change the PR head after the real-staging proof. Their exact-head GitHub Actions, both Vercel checks, unresolved review-thread count, and Ready-for-review transition must therefore be recorded against the final pushed SHA rather than claimed in advance here.
 
 Production provider status: **not configured; production persistent upload is not claimed**. Deterministic provider status: **test/guarded staging-operator only; in-memory and non-persistent; never production**. Malware scanner status: **not configured; READY means static-raster structural policy passed, not virus-free**. Physical-device QA: **not performed; Stage 7**.
 

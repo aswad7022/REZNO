@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
+import type { StoragePurpose } from "@prisma/client";
 import sharp from "sharp";
 
 import { setStorageCursorSigningSecretForTests } from "../../features/storage/domain/cursor-signing";
@@ -9,8 +10,8 @@ import { DeterministicStorageProvider } from "../../features/storage/providers/d
 import { setStorageProviderForTests } from "../../features/storage/providers/registry";
 import type { StorageAdminActor, StorageBusinessActor, StorageCustomerActor } from "../../features/storage/services/actor";
 import { createDownloadTarget, deleteStoredAsset } from "../../features/storage/services/storage-assets";
-import { createUploadSession, finalizeUpload, issueUploadTarget } from "../../features/storage/services/storage-mutations";
-import { listStoredAssets, listUploadSessions } from "../../features/storage/services/storage-query";
+import { abortUpload, createUploadSession, finalizeUpload, issueUploadTarget } from "../../features/storage/services/storage-mutations";
+import { getStorageQuotaStatus, listStoredAssets, listUploadSessions } from "../../features/storage/services/storage-query";
 import { prisma } from "../../lib/db/prisma";
 import { fixtureFingerprint, managedStorageFixtureIds } from "./managed-storage-gate5a-fixture";
 import { assertManagedStorageGate5aStaging } from "./managed-storage-gate5a-safety";
@@ -38,7 +39,7 @@ async function main() {
     sessionIds.push(session.id);
     return session;
   };
-  const ready = async (actor: StorageCustomerActor | StorageBusinessActor | StorageAdminActor, purpose: "CUSTOMER_AVATAR" | "BUSINESS_LOGO" | "INTERNAL_STORAGE_TEST") => {
+  const ready = async (actor: StorageCustomerActor | StorageBusinessActor | StorageAdminActor, purpose: StoragePurpose) => {
     const created = trackSession(await createUploadSession(actor, {
       expectedChecksumSha256: digest,
       expectedMimeType: "image/png",
@@ -60,8 +61,126 @@ async function main() {
     checks += 2;
     return finalized.asset;
   };
+  const remove = async (actor: StorageCustomerActor | StorageBusinessActor | StorageAdminActor, assetId: string) => {
+    const row = await prisma.storedAsset.findUniqueOrThrow({ where: { id: assetId } });
+    const deleted = await deleteStoredAsset(actor, {
+      assetId: row.id,
+      expectedVersion: row.version,
+      idempotencyKey: key(),
+    });
+    assert.equal(deleted.state, "DELETED");
+    checks += 1;
+  };
 
   try {
+    const quotaAssets = [];
+    for (let index = 0; index < 4; index += 1) quotaAssets.push(await ready(actors.customerB, "CUSTOMER_AVATAR"));
+    const reservationResults = await Promise.allSettled(Array.from({ length: 2 }, () => createUploadSession(actors.customerB, {
+      expectedMimeType: "image/png",
+      expectedSizeBytes: 12,
+      idempotencyKey: key(),
+      purpose: "CUSTOMER_AVATAR",
+    }).then(trackSession)));
+    assert.equal(reservationResults.filter((result) => result.status === "fulfilled").length, 1);
+    const reservationFailure = reservationResults.find((result) => result.status === "rejected");
+    assert.ok(reservationFailure?.status === "rejected" && failures("STORAGE_QUOTA_EXCEEDED")(reservationFailure.reason));
+    const rejectedReservation = reservationResults.find((result) => result.status === "fulfilled");
+    assert.ok(rejectedReservation?.status === "fulfilled");
+    await issueUploadTarget(actors.customerB, {
+      expectedVersion: rejectedReservation.value.version,
+      idempotencyKey: key(),
+      sessionId: rejectedReservation.value.id,
+    });
+    const rejectedSession = await prisma.uploadSession.findUniqueOrThrow({ where: { id: rejectedReservation.value.id } });
+    const invalidRaster = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 1, 2, 3]);
+    provider.putObject({ bytes: invalidRaster, contentType: "image/png", objectKey: rejectedSession.objectKey });
+    const rejectedAsset = await finalizeUpload(actors.customerB, {
+      expectedVersion: rejectedSession.version,
+      idempotencyKey: key(),
+      sessionId: rejectedSession.id,
+    });
+    assetIds.push(rejectedAsset.asset.id);
+    assert.equal(rejectedAsset.asset.state, "REJECTED");
+    const exactQuota = (await getStorageQuotaStatus(actors.customerB)).purposeAssets.find((row) => row.purpose === "CUSTOMER_AVATAR");
+    assert.deepEqual(exactQuota, { limit: 5, purpose: "CUSTOMER_AVATAR", reserved: 0, stored: 5, used: 5 });
+    await assert.rejects(createUploadSession(actors.customerB, {
+      expectedMimeType: "image/png",
+      expectedSizeBytes: png.byteLength,
+      idempotencyKey: key(),
+      purpose: "CUSTOMER_AVATAR",
+    }), failures("STORAGE_QUOTA_EXCEEDED"));
+
+    const old = new Date(Date.now() - 48 * 60 * 60 * 1000);
+    await prisma.storedAsset.update({ where: { id: rejectedAsset.asset.id }, data: { createdAt: old, rejectedAt: old } });
+    await assert.rejects(createUploadSession(actors.customerB, {
+      expectedMimeType: "image/png",
+      expectedSizeBytes: png.byteLength,
+      idempotencyKey: key(),
+      purpose: "CUSTOMER_AVATAR",
+    }), failures("STORAGE_QUOTA_EXCEEDED"));
+    provider.setDeleteOutcomes(rejectedSession.objectKey, ["TRANSIENT_FAILURE", "READY"]);
+    const rejectedDeleteKey = key();
+    await assert.rejects(deleteStoredAsset(actors.customerB, {
+      assetId: rejectedAsset.asset.id,
+      expectedVersion: rejectedAsset.asset.version,
+      idempotencyKey: rejectedDeleteKey,
+    }), failures("STORAGE_PROVIDER_FAILURE"));
+    assert.equal((await getStorageQuotaStatus(actors.customerB)).purposeAssets.find((row) => row.purpose === "CUSTOMER_AVATAR")?.used, 5);
+    assert.equal((await deleteStoredAsset(actors.customerB, {
+      assetId: rejectedAsset.asset.id,
+      expectedVersion: rejectedAsset.asset.version,
+      idempotencyKey: rejectedDeleteKey,
+    })).state, "DELETED");
+    const released = trackSession(await createUploadSession(actors.customerB, {
+      expectedMimeType: "image/png",
+      expectedSizeBytes: png.byteLength,
+      idempotencyKey: key(),
+      purpose: "CUSTOMER_AVATAR",
+    }));
+    await abortUpload(actors.customerB, { expectedVersion: released.version, idempotencyKey: key(), sessionId: released.id });
+    for (const asset of quotaAssets) await remove(actors.customerB, asset.id);
+    checks += 10;
+
+    const businessQuotaAssets = [];
+    for (let index = 0; index < 4; index += 1) businessQuotaAssets.push(await ready(actors.owner, "BUSINESS_COVER"));
+    const sharedReservations = await Promise.allSettled([
+      createUploadSession(actors.owner, {
+        expectedMimeType: "image/png", expectedSizeBytes: png.byteLength, idempotencyKey: key(), purpose: "BUSINESS_COVER",
+      }).then(trackSession),
+      createUploadSession(actors.manager, {
+        expectedMimeType: "image/png", expectedSizeBytes: png.byteLength, idempotencyKey: key(), purpose: "BUSINESS_COVER",
+      }).then(trackSession),
+    ]);
+    assert.equal(sharedReservations.filter((result) => result.status === "fulfilled").length, 1);
+    const sharedFailure = sharedReservations.find((result) => result.status === "rejected");
+    assert.ok(sharedFailure?.status === "rejected" && failures("STORAGE_QUOTA_EXCEEDED")(sharedFailure.reason));
+    const sharedSuccess = sharedReservations.find((result) => result.status === "fulfilled");
+    assert.ok(sharedSuccess?.status === "fulfilled");
+    await issueUploadTarget(actors.owner.personId === (await prisma.uploadSession.findUniqueOrThrow({ where: { id: sharedSuccess.value.id } })).actorPersonId ? actors.owner : actors.manager, {
+      expectedVersion: sharedSuccess.value.version,
+      idempotencyKey: key(),
+      sessionId: sharedSuccess.value.id,
+    });
+    const sharedRow = await prisma.uploadSession.findUniqueOrThrow({ where: { id: sharedSuccess.value.id } });
+    provider.putObject({ bytes: png, contentType: "image/png", objectKey: sharedRow.objectKey });
+    const sharedActor = sharedRow.actorPersonId === actors.owner.personId ? actors.owner : actors.manager;
+    const sharedFinalized = await finalizeUpload(sharedActor, {
+      expectedVersion: sharedRow.version,
+      idempotencyKey: key(),
+      sessionId: sharedRow.id,
+    });
+    assetIds.push(sharedFinalized.asset.id);
+    const ownerQuota = (await getStorageQuotaStatus(actors.owner)).purposeAssets.find((row) => row.purpose === "BUSINESS_COVER");
+    assert.deepEqual((await getStorageQuotaStatus(actors.manager)).purposeAssets.find((row) => row.purpose === "BUSINESS_COVER"), ownerQuota);
+    assert.deepEqual(ownerQuota, { limit: 5, purpose: "BUSINESS_COVER", reserved: 0, stored: 5, used: 5 });
+    const foreignReservation = trackSession(await createUploadSession(actors.foreignOwner, {
+      expectedMimeType: "image/png", expectedSizeBytes: png.byteLength, idempotencyKey: key(), purpose: "BUSINESS_COVER",
+    }));
+    assert.equal((await getStorageQuotaStatus(actors.foreignOwner)).purposeAssets.find((row) => row.purpose === "BUSINESS_COVER")?.used, 1);
+    await abortUpload(actors.foreignOwner, { expectedVersion: foreignReservation.version, idempotencyKey: key(), sessionId: foreignReservation.id });
+    for (const asset of [...businessQuotaAssets, sharedFinalized.asset]) await remove(actors.owner, asset.id);
+    checks += 8;
+
     const replayKey = key();
     const replayInput = {
       expectedMimeType: "image/png",
@@ -75,8 +194,8 @@ async function main() {
     checks += 2;
 
     const privateAsset = await ready(actors.customerB, "CUSTOMER_AVATAR");
-    const publicAsset = await ready(actors.owner, "BUSINESS_LOGO");
-    await ready(actors.manager, "BUSINESS_LOGO");
+    const publicAsset = await ready(actors.owner, "BUSINESS_COVER");
+    await ready(actors.manager, "BUSINESS_COVER");
     for (const actor of [actors.receptionist, actors.staff, actors.revoked]) {
       await assert.rejects(createUploadSession(actor, {
         expectedMimeType: "image/png",
@@ -156,7 +275,7 @@ async function main() {
       idempotencyKey: key(),
       purpose: "CUSTOMER_AVATAR",
     }).then(trackSession)));
-    assert.equal(quotaResults.filter((result) => result.status === "fulfilled").length, 4);
+    assert.equal(quotaResults.filter((result) => result.status === "fulfilled").length, 3);
     const quotaFailure = quotaResults.find((result) => result.status === "rejected");
     assert.ok(quotaFailure && quotaFailure.status === "rejected" && failures("STORAGE_QUOTA_EXCEEDED")(quotaFailure.reason));
     checks += 2;

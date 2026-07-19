@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
 
+import { generateStorageObjectKey } from "../../../features/storage/domain/policy";
 import { prisma } from "../../../lib/db/prisma";
 
 const baseUrl = process.env.STORAGE_HTTP_BASE_URL;
@@ -66,10 +67,21 @@ test("Gate 5A production storage handlers fail closed without a configured provi
   const businessCookie = `${owner.cookie}; rezno-active-business-id=${organization.id}`;
 
   t.after(async () => {
+    const personIds = [customer.person.id, owner.person.id, admin.person.id];
+    await prisma.storedAsset.deleteMany({
+      where: {
+        OR: [
+          { createdByPersonId: { in: personIds } },
+          { ownerPersonId: { in: personIds } },
+        ],
+      },
+    });
+    await prisma.storageMutation.deleteMany({ where: { actorPersonId: { in: personIds } } });
+    await prisma.uploadSession.deleteMany({ where: { actorPersonId: { in: personIds } } });
     await prisma.organizationMember.deleteMany({ where: { organizationId: organization.id } });
     await prisma.role.deleteMany({ where: { organizationId: organization.id } });
     await prisma.organization.delete({ where: { id: organization.id } });
-    await prisma.person.deleteMany({ where: { id: { in: [customer.person.id, owner.person.id, admin.person.id] } } });
+    await prisma.person.deleteMany({ where: { id: { in: personIds } } });
     await prisma.user.deleteMany({ where: { id: { in: [customer.userId, owner.userId, admin.userId] } } });
     await prisma.$disconnect();
   });
@@ -151,8 +163,100 @@ test("Gate 5A production storage handlers fail closed without a configured provi
       method: "DELETE",
     });
     assert.equal(missingAdminDelete.response.status, 404);
+    const old = new Date(Date.now() - 48 * 60 * 60 * 1000);
+    let rejectedAssetId = "";
+    for (let index = 0; index < 4; index += 1) {
+      const objectKey = generateStorageObjectKey("CUSTOMER_AVATAR");
+      const session = await prisma.uploadSession.create({
+        data: {
+          actorPersonId: customer.person.id,
+          expectedMimeType: "image/png",
+          expectedSizeBytes: 64,
+          expiresAt: new Date(Date.now() + 60_000),
+          finalizedAt: new Date(),
+          objectKey,
+          ownerPersonId: customer.person.id,
+          provider: "DETERMINISTIC_TEST",
+          purpose: "CUSTOMER_AVATAR",
+          state: "FINALIZED",
+          visibility: "PRIVATE",
+        },
+      });
+      const rejected = index === 0;
+      const timestamp = rejected ? old : new Date();
+      const asset = await prisma.storedAsset.create({
+        data: {
+          checksumSha256: "a".repeat(64),
+          createdAt: timestamp,
+          createdByPersonId: customer.person.id,
+          inspectionOutcome: rejected ? "INVALID_STRUCTURE" : "VALID",
+          mimeType: "image/png",
+          objectKey,
+          ownerPersonId: customer.person.id,
+          provider: "DETERMINISTIC_TEST",
+          providerObjectVersion: randomUUID(),
+          purpose: "CUSTOMER_AVATAR",
+          readyAt: rejected ? null : timestamp,
+          rejectedAt: rejected ? timestamp : null,
+          scannerOutcome: "SCANNER_NOT_CONFIGURED",
+          sizeBytes: 64,
+          state: rejected ? "REJECTED" : "READY",
+          uploadSessionId: session.id,
+          visibility: "PRIVATE",
+        },
+      });
+      if (rejected) rejectedAssetId = asset.id;
+    }
+    await prisma.uploadSession.create({
+      data: {
+        actorPersonId: customer.person.id,
+        expectedMimeType: "image/png",
+        expectedSizeBytes: 64,
+        expiresAt: new Date(Date.now() + 60_000),
+        objectKey: generateStorageObjectKey("CUSTOMER_AVATAR"),
+        ownerPersonId: customer.person.id,
+        provider: "DETERMINISTIC_TEST",
+        purpose: "CUSTOMER_AVATAR",
+        visibility: "PRIVATE",
+      },
+    });
+
     const quota = await request("/api/storage/customer/quota", { cookie: customer.cookie });
     assert.equal(quota.response.status, 200);
     assert.equal(((quota.body.data as { type: string }).type), "STORAGE_QUOTA_STATUS");
+    const avatar = ((quota.body.data as {
+      purposeAssets: Array<{ limit: number; purpose: string; reserved: number; stored: number; used: number }>;
+    }).purposeAssets).find((row) => row.purpose === "CUSTOMER_AVATAR");
+    assert.deepEqual(avatar, { limit: 5, purpose: "CUSTOMER_AVATAR", reserved: 1, stored: 4, used: 5 });
+
+    const exactLimitAttempts = await Promise.all(Array.from({ length: 2 }, () => request("/api/storage/customer/sessions", {
+      body: { expectedMimeType: "image/png", expectedSizeBytes: 64, purpose: "CUSTOMER_AVATAR" },
+      cookie: customer.cookie,
+      key: randomUUID(),
+      method: "POST",
+    })));
+    for (const result of exactLimitAttempts) {
+      assert.equal(result.response.status, 429);
+      assert.equal((result.body.error as { code: string }).code, "STORAGE_QUOTA_EXCEEDED");
+    }
+    assert.doesNotMatch(JSON.stringify(exactLimitAttempts.map((result) => result.body)), /objectKey|checksumSha256|postgresql:\/\//i);
+
+    await prisma.storedAsset.update({
+      where: { id: rejectedAssetId },
+      data: { deletedAt: new Date(), state: "DELETED" },
+    });
+    const releasedQuota = await request("/api/storage/customer/quota", { cookie: customer.cookie });
+    const releasedAvatar = ((releasedQuota.body.data as {
+      purposeAssets: Array<{ limit: number; purpose: string; reserved: number; stored: number; used: number }>;
+    }).purposeAssets).find((row) => row.purpose === "CUSTOMER_AVATAR");
+    assert.deepEqual(releasedAvatar, { limit: 5, purpose: "CUSTOMER_AVATAR", reserved: 1, stored: 3, used: 4 });
+    const providerUnavailable = await request("/api/storage/customer/sessions", {
+      body: { expectedMimeType: "image/png", expectedSizeBytes: 64, purpose: "CUSTOMER_AVATAR" },
+      cookie: customer.cookie,
+      key: randomUUID(),
+      method: "POST",
+    });
+    assert.equal(providerUnavailable.response.status, 503);
+    assert.equal((providerUnavailable.body.error as { code: string }).code, "STORAGE_PROVIDER_NOT_CONFIGURED");
   });
 });
