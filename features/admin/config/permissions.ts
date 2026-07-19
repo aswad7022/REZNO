@@ -20,6 +20,8 @@ export const adminPermissions = [
   "COMMERCE_INVENTORY_MANAGE",
   "COMMERCE_ORDERS_VIEW",
   "COMMERCE_ORDERS_MANAGE",
+  "STORAGE_RECORDS_VIEW",
+  "STORAGE_RECORDS_MANAGE",
 ] as const;
 
 export type AdminPermission = (typeof adminPermissions)[number];
@@ -55,6 +57,7 @@ export const adminPermissionDependencies: Readonly<
   COMMERCE_STORES_REVIEW: ["COMMERCE_STORES_VIEW"],
   NOTIFICATIONS_SEND: ["NOTIFICATIONS_VIEW"],
   COMMUNICATIONS_DISPATCH: ["NOTIFICATIONS_SEND"],
+  STORAGE_RECORDS_MANAGE: ["STORAGE_RECORDS_VIEW"],
 };
 
 export function hasAnyCommerceAdminPermission(
@@ -129,6 +132,8 @@ export const adminPermissionLabels: Record<AdminPermission, string> = {
   COMMERCE_INVENTORY_MANAGE: "Manage commerce inventory",
   COMMERCE_ORDERS_VIEW: "View commerce Orders",
   COMMERCE_ORDERS_MANAGE: "Manage commerce Orders",
+  STORAGE_RECORDS_VIEW: "View managed storage records",
+  STORAGE_RECORDS_MANAGE: "Manage managed storage lifecycle",
 };
 
 export function normalizeAdminPermissions(

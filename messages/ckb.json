@@ -1525,7 +1525,9 @@
       "COMMERCE_INVENTORY_VIEW": "بینینی کۆگای بازاڕ",
       "COMMERCE_INVENTORY_MANAGE": "بەڕێوەبردنی کۆگای بازاڕ",
       "COMMERCE_ORDERS_VIEW": "بینینی داواکارییەکانی بازاڕ",
-      "COMMERCE_ORDERS_MANAGE": "بەڕێوەبردنی داواکارییەکانی بازاڕ"
+      "COMMERCE_ORDERS_MANAGE": "بەڕێوەبردنی داواکارییەکانی بازاڕ",
+      "STORAGE_RECORDS_VIEW": "بینینی تۆمارەکانی هەڵگرتنی بەڕێوەبراو",
+      "STORAGE_RECORDS_MANAGE": "بەڕێوەبردنی ژیانی هەڵگرتنی بەڕێوەبراو"
     }
   },
   "Messages": {

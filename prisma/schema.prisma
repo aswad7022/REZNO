@@ -52,6 +52,11 @@ model Person {
   favoriteProducts                CustomerFavoriteProduct[]
   sentOrganizationInvitations     OrganizationInvitation[]            @relation("OrganizationInvitationInvitedBy")
   receivedOrganizationInvitations OrganizationInvitation[]            @relation("OrganizationInvitationRecipient")
+  ownedStoredAssets               StoredAsset[]                       @relation("StoredAssetOwnerPerson")
+  createdStoredAssets             StoredAsset[]                       @relation("StoredAssetCreatedByPerson")
+  actedUploadSessions             UploadSession[]                     @relation("UploadSessionActorPerson")
+  ownedUploadSessions             UploadSession[]                     @relation("UploadSessionOwnerPerson")
+  storageMutations                StorageMutation[]
 
   @@index([phone])
 }
@@ -89,6 +94,9 @@ model Organization {
   favoritedServices              CustomerFavoriteService[]
   invitations                    OrganizationInvitation[]
   store                          Store?
+  storedAssets                   StoredAsset[]
+  uploadSessions                 UploadSession[]
+  storageMutations               StorageMutation[]
 
   @@index([vertical])
   @@index([status, isActive, deletedAt])
@@ -224,6 +232,7 @@ model OrganizationMember {
   proposedBookingChanges     BookingChangeRequest[]
   businessOperationMutations BusinessOperationMutation[]
   businessAuditLogs          BusinessAuditLog[]
+  storageUploadSessions      UploadSession[]
   organization               Organization                @relation(fields: [organizationId], references: [id])
   person                     Person                      @relation(fields: [personId], references: [id])
   role                       Role                        @relation(fields: [roleId], references: [id])
@@ -742,6 +751,120 @@ model AdminAuditLog {
   @@index([targetType, targetId])
   @@index([createdAt, id])
   @@index([targetType, targetId, createdAt, id])
+}
+
+model StoredAsset {
+  id                       String                   @id @default(uuid()) @db.Uuid
+  uploadSessionId          String                   @unique @db.Uuid
+  ownerPersonId            String?                  @db.Uuid
+  organizationId           String?                  @db.Uuid
+  createdByPersonId        String                   @db.Uuid
+  purpose                  StoragePurpose
+  visibility               StorageVisibility
+  state                    StoredAssetState         @default(PENDING_UPLOAD)
+  provider                 StorageProviderKind
+  objectKey                String                   @unique @db.VarChar(512)
+  providerObjectVersion    String?                  @db.VarChar(180)
+  providerCleanupClaimId   String?                  @db.Uuid
+  providerCleanupClaimedAt DateTime?                @db.Timestamptz(6)
+  mimeType                 String                   @db.VarChar(100)
+  sizeBytes                BigInt
+  checksumSha256           String                   @db.VarChar(64)
+  displayName              String?                  @db.VarChar(180)
+  inspectionOutcome        StorageInspectionOutcome
+  scannerOutcome           StorageScannerOutcome
+  inspectionMetadata       Json?
+  failureCode              String?                  @db.VarChar(80)
+  version                  Int                      @default(1)
+  readyAt                  DateTime?                @db.Timestamptz(6)
+  quarantinedAt            DateTime?                @db.Timestamptz(6)
+  rejectedAt               DateTime?                @db.Timestamptz(6)
+  deleteRequestedAt        DateTime?                @db.Timestamptz(6)
+  deletedAt                DateTime?                @db.Timestamptz(6)
+  createdAt                DateTime                 @default(now()) @db.Timestamptz(6)
+  updatedAt                DateTime                 @updatedAt @db.Timestamptz(6)
+  uploadSession            UploadSession            @relation(fields: [uploadSessionId], references: [id], onDelete: Restrict)
+  ownerPerson              Person?                  @relation("StoredAssetOwnerPerson", fields: [ownerPersonId], references: [id], onDelete: Restrict)
+  organization             Organization?            @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  createdByPerson          Person                   @relation("StoredAssetCreatedByPerson", fields: [createdByPersonId], references: [id], onDelete: Restrict)
+
+  @@index([ownerPersonId, createdAt, id])
+  @@index([organizationId, createdAt, id])
+  @@index([ownerPersonId, purpose, state])
+  @@index([organizationId, purpose, state])
+  @@index([createdAt, id])
+  @@index([state, createdAt, id])
+  @@index([state, deleteRequestedAt, id])
+  @@index([purpose, state, createdAt, id])
+}
+
+model UploadSession {
+  id                       String              @id @default(uuid()) @db.Uuid
+  actorPersonId            String              @db.Uuid
+  ownerPersonId            String?             @db.Uuid
+  organizationId           String?             @db.Uuid
+  actorMembershipId        String?             @db.Uuid
+  actorRoleId              String?             @db.Uuid
+  purpose                  StoragePurpose
+  visibility               StorageVisibility
+  state                    UploadSessionState  @default(CREATED)
+  expectedMimeType         String              @db.VarChar(100)
+  expectedSizeBytes        BigInt
+  expectedChecksumSha256   String?             @db.VarChar(64)
+  displayName              String?             @db.VarChar(180)
+  provider                 StorageProviderKind
+  objectKey                String              @unique @db.VarChar(512)
+  providerUploadReference  String?             @db.VarChar(180)
+  providerCleanupClaimId   String?             @db.Uuid
+  providerCleanupClaimedAt DateTime?           @db.Timestamptz(6)
+  expiresAt                DateTime            @db.Timestamptz(6)
+  targetIssuedAt           DateTime?           @db.Timestamptz(6)
+  uploadedAt               DateTime?           @db.Timestamptz(6)
+  finalizedAt              DateTime?           @db.Timestamptz(6)
+  abortedAt                DateTime?           @db.Timestamptz(6)
+  failureCode              String?             @db.VarChar(80)
+  version                  Int                 @default(1)
+  createdAt                DateTime            @default(now()) @db.Timestamptz(6)
+  updatedAt                DateTime            @updatedAt @db.Timestamptz(6)
+  actorPerson              Person              @relation("UploadSessionActorPerson", fields: [actorPersonId], references: [id], onDelete: Restrict)
+  ownerPerson              Person?             @relation("UploadSessionOwnerPerson", fields: [ownerPersonId], references: [id], onDelete: Restrict)
+  organization             Organization?       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  actorMembership          OrganizationMember? @relation(fields: [actorMembershipId], references: [id], onDelete: Restrict)
+  asset                    StoredAsset?
+
+  @@index([actorPersonId, createdAt, id])
+  @@index([ownerPersonId, createdAt, id])
+  @@index([organizationId, createdAt, id])
+  @@index([ownerPersonId, state, expiresAt])
+  @@index([organizationId, state, expiresAt])
+  @@index([actorPersonId, createdAt])
+  @@index([organizationId, createdAt])
+  @@index([state, expiresAt, id])
+  @@index([provider, state, expiresAt, id])
+}
+
+model StorageMutation {
+  id              String                @id @default(uuid()) @db.Uuid
+  actorPersonId   String                @db.Uuid
+  organizationId  String?               @db.Uuid
+  action          StorageMutationAction
+  idempotencyKey  String                @db.Uuid
+  requestHash     String                @db.VarChar(64)
+  targetType      String                @db.VarChar(40)
+  targetId        String?               @db.Uuid
+  expectedVersion Int?
+  status          StorageMutationStatus @default(PROCESSING)
+  result          Json?
+  failureCode     String?               @db.VarChar(80)
+  createdAt       DateTime              @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime              @updatedAt @db.Timestamptz(6)
+  actorPerson     Person                @relation(fields: [actorPersonId], references: [id], onDelete: Restrict)
+  organization    Organization?         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@unique([actorPersonId, idempotencyKey])
+  @@index([targetType, targetId, createdAt, id])
+  @@index([status, createdAt, id])
+  @@index([organizationId, createdAt, id])
 }
 
 model Notification {
@@ -1573,6 +1696,84 @@ enum AccountStatus {
   ACTIVE
   SUSPENDED
   BLOCKED
+}
+
+enum StoragePurpose {
+  CUSTOMER_AVATAR
+  BUSINESS_LOGO
+  BUSINESS_COVER
+  BUSINESS_GALLERY_IMAGE
+  SERVICE_IMAGE
+  STORE_LOGO
+  STORE_COVER
+  PRODUCT_IMAGE
+  RESTAURANT_MENU_IMAGE
+  INTERNAL_STORAGE_TEST
+}
+
+enum StorageVisibility {
+  PUBLIC
+  PRIVATE
+  INTERNAL
+}
+
+enum StorageProviderKind {
+  NOT_CONFIGURED
+  DETERMINISTIC_TEST
+}
+
+enum UploadSessionState {
+  CREATED
+  TARGET_ISSUED
+  UPLOADED
+  FINALIZED
+  ABORTED
+  EXPIRED
+  FAILED
+}
+
+enum StoredAssetState {
+  PENDING_UPLOAD
+  UPLOADED
+  PENDING_INSPECTION
+  READY
+  QUARANTINED
+  REJECTED
+  DELETE_PENDING
+  DELETED
+}
+
+enum StorageInspectionOutcome {
+  VALID
+  INVALID_TYPE
+  INVALID_STRUCTURE
+  ANIMATED_NOT_ALLOWED
+  DIMENSION_LIMIT_EXCEEDED
+  DECOMPRESSION_LIMIT_EXCEEDED
+  INSPECTION_FAILED
+}
+
+enum StorageScannerOutcome {
+  SCANNER_NOT_CONFIGURED
+  CLEAN
+  MALWARE_DETECTED
+  SCAN_FAILED
+}
+
+enum StorageMutationAction {
+  CREATE_SESSION
+  ISSUE_UPLOAD_TARGET
+  FINALIZE_UPLOAD
+  ABORT_UPLOAD
+  DELETE_ASSET
+  ADMIN_REJECT_ASSET
+  MANUAL_CLEANUP
+}
+
+enum StorageMutationStatus {
+  PROCESSING
+  COMPLETED
+  FAILED
 }
 
 enum AdminAccessRole {

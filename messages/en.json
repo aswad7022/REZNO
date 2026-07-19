@@ -1613,7 +1613,9 @@
       "COMMERCE_INVENTORY_VIEW": "View commerce inventory",
       "COMMERCE_INVENTORY_MANAGE": "Manage commerce inventory",
       "COMMERCE_ORDERS_VIEW": "View commerce Orders",
-      "COMMERCE_ORDERS_MANAGE": "Manage commerce Orders"
+      "COMMERCE_ORDERS_MANAGE": "Manage commerce Orders",
+      "STORAGE_RECORDS_VIEW": "View managed storage records",
+      "STORAGE_RECORDS_MANAGE": "Manage managed storage lifecycle"
     }
   },
   "Messages": {
