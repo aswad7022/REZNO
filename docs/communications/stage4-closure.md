@@ -446,11 +446,163 @@ Gate 4D changes only functional truth, localization, and accessibility defects.
 AI remains blocked until Stage 8 is complete. Gate 4D does not begin Stage 5 or
 any later-stage work.
 
-## Evidence ledger (to be completed on the immutable PR head)
+## Gate 4D remediation record
 
-The final section will record local totals, migration rehearsals, performance
-plans, security review, deterministic integrated fixture fingerprints, exact
-staging deployment/role/cross-gate matrix, cleanup, exact-head GitHub Actions
-and Vercel, review-thread count, commits, and final Gate 4D verdict. Recording
-successful local evidence here will not announce Stage 4 completion before the
-PR is independently reviewed and merged.
+All audit findings were remediated without a migration or a second domain
+model:
+
+- G4D-01: Notification, Conversation, and Message cursors are strict version 2
+  HMAC-SHA-256 envelopes. Their server-only signers derive separate 32-byte
+  HKDF keys with the exact domains
+  `rezno:notifications:cursor-signing:v2` and
+  `rezno:messages:cursor-signing:v2`. Version 1, public-SHA recomputation, MAC
+  bit flips, wrong resource/kind/filter/page/actor, rotation, and future fences
+  are rejected only as the generic `INVALID_CURSOR` contract.
+- G4D-02: reachable Business/Admin communications, outbound preferences,
+  manual dispatch, campaign editing/reporting, and Notification notices now
+  have key-identical AR/EN/CKB copy. The Business hub states the accepted
+  Gate 4A/4B/4C behavior and still says providers/scheduling are unconnected.
+  Client failures show a stable code and localized safe copy, never a raw
+  service message.
+- G4D-03, discovered by repeated production HTTP validation: PostgreSQL keeps
+  microseconds while JavaScript `Date` keeps milliseconds. A truncated cursor
+  fence could briefly hide a row committed in the same millisecond. List
+  transactions now use a PostgreSQL-derived millisecond ceiling, so the
+  database remains authoritative without a lossy boundary. The previously
+  intermittent tests then passed both focused and complete HTTP runs.
+- G4D-04, discovered in independent fixture review: the synthetic campaign
+  Notification had reused the nested campaign-content shape. It now has a
+  separate flat Gate 4A localized-Notification shape, and a source contract
+  prevents regression.
+- the unreachable Admin Notification form/action/fixed-list service and the
+  unused `CONVERSATION_CLOSED` contract were removed; the required legacy
+  `/admin/notifications` redirect remains.
+- invalid Admin reporting fallbacks expose a stable DOM evidence marker, not
+  cursor internals, and remain valid across HTML, RSC, AR, EN, and CKB.
+
+Independent source review after remediation found no remaining P0, P1, or P2.
+The only retained P3 items are the explicitly deferred process-local rate
+limits, missing automatic scheduler, unconfigured real providers, physical
+device QA, and dependency advisories described below.
+
+## Local closure evidence
+
+Validation ran from the isolated worktree on Node 24 against disposable
+PostgreSQL databases. No command accessed the protected checkout.
+
+| Validation | Result |
+| --- | --- |
+| clean root install | passed; 1,051 packages |
+| clean Mobile install | passed; 504 packages |
+| ESLint | passed with zero warnings |
+| root non-incremental TypeScript | passed |
+| Mobile TypeScript | passed |
+| Prisma format / validate / generate | passed; no schema diff |
+| complete unit suite | 333/333 |
+| focused Gate 4D unit contracts | 10/10 |
+| complete PostgreSQL suite | 292/292 |
+| focused PostgreSQL scenarios A–J | 11/11 including the enclosing suite |
+| complete production HTTP/RSC/API suite | 84/84 |
+| focused Stage 4 production HTTP/RSC/API | 15/15 |
+| complete local automated regression total | 709/709 |
+| Next.js 16.2.9 production build | passed; 69 generated application entries |
+| Expo dependency validation | dependencies up to date |
+| Expo Doctor | 20/20 |
+| Android Hermes export | passed; `.hbc` bundle generated |
+| iOS Hermes export | passed; `.hbc` bundle generated |
+| `git diff --check` | passed |
+
+The existing Prisma/pg adapter emits a non-failing `client.query()`
+deprecation warning in older concurrent tests. Root audit reports five
+moderate advisories and Mobile reports ten moderate advisories. The suggested
+automatic fixes require breaking framework/dependency changes, so no forced
+upgrade or downgrade was applied in this closure gate. There is no high or
+critical advisory in the recorded install output.
+
+## Migration and database evidence
+
+- repository migration count is exactly 38 and migration 39 does not exist;
+- schema and migrations are byte-unchanged from accepted `origin/main`;
+- two disposable databases completed fresh forward migration paths `1→38`;
+- a populated raw `37→38` rehearsal preserved one historical Notification,
+  one Conversation, one Message, and two existing Admin communication
+  permissions; it introduced no Campaign row by itself;
+- the local Prisma-managed validation database reports 38/38 and no pending
+  migration;
+- no reset, `db push`, destructive cleanup, or historical migration rewrite
+  was used;
+- migration 39 is not required by any closure finding.
+
+## Performance and bounded-work evidence
+
+The complete PostgreSQL suite repeated the 5,000-Person preview/snapshot case,
+10,000-row scale boundary, five endpoint-resolution queries, ten chunked
+Delivery inserts, deterministic pagination, claim concurrency, and all prior
+Stage 2/3/4 regressions. Twelve representative `EXPLAIN` probes returned valid
+plans for Campaign history/due work, retry/expired claims, Delivery/Attempt
+reporting, aggregate counters, preference lookup, verified endpoints, Business
+audience joins, and bounded target search. No plan output contained a database
+URL or password. Timings are diagnostics rather than universal latency SLOs.
+
+## Security closure evidence
+
+Review covered Person/session binding, active Organization/membership/Role,
+Booking assignment, current AdminAccess, IDOR, cross-tenant/cross-Admin replay,
+mass assignment, stale versions, public-SHA forgery, MAC tampering, future
+snapshots, key rotation, raw HTML/XSS, open redirects, endpoint/provider
+injection, preference/mandatory-category abuse, double claim, retry
+amplification, cancellation, PII/error/audit leakage, fixture production
+guards, and unbounded work.
+
+Changed-source scans found no high-confidence credential, private key, PAT,
+live payment secret, or webhook token. Next client artifacts contain no cursor
+signing domain, fixture contact, database URL, or fixture email; Android/iOS
+artifacts contain no database/auth environment name, URL, fixture email, or
+fixture phone. The Better Auth dependency contains its generic dynamic
+environment-variable getter in a client dependency chunk, but no environment
+value or signing key is embedded. Production DTO/error tests contain no raw
+Prisma/PostgreSQL/provider detail, contact endpoint, campaign copy in audit, or
+Message body in arrival Notification copy.
+
+## Deterministic integrated fixture evidence
+
+The exact-name disposable local database `rezno_staging` ran the integrated
+fixture twice with the identical fingerprint
+`b974464bdccb272d2f0a3be4cdee1b87886a4027f1c6e92fb6bf5ec2e9551943`:
+
+| Entity | Count |
+| --- | ---: |
+| People | 16 |
+| active/inactive memberships | 7 |
+| Conversations | 4 |
+| Messages | 36 |
+| Notifications | 26 |
+| Campaigns | 32 |
+| Deliveries | 30 |
+| Attempts | 8 |
+
+The smoke repeated Customer/Business scopes, Restaurant Conversation,
+role/membership and Admin revocation, all six authenticated cursor families,
+in-app campaign, Message pages, provider/scheduler truth, and PII/error
+absence. Delivery-state fingerprint was
+`1b649236adcaebcf91bc9d101b72c8b50abdd0261c6f5c8f4886d984feb96dad`.
+Exact cleanup removed 8 Attempts, 30 Deliveries, 32 mutations, one audit, 32
+Campaigns, 26 Notifications, 36 Messages, four Conversations, two Bookings,
+and every other fixture-owned row. A second cleanup returned zero in every
+category.
+
+## Real-staging and immutable-head ledger
+
+Authenticated Neon discovery found the single `rezno-staging` project and the
+exact `rezno_staging` database. The read-only preflight reported 38 total and
+38 successfully applied migrations with zero failed or rolled-back row. The
+connection string stayed in process memory; its URL, host, password, and
+derived secrets were never printed or persisted.
+
+The immutable final PR-head Preview, two real-staging fixture runs, identical
+fingerprint, role/cross-gate matrix, historical Stage 3A–3D and Gate 4A/4B/4C
+fingerprints, exact cleanup, exact-head GitHub Actions/Vercel, review-thread
+count, and Ready-for-review transition are recorded in the PR evidence after
+this documentation commit. This document does not claim Stage 4 completion:
+the PR must still be independently reviewed, merged, and the resulting
+`main`/staging state verified.
