@@ -1536,7 +1536,9 @@
       "COMMERCE_INVENTORY_VIEW": "عرض مخزون السوق",
       "COMMERCE_INVENTORY_MANAGE": "إدارة مخزون السوق",
       "COMMERCE_ORDERS_VIEW": "عرض طلبات السوق",
-      "COMMERCE_ORDERS_MANAGE": "إدارة طلبات السوق"
+      "COMMERCE_ORDERS_MANAGE": "إدارة طلبات السوق",
+      "STORAGE_RECORDS_VIEW": "عرض سجلات التخزين المُدار",
+      "STORAGE_RECORDS_MANAGE": "إدارة دورة حياة التخزين المُدار"
     }
   },
   "Messages": {
