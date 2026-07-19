@@ -1,6 +1,6 @@
 # Gate 5A — Managed storage and secure upload foundation
 
-Status: architecture and local implementation complete; immutable-PR-head Preview and real-staging closure remain pending.
+Status: architecture, implementation, local validation, and real-staging migration proof complete; final immutable-head checks remain pending.
 
 Baseline: `origin/main` at `84da8d87b2b9a5676fe1b77cc015a31c46246849`, 38 repository migrations, and real staging at 38/38 before this gate. PR #120 is merged at this baseline. PR #100 remains an untouched, open Draft at `e46454df993ecccb06180060dda4353ec88e2641`.
 
@@ -307,16 +307,24 @@ List hydration is two bounded queries, quota aggregation is a fixed query set, p
 
 The guarded local `rezno_staging` operator rehearsal is 39/39. Fixture run one and run two both produced `3bebae60d7efb88d890b301b6efd9c80f0ab6efeb1aa9c1031dd9ecb415636ee`; smoke passed 32 checks. Exact cleanup removed 22 assets, 30 sessions, three Admin grants, six memberships, six Roles, two Organizations, 12 People, and 12 Users, with zero remaining mutation/audit rows. The second cleanup returned zero for every category.
 
+### Real-staging evidence
+
+Draft PR #121 supplied an immutable Vercel staging Preview for head `0cd83100cf89099762d9386a15eaf356db2c33c3` before the operator touched real staging. Authenticated Neon discovery selected exactly the `rezno-staging` project, exact `rezno_staging` database, verified owner role, direct non-pooler endpoint, and required SSL. The database URL and credentials stayed in process memory and were not persisted.
+
+Read-only preflight reported 38 total, 38 successfully applied, and zero failed migrations. Forward-only `prisma migrate deploy` applied migration 39 only; postflight and final status reported 39/39 with zero failed migrations. Two fixture executions produced the identical fingerprint `3bebae60d7efb88d890b301b6efd9c80f0ab6efeb1aa9c1031dd9ecb415636ee`. The guarded in-memory deterministic-provider smoke passed 32 checks and made no persistent-provider or human-delivery claim.
+
+Exact cleanup removed 22 assets, 30 sessions, three Admin grants, six memberships, six Roles, two Organizations, 12 People, and 12 Users; the smoke had already removed its own mutation/audit rows. A second cleanup returned zero for every category, and all three storage tables ended at zero rows. A whole-database pre/post fingerprint over every non-storage, non-migration public table remained `15596b840153cedca59f65e851adb6e08a5477e767806086f45c75b79f242590`, proving that Stage 1–4 data—including the retained Stage 3/4 fixtures—was unchanged.
+
 ### Security review
 
 The review covered asset/session IDOR, active-Business and Person/Organization confusion, membership/Role/Admin revocation races, object-key injection/path traversal/bucket escape, provider and URL injection, SSRF, MIME/extension/polyglot/SVG/animation bypass, decompression/pixel/request-body amplification, replay/cross-actor idempotency/concurrent finalization/stale versions/quota races, signed-target/provider/checksum/foreign-metadata leakage, deletion/cleanup races and overreach, deterministic-provider production activation, fixture production guards, and PII in keys/logs/audits.
 
 Hardening performed during review included actor-global mutation keys, database-authoritative expiry, write-once upload targets, bounded/safe provider target and metadata validation, provider-throw classification, a second immutable metadata check, exact raster boundaries, 40,000,000-pixel decoding, scanner-failure quarantine, authenticated scope-bound cursors, public download rate limiting, dedicated cleanup claims, batch-bounded expiration, one-time orphan reconciliation, exact-key-only delete retry, and a general Admin pagination index. No known P0/P1/P2 remains locally. This finding must be rechecked against review threads and exact-head CI before Ready for Review.
 
-### Pending immutable-head closure
+### Pending final immutable-head closure
 
-The Draft PR, exact PR SHA, Vercel Preview, real Neon `rezno_staging` migration 39/39, two real fixture runs, real smoke/cleanup, Stage 3/4 fingerprints, CI/Vercel checks, and unresolved-thread count are intentionally not claimed here until a pushed immutable commit exists.
+The documentation-only evidence commit intentionally changes the PR head after the first real-staging proof. Its exact-head GitHub Actions, both Vercel checks, final 39/39 fixture/smoke/cleanup recheck, unresolved review-thread count, and Ready-for-review transition must therefore be recorded against the final pushed SHA rather than claimed in advance here.
 
 Production provider status: **not configured; production persistent upload is not claimed**. Deterministic provider status: **test/guarded staging-operator only; in-memory and non-persistent; never production**. Malware scanner status: **not configured; READY means static-raster structural policy passed, not virus-free**. Physical-device QA: **not performed; Stage 7**.
 
-Gate 5B, Gate 5C, Gate 5D, and Stage 6 remain unstarted. Gate 5B receives the future media-field integration and migration handoff; Stage 6 receives the manual cleanup attachment point. Current local verdict: **pending immutable-head and real-staging evidence**.
+Gate 5B, Gate 5C, Gate 5D, and Stage 6 remain unstarted. Gate 5B receives the future media-field integration and migration handoff; Stage 6 receives the manual cleanup attachment point. Current verdict: **pending final immutable-head checks and review**.
