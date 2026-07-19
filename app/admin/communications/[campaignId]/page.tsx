@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -32,6 +33,7 @@ export default async function AdminCommunicationDetailPage({
     requireAdminPermission("NOTIFICATIONS_VIEW"),
   ]);
   const context = communicationAdminContext(access);
+  const t = await getTranslations("Stage4Communications");
   const deliveryCursor = typeof query.deliveryCursor === "string"
     ? query.deliveryCursor
     : typeof query.cursor === "string" ? query.cursor : null;
@@ -67,30 +69,30 @@ export default async function AdminCommunicationDetailPage({
 
   return (
     <>
-      <AdminPageHeader title="Campaign detail" description="Immutable snapshot, provider-acceptance reporting, and sanitized attempt evidence." />
-      <Button asChild variant="outline" className="mb-4"><Link href={campaignBackHref(query.campaignStatus, query.campaignCursor)}>Back to campaigns</Link></Button>
+      <AdminPageHeader title={t("campaignDetail")} description={t("campaignDetailDescription")} />
+      <Button asChild variant="outline" className="mb-4"><Link href={campaignBackHref(query.campaignStatus, query.campaignCursor)}>{t("backCampaigns")}</Link></Button>
       {canSend ? <CampaignEditor initial={campaign} /> : (
         <Card><CardContent className="pt-6"><p className="font-mono text-sm">{campaign.id}</p><Badge>{campaign.status}</Badge></CardContent></Card>
       )}
       <Card className="mt-6">
-        <CardHeader><CardTitle>Outbound deliveries</CardTitle></CardHeader>
+        <CardHeader><CardTitle>{t("outboundDeliveries")}</CardTitle></CardHeader>
         <CardContent className="space-y-2">
-          <p className="text-xs text-muted-foreground">No email, phone, token, raw payload, credential, or provider error is exposed.</p>
+          <p className="text-xs text-muted-foreground">{t("noContactExposed")}</p>
           {deliveries.items.map((delivery) => (
             <article key={delivery.id} className="rounded-xl border p-3 text-xs">
               <div className="flex flex-wrap justify-between gap-2">
                 <span className="font-mono">{delivery.id}</span>
                 <Badge variant={delivery.status === "PERMANENT_FAILURE" ? "destructive" : "secondary"}>{delivery.status}</Badge>
               </div>
-              <p className="mt-2">Person {delivery.personId} · {delivery.channel} · locale {delivery.locale} · attempts {delivery.attemptCount}</p>
-              <p className="mt-1">Provider {delivery.providerName ?? "—"} · code {delivery.safeProviderCode ?? "—"} · suppression {delivery.suppressionReason ?? "—"}</p>
+              <p className="mt-2">{t("person")} {delivery.personId} · {delivery.channel} · {t("locale")} {delivery.locale} · {t("attempts")} {delivery.attemptCount}</p>
+              <p className="mt-1">{t("provider")} {delivery.providerName ?? "—"} · {t("code")} {delivery.safeProviderCode ?? "—"} · {t("suppression")} {delivery.suppressionReason ?? "—"}</p>
               <Link className="mt-2 inline-block underline" href={detailPageHref(campaignId, {
                 campaignCursor: query.campaignCursor,
                 campaignStatus: query.campaignStatus,
                 deliveryCursor,
                 deliveryId: delivery.id,
                 deliveryStatus,
-              })}>Inspect sanitized attempts</Link>
+              })}>{t("inspectAttempts")}</Link>
             </article>
           ))}
           {deliveries.nextCursor ? <Button asChild variant="outline"><Link href={detailPageHref(campaignId, {
@@ -100,16 +102,16 @@ export default async function AdminCommunicationDetailPage({
             deliveryCursor: deliveries.nextCursor,
             deliveryId,
             deliveryStatus,
-          })}>Next deliveries</Link></Button> : null}
+          })}>{t("nextDeliveries")}</Link></Button> : null}
         </CardContent>
       </Card>
       {attempts ? (
         <Card className="mt-6">
-          <CardHeader><CardTitle>Delivery attempts</CardTitle></CardHeader>
+          <CardHeader><CardTitle>{t("deliveryAttempts")}</CardTitle></CardHeader>
           <CardContent className="space-y-2">
-            {attempts.items.length === 0 ? <p className="text-sm text-muted-foreground">No provider call was made for this delivery.</p> : attempts.items.map((attempt) => (
+            {attempts.items.length === 0 ? <p className="text-sm text-muted-foreground">{t("noProviderCall")}</p> : attempts.items.map((attempt) => (
               <article key={attempt.id} className="rounded-xl border p-3 text-xs">
-                Attempt {attempt.attemptNumber} · {attempt.outcome ?? "IN_PROGRESS"} · {attempt.providerName ?? "—"} · {attempt.safeProviderCode ?? "—"} · retryable {String(attempt.retryable)}
+                {t("attempt")} {attempt.attemptNumber} · {attempt.outcome ?? "IN_PROGRESS"} · {attempt.providerName ?? "—"} · {attempt.safeProviderCode ?? "—"} · {t("retryable")} {String(attempt.retryable)}
               </article>
             ))}
             {attempts.nextCursor && deliveryId ? <Button asChild variant="outline"><Link href={detailPageHref(campaignId, {
@@ -119,7 +121,7 @@ export default async function AdminCommunicationDetailPage({
               deliveryCursor,
               deliveryId,
               deliveryStatus,
-            })}>Next attempts</Link></Button> : null}
+            })}>{t("nextAttempts")}</Link></Button> : null}
           </CardContent>
         </Card>
       ) : null}
@@ -127,17 +129,18 @@ export default async function AdminCommunicationDetailPage({
   );
 }
 
-function InvalidCommunicationCursor() {
+async function InvalidCommunicationCursor() {
+  const t = await getTranslations("Stage4Communications");
   return (
     <>
       <AdminPageHeader
-        title="Campaign detail"
-        description="Immutable snapshot and sanitized outbound-delivery reporting."
+        title={t("campaignDetail")}
+        description={t("campaignDetailDescription")}
       />
-      <Card className="border-destructive/20">
-        <CardHeader><CardTitle>Communications reporting request was rejected safely.</CardTitle></CardHeader>
+      <Card className="border-destructive/20" data-stage4-communications-cursor-error="true">
+        <CardHeader><CardTitle>{t("invalidTitle")}</CardTitle></CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">Refresh the current reporting scope and try again.</p>
+          <p className="text-sm text-muted-foreground">{t("invalidDescription")}</p>
         </CardContent>
       </Card>
     </>

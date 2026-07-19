@@ -67,6 +67,13 @@ export async function listNotificationInbox(
       where: { id: currentContext.personId },
       select: { preferredLanguage: true },
     });
+    // PostgreSQL keeps microseconds while JavaScript Date keeps milliseconds.
+    // A database-derived millisecond ceiling prevents round-trip truncation
+    // from hiding an already-committed row at the first cursor boundary.
+    const [{ authoritativeNow }] = await transaction.$queryRaw<Array<{ authoritativeNow: Date }>>(Prisma.sql`
+      SELECT date_trunc('milliseconds', clock_timestamp()) + interval '1 millisecond'
+        AS "authoritativeNow"
+    `);
     const scopeKey = notificationScopeKey(currentContext);
     const fingerprint = notificationFilterFingerprint({
       category: query.category,
@@ -75,9 +82,13 @@ export async function listNotificationInbox(
       to: query.to?.toISOString(),
     });
     const cursor = query.cursor
-      ? decodeNotificationCursor(query.cursor, { context: currentContext, filter: fingerprint, pageSize: query.limit })
+      ? decodeNotificationCursor(
+          query.cursor,
+          { context: currentContext, filter: fingerprint, pageSize: query.limit },
+          authoritativeNow,
+        )
       : null;
-    const snapshot = cursor?.snapshotDate ?? new Date();
+    const snapshot = cursor?.snapshotDate ?? authoritativeNow;
     const inboxState = await transaction.notificationInboxState.findUnique({
       where: { personId_scopeKey: { personId: currentContext.personId, scopeKey } },
     });

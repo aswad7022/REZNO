@@ -30,11 +30,3 @@ export type DashboardNotification =
       kind: "ADMIN_ANNOUNCEMENT";
       status?: never;
     };
-
-export interface AdminNotificationActionState {
-  status: "idle" | "success" | "error";
-  message?: string;
-}
-
-export const initialAdminNotificationActionState: AdminNotificationActionState =
-  { status: "idle" };

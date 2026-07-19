@@ -174,18 +174,23 @@ function notificationCenterCopy(locale: string) {
       { BOOKINGS: "Bookings", RESTAURANT: "Restaurant", COMMERCE: "Commerce", MESSAGES: "Messages", ACCOUNT: "Account", ADMIN_ANNOUNCEMENT: "Platform announcements" };
   return ar ? {
     archive: "أرشفة", categories, filters: { all: "الكل", archived: "المؤرشف", important: "المهم", read: "مقروء", unread: "غير مقروء" },
-    filtersLabel: "مرشحات الإشعارات", mandatory: "إلزامي", markAll: "تحديد الكل كمقروء", markRead: "تحديد كمقروء", markUnread: "تحديد كغير مقروء", next: "المزيد", preferenceHelp: "الإشعارات الإلزامية للأمان وحالة الطلب لا يمكن تعطيلها.", preferences: "تفضيلات الإشعارات", restore: "استعادة", save: "حفظ التفضيلات", unread: "غير مقروء", notice: noticeText,
+    filtersLabel: "مرشحات الإشعارات", mandatory: "إلزامي", markAll: "تحديد الكل كمقروء", markRead: "تحديد كمقروء", markUnread: "تحديد كغير مقروء", next: "المزيد", preferenceHelp: "الإشعارات الإلزامية للأمان وحالة الطلب لا يمكن تعطيلها.", preferences: "تفضيلات الإشعارات", restore: "استعادة", save: "حفظ التفضيلات", unread: "غير مقروء", notice: (code: string) => noticeText(code, "ar"),
   } : ku ? {
     archive: "ئەرشیف", categories, filters: { all: "هەموو", archived: "ئەرشیف", important: "گرنگ", read: "خوێندراوە", unread: "نەخوێندراوە" },
-    filtersLabel: "پاڵاوتنی ئاگادارکردنەوە", mandatory: "پێویست", markAll: "هەمووی وەک خوێندراوە", markRead: "خوێندراوە", markUnread: "نەخوێندراوە", next: "زیاتر", preferenceHelp: "ئاگادارکردنەوە پێویستەکانی ئاسایش و دۆخی داواکاری ناخرێنە کوژاندنەوە.", preferences: "هەڵبژاردەکان", restore: "گەڕاندنەوە", save: "پاشەکەوت", unread: "نەخوێندراوە", notice: noticeText,
+    filtersLabel: "پاڵاوتنی ئاگادارکردنەوە", mandatory: "پێویست", markAll: "هەمووی وەک خوێندراوە", markRead: "خوێندراوە", markUnread: "نەخوێندراوە", next: "زیاتر", preferenceHelp: "ئاگادارکردنەوە پێویستەکانی ئاسایش و دۆخی داواکاری ناخرێنە کوژاندنەوە.", preferences: "هەڵبژاردەکان", restore: "گەڕاندنەوە", save: "پاشەکەوت", unread: "نەخوێندراوە", notice: (code: string) => noticeText(code, "ckb"),
   } : {
     archive: "Archive", categories, filters: { all: "All", archived: "Archived", important: "Important", read: "Read", unread: "Unread" },
-    filtersLabel: "Notification filters", mandatory: "Mandatory", markAll: "Mark all read", markRead: "Mark read", markUnread: "Mark unread", next: "More", preferenceHelp: "Mandatory security and order-state notifications cannot be disabled.", preferences: "Notification preferences", restore: "Restore", save: "Save preferences", unread: "Unread", notice: noticeText,
+    filtersLabel: "Notification filters", mandatory: "Mandatory", markAll: "Mark all read", markRead: "Mark read", markUnread: "Mark unread", next: "More", preferenceHelp: "Mandatory security and order-state notifications cannot be disabled.", preferences: "Notification preferences", restore: "Restore", save: "Save preferences", unread: "Unread", notice: (code: string) => noticeText(code, "en"),
   };
 }
 
-function noticeText(code: string) {
-  if (code === "updated" || code === "all-read" || code === "preferences-updated") return "Notification settings updated.";
-  if (code === "stale_version") return "This notification changed in another session. Refresh and try again.";
-  return "The notification request could not be completed.";
+function noticeText(code: string, locale: "ar" | "ckb" | "en") {
+  const copy = locale === "ar"
+    ? { failed: "تعذر إكمال طلب الإشعار.", stale: "تغيّر الإشعار في جلسة أخرى. حدّث الصفحة وحاول مجددًا.", updated: "حُدثت إعدادات الإشعارات." }
+    : locale === "ckb"
+      ? { failed: "داواکاری ئاگادارکردنەوە تەواو نەبوو.", stale: "ئاگادارکردنەوە لە دانیشتنێکی تر گۆڕا. نوێ بکەرەوە و دووبارە هەوڵ بدە.", updated: "ڕێکخستنەکانی ئاگادارکردنەوە نوێکرانەوە." }
+      : { failed: "The notification request could not be completed.", stale: "This notification changed in another session. Refresh and try again.", updated: "Notification settings updated." };
+  if (code === "updated" || code === "all-read" || code === "preferences-updated") return copy.updated;
+  if (code === "stale_version") return copy.stale;
+  return copy.failed;
 }

@@ -83,6 +83,7 @@ export async function listConversations(
   assertListQuery(query);
   return messagingSerializable(async (transaction) => {
     const currentActor = await assertMessageActorCurrent(transaction, actor);
+    const authoritativeNow = await messageTransactionTime(transaction);
     const search = query.search?.trim() || undefined;
     const filter = messageFilterFingerprint({ mode: query.mode, search });
     const cursor = query.cursor
@@ -91,9 +92,9 @@ export async function listConversations(
           filter,
           kind: "conversation",
           pageSize: query.limit,
-        })
+        }, authoritativeNow)
       : null;
-    const snapshot = cursor?.snapshotDate ?? new Date();
+    const snapshot = cursor?.snapshotDate ?? authoritativeNow;
     if (query.mode === "unread") {
       return listUnreadConversations(transaction, {
         actor: currentActor,
@@ -220,6 +221,7 @@ export async function listMessages(
   assertHistoryQuery(query);
   return messagingSerializable(async (transaction) => {
     const currentActor = await assertMessageActorCurrent(transaction, actor);
+    const authoritativeNow = await messageTransactionTime(transaction);
     const conversation = await transaction.conversation.findUnique({
       where: { id: conversationId },
       select: {
@@ -238,9 +240,9 @@ export async function listMessages(
           filter,
           kind: "message",
           pageSize: query.limit,
-        })
+        }, authoritativeNow)
       : null;
-    const snapshot = cursor?.snapshotDate ?? new Date();
+    const snapshot = cursor?.snapshotDate ?? authoritativeNow;
     const rows = await transaction.message.findMany({
       where: {
         conversationId,
@@ -496,6 +498,17 @@ function unreadBoundarySql() {
       )
     )
   `;
+}
+
+async function messageTransactionTime(transaction: Prisma.TransactionClient) {
+  // Keep PostgreSQL authoritative while making its microsecond clock a
+  // lossless upper fence in JavaScript's millisecond Date representation.
+  const [row] = await transaction.$queryRaw<Array<{ authoritativeNow: Date }>>(Prisma.sql`
+    SELECT date_trunc('milliseconds', clock_timestamp()) + interval '1 millisecond'
+      AS "authoritativeNow"
+  `);
+  if (!row?.authoritativeNow) messageError("FORBIDDEN", "Messaging transaction time is unavailable.");
+  return row.authoritativeNow;
 }
 
 export async function searchMessageTargets(
