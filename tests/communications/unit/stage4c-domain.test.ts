@@ -240,8 +240,9 @@ test("Gate 4C domain contracts are strict, bounded, and deterministic", async (t
     ]);
   });
 
-  await t.test("Gate 4D remains an explicit non-started boundary", () => {
-    assert.equal(GATE_4D_BOUNDARY.gate4cMustNotStart, true);
+  await t.test("Gate 4D owns closure while Stage 5 remains an explicit non-started boundary", () => {
+    assert.equal(GATE_4D_BOUNDARY.gate4cAccepted, true);
+    assert.equal(GATE_4D_BOUNDARY.stage5MustNotStart, true);
     assert.equal(GATE_4D_BOUNDARY.owner, "Gate 4D");
   });
 

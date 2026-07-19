@@ -18,6 +18,7 @@ import {
   messageFilterFingerprint,
 } from "../../../features/messages/domain/cursor";
 import { MessageDomainError } from "../../../features/messages/domain/errors";
+import { setMessageCursorSigningSecretForTests } from "../../../features/messages/domain/cursor-signing";
 import {
   adminBusinessConversationIdentity,
   adminUserConversationIdentity,
@@ -26,6 +27,9 @@ import {
 } from "../../../features/messages/domain/identity";
 import { canAccessConversation } from "../../../features/messages/policies/conversation-access";
 import { canAccessBusinessMessagesDestination } from "../../../features/notifications/domain/destination-policy";
+import { TEST_MESSAGE_CURSOR_SECRET } from "../../helpers/stage4-cursor-secret";
+
+setMessageCursorSigningSecretForTests(TEST_MESSAGE_CURSOR_SECRET);
 
 const ids = Array.from({ length: 10 }, () => randomUUID());
 const customer: MessageActor = {

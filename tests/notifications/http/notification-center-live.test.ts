@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import test from "node:test";
 
 import type { CanonicalNotificationEvent } from "../../../features/notifications/domain/contracts";
@@ -8,6 +8,19 @@ import { prisma } from "../../../lib/db/prisma";
 
 const baseUrl = process.env.NOTIFICATION_HTTP_BASE_URL ?? process.env.COMMERCE_HTTP_BASE_URL;
 const marker = `stage4a-http-${randomUUID().slice(0, 8)}`;
+
+function forgePublicShaCursor(cursor: string, changes: Record<string, unknown>) {
+  const decoded = {
+    ...JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")) as Record<string, unknown>,
+    ...changes,
+  };
+  const { mac: _mac, ...core } = decoded;
+  void _mac;
+  return Buffer.from(JSON.stringify({
+    ...decoded,
+    mac: createHash("sha256").update(JSON.stringify(core)).digest("hex"),
+  }), "utf8").toString("base64url");
+}
 
 async function signUp(label: string) {
   const response = await fetch(`${baseUrl}/api/auth/sign-up/email`, {
@@ -199,6 +212,16 @@ test("Gate 4A production HTML, RSC and mobile APIs enforce canonical notificatio
     const invalidCursor = await jsonRequest("/api/mobile/notifications?filter=all&cursor=forged&limit=10", { cookie: customer.cookie });
     assert.equal(invalidCursor.response.status, 400);
     assert.equal((invalidCursor.body.error as { code: string }).code, "INVALID_CURSOR");
+    const cursorPage = await jsonRequest("/api/mobile/notifications?filter=all&limit=1", { cookie: customer.cookie });
+    const cursor = (cursorPage.body.data as { pageInfo: { nextCursor: string | null } }).pageInfo.nextCursor;
+    assert.ok(cursor);
+    const forgedCursor = await jsonRequest(
+      `/api/mobile/notifications?filter=all&limit=1&cursor=${encodeURIComponent(forgePublicShaCursor(cursor, { pageSize: 10 }))}`,
+      { cookie: customer.cookie },
+    );
+    assert.equal(forgedCursor.response.status, 400);
+    assert.equal((forgedCursor.body.error as { code: string }).code, "INVALID_CURSOR");
+    assert.doesNotMatch(JSON.stringify(forgedCursor.body), /mac|scope|snapshot|BETTER_AUTH_SECRET|HMAC|HKDF/i);
 
     const readKey = randomUUID();
     const readInput = { action: "MARK_READ", expectedVersion: item.stateVersion };

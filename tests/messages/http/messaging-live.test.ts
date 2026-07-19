@@ -1,11 +1,24 @@
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import test from "node:test";
 
 import { prisma } from "../../../lib/db/prisma";
 
 const baseUrl = process.env.MESSAGE_HTTP_BASE_URL ?? process.env.COMMERCE_HTTP_BASE_URL;
 const marker = `stage4b-http-${randomUUID().slice(0, 8)}`;
+
+function forgePublicShaCursor(cursor: string, changes: Record<string, unknown>) {
+  const decoded = {
+    ...JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")) as Record<string, unknown>,
+    ...changes,
+  };
+  const { mac: _mac, ...core } = decoded;
+  void _mac;
+  return Buffer.from(JSON.stringify({
+    ...decoded,
+    mac: createHash("sha256").update(JSON.stringify(core)).digest("hex"),
+  }), "utf8").toString("base64url");
+}
 
 async function signUp(label: string) {
   const response = await fetch(`${baseUrl}/api/auth/sign-up/email`, {
@@ -359,6 +372,13 @@ test("Gate 4B production RSC and Customer Mobile messaging contracts", {
     assert.equal(firstPage.response.status, 200);
     const cursor = (firstPage.body.data as { nextCursor: string | null }).nextCursor;
     assert.ok(cursor);
+    const forged = await jsonRequest(
+      `/api/mobile/messages/conversations?mode=all&limit=1&cursor=${encodeURIComponent(forgePublicShaCursor(cursor, { pageSize: 10 }))}`,
+      { cookie: customer.cookie },
+    );
+    assert.equal(forged.response.status, 400);
+    assert.equal((forged.body.error as { code: string }).code, "INVALID_CURSOR");
+    assert.doesNotMatch(JSON.stringify(forged.body), /mac|scope|snapshot|BETTER_AUTH_SECRET|HMAC|HKDF/i);
     await prisma.person.update({
       where: { id: customer.person.id },
       data: { status: "INACTIVE" },

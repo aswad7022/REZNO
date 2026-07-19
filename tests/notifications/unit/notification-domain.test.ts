@@ -16,6 +16,7 @@ import {
   notificationFilterFingerprint,
 } from "../../../features/notifications/domain/cursor";
 import { NotificationDomainError } from "../../../features/notifications/domain/errors";
+import { setNotificationCursorSigningSecretForTests } from "../../../features/notifications/domain/cursor-signing";
 import {
   notificationEffectiveArchived,
   notificationEffectiveRead,
@@ -25,6 +26,9 @@ import {
   notificationVisibilityWhere,
 } from "../../../features/notifications/domain/visibility";
 import { parseNotificationInboxQuery } from "../../../features/notifications/api/validation";
+import { TEST_NOTIFICATION_CURSOR_SECRET } from "../../helpers/stage4-cursor-secret";
+
+setNotificationCursorSigningSecretForTests(TEST_NOTIFICATION_CURSOR_SECRET);
 
 const customer = { mode: "customer" as const, personId: "11111111-1111-4111-8111-111111111111" };
 const owner = {

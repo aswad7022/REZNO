@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import test from "node:test";
 
@@ -187,9 +187,9 @@ test("every active consumer retains its exact scope, limit, window, and response
     const source = readFileSync(resolve(process.cwd(), file), "utf8");
     for (const pattern of patterns) assert.match(source, pattern, `${file}: ${pattern}`);
   }
-  const retiredAnnouncement = readFileSync(
-    resolve(process.cwd(), "features/notifications/actions/admin-notifications.ts"),
-    "utf8",
+  assert.equal(
+    existsSync(resolve(process.cwd(), "features/notifications/actions/admin-notifications.ts")),
+    false,
+    "the retired alternate Admin Notification action must remain absent",
   );
-  assert.doesNotMatch(retiredAnnouncement, /consumeRateLimit|createCanonicalNotifications/);
 });

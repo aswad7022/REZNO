@@ -58,7 +58,7 @@ function tamperMac(cursor: string) {
 
 function assertSafeCursorFallback(status: number, html: string) {
   assert.ok([200, 400, 500].includes(status));
-  assert.match(html, /Communications reporting request was rejected safely/);
+  assert.match(html, /data-stage4-communications-cursor-error/);
   assert.doesNotMatch(
     html,
     /PrismaClient|postgresql:\/\/|DATABASE_URL|BETTER_AUTH_SECRET|node_modules|adminScope|filterFingerprint|snapshotTimestamp|sortTimestamp|tieBreakerId|rezno:communications:cursor-signing|HMAC|HKDF/i,
@@ -236,7 +236,7 @@ test("Gate 4C production HTML, RSC, redirect, and Customer Mobile outbound contr
       { headers: protectedHeaders({ cookie: admin.cookie }), redirect: "manual" },
     );
     assert.equal(validCampaignContinuation.status, 200);
-    assert.doesNotMatch(await validCampaignContinuation.text(), /rejected safely/i);
+    assert.doesNotMatch(await validCampaignContinuation.text(), /data-stage4-communications-cursor-error/);
 
     const detail = await fetch(`${baseUrl}/admin/communications/${campaign.id}?deliveryStatus=PENDING&deliveryId=${selectedDelivery.id}`, {
       headers: protectedHeaders({ cookie: admin.cookie }),
@@ -244,7 +244,7 @@ test("Gate 4C production HTML, RSC, redirect, and Customer Mobile outbound contr
     });
     assert.equal(detail.status, 200);
     const detailText = await detail.text();
-    assert.match(detailText, /Campaign detail/);
+    assert.match(detailText, /Campaign detail|تفاصيل الحملة|وردەکاری کەمپەین/);
     assert.match(detailText, /deliveryCursor=/);
     assert.match(detailText, /deliveryStatus=PENDING/);
     assert.match(detailText, new RegExp(`deliveryId=${selectedDelivery.id}`));
