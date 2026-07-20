@@ -26,6 +26,7 @@ import {
   getPublicOrganizationReviewAggregates,
   listPublicBusinessReviews,
 } from "@/features/reviews/services/review-lifecycle";
+import { resolvePublicMediaBatch } from "@/features/media/services/media-query";
 
 const publicOrganizationWhere = {
   deletedAt: null,
@@ -166,9 +167,13 @@ export async function searchMarketplace(options?: {
     orderBy: [{ isVerified: "desc" }, { name: "asc" }],
     take: nearbyInput?.take ?? options?.take ?? 24,
   });
-  const reviewStatsByOrganizationId = await getPublicOrganizationReviewAggregates(
-    organizations.map((organization) => organization.id),
-  );
+  const [reviewStatsByOrganizationId, media] = await Promise.all([
+    getPublicOrganizationReviewAggregates(organizations.map((organization) => organization.id)),
+    resolvePublicMediaBatch(organizations.flatMap((organization) => [
+      { id: organization.id, kind: "BUSINESS_PROFILE" as const, legacyValues: [organization.profile?.logoUrl], slot: "BUSINESS_LOGO" as const },
+      { id: organization.id, kind: "BUSINESS_PROFILE" as const, legacyValues: [organization.profile?.coverImageUrl], slot: "BUSINESS_COVER" as const },
+    ])),
+  ]);
 
   return organizations
     .map((organization) => {
@@ -220,8 +225,8 @@ export async function searchMarketplace(options?: {
         slug: organization.slug,
         name: organization.name,
         description: organization.profile?.description ?? null,
-        logoUrl: safePublicImageUrlOrNull(organization.profile?.logoUrl),
-        coverImageUrl: safePublicImageUrlOrNull(organization.profile?.coverImageUrl),
+        logoUrl: firstMediaPath(media, "BUSINESS_PROFILE", organization.id, "BUSINESS_LOGO"),
+        coverImageUrl: firstMediaPath(media, "BUSINESS_PROFILE", organization.id, "BUSINESS_COVER"),
         city:
           displayBranch?.city ??
           organization.branches.find((branch) => branch.city)?.city ??
@@ -461,11 +466,20 @@ export const getPublicBusiness = cache(
     const prices = offerings.map((offering) => Number(offering.price));
     const genericServiceBusiness =
       organization.vertical !== "RESTAURANT" && organization.vertical !== "CAFE";
-    const [organizationAggregates, publicReviewPage] = await Promise.all([
+    const uniqueServices = new Map(offerings.map((offering) => [offering.service.id, offering.service]));
+    const menuItems = organization.menuCategories.flatMap((category) => category.items);
+    const [organizationAggregates, publicReviewPage, media] = await Promise.all([
       getPublicOrganizationReviewAggregates([organization.id]),
       genericServiceBusiness
         ? listPublicBusinessReviews({ slug: organization.slug, limit: 6 })
         : Promise.resolve(null),
+      resolvePublicMediaBatch([
+        { id: organization.id, kind: "BUSINESS_PROFILE", legacyValues: [organization.profile?.logoUrl], slot: "BUSINESS_LOGO" },
+        { id: organization.id, kind: "BUSINESS_PROFILE", legacyValues: [organization.profile?.coverImageUrl], slot: "BUSINESS_COVER" },
+        { id: organization.id, kind: "BUSINESS_PROFILE", legacyValues: organization.profile?.galleryUrls ?? [], slot: "BUSINESS_GALLERY" },
+        ...[...uniqueServices.values()].map((service) => ({ id: service.id, kind: "SERVICE" as const, legacyValues: [service.imageUrl], slot: "SERVICE_PRIMARY" as const })),
+        ...menuItems.map((item) => ({ id: item.id, kind: "MENU_ITEM" as const, legacyValues: [item.imageUrl], slot: "MENU_ITEM_PRIMARY" as const })),
+      ]),
     ]);
     const ratingAggregate = organizationAggregates.get(organization.id);
     const averageRating = ratingAggregate?.averageRating ?? null;
@@ -475,8 +489,8 @@ export const getPublicBusiness = cache(
       slug: organization.slug,
       name: organization.name,
       description: organization.profile?.description ?? null,
-      logoUrl: safePublicImageUrlOrNull(organization.profile?.logoUrl),
-      coverImageUrl: safePublicImageUrlOrNull(organization.profile?.coverImageUrl),
+      logoUrl: firstMediaPath(media, "BUSINESS_PROFILE", organization.id, "BUSINESS_LOGO"),
+      coverImageUrl: firstMediaPath(media, "BUSINESS_PROFILE", organization.id, "BUSINESS_COVER"),
       businessType: organization.businessType,
       vertical: organization.vertical,
       categoryName:
@@ -521,9 +535,7 @@ export const getPublicBusiness = cache(
         null,
       googleMapsUrl: organization.profile?.googleMapsUrl ?? null,
       bookingPolicy: organization.profile?.bookingPolicy ?? null,
-      galleryUrls: (organization.profile?.galleryUrls ?? []).filter(
-        (url) => safePublicImageUrlOrNull(url) !== null,
-      ),
+      galleryUrls: mediaPaths(media, "BUSINESS_PROFILE", organization.id, "BUSINESS_GALLERY"),
       faqItems: parseFaqItems(organization.profile?.faqItems),
       facebookUrl: organization.profile?.facebookUrl ?? null,
       instagramUrl: organization.profile?.instagramUrl ?? null,
@@ -540,7 +552,7 @@ export const getPublicBusiness = cache(
           description: item.description,
           price: item.price.toString(),
           currency: item.currency,
-          imageUrl: safePublicImageUrlOrNull(item.imageUrl),
+          imageUrl: firstMediaPath(media, "MENU_ITEM", item.id, "MENU_ITEM_PRIMARY"),
           isAvailable: item.isAvailable,
           preparationMinutes: item.preparationMinutes,
         })),
@@ -598,7 +610,7 @@ export const getPublicBusiness = cache(
             id: offering.id,
             serviceName: offering.service.name,
             description: offering.service.description,
-            imageUrl: safePublicImageUrlOrNull(offering.service.imageUrl),
+            imageUrl: firstMediaPath(media, "SERVICE", offering.service.id, "SERVICE_PRIMARY"),
             categoryName: offering.service.category.name,
             branchName: branch.name,
             price: offering.price.toString(),
@@ -627,9 +639,7 @@ export const getPublicBusiness = cache(
               .filter(Boolean)
               .join(" "),
           publicSlug: member.publicSlug ?? "",
-          photoUrl: safePublicImageUrlOrNull(
-            member.photoUrl ?? member.person.avatarUrl,
-          ),
+          photoUrl: safePublicImageUrlOrNull(member.photoUrl),
           bio: member.bio,
           specialties: member.specialties,
         })),
@@ -718,10 +728,18 @@ export const getPublicProfessionalProfile = cache(
 
     if (services.length === 0) return null;
 
-    const reviewAggregate = await getPublicMemberReviewAggregate(
-      member.organizationId,
-      member.id,
-    );
+    const [reviewAggregate, media] = await Promise.all([
+      getPublicMemberReviewAggregate(member.organizationId, member.id),
+      resolvePublicMediaBatch([
+        { id: member.organization.id, kind: "BUSINESS_PROFILE", legacyValues: [member.organization.profile?.logoUrl], slot: "BUSINESS_LOGO" },
+        ...member.serviceAssignments.map((assignment) => ({
+          id: assignment.service.id,
+          kind: "SERVICE" as const,
+          legacyValues: [assignment.service.imageUrl],
+          slot: "SERVICE_PRIMARY" as const,
+        })),
+      ]),
+    ]);
 
     return {
       id: member.id,
@@ -731,9 +749,7 @@ export const getPublicProfessionalProfile = cache(
         [member.person.firstName, member.person.lastName]
           .filter(Boolean)
           .join(" "),
-      photoUrl: safePublicImageUrlOrNull(
-        member.photoUrl ?? member.person.avatarUrl,
-      ),
+      photoUrl: safePublicImageUrlOrNull(member.photoUrl),
       bio: member.bio,
       specialties: member.specialties,
       averageRating: reviewAggregate.averageRating,
@@ -742,9 +758,7 @@ export const getPublicProfessionalProfile = cache(
         id: member.organization.id,
         name: member.organization.name,
         slug: member.organization.slug,
-        logoUrl: safePublicImageUrlOrNull(
-          member.organization.profile?.logoUrl,
-        ),
+        logoUrl: firstMediaPath(media, "BUSINESS_PROFILE", member.organization.id, "BUSINESS_LOGO"),
         categoryName: member.organization.profile?.businessCategory ?? null,
         vertical: member.organization.vertical,
       },
@@ -756,6 +770,24 @@ export const getPublicProfessionalProfile = cache(
 function normalizeShortFilter(value: string | null | undefined): string | undefined {
   const normalized = value?.trim().slice(0, 80);
   return normalized || undefined;
+}
+
+function mediaPaths(
+  media: Awaited<ReturnType<typeof resolvePublicMediaBatch>>,
+  kind: "BUSINESS_PROFILE" | "SERVICE" | "STORE" | "PRODUCT" | "MENU_ITEM",
+  id: string,
+  slot: "BUSINESS_LOGO" | "BUSINESS_COVER" | "BUSINESS_GALLERY" | "SERVICE_PRIMARY" | "STORE_LOGO" | "STORE_COVER" | "PRODUCT_IMAGE" | "MENU_ITEM_PRIMARY",
+) {
+  return (media.get(`${kind}:${id}:${slot}`) ?? []).map((item) => item.stableDeliveryPath);
+}
+
+function firstMediaPath(
+  media: Awaited<ReturnType<typeof resolvePublicMediaBatch>>,
+  kind: Parameters<typeof mediaPaths>[1],
+  id: string,
+  slot: Parameters<typeof mediaPaths>[3],
+) {
+  return mediaPaths(media, kind, id, slot)[0] ?? null;
 }
 
 async function findMarketplaceSearchCandidateIds(

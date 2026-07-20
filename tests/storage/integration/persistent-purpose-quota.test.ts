@@ -291,8 +291,16 @@ test("persistent per-purpose storage quotas are authoritative", { concurrency: f
     await seedProviderResidentAssets(fixture.actors.foreignOwner, "BUSINESS_LOGO", 24, png);
     await Promise.all([
       createRawSession(fixture.actors.customer, "CUSTOMER_AVATAR", "CREATED", { expiresAt: new Date(Date.now() + 60_000) }),
+      ...Array.from({ length: 24 }, () => createRawSession(fixture.actors.customer, "CUSTOMER_AVATAR", "ABORTED", {
+        abortedAt: new Date(),
+        expiresAt: new Date(Date.now() + 60_000),
+      })),
       ...Array.from({ length: 24 }, () => createRawSession(fixture.actors.foreignCustomer, "CUSTOMER_AVATAR", "CREATED", { expiresAt: new Date(Date.now() + 60_000) })),
       createRawSession(fixture.actors.owner, "BUSINESS_LOGO", "CREATED", { expiresAt: new Date(Date.now() + 60_000) }),
+      ...Array.from({ length: 24 }, () => createRawSession(fixture.actors.owner, "BUSINESS_LOGO", "ABORTED", {
+        abortedAt: new Date(),
+        expiresAt: new Date(Date.now() + 60_000),
+      })),
       ...Array.from({ length: 24 }, () => createRawSession(fixture.actors.foreignOwner, "BUSINESS_LOGO", "CREATED", { expiresAt: new Date(Date.now() + 60_000) })),
     ]);
     await prisma.$executeRawUnsafe('ANALYZE "StoredAsset", "UploadSession"');

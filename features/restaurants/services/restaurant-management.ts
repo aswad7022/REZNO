@@ -9,6 +9,7 @@ import {
 } from "@/features/business-operations/services/restaurant-catalog";
 import { currentBusinessOperationReference } from "@/features/business-operations/services/identity-adapter";
 import { requireBusinessIdentity } from "@/features/identity/server";
+import { resolvePublicMediaBatch } from "@/features/media/services/media-query";
 
 export async function requireRestaurantBusiness() {
   const identity = await requireBusinessIdentity();
@@ -31,5 +32,22 @@ export async function getRestaurantMenu() {
   const result = await listOperationalRestaurantMenu(
     await currentBusinessOperationReference("RESTAURANT_MENU_READ"),
   );
-  return { ...result, canEdit: result.canWrite };
+  const items = result.categories.flatMap((category) => category.items);
+  const media = await resolvePublicMediaBatch(items.map((item) => ({
+    id: item.id,
+    kind: "MENU_ITEM" as const,
+    legacyValues: [item.imageUrl],
+    slot: "MENU_ITEM_PRIMARY" as const,
+  })));
+  return {
+    ...result,
+    canEdit: result.canWrite,
+    categories: result.categories.map((category) => ({
+      ...category,
+      items: category.items.map((item) => ({
+        ...item,
+        imageUrl: media.get(`MENU_ITEM:${item.id}:MENU_ITEM_PRIMARY`)?.[0]?.stableDeliveryPath ?? "",
+      })),
+    })),
+  };
 }

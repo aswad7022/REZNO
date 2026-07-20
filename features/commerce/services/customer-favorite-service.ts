@@ -1,7 +1,8 @@
 import { Prisma } from "@prisma/client";
 
 import { commerceError } from "@/features/commerce/domain/errors";
-import { decodePublicCursor, encodePublicCursor, publicQueryFingerprint } from "@/features/commerce/public/cursor";
+import { favoriteFingerprint } from "@/features/commerce/domain/favorite";
+import { decodePublicCursor, encodePublicCursor } from "@/features/commerce/public/cursor";
 import {
   serializePublicProductSummary,
   serializePublicStore,
@@ -14,6 +15,7 @@ import {
 } from "@/features/commerce/public/visibility";
 import { requireActiveCommerceCustomer } from "@/features/commerce/services/authorization";
 import { prisma } from "@/lib/db/prisma";
+import { enrichPublicProducts, enrichPublicStores } from "@/features/commerce/public/catalog-service";
 
 export interface FavoriteQuery {
   cursor?: string;
@@ -63,7 +65,8 @@ export async function addFavoriteStore(customerId: string, storeId: string) {
   });
   if (!store) commerceError("NOT_FOUND", "Store was not found.");
   const favorite = await createOrReadStoreFavorite(customer.personId, storeId);
-  return { favoriteId: favorite.id, store: serializePublicStore(store) };
+  const [enrichedStore] = await enrichPublicStores([store]);
+  return { favoriteId: favorite.id, store: serializePublicStore(enrichedStore!) };
 }
 
 export async function removeFavoriteStore(customerId: string, storeId: string) {
@@ -89,10 +92,12 @@ export async function listFavoriteStores(customerId: string, query: FavoriteQuer
     take: query.limit + 1,
   });
   const visible = rows.slice(0, query.limit);
+  const stores = await enrichPublicStores(visible.map((row) => row.store));
+  const storesById = new Map(stores.map((store) => [store.id, store]));
   return favoritePage(customer.personId, "stores", query.limit, rows.length, visible, (row) => ({
     favoritedAt: row.createdAt.toISOString(),
     favoriteId: row.id,
-    store: serializePublicStore(row.store),
+    store: serializePublicStore(storesById.get(row.storeId)!),
   }));
 }
 
@@ -104,9 +109,10 @@ export async function addFavoriteProduct(customerId: string, productId: string) 
   });
   if (!product) commerceError("NOT_FOUND", "Product was not found.");
   const favorite = await createOrReadProductFavorite(customer.personId, productId);
+  const [enrichedProduct] = await enrichPublicProducts([product as PublicProductRecord]);
   return {
     favoriteId: favorite.id,
-    product: serializePublicProductSummary(product as PublicProductRecord),
+    product: serializePublicProductSummary(enrichedProduct!),
   };
 }
 
@@ -133,15 +139,13 @@ export async function listFavoriteProducts(customerId: string, query: FavoriteQu
     take: query.limit + 1,
   });
   const visible = rows.slice(0, query.limit);
+  const products = await enrichPublicProducts(visible.map((row) => row.product as PublicProductRecord));
+  const productsById = new Map(products.map((product) => [product.id, product]));
   return favoritePage(customer.personId, "products", query.limit, rows.length, visible, (row) => ({
     favoritedAt: row.createdAt.toISOString(),
     favoriteId: row.id,
-    product: serializePublicProductSummary(row.product as PublicProductRecord),
+    product: serializePublicProductSummary(productsById.get(row.productId)!),
   }));
-}
-
-export function favoriteFingerprint(customerId: string, collection: "products" | "stores") {
-  return publicQueryFingerprint({ collection, customerId, scope: "customer-favorites" });
 }
 
 function favoriteCursor(customerId: string, collection: "products" | "stores", encoded?: string) {

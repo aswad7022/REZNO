@@ -54,6 +54,7 @@ import {
   TOUCH_HIT_SLOP,
 } from "./src/components/mobile-chrome";
 import { ActivityLauncher } from "./src/components/activity-launcher";
+import { CustomerAvatarManager } from "./src/components/customer-avatar-manager";
 import {
   SectionHeader,
   SummaryItem,
@@ -3774,6 +3775,9 @@ function AccountScreen({
         <Text style={[styles.screenDescription, isRtl && styles.rtlText]}>
           {accountDescription}
         </Text>
+        {authenticatedUser ? (
+          <CustomerAvatarManager locale={locale} />
+        ) : null}
         {authenticatedUser ? (
           <View style={styles.profileStatsGrid}>
             {profileOverviewStats.map((stat) => (

@@ -113,25 +113,6 @@ export function ProfileForm({
         </span>
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="avatarUrl">{t("fields.avatarUrl")}</Label>
-        <Input
-          id="avatarUrl"
-          name="avatarUrl"
-          type="url"
-          defaultValue={profile.avatarUrl}
-          placeholder="https://example.com/avatar.jpg"
-          aria-invalid={Boolean(state.fieldErrors?.avatarUrl)}
-          aria-describedby="avatarUrl-help avatarUrl-error"
-        />
-        <p id="avatarUrl-help" className="text-xs text-muted-foreground">
-          {t("avatarUrlHelp")}
-        </p>
-        <span id="avatarUrl-error">
-          <FieldError message={state.fieldErrors?.avatarUrl} />
-        </span>
-      </div>
-
       <div className="grid gap-5 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="email">{t("fields.email")}</Label>

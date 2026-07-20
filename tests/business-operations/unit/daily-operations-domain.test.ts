@@ -194,7 +194,7 @@ test("Restaurant reschedule and menu category schemas are strict and bounded", (
 });
 
 test("menu item price, currency, preparation, URL, mass assignment and normalization policies fail closed", () => {
-  const item = { currency: "iqd", description: "Dish", imageUrl: "https://example.test/dish.jpg", menuCategoryId: organizationId, name: "Dish", preparationMinutes: 20, price: "25000.00", sortOrder: 1 };
+  const item = { currency: "iqd", description: "Dish", menuCategoryId: organizationId, name: "Dish", preparationMinutes: 20, price: "25000.00", sortOrder: 1 };
   const parsed = operationalMenuItemSchema.parse(item);
   assert.equal(parsed.currency, "IQD");
   assert.equal(operationalMenuItemSchema.safeParse({ ...item, price: "99999999.99" }).success, true);
@@ -203,6 +203,7 @@ test("menu item price, currency, preparation, URL, mass assignment and normaliza
   }
   assert.equal(operationalMenuItemSchema.safeParse({ ...item, currency: "IQDD" }).success, false);
   assert.equal(operationalMenuItemSchema.safeParse({ ...item, preparationMinutes: 0 }).success, false);
+  assert.equal(operationalMenuItemSchema.safeParse({ ...item, imageUrl: "https://example.test/dish.jpg" }).success, false);
   assert.equal(operationalMenuItemSchema.safeParse({ ...item, imageUrl: "javascript:alert(1)" }).success, false);
   assert.equal(operationalMenuItemSchema.safeParse({ ...item, businessId: organizationId }).success, false);
 });

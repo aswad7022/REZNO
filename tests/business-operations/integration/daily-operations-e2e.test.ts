@@ -852,19 +852,23 @@ test(
       const category = await createOperationalMenuCategory({ actor: fixture.owner.reference, category: { description: "Hot dishes", name: "Mains", sortOrder: 10 }, contextOrganizationId: fixture.organizationA.id, idempotencyKey: categoryKey });
       assert.equal((await createOperationalMenuCategory({ actor: fixture.owner.reference, category: { description: "Hot dishes", name: "Mains", sortOrder: 10 }, contextOrganizationId: fixture.organizationA.id, idempotencyKey: categoryKey })).replayed, true);
       const categoryUpdated = await updateOperationalMenuCategory({ actor: fixture.manager.reference, category: { description: "Updated", name: "Main dishes", sortOrder: 20 }, categoryId: category.categoryId, contextOrganizationId: fixture.organizationA.id, expectedVersion: category.version, idempotencyKey: randomUUID() });
-      const maximumPriceItem = await createOperationalMenuItem({ actor: fixture.owner.reference, contextOrganizationId: fixture.organizationA.id, idempotencyKey: randomUUID(), item: { currency: "IQD", description: "Decimal boundary", imageUrl: "", menuCategoryId: category.categoryId, name: "Maximum price", preparationMinutes: null, price: "99999999.99", sortOrder: 0 } });
+      const maximumPriceItem = await createOperationalMenuItem({ actor: fixture.owner.reference, contextOrganizationId: fixture.organizationA.id, idempotencyKey: randomUUID(), item: { currency: "IQD", description: "Decimal boundary", menuCategoryId: category.categoryId, name: "Maximum price", preparationMinutes: null, price: "99999999.99", sortOrder: 0 } });
       assert.equal((await prisma.menuItem.findUniqueOrThrow({ where: { id: maximumPriceItem.itemId } })).price.toString(), "99999999.99");
       const overflowMutationCount = await prisma.businessOperationMutation.count({ where: { organizationId: fixture.organizationA.id } });
       await assert.rejects(
-        createOperationalMenuItem({ actor: fixture.owner.reference, contextOrganizationId: fixture.organizationA.id, idempotencyKey: randomUUID(), item: { currency: "IQD", description: "Overflow", imageUrl: "", menuCategoryId: category.categoryId, name: "Overflow price", preparationMinutes: null, price: "100000000", sortOrder: 0 } }),
+        createOperationalMenuItem({ actor: fixture.owner.reference, contextOrganizationId: fixture.organizationA.id, idempotencyKey: randomUUID(), item: { currency: "IQD", description: "Overflow", menuCategoryId: category.categoryId, name: "Overflow price", preparationMinutes: null, price: "100000000", sortOrder: 0 } }),
         hasCode("INVALID_REQUEST"),
       );
       assert.equal(await prisma.menuItem.count({ where: { businessId: fixture.organizationA.id, name: "Overflow price" } }), 0);
       assert.equal(await prisma.businessOperationMutation.count({ where: { organizationId: fixture.organizationA.id } }), overflowMutationCount);
-      const item = await createOperationalMenuItem({ actor: fixture.owner.reference, contextOrganizationId: fixture.organizationA.id, idempotencyKey: randomUUID(), item: { currency: "iqd", description: "Dish", imageUrl: "https://example.test/item.jpg", menuCategoryId: category.categoryId, name: "Dish", preparationMinutes: 15, price: "10000", sortOrder: 1 } });
+      await assert.rejects(
+        createOperationalMenuItem({ actor: fixture.owner.reference, contextOrganizationId: fixture.organizationA.id, idempotencyKey: randomUUID(), item: { currency: "iqd", description: "Raw image denied", imageUrl: "https://example.test/item.jpg", menuCategoryId: category.categoryId, name: "Raw image denied", preparationMinutes: 15, price: "10000", sortOrder: 1 } }),
+        hasCode("INVALID_REQUEST"),
+      );
+      const item = await createOperationalMenuItem({ actor: fixture.owner.reference, contextOrganizationId: fixture.organizationA.id, idempotencyKey: randomUUID(), item: { currency: "iqd", description: "Dish", menuCategoryId: category.categoryId, name: "Dish", preparationMinutes: 15, price: "10000", sortOrder: 1 } });
       const reservation = await createFutureRestaurantBooking(fixture, localDate(instant(7, 0)));
       await prisma.restaurantReservationItem.create({ data: { currencySnapshot: "IQD", itemNameSnapshot: "Dish Snapshot", menuItemId: item.itemId, quantity: 1, restaurantReservationDetailsId: reservation.restaurantReservation!.id, unitPrice: "10000" } });
-      const itemUpdated = await updateOperationalMenuItem({ actor: fixture.owner.reference, contextOrganizationId: fixture.organizationA.id, expectedVersion: item.version, idempotencyKey: randomUUID(), item: { currency: "USD", description: "Changed", imageUrl: "", menuCategoryId: category.categoryId, name: "Renamed Dish", preparationMinutes: 25, price: "12.50", sortOrder: 2 }, itemId: item.itemId });
+      const itemUpdated = await updateOperationalMenuItem({ actor: fixture.owner.reference, contextOrganizationId: fixture.organizationA.id, expectedVersion: item.version, idempotencyKey: randomUUID(), item: { currency: "USD", description: "Changed", menuCategoryId: category.categoryId, name: "Renamed Dish", preparationMinutes: 25, price: "12.50", sortOrder: 2 }, itemId: item.itemId });
       const snapshot = await prisma.restaurantReservationItem.findFirstOrThrow({ where: { menuItemId: item.itemId } });
       assert.equal(snapshot.itemNameSnapshot, "Dish Snapshot");
       assert.equal(snapshot.currencySnapshot, "IQD");
@@ -881,7 +885,7 @@ test(
         hasCode("HISTORICAL_RELATIONSHIP_CONFLICT"),
       );
       await assert.rejects(
-        createOperationalMenuItem({ actor: fixture.receptionist.reference, contextOrganizationId: fixture.organizationA.id, idempotencyKey: randomUUID(), item: { currency: "IQD", description: "Denied", imageUrl: "", menuCategoryId: category.categoryId, name: "Denied", preparationMinutes: null, price: "1", sortOrder: 1 } }),
+        createOperationalMenuItem({ actor: fixture.receptionist.reference, contextOrganizationId: fixture.organizationA.id, idempotencyKey: randomUUID(), item: { currency: "IQD", description: "Denied", menuCategoryId: category.categoryId, name: "Denied", preparationMinutes: null, price: "1", sortOrder: 1 } }),
         hasCode("FORBIDDEN"),
       );
       const receptionistMenu = await listOperationalRestaurantMenu(fixture.receptionist.reference);

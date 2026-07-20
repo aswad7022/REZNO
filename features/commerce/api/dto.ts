@@ -53,7 +53,7 @@ export function serializeCart(cart: CartApiRecord | null) {
       currency: "IQD" as const,
       inStock: available > 0,
       isAvailable: operationallyAvailable && available >= item.quantity,
-      primaryMediaUrl: safePublicImageUrlOrNull(product.media[0]?.url),
+      primaryMediaUrl: safePublicImageUrlOrNull(cart.mediaReferences.productPrimaryById[product.id]),
       priceChanged: !item.unitPriceSnapshot.equals(variant.price),
       productId: product.id,
       productName: product.name,
@@ -74,7 +74,7 @@ export function serializeCart(cart: CartApiRecord | null) {
     items,
     store: {
       id: cart.store.id,
-      logoUrl: safePublicImageUrlOrNull(cart.store.logoUrl),
+      logoUrl: safePublicImageUrlOrNull(cart.mediaReferences.storeLogoUrl),
       name: cart.store.name,
       slug: cart.store.slug,
     },

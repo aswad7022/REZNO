@@ -6,6 +6,7 @@ import { requireBusinessIdentity } from "@/features/identity/server";
 import { prisma } from "@/lib/db/prisma";
 import { safePublicImageUrlOrNull } from "@/lib/security/public-image-url";
 import type { BusinessProfileDetails } from "@/features/business/types";
+import { resolvePublicMediaBatch } from "@/features/media/services/media-query";
 
 export async function getCurrentBusinessProfile(): Promise<BusinessProfileDetails> {
   await currentBusinessOperationReference("SETTINGS_READ");
@@ -33,6 +34,11 @@ export async function getCurrentBusinessProfile(): Promise<BusinessProfileDetail
         return [];
       })
     : [];
+  const media = await resolvePublicMediaBatch([
+    { id: membership.organizationId, kind: "BUSINESS_PROFILE", legacyValues: [profile?.logoUrl], slot: "BUSINESS_LOGO" },
+    { id: membership.organizationId, kind: "BUSINESS_PROFILE", legacyValues: [profile?.coverImageUrl], slot: "BUSINESS_COVER" },
+    { id: membership.organizationId, kind: "BUSINESS_PROFILE", legacyValues: profile?.galleryUrls ?? [], slot: "BUSINESS_GALLERY" },
+  ]);
 
   return {
     name: membership.organization.name,
@@ -43,16 +49,15 @@ export async function getCurrentBusinessProfile(): Promise<BusinessProfileDetail
     legalName: profile?.legalName ?? "",
     description: profile?.description ?? "",
     website: profile?.website ?? "",
-    logoUrl: safePublicImageUrlOrNull(profile?.logoUrl) ?? "",
-    coverImageUrl: safePublicImageUrlOrNull(profile?.coverImageUrl) ?? "",
+    logoUrl: media.get(`BUSINESS_PROFILE:${membership.organizationId}:BUSINESS_LOGO`)?.[0]?.stableDeliveryPath ?? "",
+    coverImageUrl: media.get(`BUSINESS_PROFILE:${membership.organizationId}:BUSINESS_COVER`)?.[0]?.stableDeliveryPath ?? "",
     businessEmail: profile?.businessEmail ?? "",
     businessPhone: profile?.businessPhone ?? "",
     whatsappPhone: profile?.whatsappPhone ?? "",
     googleMapsUrl: profile?.googleMapsUrl ?? "",
     bookingPolicy: profile?.bookingPolicy ?? "",
-    galleryUrls: (profile?.galleryUrls ?? []).filter(
-      (url) => safePublicImageUrlOrNull(url) !== null,
-    ),
+    galleryUrls: (media.get(`BUSINESS_PROFILE:${membership.organizationId}:BUSINESS_GALLERY`) ?? [])
+      .map((reference) => reference.stableDeliveryPath),
     faqItems,
     seoTitle: profile?.seoTitle ?? "",
     seoDescription: profile?.seoDescription ?? "",

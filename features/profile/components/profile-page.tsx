@@ -16,13 +16,15 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { ProfileForm } from "@/features/profile/components/profile-form";
+import { MediaManager } from "@/features/media/components/media-manager";
 import { getCurrentProfile } from "@/features/profile/services/profile";
 import type { DashboardRole } from "@/types/dashboard";
 
 export async function ProfilePage({ role }: { role: DashboardRole }) {
-  const [profile, t] = await Promise.all([
+  const [profile, t, mediaT] = await Promise.all([
     getCurrentProfile(),
     getTranslations("Profile"),
+    getTranslations("Media"),
   ]);
 
   return (
@@ -32,6 +34,19 @@ export async function ProfilePage({ role }: { role: DashboardRole }) {
         description={t("description")}
       />
       {profile ? (
+        <>
+        <Card className="max-w-3xl">
+          <CardContent className="pt-6">
+            <MediaManager
+              description={mediaT("altText")}
+              endpoint="/api/media/customer/profile"
+              purpose="CUSTOMER_AVATAR"
+              slot="CUSTOMER_AVATAR"
+              storageMode="customer"
+              title={t("fields.avatarUrl")}
+            />
+          </CardContent>
+        </Card>
         <Card className="max-w-3xl">
           <CardHeader>
             <CardTitle>{t("personalTitle")}</CardTitle>
@@ -43,6 +58,7 @@ export async function ProfilePage({ role }: { role: DashboardRole }) {
             <ProfileForm profile={profile} role={role} />
           </CardContent>
         </Card>
+        </>
       ) : (
         <DashboardEmpty
           icon={UserRound}

@@ -57,6 +57,10 @@ model Person {
   actedUploadSessions             UploadSession[]                     @relation("UploadSessionActorPerson")
   ownedUploadSessions             UploadSession[]                     @relation("UploadSessionOwnerPerson")
   storageMutations                StorageMutation[]
+  mediaProfileContainers          MediaContainer[]                    @relation("MediaContainerPerson")
+  createdMediaBindings            MediaBinding[]                      @relation("MediaBindingCreatedByPerson")
+  detachedMediaBindings           MediaBinding[]                      @relation("MediaBindingDetachedByPerson")
+  mediaMutations                  MediaMutation[]
 
   @@index([phone])
 }
@@ -97,6 +101,8 @@ model Organization {
   storedAssets                   StoredAsset[]
   uploadSessions                 UploadSession[]
   storageMutations               StorageMutation[]
+  mediaContainers                MediaContainer[]
+  mediaMutations                 MediaMutation[]
 
   @@index([vertical])
   @@index([status, isActive, deletedAt])
@@ -180,6 +186,7 @@ model Service {
   branchServices     BranchService[]
   staffAssignments   ServiceStaffAssignment[]
   reviews            Review[]
+  mediaContainers    MediaContainer[]
   category           Category                 @relation(fields: [categoryId], references: [id])
   organization       Organization             @relation(fields: [organizationId], references: [id])
 
@@ -383,6 +390,7 @@ model MenuItem {
   business           Organization                @relation(fields: [businessId], references: [id], onDelete: Cascade)
   category           MenuCategory                @relation(fields: [menuCategoryId], references: [id], onDelete: Cascade)
   reservationItems   RestaurantReservationItem[]
+  mediaContainers    MediaContainer[]
 
   @@index([businessId])
   @@index([menuCategoryId])
@@ -787,6 +795,7 @@ model StoredAsset {
   ownerPerson              Person?                  @relation("StoredAssetOwnerPerson", fields: [ownerPersonId], references: [id], onDelete: Restrict)
   organization             Organization?            @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   createdByPerson          Person                   @relation("StoredAssetCreatedByPerson", fields: [createdByPersonId], references: [id], onDelete: Restrict)
+  mediaBindings            MediaBinding[]
 
   @@index([ownerPersonId, createdAt, id])
   @@index([organizationId, createdAt, id])
@@ -865,6 +874,84 @@ model StorageMutation {
   @@index([targetType, targetId, createdAt, id])
   @@index([status, createdAt, id])
   @@index([organizationId, createdAt, id])
+}
+
+model MediaContainer {
+  id             String             @id @default(uuid()) @db.Uuid
+  kind           MediaContainerKind
+  personId       String?            @db.Uuid
+  organizationId String?            @db.Uuid
+  serviceId      String?            @db.Uuid
+  storeId        String?            @db.Uuid
+  productId      String?            @db.Uuid
+  menuItemId     String?            @db.Uuid
+  version        Int                @default(1)
+  createdAt      DateTime           @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime           @updatedAt @db.Timestamptz(6)
+  person         Person?            @relation("MediaContainerPerson", fields: [personId], references: [id], onDelete: Restrict)
+  organization   Organization?      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  service        Service?           @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  store          Store?             @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  product        Product?           @relation(fields: [productId], references: [id], onDelete: Restrict)
+  menuItem       MenuItem?          @relation(fields: [menuItemId], references: [id], onDelete: Restrict)
+  bindings       MediaBinding[]
+  mutations      MediaMutation[]
+
+  @@index([organizationId, kind, updatedAt, id])
+  @@index([kind, updatedAt, id])
+}
+
+model MediaBinding {
+  id                 String            @id @default(uuid()) @db.Uuid
+  containerId        String            @db.Uuid
+  assetId            String            @db.Uuid
+  slot               MediaSlot
+  state              MediaBindingState @default(ACTIVE)
+  productVariantId   String?           @db.Uuid
+  sortOrder          Int?
+  altText            String?           @db.VarChar(300)
+  createdByPersonId  String            @db.Uuid
+  detachedByPersonId String?           @db.Uuid
+  attachedAt         DateTime          @default(now()) @db.Timestamptz(6)
+  detachedAt         DateTime?         @db.Timestamptz(6)
+  version            Int               @default(1)
+  createdAt          DateTime          @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime          @updatedAt @db.Timestamptz(6)
+  container          MediaContainer    @relation(fields: [containerId], references: [id], onDelete: Restrict)
+  asset              StoredAsset       @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  productVariant     ProductVariant?   @relation(fields: [productVariantId], references: [id], onDelete: Restrict)
+  createdByPerson    Person            @relation("MediaBindingCreatedByPerson", fields: [createdByPersonId], references: [id], onDelete: Restrict)
+  detachedByPerson   Person?           @relation("MediaBindingDetachedByPerson", fields: [detachedByPersonId], references: [id], onDelete: Restrict)
+
+  @@index([containerId, state, slot, sortOrder, id])
+  @@index([containerId, slot, createdAt, id])
+  @@index([assetId, state])
+  @@index([productVariantId, state])
+}
+
+model MediaMutation {
+  id              String                @id @default(uuid()) @db.Uuid
+  actorPersonId   String                @db.Uuid
+  organizationId  String?               @db.Uuid
+  containerId     String?               @db.Uuid
+  action          MediaMutationAction
+  idempotencyKey  String                @db.Uuid
+  requestHash     String                @db.VarChar(64)
+  expectedVersion Int
+  resultVersion   Int?
+  status          StorageMutationStatus @default(PROCESSING)
+  result          Json?
+  failureCode     String?               @db.VarChar(80)
+  createdAt       DateTime              @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime              @updatedAt @db.Timestamptz(6)
+  actorPerson     Person                @relation(fields: [actorPersonId], references: [id], onDelete: Restrict)
+  organization    Organization?         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  container       MediaContainer?       @relation(fields: [containerId], references: [id], onDelete: Restrict)
+
+  @@unique([actorPersonId, idempotencyKey])
+  @@index([containerId, createdAt, id])
+  @@index([organizationId, createdAt, id])
+  @@index([status, createdAt, id])
 }
 
 model Notification {
@@ -1285,6 +1372,7 @@ model Store {
   carts                      Cart[]
   orders                     Order[]
   favoritedBy                CustomerFavoriteStore[]
+  mediaContainers            MediaContainer[]
 
   @@index([organizationId, status])
   @@index([status, publishedAt])
@@ -1329,6 +1417,7 @@ model Product {
   media                ProductMedia[]
   orderItems           OrderItem[]
   favoritedBy          CustomerFavoriteProduct[]
+  mediaContainers      MediaContainer[]
 
   @@unique([storeId, slug])
   @@unique([id, storeId])
@@ -1364,6 +1453,7 @@ model ProductVariant {
   cartItems      CartItem[]
   reservations   InventoryReservation[]
   orderItems     OrderItem[]
+  mediaBindings  MediaBinding[]
 
   @@unique([storeId, sku])
   @@unique([productId, optionKey])
@@ -1774,6 +1864,41 @@ enum StorageMutationStatus {
   PROCESSING
   COMPLETED
   FAILED
+}
+
+enum MediaContainerKind {
+  CUSTOMER_PROFILE
+  BUSINESS_PROFILE
+  SERVICE
+  STORE
+  PRODUCT
+  MENU_ITEM
+}
+
+enum MediaSlot {
+  CUSTOMER_AVATAR
+  BUSINESS_LOGO
+  BUSINESS_COVER
+  BUSINESS_GALLERY
+  SERVICE_PRIMARY
+  STORE_LOGO
+  STORE_COVER
+  PRODUCT_IMAGE
+  MENU_ITEM_PRIMARY
+}
+
+enum MediaBindingState {
+  ACTIVE
+  DETACHED
+}
+
+enum MediaMutationAction {
+  ATTACH_MEDIA
+  REPLACE_MEDIA
+  DETACH_MEDIA
+  REORDER_MEDIA
+  UPDATE_MEDIA_ALT
+  ADMIN_DETACH_REJECTED_MEDIA
 }
 
 enum AdminAccessRole {

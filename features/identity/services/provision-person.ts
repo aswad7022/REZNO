@@ -27,7 +27,6 @@ function parseName(name: string): {
 
 export function provisionPerson({
   authUserId,
-  image,
   name,
 }: ProvisionPersonInput) {
   const parsedName = parseName(name);
@@ -39,7 +38,6 @@ export function provisionPerson({
       firstName: parsedName.firstName,
       lastName: parsedName.lastName,
       displayName: parsedName.displayName,
-      avatarUrl: image ?? null,
     },
     update: {},
   });

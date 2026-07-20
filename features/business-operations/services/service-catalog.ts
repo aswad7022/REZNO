@@ -23,6 +23,7 @@ import {
   runBusinessOperationTransaction,
 } from "@/features/business-operations/services/transaction";
 import { prisma } from "@/lib/db/prisma";
+import { resolvePublicMediaBatch } from "@/features/media/services/media-query";
 
 type ServiceInput = ReturnType<typeof operationalServiceSchema.parse>;
 
@@ -46,11 +47,15 @@ function serviceSnapshot(service: {
   };
 }
 
+function serviceAuditSnapshot(service: Parameters<typeof serviceSnapshot>[0]) {
+  const { imageUrl, ...snapshot } = serviceSnapshot(service);
+  return { ...snapshot, legacyImagePresent: Boolean(imageUrl) };
+}
+
 function toServiceData(input: ServiceInput) {
   return {
     categoryId: input.categoryId,
     description: input.description,
-    imageUrl: input.imageUrl,
     name: input.name,
     staffSelectionMode: input.staffSelectionMode,
   };
@@ -212,6 +217,21 @@ function readOnlyService(service: {
   };
 }
 
+async function readOnlyServicesWithCanonicalMedia<
+  T extends Parameters<typeof readOnlyService>[0] & { id: string },
+>(services: T[]) {
+  const media = await resolvePublicMediaBatch(services.map((service) => ({
+    id: service.id,
+    kind: "SERVICE" as const,
+    legacyValues: [service.imageUrl],
+    slot: "SERVICE_PRIMARY" as const,
+  })));
+  return services.map((service) => readOnlyService({
+    ...service,
+    imageUrl: media.get(`SERVICE:${service.id}:SERVICE_PRIMARY`)?.[0]?.stableDeliveryPath ?? "",
+  }));
+}
+
 async function listReceptionistServiceCatalog(actor: BusinessOperationActor) {
   const services = await prisma.service.findMany({
     where: {
@@ -237,6 +257,7 @@ async function listReceptionistServiceCatalog(actor: BusinessOperationActor) {
         orderBy: { branch: { name: "asc" } },
       },
       description: true,
+      id: true,
       imageUrl: true,
       name: true,
     },
@@ -248,7 +269,7 @@ async function listReceptionistServiceCatalog(actor: BusinessOperationActor) {
     organizationName: actor.organizationName,
     role: actor.role,
     scope: "RECEPTIONIST" as const,
-    services: services.map(readOnlyService),
+    services: await readOnlyServicesWithCanonicalMedia(services),
   };
 }
 
@@ -287,6 +308,7 @@ async function listStaffServiceCatalog(actor: BusinessOperationActor) {
           orderBy: { branch: { name: "asc" } },
         },
         description: true,
+        id: true,
         imageUrl: true,
         name: true,
       },
@@ -312,7 +334,7 @@ async function listStaffServiceCatalog(actor: BusinessOperationActor) {
     role: actor.role,
     scheduleMemberId: activeBranchAssignment ? actor.membershipId : null,
     scope: "STAFF" as const,
-    services: services.map(readOnlyService),
+    services: await readOnlyServicesWithCanonicalMedia(services),
   };
 }
 
@@ -359,7 +381,7 @@ export async function createOperationalService(input: {
     await recordBusinessOperation(transaction, {
       action: "SERVICE_CREATE",
       actor,
-      after: serviceSnapshot(created),
+      after: serviceAuditSnapshot(created),
       idempotencyKey: input.idempotencyKey,
       requestHash,
       result: { serviceId: created.id },
@@ -428,8 +450,8 @@ export async function updateOperationalService(input: {
     await recordBusinessOperation(transaction, {
       action: "SERVICE_UPDATE",
       actor,
-      after: serviceSnapshot(updated),
-      before: serviceSnapshot(current),
+      after: serviceAuditSnapshot(updated),
+      before: serviceAuditSnapshot(current),
       idempotencyKey: input.idempotencyKey,
       requestHash,
       result: { serviceId: updated.id },
@@ -582,8 +604,8 @@ export async function archiveOperationalService(input: {
     await recordBusinessOperation(transaction, {
       action: "SERVICE_ARCHIVE",
       actor,
-      after: serviceSnapshot(updated),
-      before: serviceSnapshot(current),
+      after: serviceAuditSnapshot(updated),
+      before: serviceAuditSnapshot(current),
       idempotencyKey: input.idempotencyKey,
       requestHash,
       result: { serviceId: updated.id, status: updated.status },

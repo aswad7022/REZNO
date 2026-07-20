@@ -102,8 +102,8 @@ jobs:
         run: |
           node -e 'const name = new URL(process.env.DATABASE_URL).pathname.slice(1); if (!/(?:_test|test_)/.test(name)) throw new Error(`Refusing non-test database: ${name}`)'
           migration_count="$(find prisma/migrations -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')"
-          if [[ "$migration_count" != "39" ]]; then
-            echo "Expected 39 migrations, found $migration_count" >&2
+          if [[ "$migration_count" != "40" ]]; then
+            echo "Expected 40 migrations, found $migration_count" >&2
             exit 1
           fi
 
@@ -119,10 +119,10 @@ jobs:
       - name: Run focused Gate 5A storage contracts
         run: npm run test:storage:unit
 
-      - name: Run complete unit suite
+      - name: Run complete unit suite including Gate 5B media contracts
         run: npm run test:unit
 
-      - name: Run PostgreSQL regressions including Gate 4D scenarios A–J
+      - name: Run PostgreSQL regressions including Gate 4D and Gate 5B media
         run: npm run test:integration
 
       - name: Confirm database validation did not modify tracked files
@@ -171,7 +171,7 @@ jobs:
       - name: Build Next.js production application
         run: npm run build
 
-      - name: Run complete HTTP suite including Gate 4D closure routes
+      - name: Run complete HTTP suite including Gate 4D and Gate 5B media routes
         shell: bash
         env:
           COMMERCE_HTTP_BASE_URL: http://127.0.0.1:3000

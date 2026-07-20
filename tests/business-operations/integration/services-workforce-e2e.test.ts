@@ -60,7 +60,6 @@ function serviceInput(fixture: Awaited<ReturnType<typeof createBusinessOperation
   return {
     categoryId: fixture.category.id,
     description: "Stage 2B operational Service",
-    imageUrl: "",
     name,
     staffSelectionMode: mode,
   };

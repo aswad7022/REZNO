@@ -3,7 +3,7 @@ import "server-only";
 import { requireBusinessIdentity } from "@/features/identity/server";
 import { currentBusinessOperationReference } from "@/features/business-operations/services/identity-adapter";
 import { prisma } from "@/lib/db/prisma";
-import { safePublicImageUrlOrNull } from "@/lib/security/public-image-url";
+import { resolvePublicMediaBatch } from "@/features/media/services/media-query";
 
 export async function getPublicProfileManagementData() {
   await currentBusinessOperationReference("SETTINGS_READ");
@@ -28,6 +28,12 @@ export async function getPublicProfileManagementData() {
       orderBy: { createdAt: "asc" },
     }),
   ]);
+  const media = await resolvePublicMediaBatch(services.map((service) => ({
+    id: service.id,
+    kind: "SERVICE" as const,
+    legacyValues: [service.imageUrl],
+    slot: "SERVICE_PRIMARY" as const,
+  })));
 
   return {
     branches: branches.map((branch) => ({
@@ -44,7 +50,7 @@ export async function getPublicProfileManagementData() {
     })),
     services: services.map((service) => ({
       ...service,
-      imageUrl: safePublicImageUrlOrNull(service.imageUrl) ?? "",
+      imageUrl: media.get(`SERVICE:${service.id}:SERVICE_PRIMARY`)?.[0]?.stableDeliveryPath ?? "",
     })),
   };
 }

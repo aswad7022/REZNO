@@ -9,6 +9,7 @@ import {
   getPublicOrganizationReviewAggregates,
   getPublicServiceReviewAggregates,
 } from "@/features/reviews/services/review-lifecycle";
+import { resolvePublicMediaBatch } from "@/features/media/services/media-query";
 
 const favoriteBusinessWhere = {
   deletedAt: null,
@@ -164,6 +165,20 @@ export const getCustomerFavoriteBusinesses = cache(async () => {
   const reviewsByOrganizationId = await getPublicOrganizationReviewAggregates(
     organizationIds,
   );
+  const media = await resolvePublicMediaBatch(favorites.flatMap((favorite) => [
+    {
+      id: favorite.organizationId,
+      kind: "BUSINESS_PROFILE" as const,
+      legacyValues: [favorite.organization.profile?.logoUrl],
+      slot: "BUSINESS_LOGO" as const,
+    },
+    {
+      id: favorite.organizationId,
+      kind: "BUSINESS_PROFILE" as const,
+      legacyValues: [favorite.organization.profile?.coverImageUrl],
+      slot: "BUSINESS_COVER" as const,
+    },
+  ]));
 
   return favorites.map((favorite): MarketplaceBusiness => {
     const organization = favorite.organization;
@@ -177,8 +192,8 @@ export const getCustomerFavoriteBusinesses = cache(async () => {
       slug: organization.slug,
       name: organization.name,
       description: organization.profile?.description ?? null,
-      logoUrl: organization.profile?.logoUrl ?? null,
-      coverImageUrl: organization.profile?.coverImageUrl ?? null,
+      logoUrl: media.get(`BUSINESS_PROFILE:${organization.id}:BUSINESS_LOGO`)?.[0]?.stableDeliveryPath ?? null,
+      coverImageUrl: media.get(`BUSINESS_PROFILE:${organization.id}:BUSINESS_COVER`)?.[0]?.stableDeliveryPath ?? null,
       city: branch?.city ?? null,
       categoryName:
         organization.profile?.businessCategory ??
@@ -243,6 +258,12 @@ export const getCustomerFavoriteServices = cache(async () => {
       serviceId: favorite.branchService.service.id,
     })),
   );
+  const media = await resolvePublicMediaBatch(favorites.map((favorite) => ({
+    id: favorite.branchService.service.id,
+    kind: "SERVICE" as const,
+    legacyValues: [favorite.branchService.service.imageUrl],
+    slot: "SERVICE_PRIMARY" as const,
+  })));
 
   return favorites.map((favorite): FavoriteServiceItem => {
     const branchService = favorite.branchService;
@@ -255,7 +276,7 @@ export const getCustomerFavoriteServices = cache(async () => {
       id: branchService.id,
       serviceName: branchService.service.name,
       description: branchService.service.description,
-      imageUrl: branchService.service.imageUrl,
+      imageUrl: media.get(`SERVICE:${branchService.service.id}:SERVICE_PRIMARY`)?.[0]?.stableDeliveryPath ?? null,
       businessId: organization.id,
       businessName: organization.name,
       businessSlug: organization.slug,

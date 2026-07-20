@@ -526,7 +526,6 @@ test("Stage 2C production Business Web HTML, RSC and Server Actions enforce dail
     await submit(itemMenuPath, itemCreate, (parameters) => {
       parameters.set("currency", "IQD");
       parameters.set("description", "Maximum valid Decimal");
-      parameters.set("imageUrl", "");
       parameters.set("menuCategoryId", httpCategory.id);
       parameters.set("name", "HTTP Maximum Price");
       parameters.set("preparationMinutes", "");
@@ -544,7 +543,6 @@ test("Stage 2C production Business Web HTML, RSC and Server Actions enforce dail
       parameters.set("currency", "IQD");
       parameters.set("description", "Overflow must fail validation");
       parameters.set("idempotencyKey", randomUUID());
-      parameters.set("imageUrl", "");
       parameters.set("menuCategoryId", httpCategory.id);
       parameters.set("name", "HTTP Overflow Price");
       parameters.set("preparationMinutes", "");

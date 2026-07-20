@@ -1,6 +1,5 @@
 import { z } from "zod";
 
-import { isSafePublicImageUrl } from "@/lib/security/public-image-url";
 
 type ServiceValidationKey =
   | "serviceNameMin"
@@ -27,14 +26,6 @@ export function createServiceSchema(t: ServiceValidationTranslator) {
       .string()
       .trim()
       .max(2000, t("descriptionMax"))
-      .transform((value) => value || null),
-    imageUrl: z
-      .string()
-      .trim()
-      .refine(
-        (value) => !value || isSafePublicImageUrl(value),
-        t("urlInvalid"),
-      )
       .transform((value) => value || null),
     categoryId: z.string().uuid(t("categoryInvalid")),
     status: z.enum(["ACTIVE", "INACTIVE"]),

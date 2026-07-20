@@ -15,6 +15,7 @@ import {
 } from "@/features/restaurants/domain/reservation-policy";
 import { restaurantReservationError } from "@/features/restaurants/domain/reservation-errors";
 import { prisma } from "@/lib/db/prisma";
+import { resolvePublicMediaBatch } from "@/features/media/services/media-query";
 
 const ACTIVE_RESERVATION_STATUSES = ["PENDING", "CONFIRMED"] as const;
 
@@ -85,13 +86,17 @@ export async function getPublicRestaurantReservationBusiness(slug: string) {
     isValidIanaTimezone(branch.timezone),
   );
   const reservableBranchIds = new Set(reservableBranches.map((branch) => branch.id));
+  const media = await resolvePublicMediaBatch([
+    { id: organization.id, kind: "BUSINESS_PROFILE", legacyValues: [organization.profile?.logoUrl], slot: "BUSINESS_LOGO" },
+    { id: organization.id, kind: "BUSINESS_PROFILE", legacyValues: [organization.profile?.coverImageUrl], slot: "BUSINESS_COVER" },
+  ]);
   return {
     id: organization.id,
     slug: organization.slug,
     name: organization.name,
     description: organization.profile?.description ?? null,
-    logoUrl: organization.profile?.logoUrl ?? null,
-    coverImageUrl: organization.profile?.coverImageUrl ?? null,
+    logoUrl: media.get(`BUSINESS_PROFILE:${organization.id}:BUSINESS_LOGO`)?.[0]?.stableDeliveryPath ?? null,
+    coverImageUrl: media.get(`BUSINESS_PROFILE:${organization.id}:BUSINESS_COVER`)?.[0]?.stableDeliveryPath ?? null,
     vertical: organization.vertical,
     supportsReservations: reservableBranches.length > 0,
     reservationDurationMinutes: RESTAURANT_RESERVATION_DURATION_MINUTES,
@@ -137,6 +142,13 @@ export async function getPublicRestaurantReservationMenu(slug: string) {
     },
     orderBy: [{ sortOrder: "asc" }, { name: "asc" }, { id: "asc" }],
   });
+  const items = categories.flatMap((category) => category.items);
+  const media = await resolvePublicMediaBatch(items.map((item) => ({
+    id: item.id,
+    kind: "MENU_ITEM" as const,
+    legacyValues: [item.imageUrl],
+    slot: "MENU_ITEM_PRIMARY" as const,
+  })));
   return categories.map((category) => ({
     id: category.id,
     name: category.name,
@@ -147,7 +159,7 @@ export async function getPublicRestaurantReservationMenu(slug: string) {
       description: item.description,
       price: item.price.toString(),
       currency: item.currency,
-      imageUrl: item.imageUrl,
+      imageUrl: media.get(`MENU_ITEM:${item.id}:MENU_ITEM_PRIMARY`)?.[0]?.stableDeliveryPath ?? null,
       preparationMinutes: item.preparationMinutes,
     })),
   }));

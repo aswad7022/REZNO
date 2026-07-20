@@ -24,9 +24,9 @@ export async function saveMerchantStoreAction(
   formData: FormData,
 ): Promise<CommerceActionState> {
   const allowed = [
-    "contextOrganizationId", "coverImageUrl", "currency", "deliveryArea", "deliveryCity",
+    "contextOrganizationId", "currency", "deliveryArea", "deliveryCity",
     "deliveryEnabled", "deliveryEstimateMinutes", "deliveryFee", "description", "expectedVersion",
-    "idempotencyKey", "logoUrl", "minimumOrderValue", "mode", "name", "pickupAdditionalDetails",
+    "idempotencyKey", "minimumOrderValue", "mode", "name", "pickupAdditionalDetails",
     "pickupArea", "pickupCity", "pickupEnabled", "pickupInstructions", "pickupStreet",
     "preparationEstimateMinutes", "slug", "storeId", "supportPhone",
   ];
@@ -37,7 +37,6 @@ export async function saveMerchantStoreAction(
     if (text(formData, "currency") !== "IQD") return invalidInput();
     const profile = {
       contextOrganizationId: text(formData, "contextOrganizationId"),
-      coverImageUrl: text(formData, "coverImageUrl"),
       currency: "IQD" as const,
       deliveryArea: text(formData, "deliveryArea"),
       deliveryCity: text(formData, "deliveryCity"),
@@ -46,7 +45,6 @@ export async function saveMerchantStoreAction(
       deliveryFee: text(formData, "deliveryFee"),
       description: text(formData, "description"),
       idempotencyKey: text(formData, "idempotencyKey"),
-      logoUrl: text(formData, "logoUrl"),
       minimumOrderValue: text(formData, "minimumOrderValue"),
       name: text(formData, "name"),
       pickupAdditionalDetails: text(formData, "pickupAdditionalDetails"),

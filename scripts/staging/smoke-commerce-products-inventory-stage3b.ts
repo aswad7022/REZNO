@@ -304,22 +304,27 @@ async function main() {
   checks.add(13);
 
   smokePhase = "media-safety";
-  product = asProduct(await addMerchantProductMedia(primary.reference, envelope(primary, product, {
-    altText: "Front", url: `https://cdn.example.com/${runId}/front.jpg`, variantId: null,
-  })));
-  product = asProduct(await addMerchantProductMedia(primary.reference, envelope(primary, product, {
-    altText: "Back", url: `https://cdn.example.com/${runId}/back.jpg`, variantId: null,
-  })));
+  await prisma.productMedia.createMany({ data: [
+    { altText: "Front", productId: product.id, sortOrder: 0, url: `https://cdn.example.com/${runId}/front.jpg` },
+    { altText: "Back", productId: product.id, sortOrder: 1, url: `https://cdn.example.com/${runId}/back.jpg` },
+  ] });
+  product = asProduct((await getMerchantProduct(primary.reference, product.id)).product);
   const front = product.media.find((media) => media.url.endsWith("front.jpg"))!;
   const back = product.media.find((media) => media.url.endsWith("back.jpg"))!;
-  product = asProduct(await updateMerchantProductMedia(primary.reference, envelope(primary, product, {
+  const legacyBefore = await prisma.productMedia.findMany({ where: { productId: product.id }, orderBy: [{ sortOrder: "asc" }, { id: "asc" }] });
+  await assert.rejects(addMerchantProductMedia(primary.reference, envelope(primary, product, {
+    altText: "New raw writer", url: `https://cdn.example.com/${runId}/new.jpg`, variantId: null,
+  })), domainCode("VALIDATION_ERROR"));
+  await assert.rejects(updateMerchantProductMedia(primary.reference, envelope(primary, product, {
     altText: "Updated front", mediaId: front.id,
-  })));
-  product = asProduct(await reorderMerchantProductMedia(primary.reference, envelope(primary, product, {
+  })), domainCode("VALIDATION_ERROR"));
+  await assert.rejects(reorderMerchantProductMedia(primary.reference, envelope(primary, product, {
     mediaIds: [back.id, front.id],
-  })));
-  assert.deepEqual(product.media.map((media) => media.id), [back.id, front.id]);
-  product = asProduct(await removeMerchantProductMedia(primary.reference, envelope(primary, product, { mediaId: front.id })));
+  })), domainCode("VALIDATION_ERROR"));
+  await assert.rejects(removeMerchantProductMedia(primary.reference, envelope(primary, product, {
+    mediaId: front.id,
+  })), domainCode("VALIDATION_ERROR"));
+  assert.deepEqual(await prisma.productMedia.findMany({ where: { productId: product.id }, orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }), legacyBefore);
   checks.add(14);
   await assert.rejects(addMerchantProductMedia(primary.reference, envelope(primary, product, {
     altText: "Unsafe", url: "https://127.0.0.1/private.jpg", variantId: null,
@@ -333,7 +338,11 @@ async function main() {
   assert.equal(product.unsafeMediaIds.includes(unsafeMedia.id), true);
   const unsafeHtml = await body(`/business/commerce/products/${product.id}`, cookies.owner);
   assert.equal(unsafeHtml.text.includes(`STAGE3B-UNSAFE-${runId}`), false);
-  product = asProduct(await removeMerchantProductMedia(primary.reference, envelope(primary, product, { mediaId: unsafeMedia.id })));
+  await assert.rejects(removeMerchantProductMedia(primary.reference, envelope(primary, product, {
+    mediaId: unsafeMedia.id,
+  })), domainCode("VALIDATION_ERROR"));
+  await prisma.productMedia.delete({ where: { id: unsafeMedia.id } });
+  product = asProduct((await getMerchantProduct(primary.reference, product.id)).product);
   checks.add(16);
 
   smokePhase = "inventory-ledger";

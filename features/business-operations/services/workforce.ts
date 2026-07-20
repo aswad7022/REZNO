@@ -50,6 +50,11 @@ function memberSnapshot(member: {
   };
 }
 
+function memberAuditSnapshot(member: Parameters<typeof memberSnapshot>[0]) {
+  const { photoUrl, ...snapshot } = memberSnapshot(member);
+  return { ...snapshot, legacyPhotoPresent: Boolean(photoUrl) };
+}
+
 async function futureMemberImpact(
   transaction: Prisma.TransactionClient,
   memberId: string,
@@ -271,7 +276,6 @@ export async function updateOperationalMemberProfile(input: {
       data: {
         bio: parsed.data.bio,
         isPublicProfessional: parsed.data.isPublicProfessional,
-        photoUrl: parsed.data.photoUrl,
         publicSlug: parsed.data.isPublicProfessional ? parsed.data.publicSlug : null,
         specialties: parsed.data.specialties,
       },
@@ -279,8 +283,8 @@ export async function updateOperationalMemberProfile(input: {
     await recordBusinessOperation(transaction, {
       action: "MEMBERSHIP_PROFILE_UPDATE",
       actor,
-      after: memberSnapshot(updated),
-      before: memberSnapshot(current),
+      after: memberAuditSnapshot(updated),
+      before: memberAuditSnapshot(current),
       idempotencyKey: input.idempotencyKey,
       requestHash,
       result: { memberId: updated.id },
@@ -414,8 +418,8 @@ export async function setOperationalMembershipActive(input: {
     await recordBusinessOperation(transaction, {
       action,
       actor,
-      after: memberSnapshot(updated),
-      before: memberSnapshot(current),
+      after: memberAuditSnapshot(updated),
+      before: memberAuditSnapshot(current),
       idempotencyKey: input.idempotencyKey,
       requestHash,
       result: { memberId: updated.id, status: updated.status },
@@ -476,8 +480,8 @@ export async function removeOperationalMembership(input: {
     await recordBusinessOperation(transaction, {
       action: "MEMBERSHIP_REMOVE",
       actor,
-      after: memberSnapshot(updated),
-      before: memberSnapshot(current),
+      after: memberAuditSnapshot(updated),
+      before: memberAuditSnapshot(current),
       idempotencyKey: input.idempotencyKey,
       requestHash,
       result: { memberId: updated.id, removed: true },

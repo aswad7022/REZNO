@@ -32,15 +32,17 @@ import {
 import { CreateServiceForm } from "@/features/services/components/create-service-form";
 import { ServiceOperations } from "@/features/services/components/service-operations";
 import { getCurrentServiceCatalog } from "@/features/services/services/service-catalog";
+import { MediaManager } from "@/features/media/components/media-manager";
 
 export async function ServiceManagementPage({
   editId,
 }: {
   editId?: string;
 }) {
-  const [catalog, t, format] = await Promise.all([
+  const [catalog, t, mediaT, format] = await Promise.all([
     getCurrentServiceCatalog(),
     getTranslations("Services"),
+    getTranslations("Media"),
     getFormatter(),
   ]);
 
@@ -83,6 +85,9 @@ export async function ServiceManagementPage({
               organizationId={catalog.organizationId}
               service={editableService}
             />
+            <div className="mt-5">
+              <MediaManager description={mediaT("altText")} endpoint={`/api/media/business/services/${editableService.id}`} purpose="SERVICE_IMAGE" slot="SERVICE_PRIMARY" storageMode="business" title={t("fields.imageUrl")} />
+            </div>
           </CardContent>
         </Card>
       ) : null}

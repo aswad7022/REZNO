@@ -73,8 +73,6 @@ export function MerchantStoreForm({
           <Label htmlFor="store-description">{t("fields.description")}</Label>
           <Textarea id="store-description" name="description" defaultValue={store?.description ?? ""} maxLength={4000} disabled={disabled} readOnly={store?.status === "ACTIVE"} />
         </div>
-        <Field label={t("fields.logoUrl")} name="logoUrl" type="url" dir="ltr" defaultValue={store?.logoUrl ?? ""} disabled={disabled} readOnly={store?.status === "ACTIVE"} />
-        <Field label={t("fields.coverImageUrl")} name="coverImageUrl" type="url" dir="ltr" defaultValue={store?.coverImageUrl ?? ""} disabled={disabled} readOnly={store?.status === "ACTIVE"} />
         <Field label={t("fields.supportPhone")} name="supportPhone" type="tel" dir="ltr" defaultValue={store?.supportPhone ?? ""} disabled={disabled} />
         <Field label={t("fields.preparationEstimate")} name="preparationEstimateMinutes" type="number" min={1} max={10080} defaultValue={store?.preparationEstimateMinutes ?? ""} disabled={disabled} />
         <Field label={t("fields.deliveryEstimate")} name="deliveryEstimateMinutes" type="number" min={1} max={10080} defaultValue={store?.deliveryEstimateMinutes ?? ""} disabled={disabled} />

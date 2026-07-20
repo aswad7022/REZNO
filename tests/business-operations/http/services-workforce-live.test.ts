@@ -120,7 +120,6 @@ test("Stage 2B live Business Web pages and Server Actions enforce real role and 
     const mutate = (parameters: URLSearchParams) => {
       parameters.set("name", "HTTP Operational Service");
       parameters.set("description", "Created through the real Server Action");
-      parameters.set("imageUrl", "");
       parameters.set("categoryId", fixture.category.id);
       parameters.set("staffSelectionMode", "OPTIONAL");
     };
@@ -149,7 +148,6 @@ test("Stage 2B live Business Web pages and Server Actions enforce real role and 
     await submit("/business/services", form, (parameters) => {
       parameters.set("name", "Manager HTTP Service");
       parameters.set("description", "Manager");
-      parameters.set("imageUrl", "");
       parameters.set("categoryId", fixture.category.id);
       parameters.set("staffSelectionMode", "NONE");
     }, ownerCookie);

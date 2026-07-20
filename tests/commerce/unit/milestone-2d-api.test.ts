@@ -22,7 +22,7 @@ import {
 } from "../../../features/commerce/domain/notification-events";
 import { commerceError } from "../../../features/commerce/domain/errors";
 import { decodePublicCursor, encodePublicCursor } from "../../../features/commerce/public/cursor";
-import { favoriteFingerprint } from "../../../features/commerce/services/customer-favorite-service";
+import { favoriteFingerprint } from "../../../features/commerce/domain/favorite";
 import {
   customerOrderFingerprint,
   type CustomerOrderRecord,

@@ -74,11 +74,11 @@ test("Stage 3A Merchant Store domain contracts", async (t) => {
     assert.equal(createStoreSchema.safeParse({ ...baseStore, status: "ACTIVE" }).success, false);
   });
 
-  await t.test("Store schemas reject unsafe image URLs", () => {
+  await t.test("Store schemas reject every raw image URL", () => {
     for (const logoUrl of ["http://example.com/a.png", "https://127.0.0.1/a.png", "https://user:pass@example.com/a.png", "javascript:alert(1)"]) {
       assert.equal(createStoreSchema.safeParse({ ...baseStore, logoUrl }).success, false);
     }
-    assert.equal(createStoreSchema.safeParse({ ...baseStore, logoUrl: "https://cdn.example.com/a.png" }).success, true);
+    assert.equal(createStoreSchema.safeParse({ ...baseStore, logoUrl: "https://cdn.example.com/a.png" }).success, false);
   });
 
   await t.test("Store schemas reject negative/fractional IQD and unbounded estimates", () => {

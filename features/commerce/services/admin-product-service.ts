@@ -28,6 +28,8 @@ import {
   type CommerceAdminContext,
 } from "@/features/commerce/services/authorization";
 import { lockProduct, runCommerceSerializable } from "@/features/commerce/services/transaction";
+import type { MediaReferenceDto } from "@/features/media/domain/contracts";
+import { resolvePublicMediaBatchWithClient } from "@/features/media/services/media-query";
 import { prisma } from "@/lib/db/prisma";
 import { isSafePublicImageUrl, safePublicImageUrlOrNull } from "@/lib/security/public-image-url";
 
@@ -148,8 +150,14 @@ export async function listAdminProducts(
       orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
       take: scanLimit,
     });
+    const media = await resolvePublicMediaBatchWithClient(transaction, rows.map((product) => ({
+      id: product.id,
+      kind: "PRODUCT" as const,
+      legacyValues: product.media.filter((item) => item.mediaType === "IMAGE").map((item) => item.url),
+      slot: "PRODUCT_IMAGE" as const,
+    })));
     const filtered = rows.filter((item) => {
-      const readiness = productReadiness(item);
+      const readiness = productReadiness(item, productMedia(item, media));
       const unsafe = item.media.some((media) => !isSafePublicImageUrl(media.url));
       return (query.readinessIssue === undefined || (!readiness.ready) === query.readinessIssue) &&
         (query.unsafeMedia === undefined || unsafe === query.unsafeMedia);
@@ -160,7 +168,7 @@ export async function listAdminProducts(
     const hasNextPage = hasFilteredNext || hasScannedNext;
     const cursorAnchor = hasFilteredNext ? visible.at(-1) : hasScannedNext ? rows.at(-1) : undefined;
     return {
-      data: visible.map(adminProductSummary),
+      data: visible.map((product) => adminProductSummary(product, productMedia(product, media))),
       pageInfo: {
         hasNextPage,
         nextCursor: hasNextPage && cursorAnchor
@@ -191,6 +199,13 @@ export async function getAdminProductDetail(context: CommerceAdminContext, rawPr
       include: adminProductInclude,
     });
     if (!product) commerceError("NOT_FOUND", "Product was not found.");
+    const media = await resolvePublicMediaBatchWithClient(transaction, [{
+      id: product.id,
+      kind: "PRODUCT",
+      legacyValues: product.media.filter((item) => item.mediaType === "IMAGE").map((item) => item.url),
+      slot: "PRODUCT_IMAGE",
+    }]);
+    const references = productMedia(product, media);
     const activeCartItems = await transaction.cartItem.count({
       where: { cart: { status: "ACTIVE" }, productVariant: { productId: product.id } },
     });
@@ -207,7 +222,7 @@ export async function getAdminProductDetail(context: CommerceAdminContext, rawPr
     return {
       audit: audit.map((entry) => ({ ...entry, createdAt: entry.createdAt.toISOString() })),
       impact: { activeCartItems, nonterminalOrders },
-      product: adminProductDetail(product),
+      product: adminProductDetail(product, references),
       ...(canModerate && product.status !== "ARCHIVED" ? {
         expectedVersion: product.updatedAt.toISOString(),
         permittedActions: {
@@ -261,7 +276,13 @@ export async function moderateAdminProduct(context: CommerceAdminContext, rawInp
         : { publishedAt: null, status: "DRAFT", suspendedAt: null, suspensionReason: null },
       include: adminProductInclude,
     });
-    const result = adminProductSummary(updated);
+    const media = await resolvePublicMediaBatchWithClient(transaction, [{
+      id: updated.id,
+      kind: "PRODUCT",
+      legacyValues: updated.media.filter((item) => item.mediaType === "IMAGE").map((item) => item.url),
+      slot: "PRODUCT_IMAGE",
+    }]);
+    const result = adminProductSummary(updated, productMedia(updated, media));
     await recordAdminMutation(transaction, {
       action,
       after: productAudit(updated),
@@ -280,8 +301,8 @@ export async function moderateAdminProduct(context: CommerceAdminContext, rawInp
   });
 }
 
-function adminProductSummary(product: AdminProductRecord) {
-  const readiness = productReadiness(product);
+function adminProductSummary(product: AdminProductRecord, media?: readonly MediaReferenceDto[]) {
+  const readiness = productReadiness(product, media);
   const activeVariantCount = product.variants.filter((item) => item.status === "ACTIVE" && !item.archivedAt).length;
   return {
     activeVariantCount,
@@ -289,7 +310,9 @@ function adminProductSummary(product: AdminProductRecord) {
     id: product.id,
     name: product.name,
     organization: { id: product.store.organization.id, name: product.store.organization.name },
-    primaryMediaUrl: safePublicImageUrlOrNull(product.media[0]?.url),
+    primaryMediaUrl: media === undefined
+      ? safePublicImageUrlOrNull(product.media[0]?.url)
+      : media[0]?.stableDeliveryPath ?? null,
     publicVisible: product.status === "PUBLISHED" && Boolean(product.publishedAt) && readiness.ready,
     readiness: { missing: readiness.missing, ready: readiness.ready },
     status: product.status,
@@ -299,14 +322,21 @@ function adminProductSummary(product: AdminProductRecord) {
   };
 }
 
-function adminProductDetail(product: AdminProductRecord) {
+function adminProductDetail(product: AdminProductRecord, media?: readonly MediaReferenceDto[]) {
   return {
-    ...adminProductSummary(product),
+    ...adminProductSummary(product, media),
     description: product.description,
-    media: product.media.flatMap((item) => {
-      const url = safePublicImageUrlOrNull(item.url);
-      return url ? [{ altText: item.altText, id: item.id, sortOrder: item.sortOrder, url }] : [];
-    }),
+    media: media === undefined
+      ? product.media.flatMap((item) => {
+          const url = safePublicImageUrlOrNull(item.url);
+          return url ? [{ altText: item.altText, id: item.id, sortOrder: item.sortOrder, url }] : [];
+        })
+      : media.map((item, index) => ({
+          altText: item.altText,
+          id: item.assetId ?? `legacy-${index}`,
+          sortOrder: item.sortOrder ?? index,
+          url: item.stableDeliveryPath,
+        })),
     slug: product.slug,
     suspensionReason: product.suspensionReason,
     variants: product.variants.map((variant) => ({
@@ -330,11 +360,13 @@ function adminProductDetail(product: AdminProductRecord) {
   };
 }
 
-function productReadiness(product: AdminProductRecord) {
+function productReadiness(product: AdminProductRecord, media?: readonly MediaReferenceDto[]) {
   return evaluateProductReadiness({
     categoryStatus: product.category.status,
     description: product.description,
-    media: product.media,
+    media: media === undefined
+      ? product.media
+      : media.map((item) => ({ url: item.stableDeliveryPath })),
     name: product.name,
     organization: product.store.organization,
     productArchivedAt: product.archivedAt,
@@ -342,6 +374,13 @@ function productReadiness(product: AdminProductRecord) {
     store: product.store,
     variants: product.variants,
   });
+}
+
+function productMedia(
+  product: Pick<AdminProductRecord, "id">,
+  media: Awaited<ReturnType<typeof resolvePublicMediaBatchWithClient>>,
+) {
+  return media.get(`PRODUCT:${product.id}:PRODUCT_IMAGE`) ?? [];
 }
 
 function productAudit(product: AdminProductRecord) {

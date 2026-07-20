@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { ImageIcon, Plus, Utensils } from "lucide-react";
+import { getTranslations } from "next-intl/server";
 
 import { DashboardEmpty } from "@/components/dashboard/dashboard-empty";
 import {
@@ -23,6 +24,7 @@ import {
   RestaurantCatalogLifecycleForm,
 } from "@/features/restaurants/components/restaurant-forms";
 import { getRestaurantMenu } from "@/features/restaurants/services/restaurant-management";
+import { MediaManager } from "@/features/media/components/media-manager";
 
 export async function RestaurantMenuPage({
   showCreateForm = false,
@@ -33,6 +35,7 @@ export async function RestaurantMenuPage({
 }) {
   const { categories, canEdit, organizationId, organizationName } =
     await getRestaurantMenu();
+  const mediaT = await getTranslations("Media");
   const categoryOptions = categories.map((category) => ({
     id: category.id,
     name: category.name,
@@ -265,6 +268,9 @@ export async function RestaurantMenuPage({
                                 </DialogContent>
                               </Dialog>
                             ) : null}
+                            {canEdit ? <div className="mt-3">
+                              <MediaManager deferLoad description={mediaT("altText")} endpoint={`/api/media/business/menu-items/${item.id}`} purpose="RESTAURANT_MENU_IMAGE" slot="MENU_ITEM_PRIMARY" storageMode="business" title={mediaT("menuItemImage")} />
+                            </div> : null}
                             {canEdit && item.version ? (
                               <div className="mt-2 grid grid-cols-2 gap-2">
                                 <CatalogLifecycleDialog

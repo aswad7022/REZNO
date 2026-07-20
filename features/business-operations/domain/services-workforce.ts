@@ -2,7 +2,6 @@ import type { SystemRole } from "@prisma/client";
 import { z } from "zod";
 
 import { operationalHoursSchema } from "@/features/business-operations/domain/validation";
-import { isSafePublicImageUrl } from "@/lib/security/public-image-url";
 
 const nullableText = (maximum: number) =>
   z.string().trim().max(maximum).transform((value) => value || null);
@@ -10,9 +9,6 @@ const nullableText = (maximum: number) =>
 export const operationalServiceSchema = z.object({
   categoryId: z.string().uuid(),
   description: nullableText(2000),
-  imageUrl: z.string().trim().max(2048).refine(
-    (value) => !value || isSafePublicImageUrl(value),
-  ).transform((value) => value || null),
   name: z.string().trim().min(2).max(120),
   staffSelectionMode: z.enum(["NONE", "OPTIONAL", "REQUIRED"]),
 }).strict();
@@ -34,9 +30,6 @@ export const operationalInvitationSchema = z.object({
 export const operationalMemberProfileSchema = z.object({
   bio: nullableText(1000),
   isPublicProfessional: z.boolean(),
-  photoUrl: z.string().trim().max(2048).refine(
-    (value) => !value || isSafePublicImageUrl(value),
-  ).transform((value) => value || null),
   publicSlug: z.string().trim().toLowerCase().max(80).regex(
     /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
   ).nullable(),
