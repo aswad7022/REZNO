@@ -159,6 +159,87 @@ CREATE UNIQUE INDEX "MediaBinding_active_collection_order_key"
   ON "MediaBinding"("containerId", "slot", "sortOrder")
   WHERE "state" = 'ACTIVE' AND "slot" IN ('BUSINESS_GALLERY', 'PRODUCT_IMAGE');
 
+-- Cross-table scope invariants cannot be expressed as CHECK constraints.
+-- Keep direct SQL and future writers inside the same typed tenant boundary as
+-- the canonical application service.
+CREATE FUNCTION "rezno_validate_media_container_scope"() RETURNS trigger AS $$
+BEGIN
+  IF NEW."kind" = 'SERVICE' AND NOT EXISTS (
+    SELECT 1 FROM "Service"
+    WHERE "id" = NEW."serviceId" AND "organizationId" = NEW."organizationId"
+  ) THEN
+    RAISE EXCEPTION 'media container service scope mismatch' USING ERRCODE = '23514';
+  ELSIF NEW."kind" = 'STORE' AND NOT EXISTS (
+    SELECT 1 FROM "Store"
+    WHERE "id" = NEW."storeId" AND "organizationId" = NEW."organizationId"
+  ) THEN
+    RAISE EXCEPTION 'media container store scope mismatch' USING ERRCODE = '23514';
+  ELSIF NEW."kind" = 'PRODUCT' AND NOT EXISTS (
+    SELECT 1
+    FROM "Product" AS product
+    JOIN "Store" AS store ON store."id" = product."storeId"
+    WHERE product."id" = NEW."productId" AND store."organizationId" = NEW."organizationId"
+  ) THEN
+    RAISE EXCEPTION 'media container product scope mismatch' USING ERRCODE = '23514';
+  ELSIF NEW."kind" = 'MENU_ITEM' AND NOT EXISTS (
+    SELECT 1 FROM "MenuItem"
+    WHERE "id" = NEW."menuItemId" AND "businessId" = NEW."organizationId"
+  ) THEN
+    RAISE EXCEPTION 'media container menu-item scope mismatch' USING ERRCODE = '23514';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER "MediaContainer_scope_guard"
+  BEFORE INSERT OR UPDATE OF "kind", "organizationId", "serviceId", "storeId", "productId", "menuItemId"
+  ON "MediaContainer"
+  FOR EACH ROW EXECUTE FUNCTION "rezno_validate_media_container_scope"();
+
+CREATE FUNCTION "rezno_validate_media_binding_scope"() RETURNS trigger AS $$
+DECLARE
+  target "MediaContainer"%ROWTYPE;
+  stored "StoredAsset"%ROWTYPE;
+BEGIN
+  SELECT * INTO target FROM "MediaContainer" WHERE "id" = NEW."containerId";
+  SELECT * INTO stored FROM "StoredAsset" WHERE "id" = NEW."assetId";
+  IF target."id" IS NULL OR stored."id" IS NULL THEN
+    RETURN NEW;
+  END IF;
+  IF NOT (
+    (NEW."slot" = 'CUSTOMER_AVATAR' AND target."kind" = 'CUSTOMER_PROFILE' AND stored."purpose" = 'CUSTOMER_AVATAR' AND stored."visibility" = 'PRIVATE' AND stored."ownerPersonId" = target."personId" AND stored."organizationId" IS NULL)
+    OR (NEW."slot" = 'BUSINESS_LOGO' AND target."kind" = 'BUSINESS_PROFILE' AND stored."purpose" = 'BUSINESS_LOGO' AND stored."visibility" = 'PUBLIC' AND stored."organizationId" = target."organizationId")
+    OR (NEW."slot" = 'BUSINESS_COVER' AND target."kind" = 'BUSINESS_PROFILE' AND stored."purpose" = 'BUSINESS_COVER' AND stored."visibility" = 'PUBLIC' AND stored."organizationId" = target."organizationId")
+    OR (NEW."slot" = 'BUSINESS_GALLERY' AND target."kind" = 'BUSINESS_PROFILE' AND stored."purpose" = 'BUSINESS_GALLERY_IMAGE' AND stored."visibility" = 'PUBLIC' AND stored."organizationId" = target."organizationId")
+    OR (NEW."slot" = 'SERVICE_PRIMARY' AND target."kind" = 'SERVICE' AND stored."purpose" = 'SERVICE_IMAGE' AND stored."visibility" = 'PUBLIC' AND stored."organizationId" = target."organizationId")
+    OR (NEW."slot" = 'STORE_LOGO' AND target."kind" = 'STORE' AND stored."purpose" = 'STORE_LOGO' AND stored."visibility" = 'PUBLIC' AND stored."organizationId" = target."organizationId")
+    OR (NEW."slot" = 'STORE_COVER' AND target."kind" = 'STORE' AND stored."purpose" = 'STORE_COVER' AND stored."visibility" = 'PUBLIC' AND stored."organizationId" = target."organizationId")
+    OR (NEW."slot" = 'PRODUCT_IMAGE' AND target."kind" = 'PRODUCT' AND stored."purpose" = 'PRODUCT_IMAGE' AND stored."visibility" = 'PUBLIC' AND stored."organizationId" = target."organizationId")
+    OR (NEW."slot" = 'MENU_ITEM_PRIMARY' AND target."kind" = 'MENU_ITEM' AND stored."purpose" = 'RESTAURANT_MENU_IMAGE' AND stored."visibility" = 'PUBLIC' AND stored."organizationId" = target."organizationId")
+  ) THEN
+    RAISE EXCEPTION 'media binding slot, purpose, visibility, or owner scope mismatch' USING ERRCODE = '23514';
+  END IF;
+  IF NEW."productVariantId" IS NOT NULL AND NOT EXISTS (
+    SELECT 1
+    FROM "ProductVariant" AS variant
+    JOIN "Product" AS product ON product."id" = variant."productId" AND product."storeId" = variant."storeId"
+    JOIN "Store" AS store ON store."id" = product."storeId"
+    WHERE variant."id" = NEW."productVariantId"
+      AND target."kind" = 'PRODUCT'
+      AND variant."productId" = target."productId"
+      AND store."organizationId" = target."organizationId"
+  ) THEN
+    RAISE EXCEPTION 'media binding product variant scope mismatch' USING ERRCODE = '23514';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER "MediaBinding_scope_guard"
+  BEFORE INSERT OR UPDATE OF "containerId", "assetId", "slot", "productVariantId"
+  ON "MediaBinding"
+  FOR EACH ROW EXECUTE FUNCTION "rezno_validate_media_binding_scope"();
+
 -- AddForeignKey
 ALTER TABLE "MediaContainer" ADD CONSTRAINT "MediaContainer_personId_fkey" FOREIGN KEY ("personId") REFERENCES "Person"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 

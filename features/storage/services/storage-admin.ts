@@ -37,6 +37,17 @@ export async function rejectStoredAsset(
     if (existing?.status === "COMPLETED" && existing.result) {
       return existing.result as ReturnType<typeof storedAssetDetailDto>;
     }
+    const existingMediaMutation = await transaction.mediaMutation.findUnique({
+      where: { actorPersonId_idempotencyKey: { actorPersonId: actor.personId, idempotencyKey: input.idempotencyKey } },
+    });
+    if (existingMediaMutation
+      && (existingMediaMutation.action !== "ADMIN_DETACH_REJECTED_MEDIA"
+        || existingMediaMutation.requestHash !== requestHash)) {
+      storageError("IDEMPOTENCY_CONFLICT", "Idempotency key was used for another media request.");
+    }
+    await transaction.$queryRaw(
+      Prisma.sql`SELECT "id" FROM "StoredAsset" WHERE "id" = ${input.assetId}::uuid FOR UPDATE`,
+    );
     const asset = await transaction.storedAsset.findUnique({ where: { id: input.assetId } });
     if (!asset) storageError("NOT_FOUND", "Stored asset was not found.");
     if (asset.version !== input.expectedVersion) storageError("STALE_VERSION", "Stored asset version is stale.");
@@ -57,11 +68,60 @@ export async function rejectStoredAsset(
       });
     }
     const now = await databaseNow(transaction);
+    const activeBinding = await transaction.mediaBinding.findFirst({
+      where: { assetId: asset.id, state: "ACTIVE" },
+      include: { container: true },
+    });
+    let lockedContainer = null;
+    if (activeBinding) {
+      await transaction.$queryRaw(
+        Prisma.sql`SELECT "id" FROM "MediaContainer" WHERE "id" = ${activeBinding.containerId}::uuid FOR UPDATE`,
+      );
+      lockedContainer = await transaction.mediaContainer.findUniqueOrThrow({ where: { id: activeBinding.containerId } });
+    }
     const changed = await transaction.storedAsset.updateMany({
       where: { id: asset.id, version: input.expectedVersion },
       data: { failureCode: "ADMIN_REJECTED", rejectedAt: now, state: "REJECTED", version: { increment: 1 } },
     });
     if (changed.count !== 1) storageError("STALE_VERSION", "Stored asset changed before rejection.");
+    let rejectedContainerVersion: number | null = null;
+    if (activeBinding) {
+      const detached = await transaction.mediaBinding.updateMany({
+        where: { id: activeBinding.id, state: "ACTIVE", version: activeBinding.version },
+        data: {
+          detachedAt: now,
+          detachedByPersonId: actor.personId,
+          state: "DETACHED",
+          version: { increment: 1 },
+        },
+      });
+      if (detached.count !== 1) storageError("STALE_VERSION", "Attached media changed before rejection.");
+      const container = await transaction.mediaContainer.update({
+        where: { id: activeBinding.containerId },
+        data: { version: { increment: 1 } },
+      });
+      rejectedContainerVersion = container.version;
+      await transaction.mediaMutation.create({
+        data: {
+          action: "ADMIN_DETACH_REJECTED_MEDIA",
+          actorPersonId: actor.personId,
+          containerId: container.id,
+          expectedVersion: lockedContainer!.version,
+          idempotencyKey: input.idempotencyKey,
+          organizationId: container.organizationId,
+          requestHash,
+          result: {
+            type: "ADMIN_MEDIA_REJECTION",
+            assetId: asset.id,
+            bindingDetached: true,
+            containerVersion: container.version,
+            state: "REJECTED",
+          },
+          resultVersion: container.version,
+          status: "COMPLETED",
+        },
+      });
+    }
     const updated = await transaction.storedAsset.findUniqueOrThrow({ where: { id: asset.id } });
     const dto = storedAssetDetailDto(updated);
     await transaction.storageMutation.update({
@@ -73,7 +133,13 @@ export async function rejectStoredAsset(
         action: "storage.asset.reject",
         adminUserId: actor.userId,
         idempotencyKey: input.idempotencyKey,
-        metadata: { purpose: updated.purpose, state: updated.state, visibility: updated.visibility },
+        metadata: {
+          bindingDetached: Boolean(activeBinding),
+          containerVersion: rejectedContainerVersion,
+          purpose: updated.purpose,
+          state: updated.state,
+          visibility: updated.visibility,
+        },
         requestHash,
         result: { state: updated.state },
         resultVersion: updated.updatedAt,

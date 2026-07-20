@@ -110,7 +110,16 @@ export async function deleteStoredAsset(
       storageError("IDEMPOTENCY_CONFLICT", "Idempotency key was used for a different storage request.");
     }
     if (mutation?.status === "COMPLETED" && mutation.result) return { replay: mutation.result, asset: null };
-    const asset = await manageableAsset(transaction, actor, input.assetId);
+    let asset = await manageableAsset(transaction, actor, input.assetId);
+    await transaction.$queryRaw(
+      Prisma.sql`SELECT "id" FROM "StoredAsset" WHERE "id" = ${asset.id}::uuid FOR UPDATE`,
+    );
+    asset = await manageableAsset(transaction, actor, input.assetId);
+    const activeBinding = await transaction.mediaBinding.findFirst({
+      where: { assetId: asset.id, state: "ACTIVE" },
+      select: { id: true },
+    });
+    if (activeBinding) storageError("ASSET_IN_USE", "Stored asset is attached to active media.");
     const retryingExistingMutation = Boolean(mutation);
     if (!mutation) {
       await transaction.storageMutation.create({
