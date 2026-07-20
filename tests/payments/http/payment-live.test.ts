@@ -190,6 +190,9 @@ test("Gate 5C production routes are strict, scope-safe, truthful, and redacted",
     for (const path of [`/api/payments/customer/intents/${intent.id}`, `/api/mobile/payments/intents/${intent.id}`, `/api/payments/return/${intent.id}`]) {
       assertError(await request(path, { cookie: foreignCookie }), 404, "NOT_FOUND");
     }
+    for (const path of ["/api/payments/customer/intents", "/api/mobile/payments/intents"]) {
+      assertError(await request(`${path}?organizationId=${foreignOrganization.id}`, { cookie: customerCookie }), 400, "VALIDATION_ERROR");
+    }
   });
 
   await t.test("strict mutations reject client financial/provider/card/redirect fields and production fails closed", async () => {
@@ -248,6 +251,14 @@ test("Gate 5C production routes are strict, scope-safe, truthful, and redacted",
       assert.equal((await request("/api/payments/business/settlements?limit=10", { cookie })).response.status, 200);
     }
     assert.equal((await request("/api/payments/business/intents", { cookie: receptionistCookie })).response.status, 403);
+    for (const path of [
+      "/api/payments/business/intents",
+      "/api/payments/business/refunds",
+      "/api/payments/business/journals",
+      "/api/payments/business/settlements",
+    ]) {
+      assertError(await request(`${path}?organizationId=${foreignOrganization.id}`, { cookie: ownerCookie }), 400, "VALIDATION_ERROR");
+    }
     assertError(await request(`/api/payments/business/intents/${intent.id}`, {
       cookie: `${owner.cookie}; rezno-active-business-id=${foreignOrganization.id}`,
     }), 404, "NOT_FOUND");

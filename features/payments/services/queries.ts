@@ -34,17 +34,19 @@ type QueryActor =
 
 export async function listCustomerPayments(
   personId: string,
-  input: PageInput & { status?: PaymentIntentStatus | null } = {},
+  input: PageInput & { organizationId?: string | null; status?: PaymentIntentStatus | null } = {},
 ) {
   await requireActiveCommerceCustomer(personId);
+  if (input.organizationId) paymentError("VALIDATION_ERROR", "Customer payment scope is server-derived.");
   return listPaymentIntents({ kind: "customer", personId }, input);
 }
 
 export async function listBusinessPayments(
   reference: MerchantActorReference,
-  input: PageInput & { status?: PaymentIntentStatus | null } = {},
+  input: PageInput & { organizationId?: string | null; status?: PaymentIntentStatus | null } = {},
 ) {
   const actor = await resolveMerchantCommerceContext(reference, "PAYMENT_VIEW");
+  if (input.organizationId) paymentError("VALIDATION_ERROR", "Business payment scope is server-derived.");
   const page = await listPaymentIntents({ ...actor, kind: "business" }, input);
   return { ...page, items: page.items as Array<ReturnType<typeof businessPaymentIntentDto>> };
 }
@@ -148,9 +150,10 @@ async function listPaymentIntents(
 
 export async function listBusinessRefunds(
   reference: MerchantActorReference,
-  input: PageInput & { status?: PaymentRefundStatus | null } = {},
+  input: PageInput & { organizationId?: string | null; status?: PaymentRefundStatus | null } = {},
 ) {
   const actor = await resolveMerchantCommerceContext(reference, "PAYMENT_VIEW");
+  if (input.organizationId) paymentError("VALIDATION_ERROR", "Business refund scope is server-derived.");
   return listRefunds({ ...actor, kind: "business" }, input);
 }
 
