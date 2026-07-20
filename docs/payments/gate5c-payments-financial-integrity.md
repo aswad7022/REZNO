@@ -1,6 +1,6 @@
 # Gate 5C — Payments and Financial Integrity Foundation
 
-Status: implementation and complete local validation passed; real staging/PR closure pending
+Status: implementation, complete local validation, and real staging passed; exact-head PR closure pending
 
 Baseline: `cb32cf401bc0f060940ec71dffba76f8d5089733`
 
@@ -459,9 +459,51 @@ or payment-instrument collection path exists.
   manual reconciliation. Exact cleanup removed only fixture IDs; the second
   cleanup reported zero.
 
-The immutable PR-head real-staging 40/40→41/41 run, cross-gate fingerprint
-comparison, exact-head CI/Vercel and review-thread closure are deliberately not
-claimed here until the Draft PR exists.
+## Real-staging evidence
+
+Draft PR #123 supplied an immutable `rezno-staging` Preview for application-code
+head `b3fcc25d97a9bbb9a4fbbed6ae95886649fa7db3`. Authenticated Neon discovery
+selected exactly project `rezno-staging`, database `rezno_staging`, owner role,
+the direct non-pooler endpoint and required SSL. The initial read-only preflight
+was healthy 40/40 with zero failed or rolled-back migration. `prisma migrate
+deploy` applied only `20260720140000_payments_financial_integrity_foundation`
+and reached healthy 41/41 without reset or `db push`. The final-head deployment
+recheck was a no-op at 41/41.
+
+The first remote evidence transaction exposed only Prisma's five-second default
+interactive-transaction timeout; the transaction rolled back. The bounded
+operator timeout was corrected to 30 seconds, locally revalidated and pushed.
+Exact-ID cleanup removed the fixture rows created before that rollback-only
+evidence step, and its immediate second cleanup returned zero before the
+accepted run.
+
+Accepted fixture runs one and two both produced
+`b313552ea282376da895de0f9ff0cd264fc47c79a9e00ad144dbb63f8299f6cf`.
+The evidence transaction proved seven balanced Journals, posted Journal and
+Posting immutability, finalized-statement immutability, over-refund rejection,
+settlement double-inclusion rejection, and statement—not-bank-payout—semantics.
+Focused smoke passed provider `NOT_CONFIGURED`, own/foreign Customer and
+Organization authorization, all scoped pagination families, cross-scope/page
+size cursor rejection, deterministic CAPTURED/REQUIRES_ACTION/AUTHORIZED/
+TRANSIENT_FAILURE/PERMANENT_FAILURE outcomes, signed/invalid/duplicate provider
+behavior, zero-commission capture/refund accounting, and manual reconciliation
+`NOT_CONFIGURED`.
+
+Final cleanup removed exactly the fixture-owned rows, including 11 intents, 13
+attempts, three provider events, two refunds, seven Journals, 14 Postings, two
+settlements, 10 compatibility Payments and one smoke Admin audit. The second
+cleanup returned zero in every category. Pre/post canonical table fingerprints
+were unchanged:
+
+- Stage 3: `ff7ea3307cb77e9c8d420bbeb828b30c1fddeff6d55c5dccf22428b8f6846d77`
+- Stage 4: `4ea0799cd5be5853ccc410a1ad6899ad1db787f36e8e136490358fad0a743864`
+- Gate 5A: `b5ed7bbd919e2e37f23e50f5bb9285785236406540c98f2b5dcc851916b44a39`
+- Gate 5B: `263e468677d3b142b35fa56ecb8fa4958380f9d6cc901c8acda26a88da97be28`
+
+Staging finished healthy at 41/41 with production provider
+`PAYMENT_PROVIDER_NOT_CONFIGURED`; no real payment/refund or human account was
+used. Database and signing credentials remained process-local and were not
+persisted. Exact-head CI/Vercel and review-thread closure remain PR checks.
 
 ## Explicit later-stage handoffs
 
