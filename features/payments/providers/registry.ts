@@ -1,4 +1,5 @@
 import { paymentError } from "@/features/payments/domain/errors";
+import type { PaymentProviderKind } from "@prisma/client";
 
 import { NotConfiguredPaymentProvider, type PaymentProvider } from "./provider";
 
@@ -24,4 +25,11 @@ export function configuredPaymentProvider(): PaymentProvider {
     paymentError("PAYMENT_PROVIDER_NOT_CONFIGURED", "Online payment provider is not configured.");
   }
   return provider;
+}
+
+export function assertPaymentWebhookProviderConfigured(expectedProvider: PaymentProviderKind): void {
+  const provider = paymentProvider();
+  if (provider.kind === "NOT_CONFIGURED" || provider.kind !== expectedProvider) {
+    paymentError("PAYMENT_PROVIDER_NOT_CONFIGURED", "Online payment provider is not configured.");
+  }
 }

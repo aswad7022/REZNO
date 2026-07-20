@@ -7,7 +7,7 @@ import { processPaymentProviderWebhook } from "@/features/payments/services/prov
 export const runtime = "nodejs";
 
 export function POST(request: NextRequest) {
-  return handleProviderWebhookRequest("webhooks.deterministic", async () =>
+  return handleProviderWebhookRequest(request, "webhooks.deterministic", "DETERMINISTIC_TEST", async () =>
     processPaymentProviderWebhook(await readBoundedWebhook(request)),
   );
 }

@@ -9,6 +9,7 @@ const REFUND_REASONS = ["CUSTOMER_REQUEST", "MERCHANT_CANCELLATION", "ADMIN_CORR
 const SETTLEMENT_STATUSES = ["DRAFT", "FINALIZED", "VOID"] as const;
 const JOURNAL_STATUSES = ["DRAFT", "POSTED", "REVERSED"] as const;
 const JOURNAL_SOURCES = ["CAPTURE", "REFUND", "SETTLEMENT", "REVERSAL", "RECONCILIATION"] as const;
+export const PAYMENT_WEBHOOK_MAXIMUM_BYTES = 64 * 1024;
 
 export function paymentId(value: string, field = "id"): string {
   if (!UUID.test(value)) paymentError("VALIDATION_ERROR", field + " must be a UUID.");
@@ -170,18 +171,70 @@ export function parseCapabilityQuery(url: URL) {
 }
 
 export async function readBoundedWebhook(request: Request) {
-  const declared = request.headers.get("content-length");
-  if (declared && (!/^[0-9]+$/.test(declared) || Number(declared) > 64 * 1024)) {
-    paymentError("VALIDATION_ERROR", "Webhook body is too large.");
-  }
-  const body = new Uint8Array(await request.arrayBuffer());
-  if (body.byteLength === 0 || body.byteLength > 64 * 1024) paymentError("VALIDATION_ERROR", "Webhook body is invalid.");
+  const body = await readBoundedPaymentWebhookBody(request, PAYMENT_WEBHOOK_MAXIMUM_BYTES);
   const signatures = request.headers.get("x-payment-signature");
   const timestamps = request.headers.get("x-payment-timestamp");
-  if (signatures?.includes(",") || timestamps?.includes(",")) {
+  if (
+    (signatures !== null && !/^[0-9a-f]{64}$/i.test(signatures)) ||
+    (timestamps !== null && (!/^[0-9]{1,16}$/.test(timestamps) || !Number.isSafeInteger(Number(timestamps))))
+  ) {
     paymentError("WEBHOOK_INVALID_SIGNATURE", "Payment webhook could not be verified.");
   }
   return { body, receivedAt: new Date(), signature: signatures, timestamp: timestamps };
+}
+
+export async function readBoundedPaymentWebhookBody(
+  request: Request,
+  maximumBytes: number,
+): Promise<Uint8Array> {
+  if (!Number.isSafeInteger(maximumBytes) || maximumBytes < 1) {
+    throw new RangeError("Payment webhook maximum must be a positive safe integer.");
+  }
+  assertPaymentWebhookContentLength(request.headers.get("content-length"), maximumBytes);
+  const reader = request.body?.getReader();
+  if (!reader) paymentError("VALIDATION_ERROR", "Webhook body is invalid.");
+
+  const retained = new Uint8Array(maximumBytes);
+  let byteLength = 0;
+  try {
+    while (true) {
+      let next: ReadableStreamReadResult<Uint8Array>;
+      try {
+        next = await reader.read();
+      } catch {
+        await cancelPaymentWebhookReader(reader);
+        paymentError("VALIDATION_ERROR", "Webhook body could not be read.");
+      }
+      if (next.done) break;
+      if (next.value.byteLength === 0) continue;
+      if (next.value.byteLength > maximumBytes - byteLength) {
+        await cancelPaymentWebhookReader(reader);
+        paymentError("VALIDATION_ERROR", "Webhook body is too large.");
+      }
+      retained.set(next.value, byteLength);
+      byteLength += next.value.byteLength;
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  if (byteLength === 0) paymentError("VALIDATION_ERROR", "Webhook body is invalid.");
+  return retained.slice(0, byteLength);
+}
+
+function assertPaymentWebhookContentLength(value: string | null, maximumBytes: number): void {
+  if (value === null) return;
+  if (!/^[0-9]+$/.test(value)) paymentError("VALIDATION_ERROR", "Webhook Content-Length is invalid.");
+  const declared = Number(value);
+  if (!Number.isSafeInteger(declared)) paymentError("VALIDATION_ERROR", "Webhook Content-Length is invalid.");
+  if (declared > maximumBytes) paymentError("VALIDATION_ERROR", "Webhook body is too large.");
+}
+
+async function cancelPaymentWebhookReader(reader: ReadableStreamDefaultReader<Uint8Array>): Promise<void> {
+  try {
+    await reader.cancel();
+  } catch {
+    // A failed cancellation must not replace the stable bounded-body error.
+  }
 }
 
 async function readJson(request: Request, allowed: readonly string[]) {

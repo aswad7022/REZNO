@@ -51,6 +51,7 @@ export class PaymentDomainError extends Error {
   constructor(
     readonly code: PaymentErrorCode,
     message: string,
+    readonly details?: { retryAfterSeconds?: number },
   ) {
     super(message);
     this.name = "PaymentDomainError";

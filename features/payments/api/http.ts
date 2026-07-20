@@ -5,10 +5,11 @@ import { getCurrentAdminAccess } from "@/features/admin/services/admin-auth";
 import { resolveCustomerApiContext, resolveMerchantApiContext, type CustomerApiContext, type MerchantApiContext } from "@/features/commerce/api/auth";
 import { mapCommerceApiError } from "@/features/commerce/api/errors";
 import type { CommerceAdminContext } from "@/features/commerce/services/authorization";
+import { assertPaymentWebhookRequestAllowed } from "@/features/payments/api/webhook-guard";
 import { PaymentDomainError } from "@/features/payments/domain/errors";
 import { logServerError } from "@/lib/logging/server";
 import { consumeRateLimit } from "@/lib/security/rate-limit-core";
-import type { CommercePermission } from "@prisma/client";
+import type { CommercePermission, PaymentProviderKind } from "@prisma/client";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
@@ -70,10 +71,15 @@ export async function handleAdminPaymentRequest(
 }
 
 export async function handleProviderWebhookRequest(
+  request: Request,
   scope: string,
+  provider: PaymentProviderKind,
   operation: () => Promise<unknown>,
 ) {
-  return handlePaymentRequest(scope, async () => ({ data: await operation() }));
+  return handlePaymentRequest(scope, async () => {
+    assertPaymentWebhookRequestAllowed(request, scope, provider);
+    return { data: await operation() };
+  });
 }
 
 async function handlePaymentRequest(
@@ -85,9 +91,12 @@ async function handlePaymentRequest(
     return NextResponse.json({ data: result.data }, { headers: NO_STORE, status: result.status ?? 200 });
   } catch (error) {
     if (error instanceof PaymentDomainError) {
+      const retryAfter = error.code === "RATE_LIMITED" && error.details?.retryAfterSeconds
+        ? String(error.details.retryAfterSeconds)
+        : undefined;
       return NextResponse.json(
         { error: { code: error.code, message: error.message } },
-        { headers: NO_STORE, status: error.status },
+        { headers: { ...NO_STORE, ...(retryAfter ? { "Retry-After": retryAfter } : {}) }, status: error.status },
       );
     }
     const mapped = mapCommerceApiError(error);
