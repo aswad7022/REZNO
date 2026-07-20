@@ -1183,14 +1183,16 @@
       "commerceProducts": "بەرهەمەکان",
       "commerceInventory": "کۆگا",
       "commerceOrders": "داواکارییەکان",
-      "commerceReports": "ڕاپۆرتی کارگێڕی"
+      "commerceReports": "ڕاپۆرتی کارگێڕی",
+      "payments": "پارەدانەکان"
     },
     "customer": {
       "dashboard": "داشبۆرد",
       "marketplace": "بازاڕ",
       "bookings": "حجزەکانم",
       "favorites": "دڵخوازەکان",
-      "notifications": "ئاگادارکردنەوەکان"
+      "notifications": "ئاگادارکردنەوەکان",
+      "payments": "پارەدانەکان"
     },
     "actions": {
       "addService": "زیادکردنی خزمەتگوزاری",
@@ -1244,7 +1246,8 @@
         "commerceProducts": "بەرهەمەکان",
         "commerceInventory": "کۆگا",
         "commerceOrders": "داواکارییەکان",
-        "commerceReports": "ڕاپۆرتی کارگێڕی"
+        "commerceReports": "ڕاپۆرتی کارگێڕی",
+        "payments": "پارەدانەکان"
       }
     },
     "openMenu": "کردنەوەی لیستی ڕێنیشاندان",
@@ -1527,7 +1530,12 @@
       "COMMERCE_ORDERS_VIEW": "بینینی داواکارییەکانی بازاڕ",
       "COMMERCE_ORDERS_MANAGE": "بەڕێوەبردنی داواکارییەکانی بازاڕ",
       "STORAGE_RECORDS_VIEW": "بینینی تۆمارەکانی هەڵگرتنی بەڕێوەبراو",
-      "STORAGE_RECORDS_MANAGE": "بەڕێوەبردنی ژیانی هەڵگرتنی بەڕێوەبراو"
+      "STORAGE_RECORDS_MANAGE": "بەڕێوەبردنی ژیانی هەڵگرتنی بەڕێوەبراو",
+      "PAYMENTS_VIEW": "بینینی پارەدانەکان",
+      "PAYMENTS_REFUND": "بەڕێوەبردنی گەڕاندنەوەی پارە",
+      "PAYMENTS_RECONCILE": "پشکنینی پارەدانەکان",
+      "SETTLEMENTS_VIEW": "بینینی بەڵگەنامەکانی یەکلاکەرەوە",
+      "SETTLEMENTS_MANAGE": "بەڕێوەبردنی بەڵگەنامەکانی یەکلاکەرەوە"
     }
   },
   "Media": {

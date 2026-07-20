@@ -228,17 +228,29 @@ export async function finalizeOrderHandoff(
     assertOrderPaymentConsistency(order);
     if (order.status !== "CONFIRMED") commerceError("INVALID_TRANSITION", "Order is not confirmed.");
     assertFulfillmentTransition(order.fulfillmentMethod, order.fulfillmentStatus, next);
-    assertPaymentTransition(order.paymentStatus, "PAID");
+    const onlinePayment = order.paymentMethod === "ONLINE_PROVIDER";
+    if (onlinePayment) {
+      if (order.paymentStatus !== "PAID") {
+        commerceError("INVALID_TRANSITION", "Online payment must be captured before final handoff.");
+      }
+    } else {
+      if (order.paymentStatus !== "UNPAID") {
+        commerceError("INVALID_TRANSITION", "Only an unpaid offline Payment can be recorded.");
+      }
+      assertPaymentTransition("UNPAID", "PAID");
+    }
     assertOrderTransition(order.status, "COMPLETED");
-    await transaction.payment.update({
-      where: { orderId: order.id },
-      data: {
-        paidAt: now,
-        recordedById: actor.personId,
-        recordedByType: "MERCHANT",
-        status: "PAID",
-      },
-    });
+    if (!onlinePayment) {
+      await transaction.payment.update({
+        where: { orderId: order.id },
+        data: {
+          paidAt: now,
+          recordedById: actor.personId,
+          recordedByType: "MERCHANT",
+          status: "PAID",
+        },
+      });
+    }
     await transaction.order.update({
       where: { id: order.id },
       data: {

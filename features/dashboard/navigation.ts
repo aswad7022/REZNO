@@ -9,6 +9,7 @@ import {
   ChartNoAxesCombined,
   Clock3,
   ClipboardList,
+  CreditCard,
   Heart,
   LayoutDashboard,
   MapPin,
@@ -89,6 +90,11 @@ const customerNavigation: DashboardNavigationGroup[] = [
         icon: BookOpen,
       },
       {
+        title: "payments",
+        href: "/customer/payments",
+        icon: CreditCard,
+      },
+      {
         title: "profile",
         href: "/customer/profile",
         icon: UserRound,
@@ -166,6 +172,9 @@ function businessNavigation(input: {
               : []),
           ],
         }] satisfies DashboardNavigationGroup["items"])
+      : []),
+    ...(input.commercePermissions.includes("PAYMENT_VIEW")
+      ? ([{ title: "payments" as const, href: "/business/payments", icon: CreditCard }] satisfies DashboardNavigationGroup["items"])
       : []),
     ...(management
       ? ([
@@ -259,4 +268,5 @@ export const dashboardRouteLabels: Readonly<
   products: "commerceProducts",
   inventory: "commerceInventory",
   orders: "commerceOrders",
+  payments: "payments",
 };

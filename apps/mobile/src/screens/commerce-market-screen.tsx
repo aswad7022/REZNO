@@ -22,6 +22,7 @@ import {
 } from "react-native";
 
 import { commerceApi, type ProductSearch, type StoreSearch } from "../api/commerce";
+import { paymentApi } from "../api/payments";
 import { MobileApiRequestError } from "../api/client";
 import {
   COMMERCE_ICONS,
@@ -77,6 +78,7 @@ import type {
   FavoriteStore,
 } from "../types/commerce";
 import type { MobileTheme } from "../theme/tokens";
+import type { MobilePaymentCapabilities } from "../types/payments";
 
 type EntryPoint = "favorites" | "market" | "orders";
 type CatalogMode = "products" | "stores";
@@ -785,6 +787,7 @@ function CheckoutScreen(props: CommonProps) {
   const styles = useMemo(() => createStyles(theme), [theme]);
   const [addresses, setAddresses] = useState<CommerceAddress[]>([]);
   const [storeDetails, setStoreDetails] = useState<CommerceStore | null>(null);
+  const [paymentCapabilities, setPaymentCapabilities] = useState<MobilePaymentCapabilities | null>(null);
   const mountedRef = useRef(false);
   const submissionInFlightRef = useRef(false);
   const submissionSequenceRef = useRef(0);
@@ -793,7 +796,7 @@ function CheckoutScreen(props: CommonProps) {
   const checkoutStoreId = cart?.store.id;
   const checkoutStoreSlug = cart?.store.slug;
   const latestCartIdentityRef = useRef({ id: checkoutCartId, version: cart?.version });
-  const updateDraft = (patch: Partial<Pick<CheckoutDraft, "addressId" | "customerInstructions" | "fulfillmentMethod">>) => {
+  const updateDraft = (patch: Partial<Pick<CheckoutDraft, "addressId" | "customerInstructions" | "fulfillmentMethod" | "paymentMethod">>) => {
     if (!cart) return;
     setCheckoutDraft((current) => ({ ...checkoutDraftForCart(current, cart), ...patch, attempt: null }));
   };
@@ -813,10 +816,11 @@ function CheckoutScreen(props: CommonProps) {
     const cartRequestSequence = beginCartRequest();
     const requestedCart = { id: checkoutCartId, store: { id: checkoutStoreId } };
     const load = async () => {
-      const [cartResult, addressesResult, storeResult] = await Promise.allSettled([
+      const [cartResult, addressesResult, storeResult, capabilitiesResult] = await Promise.allSettled([
         commerceApi.getCart(),
         commerceApi.listAddresses(),
         commerceApi.getStore(checkoutStoreSlug),
+        paymentApi.capabilities({ targetId: checkoutCartId, targetType: "CART" }),
       ]);
       if (!active) return;
       const unauthorized = [cartResult, addressesResult].find(
@@ -858,6 +862,15 @@ function CheckoutScreen(props: CommonProps) {
             : { ...currentDraft, fulfillmentMethod };
         });
       } else setNotice(messageForError(storeResult.reason, copy));
+      if (capabilitiesResult.status === "fulfilled") {
+        setPaymentCapabilities(capabilitiesResult.value);
+        if (!capabilitiesResult.value.onlinePaymentsAvailable) {
+          setCheckoutDraft((current) => ({ ...checkoutDraftForCart(current, requestedCart), paymentMethod: undefined, attempt: null }));
+        }
+      } else {
+        setPaymentCapabilities(null);
+        setCheckoutDraft((current) => ({ ...checkoutDraftForCart(current, requestedCart), paymentMethod: undefined, attempt: null }));
+      }
     };
     void load();
     return () => { active = false; };
@@ -868,7 +881,8 @@ function CheckoutScreen(props: CommonProps) {
   const addressId = draft?.addressId ?? null;
   const fulfillment = draft?.fulfillmentMethod ?? "CUSTOMER_PICKUP";
   const instructions = draft?.customerInstructions ?? "";
-  const checkoutInput = { addressId: fulfillment === "STORE_DELIVERY" ? addressId : null, cartId: cart.id, cartVersion: cart.version, customerInstructions: instructions.trim() || null, fulfillmentMethod: fulfillment };
+  const paymentMethod = draft?.paymentMethod;
+  const checkoutInput = { addressId: fulfillment === "STORE_DELIVERY" ? addressId : null, cartId: cart.id, cartVersion: cart.version, customerInstructions: instructions.trim() || null, fulfillmentMethod: fulfillment, ...(paymentMethod ? { paymentMethod } : {}) };
   const submit = async () => {
     if (fulfillment === "STORE_DELIVERY" && !addressId) return setNotice(copy.addressRequired);
     if (submissionInFlightRef.current) return;
@@ -910,7 +924,12 @@ function CheckoutScreen(props: CommonProps) {
     <View style={[styles.segment, isRtl && styles.rowRtl]}><Chip disabled={submitting || (storeDetails ? !storeDetails.pickup.enabled : false)} label={copy.pickup} onPress={() => updateDraft({ fulfillmentMethod: "CUSTOMER_PICKUP" })} selected={fulfillment === "CUSTOMER_PICKUP"} theme={theme} /><Chip disabled={submitting || (storeDetails ? !storeDetails.delivery.enabled : false)} label={copy.delivery} onPress={() => updateDraft({ fulfillmentMethod: "STORE_DELIVERY" })} selected={fulfillment === "STORE_DELIVERY"} theme={theme} /></View>
     {fulfillment === "STORE_DELIVERY" ? <><Text style={[styles.sectionTitle, isRtl ? styles.rtl : styles.ltr]}>{copy.selectAddress}</Text>{addresses.map((address) => <PremiumPressable accessibilityRole="radio" accessibilityState={{ checked: address.id === addressId, disabled: submitting }} disabled={submitting} key={address.id} onPress={() => updateDraft({ addressId: address.id })} style={[styles.addressChoice, address.id === addressId && styles.selected]}><Text style={[styles.lineTitle, isRtl ? styles.rtl : styles.ltr]}>{address.recipientName}</Text><Text style={[styles.muted, isRtl ? styles.rtl : styles.ltr]}>{address.city} · {address.area} · {address.street}</Text></PremiumPressable>)}<CommerceButton disabled={submitting} label={copy.addAddress} onPress={() => navigate({ kind: "addresses", returnToCheckout: true })} secondary theme={theme} /></> : null}
     <TextInput accessibilityLabel={copy.customerInstructions} editable={!submitting} multiline maxLength={1000} onChangeText={(value) => updateDraft({ customerInstructions: value })} placeholder={copy.customerInstructions} placeholderTextColor={theme.colors.mutedForeground} style={[styles.textArea, isRtl ? styles.rtl : styles.ltr]} value={instructions} />
-    <Text style={[styles.muted, isRtl ? styles.rtl : styles.ltr]}>{copy.payment}: {fulfillment === "STORE_DELIVERY" ? copy.cashOnDelivery : copy.payAtPickup}</Text>
+    <Text style={[styles.sectionTitle, isRtl ? styles.rtl : styles.ltr]}>{copy.payment}</Text>
+    <View style={[styles.segment, isRtl && styles.rowRtl]}>
+      <Chip disabled={submitting} label={fulfillment === "STORE_DELIVERY" ? copy.cashOnDelivery : copy.payAtPickup} onPress={() => updateDraft({ paymentMethod: undefined })} selected={!paymentMethod} theme={theme} />
+      {paymentCapabilities?.onlinePaymentsAvailable ? <Chip disabled={submitting} label={copy.onlinePayment} onPress={() => updateDraft({ paymentMethod: "ONLINE_PROVIDER" })} selected={paymentMethod === "ONLINE_PROVIDER"} theme={theme} /> : null}
+    </View>
+    {paymentCapabilities && !paymentCapabilities.onlinePaymentsAvailable ? <Text style={[styles.muted, isRtl ? styles.rtl : styles.ltr]}>{copy.onlinePaymentUnavailable}</Text> : null}
     <CommerceButton disabled={submitting || !cart.availability || (fulfillment === "STORE_DELIVERY" && !addressId)} label={submitting ? copy.loading : copy.confirm} onPress={() => void submit()} theme={theme} />
   </KeyboardAvoidingView>;
 }
@@ -927,6 +946,7 @@ function ReceiptScreen(props: CommonProps & { receipt: CommerceReceipt }) {
     <CommerceHeader copy={copy} isRtl={isRtl} title={copy.receipt} theme={theme} />
     <CommerceState body={copy.successBody} theme={theme} title={copy.successTitle} />
     <View style={styles.panel}><Summary label={copy.orderNumber} value={receipt.orderNumber} isRtl={isRtl} styles={styles} /><Summary label={copy.status} value={commerceStatusLabel(receipt.status, locale)} isRtl={isRtl} styles={styles} /><Summary label={copy.fulfillment} value={commerceStatusLabel(receipt.fulfillmentStatus, locale)} isRtl={isRtl} styles={styles} /><Summary label={copy.payment} value={`${commercePaymentMethodLabel(receipt.paymentMethod, copy)} · ${commerceStatusLabel(receipt.paymentStatus, locale)}`} isRtl={isRtl} styles={styles} /><Summary label={copy.total} value={formatCommerceMoney(receipt.grandTotal, receipt.currency, locale)} isRtl={isRtl} styles={styles} /><Text style={styles.muted}>{formatCommerceDate(receipt.createdAt, locale)}</Text></View>
+    {receipt.onlinePayment?.action ? <CommerceState body={copy.paymentActionPending} theme={theme} title={copy.onlinePayment} /> : null}
     {receipt.items.map((item, index) => <View key={`${item.productName}-${index}`} style={styles.lineCard}><Text style={[styles.lineTitle, isRtl ? styles.rtl : styles.ltr]}>{item.productName}</Text><Text style={[styles.muted, isRtl ? styles.rtl : styles.ltr]}>{item.variantTitle} · {item.quantity}</Text><Text style={styles.goldText}>{formatCommerceMoney(item.lineTotal, item.currency, locale)}</Text></View>)}
     {receipt.address ? <View style={styles.panel}><Text style={[styles.sectionTitle, isRtl ? styles.rtl : styles.ltr]}>{copy.address}</Text><Text style={[styles.body, isRtl ? styles.rtl : styles.ltr]}>{receipt.address.recipientName} · {receipt.address.city} · {receipt.address.area} · {receipt.address.street}</Text></View> : null}
     <CommerceButton label={copy.viewOrder} onPress={() => void openOrder()} theme={theme} />

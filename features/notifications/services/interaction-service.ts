@@ -334,6 +334,7 @@ async function updateSuppressionWindows(
     ["BOOKINGS", "bookingsEnabled"],
     ["RESTAURANT", "restaurantEnabled"],
     ["COMMERCE", "commerceEnabled"],
+    ["PAYMENTS", "commerceEnabled"],
     ["MESSAGES", "messagesEnabled"],
     ["ADMIN_ANNOUNCEMENT", "adminAnnouncementsEnabled"],
   ] as const satisfies readonly (readonly [NotificationCategory, keyof typeof next])[];

@@ -73,6 +73,9 @@ export type MobilePersistedBooking = {
   endsAt: string;
   timezone: string;
   price: string;
+  currency: string;
+  paymentMethod: "CASH_ON_DELIVERY" | "PAY_AT_PICKUP" | "ONLINE_PROVIDER" | null;
+  paymentStatus: "UNPAID" | "PAID" | "VOIDED" | "PARTIALLY_REFUNDED" | "REFUNDED";
   status: "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED" | "NO_SHOW";
   createdAt: string;
 };

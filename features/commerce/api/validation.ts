@@ -209,12 +209,17 @@ export async function parseCheckoutRequest(request: Request) {
     "fulfillmentMethod",
     "addressId",
     "customerInstructions",
+    "paymentMethod",
   ]);
   const fulfillmentMethod = body.fulfillmentMethod;
   if (fulfillmentMethod !== "STORE_DELIVERY" && fulfillmentMethod !== "CUSTOMER_PICKUP") {
     commerceApiError("INVALID_REQUEST", 400, "fulfillmentMethod is invalid.");
   }
   const addressId = body.addressId === undefined || body.addressId === null ? null : parseUuid(body.addressId, "addressId");
+  const paymentMethod = body.paymentMethod;
+  if (paymentMethod !== undefined && paymentMethod !== "ONLINE_PROVIDER") {
+    commerceApiError("INVALID_REQUEST", 400, "paymentMethod is invalid.");
+  }
   if (fulfillmentMethod === "STORE_DELIVERY" && !addressId) {
     commerceApiError("ADDRESS_REQUIRED", 400, "Delivery requires an address.");
   }
@@ -227,6 +232,7 @@ export async function parseCheckoutRequest(request: Request) {
     cartVersion: parseCartVersion(body.cartVersion),
     customerInstructions: normalizedCustomerInstructions(body.customerInstructions),
     fulfillmentMethod: fulfillmentMethod as "STORE_DELIVERY" | "CUSTOMER_PICKUP",
+    paymentMethod: paymentMethod as "ONLINE_PROVIDER" | undefined,
   };
 }
 

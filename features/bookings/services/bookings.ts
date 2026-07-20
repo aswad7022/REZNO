@@ -62,6 +62,10 @@ function toListItem(booking: {
   endsAt: Date;
   status: BookingListItem["status"];
   priceSnapshot: { toString(): string };
+  currency: string;
+  paymentMethod: BookingListItem["payment"]["method"];
+  paymentStatus: BookingListItem["payment"]["status"];
+  paymentIntents?: Array<{ id: string; status: BookingListItem["payment"]["intentStatus"] }>;
   branch: { name: string; timezone: string; phone: string | null };
   organization: {
     id: string;
@@ -110,6 +114,13 @@ function toListItem(booking: {
     endsAt: booking.endsAt,
     status: booking.status,
     price: booking.priceSnapshot.toString(),
+    currency: booking.currency,
+    payment: {
+      intentId: booking.paymentIntents?.[0]?.id ?? null,
+      intentStatus: booking.paymentIntents?.[0]?.status ?? null,
+      method: booking.paymentMethod,
+      status: booking.paymentStatus,
+    },
     timezone: booking.branch.timezone,
     organizationId: booking.organization.id,
     version: booking.updatedAt.toISOString(),
@@ -222,6 +233,11 @@ export async function getCustomerBookings(
         orderBy: { createdAt: "desc" },
         take: 1,
       },
+      paymentIntents: {
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        select: { id: true, status: true },
+        take: 1,
+      },
     },
     orderBy: { startsAt: filter === "upcoming" ? "asc" : "desc" },
   });
@@ -260,6 +276,11 @@ export async function getCustomerBookingDetails(
         where: { status: "PENDING" },
         include: { proposedMember: { include: { person: true } } },
         orderBy: { createdAt: "desc" },
+        take: 1,
+      },
+      paymentIntents: {
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        select: { id: true, status: true },
         take: 1,
       },
     },

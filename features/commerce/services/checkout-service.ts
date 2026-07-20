@@ -26,6 +26,10 @@ import {
 } from "@/features/commerce/services/transaction";
 import { prisma } from "@/lib/db/prisma";
 import { resolvePublicMediaBatchWithClient } from "@/features/media/services/media-query";
+import { paymentCommissionPolicy } from "@/features/payments/domain/commission";
+import { paymentError } from "@/features/payments/domain/errors";
+import { configuredPaymentProvider } from "@/features/payments/providers/registry";
+import { submitCustomerPaymentIntent } from "@/features/payments/services/payment-intents";
 
 export interface CreatePendingOrderInput {
   addressId?: string | null;
@@ -35,6 +39,7 @@ export interface CreatePendingOrderInput {
   customerInstructions?: string | null;
   fulfillmentMethod: "STORE_DELIVERY" | "CUSTOMER_PICKUP";
   idempotencyKey: string;
+  paymentMethod?: "ONLINE_PROVIDER";
   now?: Date;
 }
 
@@ -43,6 +48,12 @@ const orderInclude = {
   history: { orderBy: { createdAt: "asc" as const } },
   items: true,
   payment: true,
+  paymentIntents: {
+    include: {
+      attempts: { orderBy: { attemptNumber: "desc" as const }, take: 5 },
+      refunds: { orderBy: [{ createdAt: "desc" as const }, { id: "desc" as const }], take: 20 },
+    },
+  },
   reservations: true,
 } satisfies Prisma.OrderInclude;
 
@@ -77,6 +88,9 @@ async function replayExistingOrder(customerId: string, key: string, requestHash:
 }
 
 export async function createPendingOrder(input: CreatePendingOrderInput) {
+  const onlineProvider = input.paymentMethod === "ONLINE_PROVIDER"
+    ? configuredPaymentProvider()
+    : null;
   const instructions = boundedInstructions(input.customerInstructions);
   const requestHash = hashCheckoutRequest({
     addressId: input.addressId ?? null,
@@ -84,11 +98,12 @@ export async function createPendingOrder(input: CreatePendingOrderInput) {
     cartVersion: input.cartVersion,
     fulfillmentMethod: input.fulfillmentMethod,
     instructions,
+    paymentMethod: input.paymentMethod ?? "OFFLINE",
   });
   const now = input.now ?? new Date();
 
   try {
-    return await runCommerceSerializable(async (transaction) => {
+    const order = await runCommerceSerializable(async (transaction) => {
       const customer = await requireActiveCommerceCustomer(input.customerId, transaction);
       const existingIdempotency = await transaction.checkoutIdempotency.findUnique({
         where: { customerId_key: { customerId: customer.personId, key: input.idempotencyKey } },
@@ -126,7 +141,12 @@ export async function createPendingOrder(input: CreatePendingOrderInput) {
           store: {
             include: {
               organization: {
-                select: { deletedAt: true, isActive: true, status: true },
+                select: {
+                  deletedAt: true,
+                  isActive: true,
+                  status: true,
+                  settings: { select: { allowOnlinePayments: true } },
+                },
               },
             },
           },
@@ -150,7 +170,7 @@ export async function createPendingOrder(input: CreatePendingOrderInput) {
       }
 
       let address: Awaited<ReturnType<typeof transaction.customerAddress.findFirst>> = null;
-      let paymentMethod: "CASH_ON_DELIVERY" | "PAY_AT_PICKUP";
+      let paymentMethod: "CASH_ON_DELIVERY" | "PAY_AT_PICKUP" | "ONLINE_PROVIDER";
       if (input.fulfillmentMethod === "STORE_DELIVERY") {
         if (!cart.store.deliveryEnabled) {
           commerceError("INVALID_FULFILLMENT_METHOD", "Store delivery is not available.");
@@ -168,7 +188,7 @@ export async function createPendingOrder(input: CreatePendingOrderInput) {
         ) {
           commerceError("ADDRESS_NOT_ALLOWED", "Address is outside the Store delivery area.");
         }
-        paymentMethod = "CASH_ON_DELIVERY";
+        paymentMethod = input.paymentMethod === "ONLINE_PROVIDER" ? "ONLINE_PROVIDER" : "CASH_ON_DELIVERY";
       } else {
         if (input.addressId) {
           commerceError("ADDRESS_NOT_ALLOWED", "Pickup Checkout must not include an address.");
@@ -176,7 +196,13 @@ export async function createPendingOrder(input: CreatePendingOrderInput) {
         if (!cart.store.pickupEnabled) {
           commerceError("INVALID_FULFILLMENT_METHOD", "Customer pickup is not available.");
         }
-        paymentMethod = "PAY_AT_PICKUP";
+        paymentMethod = input.paymentMethod === "ONLINE_PROVIDER" ? "ONLINE_PROVIDER" : "PAY_AT_PICKUP";
+      }
+      if (
+        paymentMethod === "ONLINE_PROVIDER" &&
+        !cart.store.organization.settings?.allowOnlinePayments
+      ) {
+        paymentError("PAYMENT_NOT_PAYABLE", "Online payment is disabled for this Organization.");
       }
 
       const totalInput = cart.items.map((item) => {
@@ -344,6 +370,33 @@ export async function createPendingOrder(input: CreatePendingOrderInput) {
         },
       });
 
+      if (paymentMethod === "ONLINE_PROVIDER") {
+        if (!onlineProvider) paymentError("PAYMENT_PROVIDER_NOT_CONFIGURED", "Online payment provider is not configured.");
+        const intentId = randomUUID();
+        await transaction.paymentIntent.create({
+          data: {
+            amount: totals.grandTotal,
+            commissionAmount: "0",
+            commissionBasisPoints: 0,
+            commissionPolicyId: paymentCommissionPolicy.id,
+            currency: COMMERCE_CURRENCY,
+            customerPersonId: customer.personId,
+            expiresAt,
+            id: intentId,
+            merchantNetAmount: "0",
+            method: "ONLINE_PROVIDER",
+            orderId,
+            organizationId: cart.store.organizationId,
+            provider: onlineProvider.kind,
+            storeId: cart.store.id,
+          },
+        });
+        await transaction.payment.update({
+          where: { orderId },
+          data: { paymentIntentId: intentId },
+        });
+      }
+
       for (const [index, item] of cart.items.entries()) {
         const inventory = inventoryById.get(item.productVariant.inventory!.id)!;
         const orderItem = orderItemData[index];
@@ -403,9 +456,21 @@ export async function createPendingOrder(input: CreatePendingOrderInput) {
       await notifyCheckoutCreated(transaction, orderId);
       return transaction.order.findUniqueOrThrow({ where: { id: orderId }, include: orderInclude });
     });
+    const intent = order.paymentIntents[0];
+    if (input.paymentMethod === "ONLINE_PROVIDER" && intent) {
+      await submitCustomerPaymentIntent(input.customerId, intent.id, input.idempotencyKey);
+      return prisma.order.findUniqueOrThrow({ where: { id: order.id }, include: orderInclude });
+    }
+    return order;
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-      return replayExistingOrder(input.customerId, input.idempotencyKey, requestHash);
+      const order = await replayExistingOrder(input.customerId, input.idempotencyKey, requestHash);
+      const intent = order.paymentIntents[0];
+      if (input.paymentMethod === "ONLINE_PROVIDER" && intent) {
+        await submitCustomerPaymentIntent(input.customerId, intent.id, input.idempotencyKey);
+        return prisma.order.findUniqueOrThrow({ where: { id: order.id }, include: orderInclude });
+      }
+      return order;
     }
     throw error;
   }

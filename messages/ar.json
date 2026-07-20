@@ -1194,14 +1194,16 @@
       "commerceProducts": "المنتجات",
       "commerceInventory": "المخزون",
       "commerceOrders": "الطلبات",
-      "commerceReports": "التقارير التشغيلية"
+      "commerceReports": "التقارير التشغيلية",
+      "payments": "المدفوعات"
     },
     "customer": {
       "dashboard": "لوحة التحكم",
       "marketplace": "سوق الخدمات",
       "bookings": "حجوزاتي",
       "favorites": "المفضلة",
-      "notifications": "الإشعارات"
+      "notifications": "الإشعارات",
+      "payments": "المدفوعات"
     },
     "actions": {
       "addService": "إضافة خدمة",
@@ -1255,7 +1257,8 @@
         "commerceProducts": "المنتجات",
         "commerceInventory": "المخزون",
         "commerceOrders": "الطلبات",
-        "commerceReports": "التقارير التشغيلية"
+        "commerceReports": "التقارير التشغيلية",
+        "payments": "المدفوعات"
       }
     },
     "openMenu": "فتح قائمة التنقل",
@@ -1538,7 +1541,12 @@
       "COMMERCE_ORDERS_VIEW": "عرض طلبات السوق",
       "COMMERCE_ORDERS_MANAGE": "إدارة طلبات السوق",
       "STORAGE_RECORDS_VIEW": "عرض سجلات التخزين المُدار",
-      "STORAGE_RECORDS_MANAGE": "إدارة دورة حياة التخزين المُدار"
+      "STORAGE_RECORDS_MANAGE": "إدارة دورة حياة التخزين المُدار",
+      "PAYMENTS_VIEW": "عرض المدفوعات",
+      "PAYMENTS_REFUND": "إدارة استرداد المدفوعات",
+      "PAYMENTS_RECONCILE": "تشغيل مطابقة المدفوعات",
+      "SETTLEMENTS_VIEW": "عرض كشوف التسوية",
+      "SETTLEMENTS_MANAGE": "إدارة كشوف التسوية"
     }
   },
   "Media": {

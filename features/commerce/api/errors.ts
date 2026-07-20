@@ -1,5 +1,6 @@
 import { CommerceDomainError } from "@/features/commerce/domain/errors";
 import { PublicCommerceError } from "@/features/commerce/public/errors";
+import { PaymentDomainError, type PaymentErrorCode } from "@/features/payments/domain/errors";
 
 export type CommerceApiErrorCode =
   | "UNAUTHENTICATED"
@@ -29,12 +30,13 @@ export type CommerceApiErrorCode =
   | "FAVORITE_ALREADY_EXISTS"
   | "FAVORITE_NOT_FOUND"
   | "RATE_LIMITED"
+  | PaymentErrorCode
   | "INTERNAL_ERROR";
 
 export class CommerceApiError extends Error {
   constructor(
     readonly code: CommerceApiErrorCode,
-    readonly status: 400 | 401 | 403 | 404 | 409 | 429 | 500,
+    readonly status: 400 | 401 | 403 | 404 | 409 | 429 | 500 | 503,
     message: string,
     readonly details?: Readonly<Record<string, unknown>>,
   ) {
@@ -54,6 +56,9 @@ export function commerceApiError(
 
 export function mapCommerceApiError(error: unknown) {
   if (error instanceof CommerceApiError) return error;
+  if (error instanceof PaymentDomainError) {
+    return new CommerceApiError(error.code, error.status as CommerceApiError["status"], error.message);
+  }
   if (error instanceof PublicCommerceError) {
     return new CommerceApiError(
       error.code === "INVALID_CURSOR" ? "INVALID_CURSOR" : "INVALID_REQUEST",

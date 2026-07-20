@@ -1,5 +1,5 @@
 export type MobileNotificationCategory =
-  | "ACCOUNT" | "ADMIN_ANNOUNCEMENT" | "BOOKINGS" | "COMMERCE" | "MESSAGES" | "RESTAURANT";
+  | "ACCOUNT" | "ADMIN_ANNOUNCEMENT" | "BOOKINGS" | "COMMERCE" | "MESSAGES" | "PAYMENTS" | "RESTAURANT";
 
 export type MobileNotificationDestinationKind =
   | "CUSTOMER_ACCOUNT" | "CUSTOMER_BOOKING" | "CUSTOMER_COMMERCE_ORDER"

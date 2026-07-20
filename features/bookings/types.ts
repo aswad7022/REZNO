@@ -1,6 +1,9 @@
 import type {
   BookingChangeRequestStatus,
   BookingStatus,
+  PaymentIntentStatus,
+  PaymentMethod,
+  PaymentStatus,
   StaffSelectionMode,
 } from "@prisma/client";
 
@@ -102,6 +105,9 @@ export interface PersistedBookingDetail {
   endsAt: string;
   timezone: string;
   price: string;
+  currency: string;
+  paymentMethod: PaymentMethod | null;
+  paymentStatus: PaymentStatus;
   status: BookingStatus;
   createdAt: string;
 }
@@ -185,6 +191,13 @@ export interface BookingListItem {
   endsAt: Date;
   status: BookingStatus;
   price: string;
+  currency: string;
+  payment: {
+    intentId: string | null;
+    intentStatus: PaymentIntentStatus | null;
+    method: PaymentMethod | null;
+    status: PaymentStatus;
+  };
   timezone: string;
   organizationId: string;
   version: string;
