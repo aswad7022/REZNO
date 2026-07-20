@@ -242,6 +242,35 @@ test("Gate 5C production routes are strict, scope-safe, truthful, and redacted",
     }), 503, "PAYMENT_PROVIDER_NOT_CONFIGURED");
   });
 
+  await t.test("production webhook rejects chunked bodies before provider work and rate-limits repeated callers", async () => {
+    const chunked = await chunkedWebhookRequest(
+      [Buffer.alloc(64 * 1024, 65), Buffer.from("raw-webhook-marker")],
+      "rezno-payment-webhook-chunked",
+    );
+    assertError(chunked, 503, "PAYMENT_PROVIDER_NOT_CONFIGURED");
+    assert.doesNotMatch(JSON.stringify(chunked.body), /raw-webhook-marker/);
+
+    let limited: Awaited<ReturnType<typeof request>> | undefined;
+    for (let attempt = 0; attempt < 61; attempt += 1) {
+      limited = await request("/api/payments/webhooks/deterministic", {
+        body: '{"eventId":"rate-limit-body-must-not-identify-the-caller"}',
+        method: "POST",
+        queryHeaders: {
+          "user-agent": "rezno-payment-webhook-rate-limit",
+          "x-payment-signature": "0".repeat(64),
+          "x-payment-timestamp": String(Math.floor(Date.now() / 1_000)),
+        },
+      });
+      if (limited.response.status === 429) break;
+      assertError(limited, 503, "PAYMENT_PROVIDER_NOT_CONFIGURED");
+    }
+    assert.ok(limited);
+    assertError(limited, 429, "RATE_LIMITED");
+    const retryAfter = Number(limited.response.headers.get("retry-after"));
+    assert.equal(Number.isSafeInteger(retryAfter) && retryAfter >= 1 && retryAfter <= 60, true);
+    assert.doesNotMatch(JSON.stringify(limited.body), /rate-limit-body-must-not-identify-the-caller/);
+  });
+
   await t.test("Business roles and Organization scope are enforced by production routes", async () => {
     for (const cookie of [ownerCookie, managerCookie]) {
       assert.equal((await request("/api/payments/business/intents?limit=10", { cookie })).response.status, 200);
@@ -372,6 +401,34 @@ async function createOrder(customerId: string, storeId: string, total: string) {
       payment: { create: { amount: total, currency: "IQD", method: "PAY_AT_PICKUP" } },
     },
   });
+}
+
+async function chunkedWebhookRequest(chunks: readonly Uint8Array[], userAgent: string) {
+  let index = 0;
+  const body = new ReadableStream<Uint8Array>({
+    pull(controller) {
+      const chunk = chunks[index++];
+      if (!chunk) {
+        controller.close();
+        return;
+      }
+      controller.enqueue(chunk);
+    },
+  }, { highWaterMark: 0 });
+  const response = await fetch(`${baseUrl}/api/payments/webhooks/deterministic`, {
+    body,
+    duplex: "half",
+    headers: {
+      "content-type": "application/json",
+      "user-agent": userAgent,
+      "x-payment-signature": "0".repeat(64),
+      "x-payment-timestamp": String(Math.floor(Date.now() / 1_000)),
+    },
+    method: "POST",
+  } as RequestInit & { duplex: "half" });
+  const responseBody = await response.json() as Record<string, unknown>;
+  assert.equal(response.headers.get("cache-control"), "no-store, max-age=0");
+  return { body: responseBody, response };
 }
 
 function assertError(result: { body: Record<string, unknown>; response: Response }, status: number, code: string) {

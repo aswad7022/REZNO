@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
 
+import { readBoundedWebhook } from "../../../features/payments/api/validation";
+import { assertPaymentWebhookRequestAllowed } from "../../../features/payments/api/webhook-guard";
 import { PaymentDomainError } from "../../../features/payments/domain/errors";
 import { assertJournalBalanced, reverseFinancialJournal } from "../../../features/payments/services/ledger";
 import {
@@ -233,8 +235,31 @@ test("Gate 5C payment lifecycle is authorized, exact-once, balanced, refundable,
     const stored = await prisma.paymentIntent.findUniqueOrThrow({ where: { id: pending.id } });
     const now = new Date();
     const capturedEvent = provider.signWebhook({ amount: "9000.000", currency: "IQD", eventId: "late-capture-" + randomUUID(), occurredAt: now, outcome: "CAPTURED", providerReference: stored.providerReference!, safeCode: null }, now);
-    const first = await processPaymentProviderWebhook({ ...capturedEvent, receivedAt: now });
-    const duplicate = await processPaymentProviderWebhook({ ...capturedEvent, receivedAt: now });
+    const oversizedWithoutLength = paymentWebhookStreamRequest(
+      [new Uint8Array(64 * 1024), new Uint8Array(1), new Uint8Array(1)],
+      capturedEvent,
+    );
+    await assert.rejects(
+      processGuardedPaymentWebhook(oversizedWithoutLength.request),
+      code("VALIDATION_ERROR"),
+    );
+    assert.equal(oversizedWithoutLength.probe.cancelCount, 1);
+    assert.equal(oversizedWithoutLength.probe.pullCount, 2);
+
+    const forgedSmallerLength = paymentWebhookStreamRequest(
+      [new Uint8Array(64 * 1024), new Uint8Array(1), new Uint8Array(1)],
+      capturedEvent,
+      { "content-length": "1" },
+    );
+    await assert.rejects(
+      processGuardedPaymentWebhook(forgedSmallerLength.request),
+      code("VALIDATION_ERROR"),
+    );
+    assert.equal(forgedSmallerLength.probe.cancelCount, 1);
+    assert.equal(forgedSmallerLength.probe.pullCount, 2);
+
+    const first = await processGuardedPaymentWebhook(paymentWebhookRequest(capturedEvent));
+    const duplicate = await processGuardedPaymentWebhook(paymentWebhookRequest(capturedEvent));
     assert.equal(first.status, "PROCESSED");
     assert.equal(duplicate.duplicate, true);
     const collidedEvent = provider.signWebhook({ amount: "8000.000", currency: "IQD", eventId: JSON.parse(Buffer.from(capturedEvent.body).toString("utf8")).eventId, occurredAt: now, outcome: "CAPTURED", providerReference: stored.providerReference!, safeCode: null }, now);
@@ -245,7 +270,13 @@ test("Gate 5C payment lifecycle is authorized, exact-once, balanced, refundable,
     assert.equal((await prisma.order.findUniqueOrThrow({ where: { id: lateOrder.id } })).paymentStatus, "VOIDED");
     const oldAuthorized = provider.signWebhook({ amount: null, currency: null, eventId: "old-authorized-" + randomUUID(), occurredAt: new Date(now.getTime() - 60_000), outcome: "AUTHORIZED", providerReference: stored.providerReference!, safeCode: null }, now);
     assert.equal((await processPaymentProviderWebhook({ ...oldAuthorized, receivedAt: now })).status, "IGNORED");
-    await assert.rejects(processPaymentProviderWebhook({ ...capturedEvent, signature: "0".repeat(64), receivedAt: now }), code("WEBHOOK_INVALID_SIGNATURE"));
+    await assert.rejects(
+      processGuardedPaymentWebhook(paymentWebhookRequest({
+        ...capturedEvent,
+        signature: "0".repeat(64),
+      })),
+      code("WEBHOOK_INVALID_SIGNATURE"),
+    );
     assert.equal(await prisma.notification.count({ where: { sourceId: pending.id, eventType: "payment.captured" } }) > 0, true);
     provider.configureDefaultScenario("IMMEDIATE_CAPTURE");
   });
@@ -360,4 +391,61 @@ function code(expected: string) {
 
 function hasAuthorizationFailure(error: unknown) {
   return error instanceof Error && "code" in error && ["FORBIDDEN", "MEMBERSHIP_UNAVAILABLE", "UNAUTHORIZED"].includes(String((error as { code: unknown }).code));
+}
+
+function paymentWebhookRequest(input: { body: Uint8Array; signature: string; timestamp: string }) {
+  return new Request("https://rezno.invalid/api/payments/webhooks/deterministic", {
+    body: input.body,
+    duplex: "half",
+    headers: {
+      "user-agent": "rezno-gate5c-postgres-webhook",
+      "x-payment-signature": input.signature,
+      "x-payment-timestamp": input.timestamp,
+    },
+    method: "POST",
+  } as RequestInit & { duplex: "half" });
+}
+
+function paymentWebhookStreamRequest(
+  chunks: readonly Uint8Array[],
+  input: { signature: string; timestamp: string },
+  extraHeaders: HeadersInit = {},
+) {
+  const probe = { cancelCount: 0, pullCount: 0 };
+  let index = 0;
+  const body = new ReadableStream<Uint8Array>({
+    cancel() {
+      probe.cancelCount += 1;
+    },
+    pull(controller) {
+      probe.pullCount += 1;
+      const chunk = chunks[index++];
+      if (!chunk) {
+        controller.close();
+        return;
+      }
+      controller.enqueue(chunk);
+    },
+  }, { highWaterMark: 0 });
+  const request = new Request("https://rezno.invalid/api/payments/webhooks/deterministic", {
+    body,
+    duplex: "half",
+    headers: {
+      "user-agent": "rezno-gate5c-postgres-webhook",
+      "x-payment-signature": input.signature,
+      "x-payment-timestamp": input.timestamp,
+      ...extraHeaders,
+    },
+    method: "POST",
+  } as RequestInit & { duplex: "half" });
+  return { probe, request };
+}
+
+async function processGuardedPaymentWebhook(request: Request) {
+  assertPaymentWebhookRequestAllowed(
+    request,
+    "webhooks.deterministic",
+    "DETERMINISTIC_TEST",
+  );
+  return processPaymentProviderWebhook(await readBoundedWebhook(request));
 }

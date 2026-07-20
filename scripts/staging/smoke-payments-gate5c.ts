@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 
 import type { CommerceAdminContext, MerchantActorReference } from "../../features/commerce/services/authorization";
+import { PAYMENT_WEBHOOK_MAXIMUM_BYTES, readBoundedPaymentWebhookBody } from "../../features/payments/api/validation";
 import { PaymentDomainError } from "../../features/payments/domain/errors";
 import { DeterministicPaymentProvider } from "../../features/payments/providers/deterministic";
 import { paymentProvider } from "../../features/payments/providers/registry";
@@ -121,6 +122,7 @@ async function main() {
   }, signedAt);
   assert.equal((await provider.verifyAndParseWebhook({ ...signed, receivedAt: signedAt })).outcome, "READY");
   assert.equal((await provider.verifyAndParseWebhook({ ...signed, signature: "0".repeat(64), receivedAt: signedAt })).outcome, "INVALID_SIGNATURE");
+  const boundedWebhook = await assertBoundedWebhookIngestion();
 
   const financial = await materializePaymentsGate5cEvidence(prisma);
   assert.deepEqual(financial.evidence, {
@@ -147,6 +149,7 @@ async function main() {
 
   console.log(JSON.stringify({
     ...safety,
+    boundedWebhook,
     capabilities: "NOT_CONFIGURED",
     cursorIsolation: "scope-and-page-size-bound",
     deterministicOutcomes: outcomes,
@@ -157,6 +160,55 @@ async function main() {
     reconciliation: reconciliation.items[0]?.classification,
     status: "passed",
   }));
+}
+
+async function assertBoundedWebhookIngestion() {
+  const legalBody = new Uint8Array([0, 1, 2, 127, 128, 255]);
+  const legal = streamingRequest([legalBody.subarray(0, 2), legalBody.subarray(2)]);
+  assert.deepEqual(await readBoundedPaymentWebhookBody(legal.request, PAYMENT_WEBHOOK_MAXIMUM_BYTES), legalBody);
+
+  const overflow = streamingRequest(
+    [new Uint8Array(PAYMENT_WEBHOOK_MAXIMUM_BYTES), new Uint8Array(1), new Uint8Array(1)],
+    { "content-length": "1" },
+  );
+  await assert.rejects(
+    readBoundedPaymentWebhookBody(overflow.request, PAYMENT_WEBHOOK_MAXIMUM_BYTES),
+    (error) => error instanceof PaymentDomainError && error.code === "VALIDATION_ERROR",
+  );
+  assert.equal(overflow.probe.cancelCount, 1);
+  assert.equal(overflow.probe.pullCount, 2);
+  return {
+    actualByteLimit: PAYMENT_WEBHOOK_MAXIMUM_BYTES,
+    falseSmallerContentLengthRejected: true,
+    overflowCancelled: true,
+    rawByteOrderPreserved: true,
+  } as const;
+}
+
+function streamingRequest(chunks: readonly Uint8Array[], headers: HeadersInit = {}) {
+  const probe = { cancelCount: 0, pullCount: 0 };
+  let index = 0;
+  const body = new ReadableStream<Uint8Array>({
+    cancel() {
+      probe.cancelCount += 1;
+    },
+    pull(controller) {
+      probe.pullCount += 1;
+      const chunk = chunks[index++];
+      if (!chunk) {
+        controller.close();
+        return;
+      }
+      controller.enqueue(chunk);
+    },
+  }, { highWaterMark: 0 });
+  const request = new Request("https://rezno.invalid/payment-webhook", {
+    body,
+    duplex: "half",
+    headers,
+    method: "POST",
+  } as RequestInit & { duplex: "half" });
+  return { probe, request };
 }
 
 async function assertFixtureLifecycleMatrix() {

@@ -173,11 +173,12 @@ Booking notes are ordinary target PII and will not be copied into provider,
 event, ledger, settlement, cursor, audit, or notification payloads.
 
 Gate 5C remains a hosted/action-reference integration boundary: REZNO never
-collects card data. Webhook input is read once, size-bounded, signature-verified
-before business parsing, normalized, hashed and discarded. Only a safe event
-identifier, payload hash, normalized type, safe provider reference/code and
-processing state persist. Return routes are fixed same-origin UX views and
-cannot mutate financial state or redirect arbitrarily.
+collects card data. Webhook input is read from the request stream into one
+fixed 64 KiB buffer with an authoritative cumulative actual-byte bound,
+signature-verified before business parsing, normalized, hashed and discarded.
+Only a safe event identifier, payload hash, normalized type, safe provider
+reference/code and processing state persist. Return routes are fixed same-origin
+UX views and cannot mutate financial state or redirect arbitrarily.
 
 Risks to keep out of scope are client card fields, raw webhook persistence,
 logging action URLs/tokens, interpolating provider errors, arbitrary provider or
@@ -367,7 +368,9 @@ results to the claimant and turn unexpected provider errors into safe retryable
 results. Exact replays are checked before mutable target state, so a completed
 request remains exactly replayable.
 
-Webhook ingestion verifies the bounded raw body before parsing business data,
+Webhook ingestion applies the provider-route/request-derived process-local rate
+limit first, rejects an unavailable exact provider before consuming the body,
+then reads and verifies the bounded raw body before parsing business data. It
 uses timestamp tolerance and timing-safe authentication, persists only a hash
 and normalized safe fields, and rejects an event-ID replay whose payload hash or
 provider reference changed. Late/out-of-order events use the explicit mapping
@@ -438,18 +441,21 @@ or payment-instrument collection path exists.
 - Clean root `npm ci`: passed; audit: zero vulnerabilities.
 - ESLint: passed with zero warnings; non-incremental TypeScript: passed.
 - Prisma format, validate and generate: passed.
-- Payment unit: 9/9; complete unit: 381/381.
+- Bounded webhook reader and guard unit: 17/17; complete Payment unit: 26/26;
+  complete unit: 398/398.
 - Payment PostgreSQL: 11/11; complete PostgreSQL: 348/348.
-- Payment production HTTP/RSC/API: 7/7; complete HTTP: 101/101 (6 route-handler
-  contracts plus 95 live contracts).
-- Complete non-duplicated regression total: 830/830.
+- Payment production HTTP/RSC/API: 8/8; complete HTTP: 102/102 (6 route-handler
+  contracts plus 96 live contracts).
+- Complete non-duplicated regression total: 848/848.
 - Next 16.2.10 production build: passed with 96 static-page generation entries
   and all payment routes present.
 - Mobile TypeScript and Expo Doctor: passed (20/20 checks); iOS Hermes export
   passed with 912 modules/30 assets, and Android Hermes export passed with 910
   modules/30 assets. Physical-device QA was not performed.
-- Fresh migration 1→41: passed twice; populated 40→41: passed with historical
-  fingerprint unchanged.
+- Fresh migration 1→41: passed twice; populated 40→41: passed again with the
+  representative historical fingerprint
+  `ae3d86d79b541b2aa38d369d20e95cdb` unchanged, the legacy Payment unlinked,
+  Booking still `UNPAID`, and zero fabricated canonical payment rows.
 - Local staging rehearsal reached 41/41. Two fixture runs produced identical
   fingerprint `b313552ea282376da895de0f9ff0cd264fc47c79a9e00ad144dbb63f8299f6cf`.
   Focused smoke proved production provider `NOT_CONFIGURED`, deterministic
@@ -563,9 +569,73 @@ and created zero files.
 
 No real payment or refund was performed, the production payment provider
 remains `PAYMENT_PROVIDER_NOT_CONFIGURED`, physical-device QA was not performed,
-and neither Gate 5D nor Stage 6 was started. Exact-new-head GitHub Actions,
-Vercel checks and review-thread closure remain PR checks after this
-documentation-only commit.
+and neither Gate 5D nor Stage 6 was started. That accepted rotation evidence is
+preserved across the bounded-webhook remediation; exact-new-head GitHub Actions,
+Vercel checks and review-thread closure remain required PR checks.
+
+## Bounded webhook ingestion security remediation
+
+The webhook reader does not use `Request.arrayBuffer()`. It acquires the Web
+request stream reader, checks the cumulative actual byte count before copying
+each chunk into one preallocated 64 KiB buffer, cancels immediately on overflow,
+releases the reader lock in every outcome and creates the exact returned
+`Uint8Array` only after a legal nonempty stream completes. It retains no chunk
+array, does not decode or parse before authentication and converts stream errors
+to a generic validation contract without logging body content.
+
+`Content-Length` is advisory only. A malformed, negative, unsafe,
+duplicate/combined or over-limit declaration is rejected before reading; an
+absent or smaller declaration never bypasses the actual streamed-byte bound.
+Signature and timestamp headers are collected only after the body completes and
+duplicate or malformed values share the generic webhook-verification error.
+
+The production wrapper order is exact route/provider identity, rate limit,
+provider-availability assertion, bounded raw-body read, header validation,
+signature/timestamp verification, normalized parsing and idempotent processing.
+The canonical service repeats provider availability and verification as defense
+in depth. Production remains `PAYMENT_PROVIDER_NOT_CONFIGURED`, so the exact
+route returns that safe contract without consuming the request body.
+
+The webhook-specific threshold is 60 requests per 60 seconds for each exact
+provider route and safe hashed request/network identifier. Requests without a
+usable trusted address or header fingerprint share one bounded `unidentified`
+bucket instead of creating unbounded random identities. `Retry-After` is bounded
+to 1–60 seconds. This limiter is process-local defense in depth; distributed
+rate limiting remains explicitly deferred to Stage 6 and no provider throughput
+claim is implied.
+
+Focused deterministic tests cover legal and exact-limit bodies, one/many-chunk
+overflow, missing/false/malformed/duplicate `Content-Length`, immediate reader
+cancellation, unread trailing chunks, stream failures, exact raw-byte signature
+verification, unavailable-provider pre-body rejection, request-derived rate
+keys, stable unidentified fallback and rate-limited body non-consumption.
+
+The bounded-webhook real-staging recheck used the current stored Neon credential
+through authenticated read-only discovery and an in-memory process handoff. No
+credential was printed, persisted, changed or rotated. The direct SSL endpoint,
+exact `rezno_staging` database and intended owner role authenticated; opening and
+final migration states were healthy 41/41 with zero failed or rolled-back rows,
+and `prisma migrate deploy` was a no-op.
+
+An initial operator invocation seeded the exact fixture but omitted the Node
+`react-server` condition required by a server-only smoke import. Smoke stopped
+before its checks; exact-ID recovery cleanup removed only that fixture and the
+immediate second cleanup returned zero. The accepted rerun then produced the
+same fixture fingerprint twice:
+`b313552ea282376da895de0f9ff0cd264fc47c79a9e00ad144dbb63f8299f6cf`.
+Focused smoke passed the 65,536-byte actual limit, false-smaller
+`Content-Length` rejection, immediate overflow cancellation, exact raw-byte
+order, provider `NOT_CONFIGURED`, all five deterministic outcomes, cursor
+isolation, balanced/immutable financial evidence and reconciliation truth.
+
+Final exact cleanup removed 11 intents, 13 attempts, three provider events, two
+refunds, seven Journals, 14 Postings, two settlements, 10 compatibility
+Payments, three mutations, four accounts and only fixture-owned actors and
+targets; its second run returned zero in every category. A canonical SHA-256
+over every non-migration public table matched before and after at
+`58833ea6299d568e45e19d77b5f6f8e8827c326125e3197b7152ec5f1b81fdc6`,
+which also preserves the accepted Stage 3, Stage 4, Gate 5A and Gate 5B
+fingerprint matrix. No real payment/refund or physical-device QA was performed.
 
 ## Explicit later-stage handoffs
 
