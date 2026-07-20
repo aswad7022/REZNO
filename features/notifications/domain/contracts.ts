@@ -60,6 +60,7 @@ export const notificationCategories = [
   "MESSAGES",
   "ACCOUNT",
   "ADMIN_ANNOUNCEMENT",
+  "PAYMENTS",
 ] as const satisfies readonly NotificationCategory[];
 
 export const notificationDestinationKinds = [
@@ -76,6 +77,9 @@ export const notificationDestinationKinds = [
   "BUSINESS_MESSAGES",
   "BUSINESS_NOTIFICATIONS",
   "ADMIN_COMMERCE_STORES",
+  "CUSTOMER_PAYMENT",
+  "BUSINESS_PAYMENTS",
+  "ADMIN_PAYMENTS",
 ] as const satisfies readonly NotificationDestinationKind[];
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;

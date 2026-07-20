@@ -49,6 +49,7 @@ export const campaignCategories = [
   "MESSAGES",
   "ACCOUNT",
   "ADMIN_ANNOUNCEMENT",
+  "PAYMENTS",
 ] as const satisfies readonly NotificationCategory[];
 
 export type LocalizedCampaignCopy = {

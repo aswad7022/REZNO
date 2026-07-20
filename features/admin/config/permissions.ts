@@ -22,6 +22,11 @@ export const adminPermissions = [
   "COMMERCE_ORDERS_MANAGE",
   "STORAGE_RECORDS_VIEW",
   "STORAGE_RECORDS_MANAGE",
+  "PAYMENTS_VIEW",
+  "PAYMENTS_REFUND",
+  "PAYMENTS_RECONCILE",
+  "SETTLEMENTS_VIEW",
+  "SETTLEMENTS_MANAGE",
 ] as const;
 
 export type AdminPermission = (typeof adminPermissions)[number];
@@ -58,6 +63,9 @@ export const adminPermissionDependencies: Readonly<
   NOTIFICATIONS_SEND: ["NOTIFICATIONS_VIEW"],
   COMMUNICATIONS_DISPATCH: ["NOTIFICATIONS_SEND"],
   STORAGE_RECORDS_MANAGE: ["STORAGE_RECORDS_VIEW"],
+  PAYMENTS_REFUND: ["PAYMENTS_VIEW"],
+  PAYMENTS_RECONCILE: ["PAYMENTS_VIEW"],
+  SETTLEMENTS_MANAGE: ["SETTLEMENTS_VIEW"],
 };
 
 export function hasAnyCommerceAdminPermission(
@@ -134,6 +142,11 @@ export const adminPermissionLabels: Record<AdminPermission, string> = {
   COMMERCE_ORDERS_MANAGE: "Manage commerce Orders",
   STORAGE_RECORDS_VIEW: "View managed storage records",
   STORAGE_RECORDS_MANAGE: "Manage managed storage lifecycle",
+  PAYMENTS_VIEW: "View payment records",
+  PAYMENTS_REFUND: "Request and retry payment refunds",
+  PAYMENTS_RECONCILE: "Run manual payment reconciliation",
+  SETTLEMENTS_VIEW: "View settlement statements",
+  SETTLEMENTS_MANAGE: "Preview and finalize settlement statements",
 };
 
 export function normalizeAdminPermissions(

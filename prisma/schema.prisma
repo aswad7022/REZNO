@@ -61,6 +61,8 @@ model Person {
   createdMediaBindings            MediaBinding[]                      @relation("MediaBindingCreatedByPerson")
   detachedMediaBindings           MediaBinding[]                      @relation("MediaBindingDetachedByPerson")
   mediaMutations                  MediaMutation[]
+  paymentIntents                  PaymentIntent[]                     @relation("PaymentIntentCustomer")
+  paymentMutations                PaymentMutation[]                   @relation("PaymentMutationActorPerson")
 
   @@index([phone])
 }
@@ -103,6 +105,11 @@ model Organization {
   storageMutations               StorageMutation[]
   mediaContainers                MediaContainer[]
   mediaMutations                 MediaMutation[]
+  paymentIntents                 PaymentIntent[]
+  financialAccounts              FinancialAccount[]
+  paymentMutations               PaymentMutation[]
+  settlementBatches              SettlementBatch[]
+  settlementLines                SettlementLine[]
 
   @@index([vertical])
   @@index([status, isActive, deletedAt])
@@ -454,6 +461,9 @@ model Booking {
   serviceNameSnapshot                String
   customerNameSnapshot               String
   priceSnapshot                      Decimal                         @db.Decimal(10, 2)
+  currency                           String                          @default("IQD") @db.VarChar(3)
+  paymentStatus                      PaymentStatus                   @default(UNPAID)
+  paymentMethod                      PaymentMethod?
   notes                              String?
   cancellationReason                 String?
   cancelledAt                        DateTime?                       @db.Timestamptz(6)
@@ -474,6 +484,7 @@ model Booking {
   restaurantReservation              RestaurantReservationDetails?
   restaurantReservationMutations     RestaurantReservationMutation[]
   conversations                      Conversation[]
+  paymentIntents                     PaymentIntent[]
 
   @@unique([customerId, creationIdempotencyKey])
   @@unique([customerId, customerCancellationIdempotencyKey])
@@ -1373,6 +1384,7 @@ model Store {
   orders                     Order[]
   favoritedBy                CustomerFavoriteStore[]
   mediaContainers            MediaContainer[]
+  paymentIntents             PaymentIntent[]
 
   @@index([organizationId, status])
   @@index([status, publishedAt])
@@ -1664,6 +1676,7 @@ model Order {
   reservations               InventoryReservation[]
   stockMovements             StockMovement[]
   checkoutIdempotency        CheckoutIdempotency?
+  paymentIntents             PaymentIntent[]
 
   @@index([customerId, createdAt, id])
   @@index([storeId, status, createdAt])
@@ -1738,21 +1751,287 @@ model OrderStatusHistory {
 }
 
 model Payment {
-  id             String          @id @default(uuid()) @db.Uuid
-  orderId        String          @unique @db.Uuid
-  method         PaymentMethod
-  status         PaymentStatus   @default(UNPAID)
-  amount         Decimal         @db.Decimal(18, 3)
-  currency       String          @default("IQD") @db.VarChar(3)
-  paidAt         DateTime?       @db.Timestamptz(6)
-  voidedAt       DateTime?       @db.Timestamptz(6)
-  recordedByType OrderActorType?
-  recordedById   String?
-  createdAt      DateTime        @default(now()) @db.Timestamptz(6)
-  updatedAt      DateTime        @updatedAt @db.Timestamptz(6)
-  order          Order           @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  id              String          @id @default(uuid()) @db.Uuid
+  orderId         String          @unique @db.Uuid
+  method          PaymentMethod
+  status          PaymentStatus   @default(UNPAID)
+  amount          Decimal         @db.Decimal(18, 3)
+  currency        String          @default("IQD") @db.VarChar(3)
+  paidAt          DateTime?       @db.Timestamptz(6)
+  voidedAt        DateTime?       @db.Timestamptz(6)
+  recordedByType  OrderActorType?
+  recordedById    String?
+  paymentIntentId String?         @unique @db.Uuid
+  createdAt       DateTime        @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime        @updatedAt @db.Timestamptz(6)
+  order           Order           @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  paymentIntent   PaymentIntent?  @relation(fields: [paymentIntentId], references: [id], onDelete: Restrict)
 
   @@index([status, createdAt])
+}
+
+model PaymentIntent {
+  id                    String                 @id @default(uuid()) @db.Uuid
+  orderId               String?                @db.Uuid
+  bookingId             String?                @db.Uuid
+  customerPersonId      String                 @db.Uuid
+  organizationId        String                 @db.Uuid
+  storeId               String?                @db.Uuid
+  provider              PaymentProviderKind
+  method                PaymentMethod
+  status                PaymentIntentStatus    @default(CREATED)
+  generation            Int                    @default(1)
+  amount                Decimal                @db.Decimal(18, 3)
+  currency              String                 @db.VarChar(3)
+  capturedAmount        Decimal                @default(0) @db.Decimal(18, 3)
+  refundedAmount        Decimal                @default(0) @db.Decimal(18, 3)
+  commissionBasisPoints Int                    @default(0)
+  commissionAmount      Decimal                @default(0) @db.Decimal(18, 3)
+  merchantNetAmount     Decimal                @default(0) @db.Decimal(18, 3)
+  commissionPolicyId    String                 @default("zero-v1") @db.VarChar(80)
+  providerReference     String?                @db.VarChar(180)
+  expiresAt             DateTime?              @db.Timestamptz(6)
+  authorizedAt          DateTime?              @db.Timestamptz(6)
+  capturedAt            DateTime?              @db.Timestamptz(6)
+  cancelledAt           DateTime?              @db.Timestamptz(6)
+  failedAt              DateTime?              @db.Timestamptz(6)
+  version               Int                    @default(1)
+  createdAt             DateTime               @default(now()) @db.Timestamptz(6)
+  updatedAt             DateTime               @updatedAt @db.Timestamptz(6)
+  order                 Order?                 @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  booking               Booking?               @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  customer              Person                 @relation("PaymentIntentCustomer", fields: [customerPersonId], references: [id], onDelete: Restrict)
+  organization          Organization           @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  store                 Store?                 @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  attempts              PaymentAttempt[]
+  providerEvents        PaymentProviderEvent[]
+  refunds               PaymentRefund[]
+  mutations             PaymentMutation[]
+  journals              FinancialJournal[]
+  compatibilityPayment  Payment?
+
+  @@unique([provider, providerReference])
+  @@unique([orderId, generation])
+  @@unique([bookingId, generation])
+  @@index([createdAt, id])
+  @@index([customerPersonId, createdAt, id])
+  @@index([organizationId, createdAt, id])
+  @@index([organizationId, status, createdAt, id])
+  @@index([organizationId, updatedAt, id])
+  @@index([status, updatedAt, id])
+  @@index([updatedAt, id])
+}
+
+model PaymentAttempt {
+  id                       String               @id @default(uuid()) @db.Uuid
+  paymentIntentId          String               @db.Uuid
+  attemptNumber            Int
+  status                   PaymentAttemptStatus @default(CREATED)
+  provider                 PaymentProviderKind
+  providerRequestReference String               @db.VarChar(180)
+  providerPaymentReference String?              @db.VarChar(180)
+  idempotencyKey           String               @db.Uuid
+  safeProviderCode         String?              @db.VarChar(80)
+  requiresAction           Boolean              @default(false)
+  actionReference          String?              @db.VarChar(240)
+  actionExpiresAt          DateTime?            @db.Timestamptz(6)
+  claimedBy                String?              @db.VarChar(120)
+  claimExpiresAt           DateTime?            @db.Timestamptz(6)
+  startedAt                DateTime?            @db.Timestamptz(6)
+  finishedAt               DateTime?            @db.Timestamptz(6)
+  createdAt                DateTime             @default(now()) @db.Timestamptz(6)
+  updatedAt                DateTime             @updatedAt @db.Timestamptz(6)
+  paymentIntent            PaymentIntent        @relation(fields: [paymentIntentId], references: [id], onDelete: Restrict)
+
+  @@unique([paymentIntentId, attemptNumber])
+  @@unique([paymentIntentId, idempotencyKey])
+  @@unique([provider, providerRequestReference])
+  @@index([paymentIntentId, createdAt, id])
+  @@index([status, claimExpiresAt])
+}
+
+model PaymentProviderEvent {
+  id                String                     @id @default(uuid()) @db.Uuid
+  paymentIntentId   String?                    @db.Uuid
+  provider          PaymentProviderKind
+  providerEventId   String                     @db.VarChar(180)
+  providerReference String?                    @db.VarChar(180)
+  normalizedType    String                     @db.VarChar(80)
+  status            PaymentProviderEventStatus @default(RECEIVED)
+  payloadHash       String                     @db.VarChar(64)
+  safeProviderCode  String?                    @db.VarChar(80)
+  occurredAt        DateTime                   @db.Timestamptz(6)
+  verifiedAt        DateTime?                  @db.Timestamptz(6)
+  processedAt       DateTime?                  @db.Timestamptz(6)
+  createdAt         DateTime                   @default(now()) @db.Timestamptz(6)
+  updatedAt         DateTime                   @updatedAt @db.Timestamptz(6)
+  paymentIntent     PaymentIntent?             @relation(fields: [paymentIntentId], references: [id], onDelete: Restrict)
+
+  @@unique([provider, providerEventId])
+  @@index([provider, providerReference])
+  @@index([paymentIntentId, occurredAt, id])
+  @@index([status, createdAt, id])
+}
+
+model PaymentRefund {
+  id                   String              @id @default(uuid()) @db.Uuid
+  paymentIntentId      String              @db.Uuid
+  amount               Decimal             @db.Decimal(18, 3)
+  currency             String              @db.VarChar(3)
+  reasonCode           PaymentRefundReason
+  note                 String?             @db.VarChar(500)
+  requestedByActorType PaymentActorType
+  requestedByActorId   String              @db.VarChar(191)
+  providerReference    String?             @db.VarChar(180)
+  status               PaymentRefundStatus @default(REQUESTED)
+  idempotencyKey       String              @db.Uuid
+  requestHash          String              @db.VarChar(64)
+  safeProviderCode     String?             @db.VarChar(80)
+  claimedBy            String?             @db.VarChar(120)
+  claimExpiresAt       DateTime?           @db.Timestamptz(6)
+  version              Int                 @default(1)
+  createdAt            DateTime            @default(now()) @db.Timestamptz(6)
+  updatedAt            DateTime            @updatedAt @db.Timestamptz(6)
+  completedAt          DateTime?           @db.Timestamptz(6)
+  paymentIntent        PaymentIntent       @relation(fields: [paymentIntentId], references: [id], onDelete: Restrict)
+  journals             FinancialJournal[]
+
+  @@unique([requestedByActorType, requestedByActorId, idempotencyKey])
+  @@unique([providerReference])
+  @@index([createdAt, id])
+  @@index([paymentIntentId, createdAt, id])
+  @@index([status, createdAt, id])
+  @@index([status, claimExpiresAt])
+}
+
+model FinancialAccount {
+  id             String                 @id @default(uuid()) @db.Uuid
+  organizationId String?                @db.Uuid
+  family         FinancialAccountFamily
+  currency       String                 @db.VarChar(3)
+  createdAt      DateTime               @default(now()) @db.Timestamptz(6)
+  organization   Organization?          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  postings       FinancialPosting[]
+
+  @@unique([organizationId, family, currency])
+  @@index([family, currency])
+}
+
+model FinancialJournal {
+  id                  String                 @id @default(uuid()) @db.Uuid
+  sourceType          FinancialJournalSource
+  sourceId            String                 @db.Uuid
+  paymentIntentId     String?                @db.Uuid
+  paymentRefundId     String?                @db.Uuid
+  currency            String                 @db.VarChar(3)
+  status              FinancialJournalStatus @default(DRAFT)
+  idempotencyKey      String                 @unique @db.VarChar(191)
+  reversalOfJournalId String?                @unique @db.Uuid
+  createdAt           DateTime               @default(now()) @db.Timestamptz(6)
+  postedAt            DateTime?              @db.Timestamptz(6)
+  paymentIntent       PaymentIntent?         @relation(fields: [paymentIntentId], references: [id], onDelete: Restrict)
+  paymentRefund       PaymentRefund?         @relation(fields: [paymentRefundId], references: [id], onDelete: Restrict)
+  reversalOfJournal   FinancialJournal?      @relation("FinancialJournalReversal", fields: [reversalOfJournalId], references: [id], onDelete: Restrict)
+  reversalJournal     FinancialJournal?      @relation("FinancialJournalReversal")
+  postings            FinancialPosting[]
+  settlementLines     SettlementLine[]
+
+  @@unique([sourceType, sourceId])
+  @@index([createdAt, id])
+  @@index([paymentIntentId, createdAt, id])
+  @@index([status, createdAt, id])
+  @@index([status, postedAt, id])
+}
+
+model FinancialPosting {
+  id        String               @id @default(uuid()) @db.Uuid
+  journalId String               @db.Uuid
+  accountId String               @db.Uuid
+  side      FinancialPostingSide
+  amount    Decimal              @db.Decimal(18, 3)
+  createdAt DateTime             @default(now()) @db.Timestamptz(6)
+  journal   FinancialJournal     @relation(fields: [journalId], references: [id], onDelete: Restrict)
+  account   FinancialAccount     @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
+  @@index([journalId])
+  @@index([accountId, createdAt, id])
+}
+
+model PaymentMutation {
+  id              String                @id @default(uuid()) @db.Uuid
+  actorType       PaymentActorType
+  actorKey        String                @db.VarChar(220)
+  actorPersonId   String?               @db.Uuid
+  organizationId  String?               @db.Uuid
+  paymentIntentId String?               @db.Uuid
+  action          PaymentMutationAction
+  targetType      PaymentTargetType
+  targetId        String                @db.Uuid
+  idempotencyKey  String                @db.Uuid
+  requestHash     String                @db.VarChar(64)
+  expectedVersion Int?
+  resultVersion   Int?
+  status          PaymentMutationStatus @default(PROCESSING)
+  result          Json?
+  failureCode     String?               @db.VarChar(80)
+  createdAt       DateTime              @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime              @updatedAt @db.Timestamptz(6)
+  actorPerson     Person?               @relation("PaymentMutationActorPerson", fields: [actorPersonId], references: [id], onDelete: Restrict)
+  organization    Organization?         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  paymentIntent   PaymentIntent?        @relation(fields: [paymentIntentId], references: [id], onDelete: Restrict)
+
+  @@unique([actorKey, idempotencyKey])
+  @@index([paymentIntentId, createdAt, id])
+  @@index([organizationId, createdAt, id])
+  @@index([status, createdAt, id])
+}
+
+model SettlementBatch {
+  id                 String                @id @default(uuid()) @db.Uuid
+  organizationId     String                @db.Uuid
+  currency           String                @db.VarChar(3)
+  status             SettlementBatchStatus @default(DRAFT)
+  periodStart        DateTime              @db.Timestamptz(6)
+  periodEnd          DateTime              @db.Timestamptz(6)
+  captureGross       Decimal               @default(0) @db.Decimal(18, 3)
+  refunds            Decimal               @default(0) @db.Decimal(18, 3)
+  commission         Decimal               @default(0) @db.Decimal(18, 3)
+  merchantNet        Decimal               @default(0) @db.Decimal(18, 3)
+  idempotencyKey     String                @db.Uuid
+  requestHash        String                @db.VarChar(64)
+  finalizedByAdminId String?               @db.VarChar(191)
+  finalizedAt        DateTime?             @db.Timestamptz(6)
+  voidedAt           DateTime?             @db.Timestamptz(6)
+  version            Int                   @default(1)
+  createdAt          DateTime              @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime              @updatedAt @db.Timestamptz(6)
+  organization       Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  lines              SettlementLine[]
+
+  @@unique([organizationId, idempotencyKey])
+  @@index([createdAt, id])
+  @@index([organizationId, createdAt, id])
+  @@index([status, createdAt, id])
+}
+
+model SettlementLine {
+  id                String           @id @default(uuid()) @db.Uuid
+  settlementBatchId String           @db.Uuid
+  organizationId    String           @db.Uuid
+  journalId         String           @db.Uuid
+  currency          String           @db.VarChar(3)
+  captureGross      Decimal          @default(0) @db.Decimal(18, 3)
+  refunds           Decimal          @default(0) @db.Decimal(18, 3)
+  commission        Decimal          @default(0) @db.Decimal(18, 3)
+  merchantNet       Decimal          @default(0) @db.Decimal(18, 3)
+  createdAt         DateTime         @default(now()) @db.Timestamptz(6)
+  settlementBatch   SettlementBatch  @relation(fields: [settlementBatchId], references: [id], onDelete: Restrict)
+  organization      Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  journal           FinancialJournal @relation(fields: [journalId], references: [id], onDelete: Restrict)
+
+  @@unique([settlementBatchId, journalId])
+  @@index([journalId])
+  @@index([organizationId, createdAt, id])
 }
 
 model CustomerFavoriteStore {
@@ -2030,6 +2309,7 @@ enum NotificationCategory {
   MESSAGES
   ACCOUNT
   ADMIN_ANNOUNCEMENT
+  PAYMENTS
 }
 
 enum NotificationSourceType {
@@ -2042,6 +2322,9 @@ enum NotificationSourceType {
   CONVERSATION
   ADMIN_ANNOUNCEMENT
   ACCOUNT
+  PAYMENT_INTENT
+  PAYMENT_REFUND
+  SETTLEMENT_BATCH
 }
 
 enum NotificationDestinationKind {
@@ -2058,6 +2341,9 @@ enum NotificationDestinationKind {
   BUSINESS_MESSAGES
   BUSINESS_NOTIFICATIONS
   ADMIN_COMMERCE_STORES
+  CUSTOMER_PAYMENT
+  BUSINESS_PAYMENTS
+  ADMIN_PAYMENTS
 }
 
 enum NotificationReadState {
@@ -2128,6 +2414,9 @@ enum CommercePermission {
   ORDER_MANAGE
   ORDER_CANCEL
   REPORTS_VIEW
+  PAYMENT_VIEW
+  PAYMENT_REFUND
+  SETTLEMENT_VIEW
 }
 
 enum StoreStatus {
@@ -2216,11 +2505,138 @@ enum PaymentStatus {
   UNPAID
   PAID
   VOIDED
+  PARTIALLY_REFUNDED
+  REFUNDED
 }
 
 enum PaymentMethod {
   CASH_ON_DELIVERY
   PAY_AT_PICKUP
+  ONLINE_PROVIDER
+}
+
+enum PaymentProviderKind {
+  NOT_CONFIGURED
+  DETERMINISTIC_TEST
+}
+
+enum PaymentIntentStatus {
+  CREATED
+  REQUIRES_ACTION
+  PROCESSING
+  AUTHORIZED
+  PARTIALLY_CAPTURED
+  CAPTURED
+  PARTIALLY_REFUNDED
+  REFUNDED
+  FAILED
+  CANCELLED
+  EXPIRED
+}
+
+enum PaymentAttemptStatus {
+  CREATED
+  CLAIMED
+  PROCESSING
+  REQUIRES_ACTION
+  AUTHORIZED
+  CAPTURED
+  FAILED
+  CANCELLED
+  EXPIRED
+}
+
+enum PaymentProviderEventStatus {
+  RECEIVED
+  VERIFIED
+  PROCESSED
+  IGNORED
+  FAILED
+}
+
+enum PaymentRefundStatus {
+  REQUESTED
+  PROCESSING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+enum PaymentRefundReason {
+  CUSTOMER_REQUEST
+  MERCHANT_CANCELLATION
+  ADMIN_CORRECTION
+  DUPLICATE_PAYMENT
+  SERVICE_UNAVAILABLE
+  OTHER
+}
+
+enum PaymentActorType {
+  CUSTOMER
+  MERCHANT
+  ADMIN
+  SYSTEM
+  PROVIDER
+}
+
+enum PaymentTargetType {
+  ORDER
+  BOOKING
+}
+
+enum PaymentMutationAction {
+  CREATE_INTENT
+  SUBMIT_ATTEMPT
+  RETRY_ATTEMPT
+  CANCEL_INTENT
+  CAPTURE
+  REQUEST_REFUND
+  RETRY_REFUND
+  PROCESS_PROVIDER_EVENT
+  PREVIEW_SETTLEMENT
+  FINALIZE_SETTLEMENT
+  RUN_RECONCILIATION
+  APPLY_CORRECTION
+}
+
+enum PaymentMutationStatus {
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum FinancialAccountFamily {
+  PROVIDER_CLEARING
+  MERCHANT_PAYABLE
+  PLATFORM_REVENUE
+  CUSTOMER_REFUND_CLEARING
+  SETTLEMENT_CLEARING
+  PAYMENT_EXCEPTION
+}
+
+enum FinancialJournalSource {
+  CAPTURE
+  REFUND
+  SETTLEMENT
+  REVERSAL
+  RECONCILIATION
+}
+
+enum FinancialJournalStatus {
+  DRAFT
+  POSTED
+  REVERSED
+}
+
+enum FinancialPostingSide {
+  DEBIT
+  CREDIT
+}
+
+enum SettlementBatchStatus {
+  DRAFT
+  FINALIZED
+  VOID
 }
 
 enum FulfillmentMethod {

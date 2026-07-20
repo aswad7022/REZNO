@@ -41,6 +41,9 @@ export const OWNER_DEFAULT_COMMERCE_PERMISSIONS = [
   "ORDER_MANAGE",
   "ORDER_CANCEL",
   "REPORTS_VIEW",
+  "PAYMENT_VIEW",
+  "PAYMENT_REFUND",
+  "SETTLEMENT_VIEW",
 ] as const satisfies readonly CommercePermission[];
 
 // Store lifecycle ownership is deliberately not delegable in Gate 1A. Other
