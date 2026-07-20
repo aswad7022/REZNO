@@ -502,8 +502,70 @@ were unchanged:
 
 Staging finished healthy at 41/41 with production provider
 `PAYMENT_PROVIDER_NOT_CONFIGURED`; no real payment/refund or human account was
-used. Database and signing credentials remained process-local and were not
-persisted. Exact-head CI/Vercel and review-thread closure remain PR checks.
+used. The accepted application evidence did not commit or retain credential
+material. A subsequent security review identified that an earlier operator
+diagnostic had emitted the then-current staging database URL, so that credential
+was treated as compromised and closed by the rotation evidence below.
+
+## Credential rotation security closure
+
+Rotation started from exact PR head
+`aa71ad5ac94a296f96b147febd91fe4ecc99a17f`. Authenticated metadata inventory
+identified only project `rezno-staging`, database `rezno_staging`, the affected
+staging owner role, and the sensitive Vercel database entry serving Preview
+and the production target of the staging-only Vercel project. `DIRECT_URL` was
+not configured, and the separate Vercel project `rezno` had no database
+environment consumer. The endpoint remained direct rather than pooled. No
+production database project, role, or credential was changed.
+
+The existing staging owner-role password was reset through Neon’s authenticated
+role-password API, preserving its Prisma runtime and migration privileges. A
+fresh connection using the old credential was rejected with PostgreSQL
+authentication failure. The replacement authenticated as the intended role to
+exact database `rezno_staging`; Neon’s control plane and Vercel received the
+replacement only through in-memory/stdin channels. The single sensitive Vercel
+entry was atomically replaced for both authorized targets.
+
+Using only the replacement credential, `prisma migrate deploy` was a no-op and
+the database remained 41/41 with zero failed and zero rolled-back migrations.
+Opening fixture cleanup was zero. Two fixture runs reproduced the identical
+fingerprint
+`b313552ea282376da895de0f9ff0cd264fc47c79a9e00ad144dbb63f8299f6cf`.
+The complete focused smoke again passed provider and reconciliation
+`NOT_CONFIGURED`, all five deterministic outcomes, server-derived money,
+intent replay, webhook duplicate/out-of-order behavior, scoped signed cursors,
+capture/refund accounting, balanced and immutable posted Journals, zero-v1
+commission, merchant payable, refund limits, settlement immutability and
+Customer/Business/Admin isolation.
+
+Exact cleanup then removed 11 intents, 13 attempts, three provider events, two
+refunds, seven Journals, 14 Postings, two settlement batches, 10 compatibility
+Payments, three mutations, four accounts and only the deterministic fixture
+actors and targets. The second cleanup returned zero for every category. The
+Stage 3, Stage 4, Gate 5A and Gate 5B fingerprints recorded above remained
+unchanged.
+
+Vercel rebuilt the exact `aa71ad5` PR Preview and the latest main-based staging
+deployment after the environment replacement; both reached Ready. Their
+authenticated public-catalog health probes returned HTTP 200 with no database
+authentication errors. The unauthenticated Preview URL redirects to Vercel
+deployment protection as expected. Build logs, runtime logs, repository and Git
+history, PR text and the exact-head Actions logs were scanned without emitting
+their contents; no old/replacement credential or database connection string was
+present.
+
+One Vercel link diagnostic unexpectedly created an ephemeral `.env.local` with
+an OIDC token under an isolated `/tmp` directory. The command was stopped; the
+token value was never read or printed; the exact file, link metadata and empty
+temporary directory were removed immediately, and their absence was verified.
+Subsequent authenticated health checks used process-only project identifiers
+and created zero files.
+
+No real payment or refund was performed, the production payment provider
+remains `PAYMENT_PROVIDER_NOT_CONFIGURED`, physical-device QA was not performed,
+and neither Gate 5D nor Stage 6 was started. Exact-new-head GitHub Actions,
+Vercel checks and review-thread closure remain PR checks after this
+documentation-only commit.
 
 ## Explicit later-stage handoffs
 
