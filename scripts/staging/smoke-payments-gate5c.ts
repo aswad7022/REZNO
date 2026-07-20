@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 
 import type { CommerceAdminContext, MerchantActorReference } from "../../features/commerce/services/authorization";
 import { PaymentDomainError } from "../../features/payments/domain/errors";
@@ -52,6 +53,8 @@ async function main() {
   await assert.rejects(getBusinessPayment(foreignOwner, ids.intentIds[3]!), notFound);
   assert.equal((await getAdminPayment(admin, ids.intentIds[3]!)).id, ids.intentIds[3]);
   await assert.rejects(getAdminPayment(revokedAdmin, ids.intentIds[3]!), denied);
+
+  const lifecycleMatrix = await assertFixtureLifecycleMatrix();
 
   const customerPage = await listCustomerPayments(customerA, { limit: 1 });
   const ownerPage = await listBusinessPayments(owner, { limit: 1 });
@@ -132,7 +135,7 @@ async function main() {
     settlementImmutable: true,
   });
 
-  const leaked = JSON.stringify({ adminPage, capabilities, customerPage, financial, journals, ownerPage, reconciliation, refunds, settlements });
+  const leaked = JSON.stringify({ adminPage, capabilities, customerPage, financial, journals, lifecycleMatrix, ownerPage, reconciliation, refunds, settlements });
   assert.doesNotMatch(leaked, /postgresql:\/\/|DATABASE_URL|BETTER_AUTH_SECRET|webhookSecret|authorization|cardNumber|\bcvv\b|\bpan\b|provider access token/i);
   const duplicatedNotifications = await prisma.notification.groupBy({
     by: ["eventType", "sourceId"],
@@ -149,10 +152,118 @@ async function main() {
     deterministicOutcomes: outcomes,
     financial,
     fixture: PAYMENTS_GATE5C_MARKER,
+    lifecycleMatrix,
     pagination: { admin: adminPage.items.length, customer: customerPage.items.length, journals: journals.items.length, merchant: ownerPage.items.length, refunds: refunds.items.length, settlements: settlements.items.length },
     reconciliation: reconciliation.items[0]?.classification,
     status: "passed",
   }));
+}
+
+async function assertFixtureLifecycleMatrix() {
+  const ids = paymentsGate5cFixtureIds;
+  const intents = await prisma.paymentIntent.findMany({
+    where: { id: { in: ids.intentIds } },
+    include: {
+      attempts: true,
+      booking: { select: { currency: true, customerId: true, paymentStatus: true, priceSnapshot: true } },
+      journals: { include: { postings: true } },
+      order: { select: { currency: true, customerId: true, grandTotal: true, paymentStatus: true } },
+      providerEvents: true,
+      refunds: true,
+    },
+  });
+  assert.equal(intents.length, 11);
+  const byId = new Map(intents.map((intent) => [intent.id, intent]));
+  const created = byId.get(ids.intentIds[0]!)!;
+  const requiresAction = byId.get(ids.intentIds[1]!)!;
+  const authorized = byId.get(ids.intentIds[2]!)!;
+  const captured = byId.get(ids.intentIds[3]!)!;
+  const partiallyRefunded = byId.get(ids.intentIds[4]!)!;
+  const refunded = byId.get(ids.intentIds[5]!)!;
+  const failed = byId.get(ids.intentIds[6]!)!;
+  const lateCapture = byId.get(ids.intentIds[8]!)!;
+  const capturedBooking = byId.get(ids.intentIds[9]!)!;
+
+  assert.equal(created.customerPersonId, created.order?.customerId);
+  assert.equal(created.amount.equals(created.order!.grandTotal), true);
+  assert.equal(created.currency, created.order?.currency);
+  assert.equal(requiresAction.status, "REQUIRES_ACTION");
+  assert.equal(requiresAction.attempts.some((attempt) => attempt.status === "REQUIRES_ACTION" && attempt.requiresAction), true);
+  assert.equal(authorized.status, "AUTHORIZED");
+  assert.equal(captured.status, "CAPTURED");
+  assert.equal(captured.order?.paymentStatus, "PAID");
+  assert.equal(partiallyRefunded.status, "PARTIALLY_REFUNDED");
+  assert.equal(partiallyRefunded.order?.paymentStatus, "PARTIALLY_REFUNDED");
+  assert.equal(partiallyRefunded.refunds.some((refund) => refund.status === "SUCCEEDED" && refund.amount.equals("5000.000")), true);
+  assert.equal(refunded.status, "REFUNDED");
+  assert.equal(refunded.order?.paymentStatus, "REFUNDED");
+  assert.equal(refunded.refunds.some((refund) => refund.status === "SUCCEEDED" && refund.amount.equals(refunded.capturedAmount)), true);
+  assert.equal(failed.status, "FAILED");
+  assert.equal(capturedBooking.booking?.paymentStatus, "PAID");
+  assert.equal(capturedBooking.amount.equals(capturedBooking.booking!.priceSnapshot), true);
+  assert.equal(capturedBooking.currency, capturedBooking.booking?.currency);
+  assert.equal(lateCapture.status, "CANCELLED");
+  assert.equal(lateCapture.capturedAmount.isPositive(), true);
+  assert.equal(lateCapture.order?.paymentStatus, "VOIDED");
+  assert.equal(lateCapture.providerEvents.some((event) => event.normalizedType === "CAPTURED" && event.status === "PROCESSED"), true);
+  assert.equal(captured.providerEvents.some((event) => event.normalizedType === "AUTHORIZED" && event.status === "IGNORED"), true);
+  assert.equal(captured.providerEvents.some((event) => event.normalizedType === "CAPTURED" && event.status === "PROCESSED"), true);
+
+  const captureJournals = intents.flatMap((intent) => intent.journals).filter((journal) => journal.sourceType === "CAPTURE");
+  const refundJournals = intents.flatMap((intent) => intent.journals).filter((journal) => journal.sourceType === "REFUND");
+  assert.equal(captureJournals.length, 5);
+  assert.equal(refundJournals.length, 2);
+  for (const journal of [...captureJournals, ...refundJournals]) {
+    const debit = journal.postings.filter((posting) => posting.side === "DEBIT").reduce((sum, posting) => sum.plus(posting.amount), journal.postings[0]!.amount.mul(0));
+    const credit = journal.postings.filter((posting) => posting.side === "CREDIT").reduce((sum, posting) => sum.plus(posting.amount), journal.postings[0]!.amount.mul(0));
+    assert.equal(debit.equals(credit), true);
+  }
+  for (const intent of intents.filter((intent) => intent.capturedAmount.isPositive())) {
+    assert.equal(intent.commissionBasisPoints, 0);
+    assert.equal(intent.commissionAmount.isZero(), true);
+    assert.equal(intent.merchantNetAmount.equals(intent.capturedAmount), true);
+  }
+
+  const createMutation = await prisma.paymentMutation.findUniqueOrThrow({ where: { id: ids.mutationIds[0]! } });
+  assert.equal(createMutation.action, "CREATE_INTENT");
+  assert.equal(createMutation.actorPersonId, created.customerPersonId);
+  assert.equal(createMutation.paymentIntentId, created.id);
+  assert.equal(await prisma.paymentMutation.count({ where: { actorKey: createMutation.actorKey, idempotencyKey: createMutation.idempotencyKey } }), 1);
+  await assert.rejects(prisma.paymentMutation.create({
+    data: {
+      action: createMutation.action,
+      actorKey: createMutation.actorKey,
+      actorPersonId: createMutation.actorPersonId,
+      actorType: createMutation.actorType,
+      id: randomUUID(),
+      idempotencyKey: createMutation.idempotencyKey,
+      organizationId: createMutation.organizationId,
+      paymentIntentId: createMutation.paymentIntentId,
+      requestHash: "0".repeat(64),
+      result: { changedReplay: true },
+      resultVersion: createMutation.resultVersion,
+      status: createMutation.status,
+      targetId: createMutation.targetId,
+      targetType: createMutation.targetType,
+    },
+  }));
+  const captureEvent = captured.providerEvents.find((event) => event.normalizedType === "CAPTURED")!;
+  assert.equal(await prisma.paymentProviderEvent.count({ where: { provider: captureEvent.provider, providerEventId: captureEvent.providerEventId } }), 1);
+
+  return {
+    bookingStateMapping: true,
+    captureAndRefundJournalsBalanced: true,
+    captureExactOnceEvidence: true,
+    changedReplayRejected: true,
+    commissionZeroMerchantPayableExact: true,
+    customerCreateReplayEvidence: true,
+    duplicateWebhookEvidence: true,
+    lateCaptureExceptionPreserved: true,
+    orderStateMapping: true,
+    outOfOrderWebhookIgnored: true,
+    partialAndFullRefunds: true,
+    serverAmountAndCurrency: true,
+  } as const;
 }
 
 function merchant(memberIndex: number, personIndex: number, organizationIndex = 0): MerchantActorReference {
