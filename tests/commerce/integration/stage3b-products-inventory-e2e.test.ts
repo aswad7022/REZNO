@@ -350,34 +350,47 @@ test("Gate 3B Products, Variants and Inventory PostgreSQL end-to-end", { concurr
 
   await t.test("32-39 media mutations and historical unsafe serialization are safe", async () => {
     const firstKey = randomUUID();
-    const firstPayload = envelope(owner, aggregate, {
-      altText: "Front", idempotencyKey: firstKey, url: "https://cdn.example.com/front.jpg", variantId: null,
+    const mutationCount = await prisma.businessOperationMutation.count({
+      where: { organizationId: owner.organization.id },
     });
-    aggregate = asProduct(await addMerchantProductMedia(owner.reference, firstPayload));
-    assert.deepEqual(asProduct(await addMerchantProductMedia(owner.reference, firstPayload)), aggregate);
-    aggregate = asProduct(await addMerchantProductMedia(owner.reference, envelope(owner, aggregate, {
-      altText: "Back", url: "https://cdn.example.com/back.jpg", variantId: null,
-    })));
     await assert.rejects(addMerchantProductMedia(owner.reference, envelope(owner, aggregate, {
-      altText: "Duplicate", url: "https://cdn.example.com/back.jpg", variantId: null,
-    })), code("CONFLICT"));
+      altText: "Raw managed replacement", idempotencyKey: firstKey, url: "https://cdn.example.com/front.jpg", variantId: null,
+    })), code("VALIDATION_ERROR"));
     await assert.rejects(addMerchantProductMedia(owner.reference, envelope(owner, aggregate, {
       altText: "Unsafe", url: "http://127.0.0.1/private.jpg", variantId: null,
     })), code("VALIDATION_ERROR"));
+    assert.equal(await prisma.businessOperationMutation.count({
+      where: { organizationId: owner.organization.id },
+    }), mutationCount);
+    await prisma.productMedia.createMany({
+      data: [
+        { altText: "Front", productId: aggregate.id, sortOrder: 0, url: "https://cdn.example.com/front.jpg" },
+        { altText: "Back", productId: aggregate.id, sortOrder: 1, url: "https://cdn.example.com/back.jpg" },
+      ],
+    });
+    aggregate = asProduct((await getMerchantProduct(owner.reference, aggregate.id)).product);
     const first = aggregate.media.find((item) => item.url.endsWith("front.jpg"))!;
     const second = aggregate.media.find((item) => item.url.endsWith("back.jpg"))!;
-    aggregate = asProduct(await updateMerchantProductMedia(owner.reference, envelope(owner, aggregate, { altText: "Updated", mediaId: first.id })));
-    await prisma.productMedia.update({ where: { id: first.id }, data: { sortOrder: -1 } });
-    aggregate = asProduct((await getMerchantProduct(owner.reference, aggregate.id)).product);
-    aggregate = asProduct(await reorderMerchantProductMedia(owner.reference, envelope(owner, aggregate, { mediaIds: [second.id, first.id] })));
-    assert.deepEqual(aggregate.media.map((item) => item.id), [second.id, first.id]);
+    const updatePayload = envelope(owner, aggregate, { altText: "Updated", idempotencyKey: firstKey, mediaId: first.id });
+    await assert.rejects(updateMerchantProductMedia(owner.reference, updatePayload), code("VALIDATION_ERROR"));
+    await assert.rejects(
+      reorderMerchantProductMedia(owner.reference, envelope(owner, aggregate, { mediaIds: [second.id, first.id] })),
+      code("VALIDATION_ERROR"),
+    );
+    await assert.rejects(
+      removeMerchantProductMedia(owner.reference, envelope(owner, aggregate, { mediaId: first.id })),
+      code("VALIDATION_ERROR"),
+    );
+    assert.deepEqual(
+      await prisma.productMedia.findMany({ where: { productId: aggregate.id }, orderBy: { sortOrder: "asc" }, select: { altText: true, id: true } }),
+      [{ altText: "Front", id: first.id }, { altText: "Back", id: second.id }],
+    );
+    aggregate = asProduct(await publishMerchantProduct(owner.reference, envelope(owner, aggregate)));
     await prisma.productMedia.create({ data: { productId: aggregate.id, sortOrder: 2, url: "javascript:historical" } });
     const safeView = asProduct((await getMerchantProduct(owner.reference, aggregate.id)).product);
     assert.equal(JSON.stringify(safeView).includes("javascript:historical"), false);
     assert.equal(safeView.unsafeMediaIds.length, 1);
-    aggregate = asProduct(await removeMerchantProductMedia(owner.reference, envelope(owner, safeView, { mediaId: safeView.unsafeMediaIds[0] })));
-    aggregate = asProduct(await publishMerchantProduct(owner.reference, envelope(owner, aggregate)));
-    await prisma.productMedia.create({ data: { productId: aggregate.id, sortOrder: 2, url: "file:///historical" } });
+    await prisma.productMedia.create({ data: { productId: aggregate.id, sortOrder: 3, url: "file:///historical" } });
     const publicDto = await getPublicProduct(store.slug, aggregate.slug);
     assert.equal(JSON.stringify(publicDto).includes("file:///historical"), false);
   });
@@ -579,13 +592,16 @@ test("Gate 3B Products, Variants and Inventory PostgreSQL end-to-end", { concurr
       () => setMerchantDefaultVariant(owner.reference, aggregateInput({ variantId: active.id })),
       () => archiveMerchantVariant(owner.reference, aggregateInput({ replacementVariantId: null, variantId: active.id })),
       () => restoreMerchantVariant(owner.reference, aggregateInput({ makeDefault: false, variantId: archived.id })),
+      () => adjustInventory(owner.reference, { expectedVersion: inventory.version, idempotencyKey: randomUUID(), inventoryItemId: inventory.id, quantityDelta: 1, reason: "Denied archived Product adjustment" }),
+      () => updateInventoryThreshold(owner.reference, { contextOrganizationId: owner.organization.id, expectedVersion: inventory.version, idempotencyKey: randomUUID(), inventoryItemId: inventory.id, lowStockThreshold: 4 }),
+    ];
+    const legacyMediaDenied: Array<() => Promise<unknown>> = [
       () => addMerchantProductMedia(owner.reference, aggregateInput({ altText: "Denied", url: "https://cdn.example.com/denied.jpg", variantId: null })),
       () => updateMerchantProductMedia(owner.reference, aggregateInput({ altText: "Denied", mediaId: media[0]!.id })),
       () => reorderMerchantProductMedia(owner.reference, aggregateInput({ mediaIds: media.map((item) => item.id).reverse() })),
       () => removeMerchantProductMedia(owner.reference, aggregateInput({ mediaId: media[0]!.id })),
-      () => adjustInventory(owner.reference, { expectedVersion: inventory.version, idempotencyKey: randomUUID(), inventoryItemId: inventory.id, quantityDelta: 1, reason: "Denied archived Product adjustment" }),
-      () => updateInventoryThreshold(owner.reference, { contextOrganizationId: owner.organization.id, expectedVersion: inventory.version, idempotencyKey: randomUUID(), inventoryItemId: inventory.id, lowStockThreshold: 4 }),
     ];
+    for (const operation of legacyMediaDenied) await assert.rejects(operation, code("VALIDATION_ERROR"));
     for (const operation of denied) await assert.rejects(operation, code("INVALID_TRANSITION"));
 
     const persisted = await prisma.product.findUniqueOrThrow({

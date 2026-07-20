@@ -101,6 +101,7 @@ test("Cart DTO serializes Decimal money and excludes inventory, SKU, Organizatio
     customerId: "private-customer",
     expiresAt: null,
     id: "cart",
+    mediaReferences: { productPrimaryById: {}, storeLogoUrl: null },
     items: [{
       cartId: "cart",
       createdAt: new Date(),

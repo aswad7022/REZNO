@@ -163,7 +163,7 @@ test("Gate 3B production HTML, RSC and Server Actions enforce Product and Invent
     inventory: { create: { onHand: 7 } }, isDefault: true, optionKey: "default", optionValues: {}, price: "10000",
     productId: product.id, sku: "OWNER-SKU", storeId: owner.store.id, title: "Default",
   }, include: { inventory: true } });
-  const unsafeMedia = await prisma.productMedia.create({ data: { productId: product.id, sortOrder: 0, url: "javascript:UNSAFE-URL-SENTINEL" } });
+  await prisma.productMedia.create({ data: { productId: product.id, sortOrder: 0, url: "javascript:UNSAFE-URL-SENTINEL" } });
   await prisma.product.create({ data: {
     categoryId: category.id, description: "FOREIGN-PRODUCT-SENTINEL", name: "Foreign Product",
     normalizedSearchText: "foreign product", slug: "foreign-product", storeId: foreign.store.id,
@@ -273,7 +273,6 @@ test("Gate 3B production HTML, RSC and Server Actions enforce Product and Invent
     const forged = {
       inventoryAdjust: findForm(mutableInventory.text, { operation: "adjust" }),
       inventoryThreshold: findForm(mutableInventory.text, { operation: "threshold" }),
-      media: findForm(mutableProduct.text, { mediaId: unsafeMedia.id, operation: "remove" }),
       product: findForm(mutableProduct.text, { mode: "update" }),
       variant: findForm(mutableProduct.text, { operation: "update", variantId: variant.id }),
     };
@@ -310,7 +309,6 @@ test("Gate 3B production HTML, RSC and Server Actions enforce Product and Invent
     const responses = await Promise.all([
       submit(productPath, forged.product, (parameters) => parameters.set("expectedVersion", archivedRow.updatedAt.toISOString()), cookies.owner),
       submit(productPath, forged.variant, (parameters) => parameters.set("expectedVersion", archivedRow.updatedAt.toISOString()), cookies.owner),
-      submit(productPath, forged.media, (parameters) => parameters.set("expectedVersion", archivedRow.updatedAt.toISOString()), cookies.owner),
       submit(inventoryPath, forged.inventoryAdjust, (parameters) => {
         parameters.set("quantityDelta", "1");
         parameters.set("reason", "Forged archived Product adjustment");

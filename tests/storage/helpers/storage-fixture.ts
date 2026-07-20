@@ -7,7 +7,7 @@ import { prisma } from "../../../lib/db/prisma";
 
 export async function resetStorageTestDatabase() {
   const [row] = await prisma.$queryRaw<Array<{ database: string }>>`SELECT current_database() AS database`;
-  assert.match(row?.database ?? "", /(?:_test|test_|gate5a)/, "Storage integration tests require a disposable database.");
+  assert.match(row?.database ?? "", /(?:_test|test_|gate5a|gate5b)/, "Storage integration tests require a disposable database.");
   await prisma.$executeRawUnsafe('TRUNCATE TABLE "Organization", "Person", "user", "Category", "MarketplaceCategory" CASCADE');
 }
 

@@ -56,13 +56,12 @@ test("Service input is normalized, bounded, allowlisted, and preserves canonical
   const parsed = operationalServiceSchema.parse({
     categoryId,
     description: "  description  ",
-    imageUrl: "",
     name: "  Hair service  ",
     staffSelectionMode: "OPTIONAL",
   });
   assert.equal(parsed.name, "Hair service");
   assert.equal(parsed.description, "description");
-  assert.equal(parsed.imageUrl, null);
+  assert.equal(operationalServiceSchema.safeParse({ ...parsed, imageUrl: "https://example.com/new.jpg" }).success, false);
   assert.equal(operationalServiceSchema.safeParse({ ...parsed, organizationId: categoryId }).success, false);
   assert.equal(operationalServiceSchema.safeParse({ ...parsed, staffSelectionMode: "AUTOMATIC" }).success, false);
 });
@@ -105,9 +104,10 @@ test("weekly schedule requires seven canonical unique days and member leave is s
 });
 
 test("workforce profile normalization and public slug policy fail closed", () => {
-  assert.equal(operationalMemberProfileSchema.safeParse({ bio: "", isPublicProfessional: false, photoUrl: "", publicSlug: null, specialties: ["Cut", "Cut"] }).success, true);
-  assert.equal(operationalMemberProfileSchema.safeParse({ bio: "", isPublicProfessional: true, photoUrl: "", publicSlug: null, specialties: [] }).success, false);
-  assert.equal(operationalMemberProfileSchema.safeParse({ bio: "", isPublicProfessional: true, photoUrl: "", publicSlug: "Bad Slug", specialties: [] }).success, false);
+  assert.equal(operationalMemberProfileSchema.safeParse({ bio: "", isPublicProfessional: false, publicSlug: null, specialties: ["Cut", "Cut"] }).success, true);
+  assert.equal(operationalMemberProfileSchema.safeParse({ bio: "", isPublicProfessional: true, publicSlug: null, specialties: [] }).success, false);
+  assert.equal(operationalMemberProfileSchema.safeParse({ bio: "", isPublicProfessional: true, publicSlug: "Bad Slug", specialties: [] }).success, false);
+  assert.equal(operationalMemberProfileSchema.safeParse({ bio: "", isPublicProfessional: false, photoUrl: "https://example.com/new.jpg", publicSlug: null, specialties: [] }).success, false);
 });
 
 test("explicit Service staff assignment never falls back to every Branch employee", () => {

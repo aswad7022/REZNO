@@ -125,7 +125,6 @@ function storeInput(merchant: MerchantFixture, input: Partial<{
   deliveryCity: string;
   deliveryEnabled: boolean;
   idempotencyKey: string;
-  logoUrl: string;
   name: string;
   pickupArea: string;
   pickupCity: string;
@@ -165,7 +164,6 @@ function updateInput(merchant: MerchantFixture, store: Awaited<ReturnType<typeof
     description: store.description ?? "",
     expectedVersion: store.expectedVersion,
     idempotencyKey: randomUUID(),
-    logoUrl: store.logoUrl ?? "",
     minimumOrderValue: store.minimumOrderValue.replace(/\.000$/, ""),
     name: store.name,
     pickupAdditionalDetails: store.pickupAdditionalDetails ?? "",
@@ -573,7 +571,11 @@ test("Gate 3A Merchant Store PostgreSQL end-to-end", { concurrency: false }, asy
   await t.test("48 denied/invalid operations leave no partial Store, audit or ledger", async () => {
     const merchant = await createMerchant("rollback-invalid");
     const before = await prisma.businessOperationMutation.count({ where: { organizationId: merchant.organization.id } });
-    await assert.rejects(createStoreDraft(merchant.reference, storeInput(merchant, { logoUrl: "http://127.0.0.1/private.png" })), code("VALIDATION_ERROR"));
+    const rawImageInput = {
+      ...storeInput(merchant),
+      logoUrl: "http://127.0.0.1/private.png",
+    };
+    await assert.rejects(createStoreDraft(merchant.reference, rawImageInput), code("VALIDATION_ERROR"));
     assert.equal(await prisma.store.count({ where: { organizationId: merchant.organization.id } }), 0);
     assert.equal(await prisma.businessOperationMutation.count({ where: { organizationId: merchant.organization.id } }), before);
     assert.equal(await prisma.businessAuditLog.count({ where: { organizationId: merchant.organization.id } }), 0);
@@ -581,14 +583,15 @@ test("Gate 3A Merchant Store PostgreSQL end-to-end", { concurrency: false }, asy
 
   await t.test("49 historical unsafe Store images serialize as null with structural management flags", async () => {
     const merchant = await createMerchant("legacy-image-dto");
-    const draft = await createStoreDraft(merchant.reference, storeInput(merchant, {
-      logoUrl: "https://cdn.example.com/safe-logo.png",
-    }));
+    const draft = await createStoreDraft(merchant.reference, storeInput(merchant));
     const pending = await submitStoreForReview(merchant.reference, lifecycle(merchant, draft));
     const active = await approveStore(reviewer.context, adminInput(pending));
     await prisma.store.update({
       where: { id: active.id },
-      data: { coverImageUrl: "https://127.0.0.1/private-cover.png" },
+      data: {
+        coverImageUrl: "https://127.0.0.1/private-cover.png",
+        logoUrl: "https://cdn.example.com/safe-logo.png",
+      },
     });
 
     const management = (await getMerchantStore(merchant.reference)).store as
@@ -606,14 +609,15 @@ test("Gate 3A Merchant Store PostgreSQL end-to-end", { concurrency: false }, asy
 
   await t.test("50 Owner remediation clears only unsafe ACTIVE images and replays exactly", async () => {
     const merchant = await createMerchant("legacy-active-clear");
-    const draft = await createStoreDraft(merchant.reference, storeInput(merchant, {
-      logoUrl: "https://cdn.example.com/keep-logo.png",
-    }));
+    const draft = await createStoreDraft(merchant.reference, storeInput(merchant));
     const pending = await submitStoreForReview(merchant.reference, lifecycle(merchant, draft));
     const active = await approveStore(reviewer.context, adminInput(pending));
     const legacy = await prisma.store.update({
       where: { id: active.id },
-      data: { coverImageUrl: "https://127.0.0.1/active-private.png" },
+      data: {
+        coverImageUrl: "https://127.0.0.1/active-private.png",
+        logoUrl: "https://cdn.example.com/keep-logo.png",
+      },
     });
     const key = randomUUID();
     const input = lifecycle(merchant, {
