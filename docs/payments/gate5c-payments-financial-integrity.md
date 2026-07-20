@@ -1,8 +1,11 @@
 # Gate 5C — Payments and Financial Integrity Foundation
 
-Status: architecture audit complete; implementation pending  
-Baseline: `cb32cf401bc0f060940ec71dffba76f8d5089733`  
-Branch: `feat/payments-financial-foundation`  
+Status: implementation and complete local validation passed; real staging/PR closure pending
+
+Baseline: `cb32cf401bc0f060940ec71dffba76f8d5089733`
+
+Branch: `feat/payments-financial-foundation`
+
 Scope: Gate 5C only
 
 ## Baseline and operating boundary
@@ -40,7 +43,7 @@ modified. PR #100 remains Open and Draft at protected head
 | Refunds | No refund model, provider refund, refunded state, or refund accounting. Cancellation text is not a refund record. |
 | Settlement | No payment settlement, merchant payable, payout, remittance, commission, revenue recognition, or reconciliation model. Existing docs explicitly defer them to Stage 5. |
 
-Migration 41 will preserve `Payment` as a clearly documented derived
+Migration 41 preserves `Payment` as a clearly documented derived
 compatibility summary. Existing rows are pre-ledger because they have no
 canonical intent or journal link. No provider, capture, or financial journal will
 be fabricated for history. New online money movement is authoritative only in
@@ -81,7 +84,7 @@ commerce types/screens. List filters accept only the three baseline summary
 states. Booking detail serializers and Web/Mobile booking screens currently have
 no payment fields. No client receives provider data or ledger data.
 
-The Gate 5C integration will add explicit safe payment DTOs and a single mapping
+The Gate 5C integration adds explicit safe payment DTOs and a single mapping
 service. Existing order DTOs continue receiving a compatibility status, while
 canonical intent detail remains separately typed and authorized.
 
@@ -96,7 +99,7 @@ canonical intent detail remains separately typed and authorized.
 | Partial/full capture | Unsupported | Unsupported | Unsupported |
 | Partial/full refund | Unsupported | Unsupported | Unsupported |
 
-Gate 5C will add `PARTIALLY_REFUNDED` and `REFUNDED` to the compatibility
+Gate 5C adds `PARTIALLY_REFUNDED` and `REFUNDED` to the compatibility
 `PaymentStatus`, and `ONLINE_PROVIDER` to `PaymentMethod`. Intent states map as:
 
 | Canonical intent | Target compatibility state |
@@ -190,7 +193,7 @@ Order/Booking. Admin access uses current `AdminAccess`, current permission
 revalidation, dependency-aware permissions, environment Super Admin policy,
 UUID idempotency and redacted `AdminAuditLog`.
 
-No payment-specific Admin permission exists. Migration/code will add:
+No payment-specific Admin permission existed. Migration/code adds:
 
 - `PAYMENTS_VIEW`
 - `PAYMENTS_REFUND` (depends on `PAYMENTS_VIEW`)
@@ -202,7 +205,7 @@ Existing idempotency ledgers are target-specific: Checkout idempotency, Order
 mutation histories, Admin mutations, Booking create/cancel/change mutations,
 notification event keys, communication mutations, and storage/media mutations.
 None can safely represent provider attempts, refunds, events, settlement or
-reconciliation. `PaymentMutation` will bind actor, scope, action, target,
+reconciliation. `PaymentMutation` binds actor, scope, action, target,
 authoritative amount/currency, expected version and request hash. Exact replay
 returns its safe result; changed replay fails with `IDEMPOTENCY_CONFLICT`.
 
@@ -305,27 +308,31 @@ currency and amount bounds, Organization enablement, action/refund support. In
 production baseline, online control is disabled and API creation fails with
 `PAYMENT_PROVIDER_NOT_CONFIGURED`; offline methods continue to work.
 
-## Migration 41 decision and integrity plan
+## Migration 41 and database integrity evidence
 
-Migration 41, `payments_financial_integrity_foundation`, is required. It will be
-forward-only and the sole Gate 5C migration. Migrations 1–40 remain byte-for-byte
-unchanged. It will add the canonical models/enums/indexes/checks, exact-target
+Migration 41, `payments_financial_integrity_foundation`, is required. It is
+forward-only and is the sole Gate 5C migration. Migrations 1–40 remain byte-for-byte
+unchanged. It adds the canonical models/enums/indexes/checks, exact-target
 constraint, amount/capture/refund/commission/net bounds, currency checks,
 positive versions/postings, attempt/event/mutation uniqueness, posted-ledger
 balance and immutability triggers, reversal validity, and settlement inclusion
 protection.
 
-It will preserve all Order, Booking and Payment history. Existing Payment rows
+It preserves all Order, Booking and Payment history. Existing Payment rows
 remain visibly pre-ledger by nullable canonical linkage/no journal evidence. No
 historical capture, provider identity, commission, refund or journal will be
 backfilled. Booking receives explicit IQD/payment compatibility fields because
 the existing system contract is IQD; this is a truthful target projection, not
 fabricated payment evidence.
 
-Required rehearsal is fresh 1→41 twice, populated 40→41, then real staging
-40/40→41/41 without reset or `db push`.
+Fresh PostgreSQL migrations 1→41 passed twice. The populated rehearsal applied
+only migration 41 to a true 40-migration database while preserving fingerprint
+`404b71e184a96d15c8b3e7dc047c3a35`; it finished at 41 migrations, preserved the
+single historical Payment as an unlinked pre-ledger summary, created no fake
+intent or Journal, and left Booking payment truth at `UNPAID`. No reset or
+`db push` was used. Real staging 40/40→41/41 remains the PR-head closure step.
 
-## Performance plan
+## Performance evidence
 
 All list paths are bounded and index-backed by owner/scope, status and
 `(createdAt,id)`. Target intent lookups use unique/partial indexes on Order or
@@ -336,10 +343,54 @@ sum. Journals/postings use source and account/currency/time indexes. Merchant
 payable and settlement candidates aggregate exact PostgreSQL numeric values.
 Settlement inclusion has a unique active-finalized constraint. Reconciliation
 uses a bounded cursor batch. Provider calls never occur while database locks are
-held. Query plans will be recorded after schema implementation on populated
+held. Query plans were recorded after schema implementation on populated
 PostgreSQL data.
 
-## Notifications, audit, and UX integration plan
+`EXPLAIN` on populated PostgreSQL confirmed index-backed plans for Customer
+`(customerPersonId,createdAt,id)`, Organization
+`(organizationId,createdAt,id)`, Admin `(createdAt,id)`, unique Order/Booking
+generation, the active-target partial indexes, attempt history, provider
+reference/event lookup, refund-by-intent, Journal-by-intent, Posting-by-Journal,
+account balance, settlement status/time, reconciliation Organization/time and
+actor/idempotency lookup. The Admin path uses a bounded bitmap scan and sort;
+all other exercised point/page paths use the corresponding index directly.
+
+## Implemented lifecycle and integration result
+
+The canonical implementation consists of `PaymentIntent`, `PaymentAttempt`,
+`PaymentProviderEvent`, `PaymentRefund`, `FinancialAccount`,
+`FinancialJournal`, `FinancialPosting`, `PaymentMutation`, `SettlementBatch`
+and `SettlementLine`. The old `Payment` remains only the derived Order/offline
+compatibility projection. Payment intent and refund provider submissions hold
+short owner-bound claims across external calls, recover expired claims, bind
+results to the claimant and turn unexpected provider errors into safe retryable
+results. Exact replays are checked before mutable target state, so a completed
+request remains exactly replayable.
+
+Webhook ingestion verifies the bounded raw body before parsing business data,
+uses timestamp tolerance and timing-safe authentication, persists only a hash
+and normalized safe fields, and rejects an event-ID replay whose payload hash or
+provider reference changed. Late/out-of-order events use the explicit mapping
+and reconciliation exception path. Return routes are read-only same-origin
+status views.
+
+Posted Journal and Posting mutation/deletion is rejected in PostgreSQL. Reversal
+triggers require a linked posted original, identical target/currency and the
+exact opposite account/side amounts. Settlement finalization locks candidate
+Journals, validates line totals and accepts only posted CAPTURE/REFUND Journals
+from the same Organization/currency; concurrent finalization has exactly one
+winner. `FINALIZED` continues to mean an immutable statement, not a bank payout.
+
+Marketplace checkout and Booking integrations derive target, amount and IQD
+currency from persisted server state. Offline checkout remains unchanged.
+Capture/refund updates the canonical aggregate, compatibility target state,
+ledger, audit and Gate 4 Notification event in one transaction. Customer Web
+and Mobile, Business Web and Admin Web expose only their authorized safe DTOs.
+Production capabilities truthfully return provider not configured; the
+deterministic provider is guarded to non-production tests and the exact staging
+operator flow.
+
+## Notifications, audit, and UX integration
 
 Capture/failure/refund events use the canonical notification producer with exact
 event keys and safe amount/currency metadata. Settlement finalization targets
@@ -356,15 +407,61 @@ proof.
 
 ## Security findings and acceptance boundary
 
-No baseline P0/P1/P2 payment vulnerability is reachable because online payment
-does not yet exist. The implementation must prove ownership/tenant/current-access
-checks, amount/currency/commission authority, provider and callback allowlists,
-no client success transition, exact-once capture/refund/event processing,
-over-refund locking, late/out-of-order classification, webhook timing-safe
-signature and replay bounds, scope-bound idempotency/cursors, immutable balanced
-ledger, valid reversals, unique settlement inclusion, Decimal capacity, safe
-errors/DTOs/logs, production deterministic-provider denial, and fixture/cleanup
-guards. A remaining P0/P1/P2 prevents Ready for Review.
+The explicit Gate 5C security review found zero remaining P0/P1/P2. Ownership,
+Person, Organization, active-Business and current-Admin checks were exercised;
+amount, currency, commission, provider and redirect inputs are not client
+selectable. Concurrent attempt/refund tests prove one provider call per active
+claim and expired-claim recovery. Exact capture/refund/event replay is a no-op,
+changed replay conflicts, and concurrent refunds cannot exceed captured value.
+Webhook signature/timestamp/replay checks, provider-event payload collisions,
+late/out-of-order events, stale versions and cross-scope cursor/idempotency were
+covered.
+
+PostgreSQL rejects imbalance, posted-row mutation/deletion, fake or incomplete
+reversals, settlement double inclusion and concurrent settlement races. Decimal
+capacity, positive amounts, target identity, currency and refund bounds are
+database constrained. Production rejects the deterministic provider. Fixture
+and cleanup require the exact database, marker and confirmation token and use
+only deterministic IDs.
+
+Root and Customer Mobile production dependency audits report zero known
+vulnerabilities after patching Next to 16.2.10 and constraining vulnerable
+transitive PostCSS, Hono and UUID versions. Final Web/Mobile bundle scans found
+no database URL, provider/webhook secret marker, authorization token, raw
+provider field or locally used secret value. All Luhn-matching numeric bundle
+sequences were 16 zero bytes in Hermes binary data; all apparent `pan` field
+matches were browser/CSS pan vocabulary. No PAN/CVV/expiry/cardholder/IBAN field
+or payment-instrument collection path exists.
+
+## Complete local validation evidence
+
+- Clean root `npm ci`: passed; audit: zero vulnerabilities.
+- ESLint: passed with zero warnings; non-incremental TypeScript: passed.
+- Prisma format, validate and generate: passed.
+- Payment unit: 9/9; complete unit: 381/381.
+- Payment PostgreSQL: 11/11; complete PostgreSQL: 348/348.
+- Payment production HTTP/RSC/API: 7/7; complete HTTP: 101/101 (6 route-handler
+  contracts plus 95 live contracts).
+- Complete non-duplicated regression total: 830/830.
+- Next 16.2.10 production build: passed with 96 static-page generation entries
+  and all payment routes present.
+- Mobile TypeScript and Expo Doctor: passed (20/20 checks); iOS Hermes export
+  passed with 912 modules/30 assets, and Android Hermes export passed with 910
+  modules/30 assets. Physical-device QA was not performed.
+- Fresh migration 1→41: passed twice; populated 40→41: passed with historical
+  fingerprint unchanged.
+- Local staging rehearsal reached 41/41. Two fixture runs produced identical
+  fingerprint `b313552ea282376da895de0f9ff0cd264fc47c79a9e00ad144dbb63f8299f6cf`.
+  Focused smoke proved production provider `NOT_CONFIGURED`, deterministic
+  capture/action/authorization/transient/permanent outcomes, balanced capture
+  and refund Journals, zero commission, over-refund prevention, immutable
+  finalized statement, double-inclusion rejection, pagination/cursor scope and
+  manual reconciliation. Exact cleanup removed only fixture IDs; the second
+  cleanup reported zero.
+
+The immutable PR-head real-staging 40/40→41/41 run, cross-gate fingerprint
+comparison, exact-head CI/Vercel and review-thread closure are deliberately not
+claimed here until the Draft PR exists.
 
 ## Explicit later-stage handoffs
 
