@@ -3,14 +3,9 @@ import { z } from "zod";
 import {
   COMMERCE_MONEY_INTEGER_DIGITS,
 } from "@/features/commerce/domain/money";
-import { isSafePublicImageUrl } from "@/lib/security/public-image-url";
 
 const nullableText = (maximum: number) =>
   z.string().trim().max(maximum).default("").transform((value) => value || null);
-
-const nullableImage = z.string().trim().default("").transform((value) => value || null).pipe(
-  z.string().refine(isSafePublicImageUrl, "Image URL must be a safe public HTTPS URL.").nullable(),
-);
 
 const nullablePhone = z.string().trim().max(30).default("").transform((value, context) => {
   if (!value) return null;
@@ -35,7 +30,6 @@ const iqdAmount = z.string().trim().default("0").superRefine((value, context) =>
 const estimate = z.number().int().min(1).max(10_080).nullable().default(null);
 
 export const storeProfileSchema = z.object({
-  coverImageUrl: nullableImage,
   currency: z.literal("IQD").default("IQD"),
   deliveryArea: nullableText(160),
   deliveryCity: nullableText(160),
@@ -43,7 +37,6 @@ export const storeProfileSchema = z.object({
   deliveryEstimateMinutes: estimate,
   deliveryFee: iqdAmount,
   description: nullableText(4_000),
-  logoUrl: nullableImage,
   minimumOrderValue: iqdAmount,
   name: z.string().trim().min(2).max(120),
   pickupAdditionalDetails: nullableText(500),

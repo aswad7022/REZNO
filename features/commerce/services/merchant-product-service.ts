@@ -11,19 +11,15 @@ import {
   merchantCursorFingerprint,
 } from "@/features/commerce/domain/merchant-cursor";
 import {
-  addProductMediaSchema,
   archiveVariantSchema,
   canonicalizeVariantOptions,
   createProductAggregateSchema,
   createVariantSchema,
   productLifecycleSchema,
   productSearchText,
-  removeProductMediaSchema,
-  reorderProductMediaSchema,
   restoreVariantSchema,
   setDefaultVariantSchema,
   updateProductAggregateSchema,
-  updateProductMediaSchema,
   updateVariantSchema,
 } from "@/features/commerce/domain/product-input";
 import {
@@ -51,6 +47,8 @@ import {
   runCommerceSerializable,
 } from "@/features/commerce/services/transaction";
 import { prisma } from "@/lib/db/prisma";
+import { resolvePublicMediaBatch } from "@/features/media/services/media-query";
+import { isSafePublicImageUrl } from "@/lib/security/public-image-url";
 
 export interface MerchantProductQuery {
   categoryId?: string;
@@ -144,7 +142,7 @@ export async function listMerchantProducts(
     ORDER BY p."updatedAt" DESC, p."id" DESC
     LIMIT ${scanLimit}
   `);
-  const records = await loadProducts(candidates.map((item) => item.id));
+  const records = await enrichMerchantProductMedia(await loadProducts(candidates.map((item) => item.id)));
   const byId = new Map(records.map((item) => [item.id, item]));
   const ordered = candidates.flatMap((item) => byId.has(item.id) ? [byId.get(item.id)!] : []);
   const filtered = query.readiness
@@ -190,7 +188,8 @@ export async function getMerchantProduct(
   )
     ? "read-only"
     : "management";
-  return { actor, product: serializeMerchantProduct(product, actor.permissions, mode) };
+  const [enrichedProduct] = await enrichMerchantProductMedia([product]);
+  return { actor, product: serializeMerchantProduct(enrichedProduct!, actor.permissions, mode) };
 }
 
 export async function createMerchantProduct(reference: MerchantActorReference, rawInput: unknown) {
@@ -449,74 +448,27 @@ export async function restoreMerchantVariant(reference: MerchantActorReference, 
 }
 
 export async function addMerchantProductMedia(reference: MerchantActorReference, rawInput: unknown) {
-  const input = parse(addProductMediaSchema, rawInput);
-  return mutateProduct(reference, input, "PRODUCT_UPDATE", "commerce.product-media.add", async ({ actor, product, transaction }) => {
-    if (product.media.length >= 12) commerceError("VALIDATION_ERROR", "A Product supports at most 12 media records.");
-    if (product.media.some((item) => item.url === input.url)) commerceError("CONFLICT", "Product media URL already exists.");
-    if (input.variantId && !product.variants.some((item) => item.id === input.variantId)) {
-      commerceError("NOT_FOUND", "Variant was not found.");
-    }
-    await transaction.productMedia.create({
-      data: {
-        altText: input.altText,
-        mediaType: "IMAGE",
-        productId: product.id,
-        sortOrder: product.media.length,
-        url: input.url,
-        variantId: input.variantId,
-      },
-    });
-    const updated = await touchAndLoad(transaction, product.id);
-    assertPublishedResultReady(updated);
-    return { actor, product: updated };
-  });
+  void reference;
+  void rawInput;
+  commerceError("VALIDATION_ERROR", "Raw Product media URL writes are closed; use managed Product media.");
 }
 
 export async function updateMerchantProductMedia(reference: MerchantActorReference, rawInput: unknown) {
-  const input = parse(updateProductMediaSchema, rawInput);
-  return mutateProduct(reference, input, "PRODUCT_UPDATE", "commerce.product-media.update", async ({ actor, product, transaction }) => {
-    if (!product.media.some((item) => item.id === input.mediaId)) commerceError("NOT_FOUND", "Product media was not found.");
-    await transaction.productMedia.update({ where: { id: input.mediaId }, data: { altText: input.altText } });
-    return { actor, product: await touchAndLoad(transaction, product.id) };
-  });
+  void reference;
+  void rawInput;
+  commerceError("VALIDATION_ERROR", "Legacy Product media mutations are closed; use managed Product media.");
 }
 
 export async function reorderMerchantProductMedia(reference: MerchantActorReference, rawInput: unknown) {
-  const input = parse(reorderProductMediaSchema, rawInput);
-  return mutateProduct(reference, input, "PRODUCT_UPDATE", "commerce.product-media.reorder", async ({ actor, product, transaction }) => {
-    const existing = new Set(product.media.map((item) => item.id));
-    if (input.mediaIds.length !== existing.size || input.mediaIds.some((id) => !existing.has(id))) {
-      commerceError("VALIDATION_ERROR", "Media order must contain every Product media ID exactly once.");
-    }
-    const occupied = new Set(product.media.map((item) => item.sortOrder));
-    const temporary: number[] = [];
-    for (let candidate = -2_147_483_648; temporary.length < input.mediaIds.length; candidate += 1) {
-      if (!occupied.has(candidate) && (candidate < 0 || candidate >= input.mediaIds.length)) {
-        temporary.push(candidate);
-      }
-    }
-    for (const [index, mediaId] of input.mediaIds.entries()) {
-      await transaction.productMedia.update({ where: { id: mediaId }, data: { sortOrder: temporary[index]! } });
-    }
-    for (const [index, mediaId] of input.mediaIds.entries()) {
-      await transaction.productMedia.update({ where: { id: mediaId }, data: { sortOrder: index } });
-    }
-    return { actor, product: await touchAndLoad(transaction, product.id) };
-  });
+  void reference;
+  void rawInput;
+  commerceError("VALIDATION_ERROR", "Legacy Product media mutations are closed; use managed Product media.");
 }
 
 export async function removeMerchantProductMedia(reference: MerchantActorReference, rawInput: unknown) {
-  const input = parse(removeProductMediaSchema, rawInput);
-  return mutateProduct(reference, input, "PRODUCT_UPDATE", "commerce.product-media.remove", async ({ actor, product, transaction }) => {
-    const media = product.media.find((item) => item.id === input.mediaId);
-    if (!media) commerceError("NOT_FOUND", "Product media was not found.");
-    await transaction.productMedia.delete({ where: { id: media.id } });
-    const remaining = product.media.filter((item) => item.id !== media.id);
-    for (const [index, item] of remaining.entries()) {
-      await transaction.productMedia.update({ where: { id: item.id }, data: { sortOrder: index } });
-    }
-    return { actor, product: await touchAndLoad(transaction, product.id) };
-  });
+  void reference;
+  void rawInput;
+  commerceError("VALIDATION_ERROR", "Legacy Product media mutations are closed; use managed Product media.");
 }
 
 type AggregateInput = {
@@ -653,6 +605,29 @@ async function loadProducts(ids: string[]) {
     where: { id: { in: ids } },
     include: merchantProductInclude,
   });
+}
+
+async function enrichMerchantProductMedia(products: MerchantProductRecord[]) {
+  const media = await resolvePublicMediaBatch(products.map((product) => ({
+    id: product.id,
+    kind: "PRODUCT" as const,
+    legacyValues: product.media.map((item) => item.url),
+    slot: "PRODUCT_IMAGE" as const,
+  })));
+  return products.map((product) => ({
+    ...product,
+    media: [
+      ...(media.get(`PRODUCT:${product.id}:PRODUCT_IMAGE`) ?? []).map((reference, index) => ({
+        altText: reference.altText,
+        id: reference.assetId ?? product.media[index]?.id ?? `legacy-${index}`,
+        mediaType: "IMAGE" as const,
+        sortOrder: reference.sortOrder ?? index,
+        url: reference.stableDeliveryPath,
+        variantId: reference.variantId,
+      })),
+      ...product.media.filter((item) => !isSafePublicImageUrl(item.url)),
+    ],
+  }));
 }
 
 function productReadiness(product: MerchantProductRecord) {

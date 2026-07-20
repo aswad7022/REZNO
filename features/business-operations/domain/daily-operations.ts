@@ -2,7 +2,6 @@ import type { BookingStatus, Prisma, SystemRole } from "@prisma/client";
 import { z } from "zod";
 
 import { businessOperationsError } from "@/features/business-operations/domain/errors";
-import { isSafePublicImageUrl } from "@/lib/security/public-image-url";
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -196,13 +195,6 @@ export const operationalCancellationReasonSchema = z
 const nullableText = (maximum: number) =>
   z.union([z.string().trim().max(maximum), z.null()])
     .transform((value) => value || null);
-const optionalUrl = z
-  .string()
-  .trim()
-  .max(2048)
-  .refine((value) => !value || isSafePublicImageUrl(value))
-  .transform((value) => value || null);
-
 const operationalRestaurantTableFields = {
   area: nullableText(120),
   capacity: z.number().int().min(1).max(100),
@@ -236,7 +228,6 @@ const decimalPrice = z
 export const operationalMenuItemSchema = z.object({
   currency: z.string().trim().toUpperCase().regex(/^[A-Z]{3}$/),
   description: nullableText(1000),
-  imageUrl: optionalUrl,
   menuCategoryId: z.string().uuid(),
   name: z.string().trim().min(1).max(120),
   preparationMinutes: z.number().int().min(1).max(1440).nullable(),

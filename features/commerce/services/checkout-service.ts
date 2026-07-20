@@ -25,7 +25,7 @@ import {
   runCommerceSerializable,
 } from "@/features/commerce/services/transaction";
 import { prisma } from "@/lib/db/prisma";
-import { safePublicImageUrlOrNull } from "@/lib/security/public-image-url";
+import { resolvePublicMediaBatchWithClient } from "@/features/media/services/media-query";
 
 export interface CreatePendingOrderInput {
   addressId?: string | null;
@@ -237,6 +237,15 @@ export async function createPendingOrder(input: CreatePendingOrderInput) {
             },
           });
 
+      const snapshotMedia = await resolvePublicMediaBatchWithClient(transaction, [
+        { id: cart.store.id, kind: "STORE", legacyValues: [cart.store.logoUrl], slot: "STORE_LOGO" },
+        ...cart.items.map((item) => ({
+          id: item.productVariant.product.id,
+          kind: "PRODUCT" as const,
+          legacyValues: item.productVariant.product.media.map((media) => media.url),
+          slot: "PRODUCT_IMAGE" as const,
+        })),
+      ]);
       const orderId = randomUUID();
       const expiresAt = reservationExpiresAt(now);
       const orderItemData = cart.items.map((item, index) => {
@@ -246,7 +255,7 @@ export async function createPendingOrder(input: CreatePendingOrderInput) {
           compareAtPrice: line.compareAtPrice,
           currency: COMMERCE_CURRENCY,
           id: randomUUID(),
-          imageUrlSnapshot: safePublicImageUrlOrNull(variant.product.media[0]?.url),
+          imageUrlSnapshot: snapshotMedia.get(`PRODUCT:${variant.product.id}:PRODUCT_IMAGE`)?.[0]?.stableDeliveryPath ?? null,
           lineDiscount: line.lineDiscount,
           lineSubtotal: line.lineSubtotal,
           lineTotal: line.lineTotal,
@@ -326,7 +335,7 @@ export async function createPendingOrder(input: CreatePendingOrderInput) {
           preparationEstimateMinutes: cart.store.preparationEstimateMinutes,
           reservationExpiresAt: expiresAt,
           storeId: cart.storeId,
-          storeLogoUrlSnapshot: safePublicImageUrlOrNull(cart.store.logoUrl),
+          storeLogoUrlSnapshot: snapshotMedia.get(`STORE:${cart.store.id}:STORE_LOGO`)?.[0]?.stableDeliveryPath ?? null,
           storeNameSnapshot: cart.store.name,
           storePhoneSnapshot: cart.store.supportPhone,
           storeSlugSnapshot: cart.store.slug,

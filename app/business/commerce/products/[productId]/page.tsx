@@ -8,7 +8,6 @@ import { DashboardPageHeader, DashboardShell } from "@/components/dashboard/dash
 import {
   MerchantProductForm,
   ProductLifecycleForms,
-  ProductMediaForms,
   ProductVariantForms,
   type ProductEditorValue,
 } from "@/features/commerce/components/merchant-product-forms";
@@ -17,14 +16,16 @@ import {
   getMerchantProduct,
   listMerchantProductCategories,
 } from "@/features/commerce/services/merchant-product-service";
+import { MediaManager } from "@/features/media/components/media-manager";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export default async function MerchantProductDetailPage({ params }: { params: Promise<{ productId: string }> }) {
-  const [actor, route, t] = await Promise.all([
+  const [actor, route, t, mediaT] = await Promise.all([
     requireAuthenticatedMerchantActor(),
     params,
     getTranslations("Commerce"),
+    getTranslations("Media"),
   ]);
   if (!actor.permissions.includes("PRODUCT_VIEW")) forbidden();
   if (!UUID_PATTERN.test(route.productId)) notFound();
@@ -37,6 +38,11 @@ export default async function MerchantProductDetailPage({ params }: { params: Pr
     ? product as ProductEditorValue
     : null;
   const canUpdate = Boolean(management?.permittedActions.update);
+  const canManageMedia = (actor.systemRole === "OWNER" || actor.systemRole === "MANAGER")
+    && product.status !== "ARCHIVED";
+  const mediaVariants = "variants" in product
+    ? product.variants.map((variant) => ({ id: variant.id, title: variant.title }))
+    : [];
   const hasLifecycleAction = Boolean(
     management && (
       management.permittedActions.archive ||
@@ -57,7 +63,6 @@ export default async function MerchantProductDetailPage({ params }: { params: Pr
       {canUpdate ? <Card><CardHeader><CardTitle>{t("productProfile")}</CardTitle></CardHeader><CardContent><MerchantProductForm categories={categories} contextOrganizationId={actor.organizationId} idempotencyKey={randomUUID()} product={management} /></CardContent></Card> : null}
       {hasLifecycleAction ? <Card><CardHeader><CardTitle>{t("lifecycle")}</CardTitle></CardHeader><CardContent><ProductLifecycleForms contextOrganizationId={actor.organizationId} idempotencyKeys={randomKeys(3)} product={management} /></CardContent></Card> : null}
       {canUpdate ? <Card><CardHeader><CardTitle>{t("variants")}</CardTitle></CardHeader><CardContent><ProductVariantForms contextOrganizationId={actor.organizationId} idempotencyKeys={randomKeys(management.variants.length * 3 + 1)} product={management} /></CardContent></Card> : null}
-      {canUpdate ? <Card><CardHeader><CardTitle>{t("productMedia")}</CardTitle></CardHeader><CardContent><ProductMediaForms contextOrganizationId={actor.organizationId} idempotencyKeys={randomKeys(management.media.length + management.unsafeMediaIds.length + 2)} product={management} /></CardContent></Card> : null}
       {!canUpdate ? <Card><CardContent className="space-y-4 pt-6">
         <p className="text-sm text-muted-foreground">{t("readOnly")}</p>
         {management.variants.map((variant) => <div key={variant.id} className="rounded-xl border p-3 text-sm">{variant.title} · {variant.sku} · {variant.status}</div>)}
@@ -66,6 +71,9 @@ export default async function MerchantProductDetailPage({ params }: { params: Pr
       <p className="text-sm text-muted-foreground">{t("readOnly")}</p>
       {"variants" in product ? product.variants.map((variant) => <div key={variant.id} className="rounded-xl border p-3 text-sm">{variant.title} · {variant.sku} · {variant.status}</div>) : null}
     </CardContent></Card>}
+    {canManageMedia ? <Card><CardHeader><CardTitle>{t("productMedia")}</CardTitle></CardHeader><CardContent className="space-y-5">
+      <MediaManager collection description={mediaT("altText")} endpoint={`/api/media/business/products/${product.id}`} purpose="PRODUCT_IMAGE" reorderEndpoint={`/api/media/business/products/${product.id}/reorder`} slot="PRODUCT_IMAGE" storageMode="business" title={t("productMedia")} variants={mediaVariants} />
+    </CardContent></Card> : null}
   </DashboardShell>;
 }
 

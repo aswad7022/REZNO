@@ -4,19 +4,15 @@ import { revalidatePath } from "next/cache";
 
 import { actionError, type CommerceActionState } from "@/features/commerce/actions/action-state";
 import {
-  addMerchantProductMedia,
   archiveMerchantProduct,
   archiveMerchantVariant,
   createMerchantProduct,
   createMerchantVariant,
   publishMerchantProduct,
-  removeMerchantProductMedia,
-  reorderMerchantProductMedia,
   restoreMerchantVariant,
   setMerchantDefaultVariant,
   unpublishMerchantProduct,
   updateMerchantProduct,
-  updateMerchantProductMedia,
   updateMerchantVariant,
 } from "@/features/commerce/services/merchant-product-service";
 import {
@@ -113,46 +109,6 @@ export async function merchantVariantAction(
     else return invalidInput();
     revalidateCommerce(input.productId);
     return success("تم تحديث المتغير.");
-  } catch (error) {
-    return actionError(error);
-  }
-}
-
-export async function merchantProductMediaAction(
-  _previous: CommerceActionState,
-  formData: FormData,
-): Promise<CommerceActionState> {
-  const allowed = [
-    "altText", "contextOrganizationId", "expectedVersion", "idempotencyKey", "mediaId", "mediaIds",
-    "operation", "productId", "url", "variantId",
-  ];
-  if (hasUnknownFields(formData, allowed)) return invalidInput();
-  try {
-    const reference = await currentReference();
-    const input = aggregateEnvelope(formData);
-    const operation = text(formData, "operation");
-    if (operation === "add") await addMerchantProductMedia(reference, {
-      ...input,
-      altText: text(formData, "altText"),
-      url: text(formData, "url"),
-      variantId: text(formData, "variantId") || null,
-    });
-    else if (operation === "update") await updateMerchantProductMedia(reference, {
-      ...input,
-      altText: text(formData, "altText"),
-      mediaId: text(formData, "mediaId"),
-    });
-    else if (operation === "remove") await removeMerchantProductMedia(reference, {
-      ...input,
-      mediaId: text(formData, "mediaId"),
-    });
-    else if (operation === "reorder") await reorderMerchantProductMedia(reference, {
-      ...input,
-      mediaIds: text(formData, "mediaIds").split(",").map((value) => value.trim()).filter(Boolean),
-    });
-    else return invalidInput();
-    revalidateCommerce(input.productId);
-    return success("تم تحديث وسائط المنتج.");
   } catch (error) {
     return actionError(error);
   }

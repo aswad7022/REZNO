@@ -267,16 +267,6 @@ export function MenuItemForm({
           defaultValue={item?.description ?? ""}
         />
       </div>
-      <div className="space-y-2 md:col-span-2">
-        <Label htmlFor={`item-image-${item?.id ?? "new"}`}>رابط الصورة</Label>
-        <Input
-          id={`item-image-${item?.id ?? "new"}`}
-          name="imageUrl"
-          type="url"
-          maxLength={2048}
-          defaultValue={item?.imageUrl ?? ""}
-        />
-      </div>
       <SubmitState pending={pending} state={state} />
     </form>
   );

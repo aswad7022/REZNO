@@ -64,7 +64,6 @@ const itemFields = [
   ...operationFields,
   "currency",
   "description",
-  "imageUrl",
   "menuCategoryId",
   "name",
   "preparationMinutes",
@@ -140,7 +139,6 @@ function itemInput(formData: FormData) {
   return {
     currency: formData.get("currency"),
     description: formData.get("description"),
-    imageUrl: formData.get("imageUrl"),
     menuCategoryId: formData.get("menuCategoryId"),
     name: formData.get("name"),
     preparationMinutes: preparation === "" ? null : Number(preparation),

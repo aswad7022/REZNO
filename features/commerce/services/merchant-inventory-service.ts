@@ -19,6 +19,7 @@ import {
   type MerchantInventoryRecord,
 } from "@/features/commerce/services/inventory-service";
 import { prisma } from "@/lib/db/prisma";
+import { resolvePublicMediaBatch } from "@/features/media/services/media-query";
 
 export interface MerchantInventoryQuery {
   availability?: "in_stock" | "out_of_stock";
@@ -103,7 +104,9 @@ export async function listMerchantInventory(
     include: merchantInventoryInclude,
   });
   const byId = new Map(records.map((item) => [item.id, item]));
-  const data = visible.flatMap((item) => byId.has(item.id) ? [byId.get(item.id)!] : []);
+  const data = await withCanonicalInventoryMedia(
+    visible.flatMap((item) => byId.has(item.id) ? [byId.get(item.id)!] : []),
+  );
   const last = visible.at(-1);
   return {
     data,
@@ -138,6 +141,7 @@ export async function getMerchantInventoryDetail(
     include: merchantInventoryInclude,
   });
   if (!inventory) commerceError("NOT_FOUND", "Inventory item was not found.");
+  const [projectedInventory] = await withCanonicalInventoryMedia([inventory]);
   const movementPage = await listMovementPage(actor, inventory.id, query);
   const mutable =
     inventory.variant.status !== "ARCHIVED" &&
@@ -146,13 +150,35 @@ export async function getMerchantInventoryDetail(
     !inventory.variant.product.archivedAt;
   return {
     actor,
-    inventory: serializeInventorySummary(inventory),
+    inventory: serializeInventorySummary(projectedInventory!),
     movements: movementPage,
     permittedActions: {
       adjust: mutable && actor.permissions.includes("INVENTORY_ADJUST"),
       threshold: mutable && actor.permissions.includes("INVENTORY_ADJUST"),
     },
   };
+}
+
+async function withCanonicalInventoryMedia(items: readonly MerchantInventoryRecord[]) {
+  const products = [...new Map(items.map((item) => [item.variant.product.id, item.variant.product])).values()];
+  const media = await resolvePublicMediaBatch(products.map((product) => ({
+    id: product.id,
+    kind: "PRODUCT" as const,
+    legacyValues: product.media.map((item) => item.url),
+    slot: "PRODUCT_IMAGE" as const,
+  })));
+  return items.map((item) => ({
+    ...item,
+    variant: {
+      ...item.variant,
+      product: {
+        ...item.variant.product,
+        media: (media.get(`PRODUCT:${item.variant.product.id}:PRODUCT_IMAGE`) ?? []).map((reference) => ({
+          url: reference.stableDeliveryPath,
+        })),
+      },
+    },
+  }));
 }
 
 async function listMovementPage(

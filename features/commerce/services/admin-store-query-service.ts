@@ -20,6 +20,7 @@ import {
 } from "@/features/commerce/services/authorization";
 import { prisma } from "@/lib/db/prisma";
 import { isSafePublicImageUrl, safePublicImageUrlOrNull } from "@/lib/security/public-image-url";
+import { resolvePublicMediaBatchWithClient } from "@/features/media/services/media-query";
 
 const uuid = z.string().uuid();
 
@@ -98,7 +99,12 @@ export async function listAdminStores(context: CommerceAdminContext, query: Admi
         : [{ updatedAt: "desc" }, { id: "desc" }],
       take: scanLimit,
     });
-    const filtered = rows.filter((store) => {
+    const media = await resolvePublicMediaBatchWithClient(transaction, rows.flatMap((store) => [
+      { id: store.id, kind: "STORE" as const, legacyValues: [store.logoUrl], slot: "STORE_LOGO" as const },
+      { id: store.id, kind: "STORE" as const, legacyValues: [store.coverImageUrl], slot: "STORE_COVER" as const },
+    ]));
+    const projected = rows.map((store) => withAdminStoreMedia(store, media));
+    const filtered = projected.filter((store) => {
       const readiness = storeReadiness(store);
       const publicVisible = isPublicStore(store);
       return (query.readinessIssue === undefined || !readiness.ready === query.readinessIssue) &&
@@ -158,6 +164,11 @@ export async function getAdminStoreDetail(
       include: merchantStoreInclude,
     });
     if (!store) commerceError("NOT_FOUND", "Store was not found.");
+    const media = await resolvePublicMediaBatchWithClient(transaction, [
+      { id: store.id, kind: "STORE", legacyValues: [store.logoUrl], slot: "STORE_LOGO" },
+      { id: store.id, kind: "STORE", legacyValues: [store.coverImageUrl], slot: "STORE_COVER" },
+    ]);
+    const projectedStore = withAdminStoreMedia(store, media);
     const products = await transaction.product.count({ where: { storeId: store.id } });
     const inventory = await transaction.inventoryItem.count({ where: { variant: { storeId: store.id } } });
     const orders = await transaction.order.count({ where: { storeId: store.id } });
@@ -208,9 +219,9 @@ export async function getAdminStoreDetail(
         id: store.organization.id,
         name: store.organization.name,
       },
-      profile: adminStoreProfile(store),
+      profile: adminStoreProfile(projectedStore),
       publicVisible: isPublicStore(store),
-      readiness: storeReadiness(store),
+      readiness: storeReadiness(projectedStore),
       ...(canReview ? {
         expectedVersion: store.updatedAt.toISOString(),
         permittedActions: {
@@ -264,4 +275,15 @@ function adminStoreProfile(store: Prisma.StoreGetPayload<{ include: typeof merch
 function isPublicStore(store: Prisma.StoreGetPayload<{ include: typeof merchantStoreInclude }>) {
   return store.status === "ACTIVE" && Boolean(store.publishedAt) && !store.archivedAt &&
     store.organization.isActive && store.organization.status === "ACTIVE" && !store.organization.deletedAt;
+}
+
+function withAdminStoreMedia(
+  store: Prisma.StoreGetPayload<{ include: typeof merchantStoreInclude }>,
+  media: Awaited<ReturnType<typeof resolvePublicMediaBatchWithClient>>,
+) {
+  return {
+    ...store,
+    coverImageUrl: media.get(`STORE:${store.id}:STORE_COVER`)?.[0]?.stableDeliveryPath ?? null,
+    logoUrl: media.get(`STORE:${store.id}:STORE_LOGO`)?.[0]?.stableDeliveryPath ?? null,
+  };
 }

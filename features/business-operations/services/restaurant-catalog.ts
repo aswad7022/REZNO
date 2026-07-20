@@ -478,6 +478,11 @@ function itemSnapshot(item: {
   };
 }
 
+function itemAuditSnapshot(item: Parameters<typeof itemSnapshot>[0]) {
+  const { imageUrl, ...snapshot } = itemSnapshot(item);
+  return { ...snapshot, legacyImagePresent: Boolean(imageUrl) };
+}
+
 export async function listOperationalRestaurantMenu(
   reference: BusinessOperationActorReference,
 ) {
@@ -762,7 +767,7 @@ export async function createOperationalMenuItem(input: {
     await recordBusinessOperation(transaction, {
       action: "MENU_ITEM_CREATE",
       actor,
-      after: itemSnapshot(item),
+      after: itemAuditSnapshot(item),
       idempotencyKey: input.idempotencyKey,
       requestHash,
       resultVersion: item.updatedAt,
@@ -823,7 +828,7 @@ export async function updateOperationalMenuItem(input: {
       action: "MENU_ITEM_UPDATE",
       actor,
       after: { ...parsed.data, isAvailable: item.isAvailable },
-      before: itemSnapshot(item),
+      before: itemAuditSnapshot(item),
       idempotencyKey: input.idempotencyKey,
       requestHash,
       resultVersion: changedAt,
@@ -928,7 +933,7 @@ export async function removeOperationalMenuItem(input: {
     await recordBusinessOperation(transaction, {
       action: "MENU_ITEM_REMOVE",
       actor,
-      before: itemSnapshot(item),
+      before: itemAuditSnapshot(item),
       idempotencyKey: input.idempotencyKey,
       requestHash,
       resultVersion: removedAt,

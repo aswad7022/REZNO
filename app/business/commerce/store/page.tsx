@@ -13,12 +13,14 @@ import {
 } from "@/features/commerce/components/merchant-store-forms";
 import { requireAuthenticatedMerchantActor } from "@/features/commerce/services/authenticated-context";
 import { getMerchantStore } from "@/features/commerce/services/store-service";
+import { MediaManager } from "@/features/media/components/media-manager";
 
 export default async function MerchantStorePage() {
-  const [actor, t] = await Promise.all([requireAuthenticatedMerchantActor(), getTranslations("Commerce")]);
+  const [actor, t, mediaT] = await Promise.all([requireAuthenticatedMerchantActor(), getTranslations("Commerce"), getTranslations("Media")]);
   if (!actor.permissions.includes("STORE_VIEW")) forbidden();
   const view = await getMerchantStore(reference(actor));
   const owner = actor.systemRole === "OWNER" && actor.permissions.includes("STORE_MANAGE");
+  const canManageMedia = actor.systemRole === "OWNER" || actor.systemRole === "MANAGER";
   const store = view.store;
   const managementStore = owner && store
     ? store as StoreFormValue & {
@@ -42,6 +44,10 @@ export default async function MerchantStorePage() {
         <CardHeader><CardTitle>{store ? t("editStore") : t("createStore")}</CardTitle></CardHeader>
         <CardContent><MerchantStoreForm contextOrganizationId={actor.organizationId} idempotencyKey={randomUUID()} store={managementStore} /></CardContent>
       </Card> : store ? <Card><CardContent className="pt-6 text-sm text-muted-foreground">{t("readOnly")}</CardContent></Card> : null}
+      {canManageMedia && store ? <Card><CardHeader><CardTitle>{mediaT("manage")}</CardTitle></CardHeader><CardContent className="space-y-4">
+        <MediaManager description={mediaT("altText")} endpoint={`/api/media/business/stores/${store.id}`} purpose="STORE_LOGO" slot="STORE_LOGO" storageMode="business" title={t("fields.logoUrl")} />
+        <MediaManager description={mediaT("altText")} endpoint={`/api/media/business/stores/${store.id}`} purpose="STORE_COVER" slot="STORE_COVER" storageMode="business" title={t("fields.coverImageUrl")} />
+      </CardContent></Card> : null}
       {managementStore ? <Card>
         <CardHeader><CardTitle>{t("lifecycle")}</CardTitle></CardHeader>
         <CardContent><MerchantStoreLifecycleForms

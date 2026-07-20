@@ -10,7 +10,6 @@ import { Textarea } from "@/components/ui/textarea";
 import type { CommerceActionState } from "@/features/commerce/actions/action-state";
 import {
   merchantProductLifecycleAction,
-  merchantProductMediaAction,
   merchantVariantAction,
   saveMerchantProductAction,
 } from "@/features/commerce/actions/manage-products-inventory";
@@ -156,52 +155,6 @@ export function ProductVariantForms({ contextOrganizationId, idempotencyKeys, pr
       <h3 className="font-semibold md:col-span-2">{t("addVariant")}</h3>
       <VariantProfileFields />
       <Button className="w-fit" type="submit" disabled={pending}>{t("addVariant")}</Button>
-    </form> : null}
-    <Result state={state} />
-  </div>;
-}
-
-export function ProductMediaForms({ contextOrganizationId, idempotencyKeys, product }: {
-  contextOrganizationId: string;
-  idempotencyKeys: readonly string[];
-  product: ProductEditorValue;
-}) {
-  const t = useTranslations("Commerce");
-  const [state, action, pending] = useActionState(merchantProductMediaAction, INITIAL);
-  return <div className="space-y-4">
-    {product.media.map((media, index) => <form action={action} key={media.id} className="grid gap-3 rounded-xl border p-4 md:grid-cols-[1fr_auto_auto]">
-      <AggregateEnvelope contextOrganizationId={contextOrganizationId} expectedVersion={product.expectedVersion} idempotencyKey={keyAt(idempotencyKeys, index)} productId={product.id} />
-      <input type="hidden" name="mediaId" value={media.id} />
-      <Field label={t("productFields.altText")} name="altText" defaultValue={media.altText ?? ""} maxLength={300} />
-      <Button name="operation" value="update" type="submit" variant="outline" disabled={pending}>{t("save")}</Button>
-      <Button name="operation" value="remove" type="submit" variant="destructive" disabled={pending}>{t("remove")}</Button>
-    </form>)}
-    {product.unsafeMediaIds.map((mediaId, index) => <form action={action} key={mediaId} className="flex items-center justify-between gap-3 rounded-xl border border-destructive/40 p-4">
-      <AggregateEnvelope contextOrganizationId={contextOrganizationId} expectedVersion={product.expectedVersion} idempotencyKey={keyAt(idempotencyKeys, product.media.length + index)} productId={product.id} />
-      <input type="hidden" name="mediaId" value={mediaId} />
-      <input type="hidden" name="operation" value="remove" />
-      <span>{t("unsafeProductMedia")}</span>
-      <Button type="submit" variant="destructive" disabled={pending}>{t("remove")}</Button>
-    </form>)}
-    {product.media.length > 1 ? <form action={action} className="space-y-3 rounded-xl border p-4">
-      <AggregateEnvelope contextOrganizationId={contextOrganizationId} expectedVersion={product.expectedVersion} idempotencyKey={keyAt(idempotencyKeys, product.media.length + product.unsafeMediaIds.length)} productId={product.id} />
-      <input type="hidden" name="operation" value="reorder" />
-      <Field label={t("mediaOrder")} name="mediaIds" defaultValue={product.media.map((item) => item.id).join(",")} dir="ltr" required />
-      <Button type="submit" disabled={pending}>{t("productActions.reorderMedia")}</Button>
-    </form> : null}
-    {product.permittedActions.addMedia ? <form action={action} className="grid gap-3 rounded-xl border p-4 md:grid-cols-2">
-      <AggregateEnvelope contextOrganizationId={contextOrganizationId} expectedVersion={product.expectedVersion} idempotencyKey={keyAt(idempotencyKeys, product.media.length + product.unsafeMediaIds.length + 1)} productId={product.id} />
-      <input type="hidden" name="operation" value="add" />
-      <Field label={t("productFields.imageUrl")} name="url" type="url" dir="ltr" required maxLength={2048} />
-      <Field label={t("productFields.altText")} name="altText" maxLength={300} />
-      <div className="space-y-2">
-        <Label htmlFor="commerce-media-variant">{t("variantOptional")}</Label>
-        <select id="commerce-media-variant" name="variantId" className="h-9 w-full rounded-md border bg-background px-3 text-sm">
-          <option value="">{t("allVariants")}</option>
-          {product.variants.map((variant) => <option value={variant.id} key={variant.id}>{variant.title}</option>)}
-        </select>
-      </div>
-      <Button className="w-fit" type="submit" disabled={pending}>{t("addMedia")}</Button>
     </form> : null}
     <Result state={state} />
   </div>;

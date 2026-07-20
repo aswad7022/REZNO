@@ -6,6 +6,7 @@ import { COMMERCE_CURRENCY } from "@/features/commerce/domain/money";
 import { requireActiveCommerceCustomer } from "@/features/commerce/services/authorization";
 import { runCommerceSerializable } from "@/features/commerce/services/transaction";
 import { prisma } from "@/lib/db/prisma";
+import { resolvePublicMediaBatchWithClient } from "@/features/media/services/media-query";
 
 export interface AddCartItemInput {
   expectedVersion?: number;
@@ -33,7 +34,13 @@ export const cartApiInclude = {
   store: true,
 } satisfies Prisma.CartInclude;
 
-export type CartApiRecord = Prisma.CartGetPayload<{ include: typeof cartApiInclude }>;
+type CartDatabaseRecord = Prisma.CartGetPayload<{ include: typeof cartApiInclude }>;
+export type CartApiRecord = CartDatabaseRecord & {
+  mediaReferences: {
+    productPrimaryById: Readonly<Record<string, string>>;
+    storeLogoUrl: string | null;
+  };
+};
 
 function assertQuantity(quantity: number) {
   if (!Number.isInteger(quantity) || quantity < 1 || quantity > 99) {
@@ -80,15 +87,48 @@ function assertAvailable(
 }
 
 async function loadCart(transaction: Prisma.TransactionClient, cartId: string) {
-  return transaction.cart.findUniqueOrThrow({ where: { id: cartId }, include: cartApiInclude });
+  const cart = await transaction.cart.findUniqueOrThrow({ where: { id: cartId }, include: cartApiInclude });
+  return enrichCartMedia(transaction, cart);
 }
 
 export async function getCustomerCart(customerId: string) {
   await requireActiveCommerceCustomer(customerId);
-  return prisma.cart.findFirst({
+  const cart = await prisma.cart.findFirst({
     where: { customerId, status: "ACTIVE" },
     include: cartApiInclude,
   });
+  return cart ? enrichCartMedia(prisma, cart) : null;
+}
+
+async function enrichCartMedia(
+  client: Pick<Prisma.TransactionClient, "mediaBinding" | "mediaContainer">,
+  cart: CartDatabaseRecord,
+): Promise<CartApiRecord> {
+  const products = new Map(cart.items.map((item) => [item.productVariant.product.id, item.productVariant.product]));
+  const media = await resolvePublicMediaBatchWithClient(client, [
+    {
+      id: cart.store.id,
+      kind: "STORE",
+      legacyValues: [cart.store.logoUrl],
+      slot: "STORE_LOGO",
+    },
+    ...[...products.values()].map((product) => ({
+      id: product.id,
+      kind: "PRODUCT" as const,
+      legacyValues: product.media.map((item) => item.url),
+      slot: "PRODUCT_IMAGE" as const,
+    })),
+  ]);
+  return {
+    ...cart,
+    mediaReferences: {
+      productPrimaryById: Object.fromEntries([...products.keys()].flatMap((productId) => {
+        const path = media.get(`PRODUCT:${productId}:PRODUCT_IMAGE`)?.[0]?.stableDeliveryPath;
+        return path ? [[productId, path]] : [];
+      })),
+      storeLogoUrl: media.get(`STORE:${cart.store.id}:STORE_LOGO`)?.[0]?.stableDeliveryPath ?? null,
+    },
+  };
 }
 
 export async function addCartItem(customerId: string, input: AddCartItemInput) {

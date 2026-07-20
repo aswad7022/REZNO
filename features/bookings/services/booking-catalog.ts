@@ -15,6 +15,7 @@ import type {
 } from "@/features/bookings/types";
 import { prisma } from "@/lib/db/prisma";
 import { getPublicOrganizationReviewAggregates } from "@/features/reviews/services/review-lifecycle";
+import { resolvePublicMediaBatch } from "@/features/media/services/media-query";
 
 const publicOrganizationWhere = {
   deletedAt: null,
@@ -44,8 +45,12 @@ export async function getPublicBookingBusiness(
 
   const restaurantFlow =
     organization.vertical === "RESTAURANT" || organization.vertical === "CAFE";
-  const reviewAggregates = await getPublicOrganizationReviewAggregates([
-    organization.id,
+  const [reviewAggregates, media] = await Promise.all([
+    getPublicOrganizationReviewAggregates([organization.id]),
+    resolvePublicMediaBatch([
+      { id: organization.id, kind: "BUSINESS_PROFILE", legacyValues: [organization.profile?.logoUrl], slot: "BUSINESS_LOGO" },
+      { id: organization.id, kind: "BUSINESS_PROFILE", legacyValues: [organization.profile?.coverImageUrl], slot: "BUSINESS_COVER" },
+    ]),
   ]);
   const reviewAggregate = reviewAggregates.get(organization.id);
   return {
@@ -53,8 +58,8 @@ export async function getPublicBookingBusiness(
     slug: organization.slug,
     name: organization.name,
     description: organization.profile?.description ?? null,
-    logoUrl: organization.profile?.logoUrl ?? null,
-    coverImageUrl: organization.profile?.coverImageUrl ?? null,
+    logoUrl: media.get(`BUSINESS_PROFILE:${organization.id}:BUSINESS_LOGO`)?.[0]?.stableDeliveryPath ?? null,
+    coverImageUrl: media.get(`BUSINESS_PROFILE:${organization.id}:BUSINESS_COVER`)?.[0]?.stableDeliveryPath ?? null,
     categoryName: organization.profile?.businessCategory ?? null,
     vertical: organization.vertical,
     supportsServiceBooking: !restaurantFlow,
@@ -97,6 +102,12 @@ export async function getPublicBookingServices(
     orderBy: [{ name: "asc" }, { id: "asc" }],
   });
 
+  const media = await resolvePublicMediaBatch(services.map((service) => ({
+    id: service.id,
+    kind: "SERVICE" as const,
+    legacyValues: [service.imageUrl],
+    slot: "SERVICE_PRIMARY" as const,
+  })));
   return services.flatMap((service) => {
     const offerings = service.branchServices.filter(
       (offering) => offering.branch.organizationId === business.id,
@@ -106,7 +117,7 @@ export async function getPublicBookingServices(
       id: service.id,
       name: service.name,
       description: service.description,
-      imageUrl: service.imageUrl,
+      imageUrl: media.get(`SERVICE:${service.id}:SERVICE_PRIMARY`)?.[0]?.stableDeliveryPath ?? null,
       categoryName: service.category.name,
       staffSelectionMode: service.staffSelectionMode,
       branchCount: offerings.length,
@@ -242,7 +253,7 @@ export async function getPublicOfferingStaff(
                 .filter(Boolean)
                 .join(" "),
             photoUrl: member.isPublicProfessional
-              ? member.photoUrl ?? member.person.avatarUrl
+              ? member.photoUrl
               : null,
             specialties: member.isPublicProfessional ? member.specialties : [],
           })),

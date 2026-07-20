@@ -25,6 +25,7 @@ import {
   type CommerceAdminContext,
 } from "@/features/commerce/services/authorization";
 import { lockInventoryItems, runCommerceSerializable } from "@/features/commerce/services/transaction";
+import { resolvePublicMediaBatchWithClient } from "@/features/media/services/media-query";
 import { prisma } from "@/lib/db/prisma";
 import { safePublicImageUrlOrNull } from "@/lib/security/public-image-url";
 
@@ -126,8 +127,11 @@ export async function listAdminInventory(context: CommerceAdminContext, query: A
       where: { id: { in: visible.map((item) => item.id) } },
       include: adminInventoryInclude,
     });
+    const media = await inventoryProductMedia(transaction, records);
     const byId = new Map(records.map((item) => [item.id, item]));
-    const data = visible.flatMap((item) => byId.has(item.id) ? [adminInventorySummary(byId.get(item.id)!)] : []);
+    const data = visible.flatMap((item) => byId.has(item.id)
+      ? [adminInventorySummary(byId.get(item.id)!, media.get(byId.get(item.id)!.variant.product.id) ?? null)]
+      : []);
     const last = visible.at(-1);
     return {
       data,
@@ -178,6 +182,7 @@ export async function getAdminInventoryDetail(
       include: adminInventoryInclude,
     });
     if (!item) commerceError("NOT_FOUND", "Inventory item was not found.");
+    const media = await inventoryProductMedia(transaction, [item]);
     const movements = await transaction.stockMovement.findMany({
       where: {
         inventoryItemId: item.id,
@@ -213,7 +218,7 @@ export async function getAdminInventoryDetail(
     const canManage = context.isSuperAdmin || context.permissions.includes("COMMERCE_INVENTORY_MANAGE");
     return {
       activeReservations,
-      inventory: adminInventorySummary(item),
+      inventory: adminInventorySummary(item, media.get(item.variant.product.id) ?? null),
       movements: {
         data: visible.map((movement) => ({ ...movement, createdAt: movement.createdAt.toISOString() })),
         pageInfo: {
@@ -286,6 +291,7 @@ export async function correctAdminInventory(context: CommerceAdminContext, rawIn
       data: { onHand: resultingOnHand, version: { increment: 1 } },
       include: adminInventoryInclude,
     });
+    const media = await inventoryProductMedia(transaction, [updated]);
     await transaction.stockMovement.create({
       data: {
         actorId: context.userId,
@@ -302,7 +308,7 @@ export async function correctAdminInventory(context: CommerceAdminContext, rawIn
         type: input.quantityDelta > 0 ? "ADJUSTMENT_IN" : "ADJUSTMENT_OUT",
       },
     });
-    const result = adminInventorySummary(updated);
+    const result = adminInventorySummary(updated, media.get(updated.variant.product.id) ?? null);
     await recordAdminMutation(transaction, {
       action,
       after: { onHand: updated.onHand, reserved: updated.reserved, version: updated.version },
@@ -321,7 +327,7 @@ export async function correctAdminInventory(context: CommerceAdminContext, rawIn
   });
 }
 
-function adminInventorySummary(item: AdminInventoryRecord) {
+function adminInventorySummary(item: AdminInventoryRecord, canonicalMediaUrl?: string | null) {
   const available = item.onHand - item.reserved;
   return {
     available,
@@ -333,7 +339,9 @@ function adminInventorySummary(item: AdminInventoryRecord) {
       id: item.variant.product.store.organization.id,
       name: item.variant.product.store.organization.name,
     },
-    primaryMediaUrl: safePublicImageUrlOrNull(item.variant.product.media[0]?.url),
+    primaryMediaUrl: canonicalMediaUrl === undefined
+      ? safePublicImageUrlOrNull(item.variant.product.media[0]?.url)
+      : canonicalMediaUrl,
     product: { id: item.variant.product.id, name: item.variant.product.name, status: item.variant.product.status },
     reserved: item.reserved,
     store: { id: item.variant.product.store.id, name: item.variant.product.store.name, status: item.variant.product.store.status },
@@ -341,4 +349,21 @@ function adminInventorySummary(item: AdminInventoryRecord) {
     variant: { id: item.variant.id, sku: item.variant.sku, status: item.variant.status, title: item.variant.title },
     version: item.version,
   };
+}
+
+async function inventoryProductMedia(
+  transaction: Prisma.TransactionClient,
+  items: readonly AdminInventoryRecord[],
+) {
+  const products = [...new Map(items.map((item) => [item.variant.product.id, item.variant.product])).values()];
+  const media = await resolvePublicMediaBatchWithClient(transaction, products.map((product) => ({
+    id: product.id,
+    kind: "PRODUCT" as const,
+    legacyValues: product.media.map((item) => item.url),
+    slot: "PRODUCT_IMAGE" as const,
+  })));
+  return new Map(products.map((product) => [
+    product.id,
+    media.get(`PRODUCT:${product.id}:PRODUCT_IMAGE`)?.[0]?.stableDeliveryPath ?? null,
+  ]));
 }

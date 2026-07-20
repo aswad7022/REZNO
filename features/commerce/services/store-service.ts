@@ -48,6 +48,7 @@ import {
 } from "@/features/commerce/services/transaction";
 import { prisma } from "@/lib/db/prisma";
 import { isSafePublicImageUrl } from "@/lib/security/public-image-url";
+import { resolvePublicMediaBatch } from "@/features/media/services/media-query";
 
 export type MerchantIdentityInput = MerchantActorReference;
 
@@ -72,10 +73,19 @@ export async function getMerchantStore(reference: MerchantActorReference) {
     include: merchantStoreInclude,
   });
   if (!store) return { actor, store: null };
+  const media = await resolvePublicMediaBatch([
+    { id: store.id, kind: "STORE", legacyValues: [store.logoUrl], slot: "STORE_LOGO" },
+    { id: store.id, kind: "STORE", legacyValues: [store.coverImageUrl], slot: "STORE_COVER" },
+  ]);
+  const ownerDto = ownerManagementStoreDto(store);
   return {
     actor,
     store: actor.systemRole === "OWNER"
-      ? ownerManagementStoreDto(store)
+      ? {
+          ...ownerDto,
+          coverImageUrl: media.get(`STORE:${store.id}:STORE_COVER`)?.[0]?.stableDeliveryPath ?? null,
+          logoUrl: media.get(`STORE:${store.id}:STORE_LOGO`)?.[0]?.stableDeliveryPath ?? null,
+        }
       : merchantReadOnlyStoreDto(store),
   };
 }
@@ -550,9 +560,7 @@ function assertProfileEditable(store: MerchantStoreRecord, input: StoreProfileIn
     const materialChanged =
       store.name !== input.name ||
       store.slug !== input.slug ||
-      store.description !== input.description ||
-      store.logoUrl !== input.logoUrl ||
-      store.coverImageUrl !== input.coverImageUrl;
+      store.description !== input.description;
     if (materialChanged) {
       commerceError(
         "VALIDATION_ERROR",
@@ -564,7 +572,6 @@ function assertProfileEditable(store: MerchantStoreRecord, input: StoreProfileIn
 
 function storeProfileData(input: StoreProfileInput) {
   return {
-    coverImageUrl: input.coverImageUrl,
     currency: input.currency,
     deliveryArea: input.deliveryArea,
     deliveryCity: input.deliveryCity,
@@ -572,7 +579,6 @@ function storeProfileData(input: StoreProfileInput) {
     deliveryEstimateMinutes: input.deliveryEstimateMinutes,
     deliveryFee: input.deliveryFee,
     description: input.description,
-    logoUrl: input.logoUrl,
     minimumOrderValue: input.minimumOrderValue,
     name: input.name,
     pickupAdditionalDetails: input.pickupAdditionalDetails,

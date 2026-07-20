@@ -22,6 +22,7 @@ import {
   publicVariantWhere,
 } from "@/features/commerce/public/visibility";
 import { prisma } from "@/lib/db/prisma";
+import { resolvePublicMediaBatch } from "@/features/media/services/media-query";
 
 const ARABIC_TRANSLATE_FROM = "أإآٱىـ";
 const ARABIC_TRANSLATE_TO = "ااااي";
@@ -126,7 +127,7 @@ export async function listPublicStores(query: StoreCollectionQuery) {
     LIMIT ${query.limit + 1}
   `);
   const visibleRows = rows.slice(0, query.limit);
-  const stores = await loadStoresInOrder(visibleRows.map((row) => row.id));
+  const stores = await enrichPublicStores(await loadStoresInOrder(visibleRows.map((row) => row.id)));
   return {
     data: stores.map(serializePublicStore),
     pageInfo: pageInfo(rows.length > query.limit, visibleRows.at(-1), query, storeSortValue),
@@ -139,7 +140,7 @@ export async function getPublicStore(storeSlug: string) {
     select: storeSelect,
   });
   if (!store) publicCommerceError("NOT_FOUND", 404, "Store not found.");
-  return serializePublicStore(store);
+  return serializePublicStore((await enrichPublicStores([store]))[0]!);
 }
 
 export async function listPublicProducts(query: ProductCollectionQuery) {
@@ -190,7 +191,7 @@ export async function listPublicProducts(query: ProductCollectionQuery) {
     LIMIT ${query.limit + 1}
   `);
   const visibleRows = rows.slice(0, query.limit);
-  const products = await loadProductsInOrder(visibleRows.map((row) => row.id));
+  const products = await enrichPublicProducts(await loadProductsInOrder(visibleRows.map((row) => row.id)));
   return {
     data: products.map(serializePublicProductSummary),
     pageInfo: pageInfo(rows.length > query.limit, visibleRows.at(-1), query, productSortValue),
@@ -212,7 +213,7 @@ export async function getPublicProduct(storeSlug: string, productSlug: string) {
     include: productInclude,
   });
   if (!product) publicCommerceError("NOT_FOUND", 404, "Product not found.");
-  return serializePublicProductDetail(product as PublicProductRecord);
+  return serializePublicProductDetail((await enrichPublicProducts([product as PublicProductRecord]))[0]!);
 }
 
 async function loadStoresInOrder(ids: string[]): Promise<PublicStoreRecord[]> {
@@ -233,6 +234,49 @@ async function loadProductsInOrder(ids: string[]): Promise<PublicProductRecord[]
   });
   const byId = new Map(records.map((record) => [record.id, record]));
   return ids.flatMap((id) => (byId.has(id) ? [byId.get(id)! as PublicProductRecord] : []));
+}
+
+export async function enrichPublicStores(stores: PublicStoreRecord[]): Promise<PublicStoreRecord[]> {
+  const media = await resolvePublicMediaBatch(stores.flatMap((store) => [
+    { id: store.id, kind: "STORE" as const, legacyValues: [store.logoUrl], slot: "STORE_LOGO" as const },
+    { id: store.id, kind: "STORE" as const, legacyValues: [store.coverImageUrl], slot: "STORE_COVER" as const },
+  ]));
+  return stores.map((store) => ({
+    ...store,
+    coverImageUrl: media.get(`STORE:${store.id}:STORE_COVER`)?.[0]?.stableDeliveryPath ?? null,
+    logoUrl: media.get(`STORE:${store.id}:STORE_LOGO`)?.[0]?.stableDeliveryPath ?? null,
+  }));
+}
+
+export async function enrichPublicProducts(products: PublicProductRecord[]): Promise<PublicProductRecord[]> {
+  const uniqueStores = new Map(products.map((product) => [product.store.id, product.store]));
+  const media = await resolvePublicMediaBatch([
+    ...products.map((product) => ({
+      id: product.id,
+      kind: "PRODUCT" as const,
+      legacyValues: product.media.filter((item) => item.mediaType === "IMAGE").map((item) => item.url),
+      slot: "PRODUCT_IMAGE" as const,
+    })),
+    ...[...uniqueStores.values()].flatMap((store) => [
+      { id: store.id, kind: "STORE" as const, legacyValues: [store.logoUrl], slot: "STORE_LOGO" as const },
+      { id: store.id, kind: "STORE" as const, legacyValues: [store.coverImageUrl], slot: "STORE_COVER" as const },
+    ]),
+  ]);
+  return products.map((product) => ({
+    ...product,
+    media: (media.get(`PRODUCT:${product.id}:PRODUCT_IMAGE`) ?? []).map((reference, index) => ({
+      altText: reference.altText,
+      id: reference.assetId ?? product.media[index]?.id ?? `legacy-${index}`,
+      mediaType: "IMAGE" as const,
+      sortOrder: reference.sortOrder ?? index,
+      url: reference.stableDeliveryPath,
+    })),
+    store: {
+      ...product.store,
+      coverImageUrl: media.get(`STORE:${product.store.id}:STORE_COVER`)?.[0]?.stableDeliveryPath ?? null,
+      logoUrl: media.get(`STORE:${product.store.id}:STORE_LOGO`)?.[0]?.stableDeliveryPath ?? null,
+    },
+  }));
 }
 
 function normalizedDatabaseExpression(parts: Prisma.Sql[]) {
