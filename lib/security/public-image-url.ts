@@ -11,13 +11,13 @@ function normalizedHostname(url: URL) {
 }
 
 /**
- * Allows only bounded HTTPS image locations with a public-looking DNS hostname.
- * Next Image performs its own resolved-address checks; this guard additionally
- * prevents credentials, loopback/private hostnames, and literal IP targets from
- * entering Business-managed image fields.
+ * Allows stable same-origin media paths and bounded HTTPS legacy locations with
+ * a public-looking DNS hostname. Remote legacy locations are always rendered
+ * without server-side optimization.
  */
 export function isSafePublicImageUrl(value: string) {
   if (!value || value.length > 2048) return false;
+  if (value.startsWith("/") && !value.startsWith("//") && !value.includes("\\")) return true;
   let url: URL;
   try {
     url = new URL(value);

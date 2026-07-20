@@ -86,8 +86,8 @@ export function BusinessProfileForm({
     setPreview({
       name: String(data.get("name") ?? ""),
       description: String(data.get("description") ?? ""),
-      logoUrl: String(data.get("logoUrl") ?? ""),
-      coverImageUrl: String(data.get("coverImageUrl") ?? ""),
+      logoUrl: profile.logoUrl,
+      coverImageUrl: profile.coverImageUrl,
     });
   }
 
@@ -284,28 +284,6 @@ export function BusinessProfileForm({
 
       <Card>
         <CardHeader>
-          <CardTitle>{t("galleryTitle")}</CardTitle>
-          <CardDescription>{t("galleryDescription")}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <FormField
-            htmlFor="galleryUrls"
-            label={t("fields.galleryUrls")}
-            error={state.fieldErrors?.galleryUrls}
-          >
-            <Textarea
-              {...fieldProps("galleryUrls")}
-              defaultValue={profile.galleryUrls.join("\n")}
-              dir="ltr"
-              className="min-h-32"
-              placeholder={"https://example.com/photo-1.jpg\nhttps://example.com/photo-2.jpg"}
-            />
-          </FormField>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
           <CardTitle>{t("publicInfoTitle")}</CardTitle>
           <CardDescription>{t("publicInfoDescription")}</CardDescription>
         </CardHeader>
@@ -360,20 +338,6 @@ export function BusinessProfileForm({
         </CardHeader>
         <CardContent className="grid gap-5 md:grid-cols-2">
           <FormField
-            htmlFor="logoUrl"
-            label={t("fields.logoUrl")}
-            error={state.fieldErrors?.logoUrl}
-          >
-            <Input
-              {...fieldProps("logoUrl")}
-              type="url"
-              dir="ltr"
-              defaultValue={profile.logoUrl}
-              placeholder="https://"
-            />
-          </FormField>
-
-          <FormField
             htmlFor="whatsappPhone"
             label={t("fields.whatsappPhone")}
             error={state.fieldErrors?.whatsappPhone}
@@ -384,19 +348,6 @@ export function BusinessProfileForm({
               dir="ltr"
               defaultValue={profile.whatsappPhone}
               placeholder={t("placeholders.phone")}
-            />
-          </FormField>
-          <FormField
-            htmlFor="coverImageUrl"
-            label={t("fields.coverImageUrl")}
-            error={state.fieldErrors?.coverImageUrl}
-          >
-            <Input
-              {...fieldProps("coverImageUrl")}
-              type="url"
-              dir="ltr"
-              defaultValue={profile.coverImageUrl}
-              placeholder="https://"
             />
           </FormField>
         </CardContent>
@@ -417,19 +368,6 @@ export function BusinessProfileForm({
               {...fieldProps("seoTitle")}
               defaultValue={profile.seoTitle}
               maxLength={70}
-            />
-          </FormField>
-          <FormField
-            htmlFor="ogImageUrl"
-            label={t("fields.ogImageUrl")}
-            error={state.fieldErrors?.ogImageUrl}
-          >
-            <Input
-              {...fieldProps("ogImageUrl")}
-              type="url"
-              dir="ltr"
-              defaultValue={profile.ogImageUrl}
-              placeholder="https://"
             />
           </FormField>
           <div className="md:col-span-2">

@@ -99,7 +99,7 @@ export async function updateTeamMember(
     idempotencyKey: formData.get("idempotencyKey"),
   });
   if (!envelope.success || !exactFields(formData, [
-    "bio", "contextOrganizationId", "expectedVersion", "idempotencyKey", "isPublicProfessional", "photoUrl", "publicSlug", "specialties",
+    "bio", "contextOrganizationId", "expectedVersion", "idempotencyKey", "isPublicProfessional", "publicSlug", "specialties",
   ])) return { code: "INVALID_REQUEST", message: "Invalid workforce profile request.", status: "error" };
   const slug = String(formData.get("publicSlug") ?? "").trim();
   try {
@@ -109,7 +109,6 @@ export async function updateTeamMember(
       profile: {
         bio: formData.get("bio") ?? "",
         isPublicProfessional: formData.get("isPublicProfessional") === "on",
-        photoUrl: formData.get("photoUrl") ?? "",
         publicSlug: slug || null,
         specialties: String(formData.get("specialties") ?? "").split(",").map((item) => item.trim()).filter(Boolean),
       },

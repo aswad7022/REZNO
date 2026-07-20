@@ -1,7 +1,5 @@
 import { z } from "zod";
 
-import { isSafePublicImageUrl } from "@/lib/security/public-image-url";
-
 type ValidationKey =
   | "businessNameMin"
   | "businessNameMax"
@@ -23,11 +21,6 @@ export function createBusinessProfileSchema(t: ValidationTranslator) {
     emptyToNull,
     z.string().trim().url(t("urlInvalid")).max(2048).nullable(),
   );
-  const optionalImageUrl = z.preprocess(
-    emptyToNull,
-    z.string().trim().max(2048).refine(isSafePublicImageUrl, t("urlInvalid")).nullable(),
-  );
-
   return z.object({
     name: z
       .string()
@@ -80,16 +73,6 @@ export function createBusinessProfileSchema(t: ValidationTranslator) {
       emptyToNull,
       z.string().trim().max(4000).nullable(),
     ),
-    galleryUrls: z
-      .string()
-      .max(12000)
-      .transform((value) =>
-        [...new Set(value.split(/\r?\n/).map((item) => item.trim()).filter(Boolean))],
-      )
-      .refine(
-        (items) => items.every(isSafePublicImageUrl),
-        t("urlInvalid"),
-      ),
     faqItems: z
       .string()
       .max(12000)
@@ -114,14 +97,11 @@ export function createBusinessProfileSchema(t: ValidationTranslator) {
     visibility: z.enum(["PUBLISHED", "HIDDEN"]),
     website: optionalUrl,
     googleMapsUrl: optionalUrl,
-    logoUrl: optionalImageUrl,
-    coverImageUrl: optionalImageUrl,
-    ogImageUrl: optionalImageUrl,
     facebookUrl: optionalUrl,
     instagramUrl: optionalUrl,
     tiktokUrl: optionalUrl,
     youtubeUrl: optionalUrl,
-  });
+  }).strict();
 }
 
 export type BusinessProfileInput = z.infer<

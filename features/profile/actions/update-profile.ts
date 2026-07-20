@@ -21,8 +21,7 @@ function fieldErrors(
       field === "firstName" ||
       field === "lastName" ||
       field === "displayName" ||
-      field === "phone" ||
-      field === "avatarUrl"
+      field === "phone"
     ) {
       errors[field] ??= issue.message;
     }
@@ -41,12 +40,16 @@ export async function updateProfile(
     getTranslations("Profile"),
   ]);
 
+  const allowed = new Set(["firstName", "lastName", "displayName", "phone"]);
+  if ([...formData.keys()].some((key) => !key.startsWith("$ACTION_") && !allowed.has(key))) {
+    return { status: "error", message: t("messages.invalid") };
+  }
+
   const parsed = createProfileSchema((key) => t(`validation.${key}`)).safeParse({
     firstName: formData.get("firstName"),
     lastName: formData.get("lastName"),
     displayName: formData.get("displayName"),
     phone: formData.get("phone"),
-    avatarUrl: formData.get("avatarUrl"),
   });
 
   if (!parsed.success) {
@@ -57,14 +60,14 @@ export async function updateProfile(
     };
   }
 
-  const { firstName, lastName, displayName, phone, avatarUrl } = parsed.data;
+  const { firstName, lastName, displayName, phone } = parsed.data;
   const fullName = [firstName, lastName].filter(Boolean).join(" ");
 
   try {
     await prisma.$transaction([
       prisma.user.update({
         where: { id: session.user.id },
-        data: { name: displayName ?? fullName, image: avatarUrl },
+        data: { name: displayName ?? fullName },
       }),
       prisma.person.update({
         where: { id: person.id },
@@ -73,7 +76,6 @@ export async function updateProfile(
           lastName,
           displayName,
           phone,
-          avatarUrl,
         },
       }),
     ]);

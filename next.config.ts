@@ -25,9 +25,8 @@ const nextConfig: NextConfig = {
     ];
   },
   images: {
-    remotePatterns: [
-      { protocol: "https", hostname: "**" },
-    ],
+    // Gate 5B never lets the Next.js server fetch user-controlled legacy URLs.
+    unoptimized: true,
   },
 };
 

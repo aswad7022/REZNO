@@ -1,15 +1,12 @@
 import { z } from "zod";
 
-import { isSafePublicImageUrl } from "@/lib/security/public-image-url";
-
 type Translate = (
   key:
     | "firstNameMin"
     | "firstNameMax"
     | "optionalTextMax"
     | "phoneMax"
-    | "phoneInvalid"
-    | "imageUrlInvalid",
+    | "phoneInvalid",
 ) => string;
 
 export const createProfileSchema = (t: Translate) => {
@@ -36,17 +33,7 @@ export const createProfileSchema = (t: Translate) => {
         t("phoneInvalid"),
       )
       .transform((value) => value || null),
-    avatarUrl: z
-      .string()
-      .trim()
-      .transform((value) => value || null)
-      .pipe(
-        z
-          .string()
-          .refine(isSafePublicImageUrl, t("imageUrlInvalid"))
-          .nullable(),
-      ),
-  });
+  }).strict();
 };
 
 export type ProfileInput = z.infer<ReturnType<typeof createProfileSchema>>;

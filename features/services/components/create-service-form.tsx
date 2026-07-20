@@ -67,10 +67,6 @@ export function CreateServiceForm({
           <Label htmlFor={`service-description-${service?.id ?? "new"}`}>{t("fields.description")}</Label>
           <Textarea id={`service-description-${service?.id ?? "new"}`} name="description" defaultValue={service?.description} maxLength={2000} />
         </div>
-        <div className="space-y-2 md:col-span-2">
-          <Label htmlFor={`service-image-${service?.id ?? "new"}`}>{t("fields.imageUrl")}</Label>
-          <Input id={`service-image-${service?.id ?? "new"}`} name="imageUrl" type="url" dir="ltr" defaultValue={service?.imageUrl} placeholder="https://" />
-        </div>
         <div className="space-y-2">
           <Label htmlFor={`staff-mode-${service?.id ?? "new"}`}>{t("fields.staffSelectionMode")}</Label>
           <Select name="staffSelectionMode" defaultValue={service?.staffSelectionMode ?? "OPTIONAL"}>

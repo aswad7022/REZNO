@@ -5,6 +5,7 @@ import { listOperationalServices } from "@/features/business-operations/services
 import { currentBusinessOperationReference } from "@/features/business-operations/services/identity-adapter";
 import { prisma } from "@/lib/db/prisma";
 import type { ServiceCatalogData } from "@/features/services/types";
+import { resolvePublicMediaBatch } from "@/features/media/services/media-query";
 
 export async function getCurrentServiceCatalog(): Promise<ServiceCatalogData> {
   const reference = await currentBusinessOperationReference("SERVICE_READ");
@@ -30,6 +31,7 @@ export async function getCurrentServiceCatalog(): Promise<ServiceCatalogData> {
   }
 
   const { organizationId } = catalog;
+  const services = await withCanonicalServiceMedia(catalog.organizationId, catalog.services);
   const [branches, categories, members] = await Promise.all([
     prisma.branch.findMany({
       where: {
@@ -83,7 +85,7 @@ export async function getCurrentServiceCatalog(): Promise<ServiceCatalogData> {
           .filter(Boolean)
           .join(" "),
     })),
-    services: catalog.services.map((service) => ({
+    services: services.map((service) => ({
       id: service.id,
       name: service.name,
       description: service.description ?? "",
@@ -115,4 +117,24 @@ export async function getCurrentServiceCatalog(): Promise<ServiceCatalogData> {
       })),
     })),
   };
+}
+
+async function withCanonicalServiceMedia<T extends { id: string; imageUrl: string | null }>(
+  _organizationId: string,
+  services: T[],
+): Promise<Array<Omit<T, "imageUrl"> & { imageUrl: string }>> {
+  const targets = services.map((service) => ({
+    id: service.id,
+    service,
+  }));
+  const media = await resolvePublicMediaBatch(targets.map(({ id, service }) => ({
+    id,
+    kind: "SERVICE" as const,
+    legacyValues: [service.imageUrl],
+    slot: "SERVICE_PRIMARY" as const,
+  })));
+  return targets.map(({ id, service }) => ({
+    ...service,
+    imageUrl: media.get(`SERVICE:${id}:SERVICE_PRIMARY`)?.[0]?.stableDeliveryPath ?? "",
+  }));
 }

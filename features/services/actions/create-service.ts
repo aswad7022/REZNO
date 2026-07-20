@@ -26,7 +26,6 @@ const serviceFields = [
   "description",
   "expectedVersion",
   "idempotencyKey",
-  "imageUrl",
   "name",
   "staffSelectionMode",
 ] as const;
@@ -42,7 +41,6 @@ function serviceInput(formData: FormData) {
   return {
     categoryId: formData.get("categoryId"),
     description: formData.get("description") ?? "",
-    imageUrl: formData.get("imageUrl") ?? "",
     name: formData.get("name"),
     staffSelectionMode: formData.get("staffSelectionMode") ?? "OPTIONAL",
   };

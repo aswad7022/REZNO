@@ -23,14 +23,16 @@ import { getCurrentBusinessProfile } from "@/features/business/services/business
 import { getPublicProfileManagementData } from "@/features/business/services/public-profile-management";
 import { PublicProfileActions } from "@/features/marketplace/components/public-profile-actions";
 import { PublicProfileSection } from "@/features/marketplace/components/public-profile-motion";
+import { MediaManager } from "@/features/media/components/media-manager";
 
 export async function PublicProfileManagementPage() {
   await currentBusinessOperationReference("SETTINGS_READ");
-  const [profile, data, t, hoursT, format, headerList] = await Promise.all([
+  const [profile, data, t, hoursT, mediaT, format, headerList] = await Promise.all([
     getCurrentBusinessProfile(),
     getPublicProfileManagementData(),
     getTranslations("PublicProfileManagement"),
     getTranslations("WorkingHours"),
+    getTranslations("Media"),
     getFormatter(),
     headers(),
   ]);
@@ -245,6 +247,17 @@ export async function PublicProfileManagementPage() {
             ) : (
               <p className="text-sm text-muted-foreground">{t("noServices")}</p>
             )}
+          </CardContent>
+        </Card>
+      </PublicProfileSection>
+
+      <PublicProfileSection>
+        <Card>
+          <CardHeader><CardTitle>{mediaT("manage")}</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            <MediaManager description={mediaT("altText")} endpoint="/api/media/business/profile" purpose="BUSINESS_LOGO" slot="BUSINESS_LOGO" storageMode="business" title={t("imageAdded")} />
+            <MediaManager description={mediaT("altText")} endpoint="/api/media/business/profile" purpose="BUSINESS_COVER" slot="BUSINESS_COVER" storageMode="business" title={t("imageAdded")} />
+            <MediaManager collection description={mediaT("emptyGallery")} endpoint="/api/media/business/profile" purpose="BUSINESS_GALLERY_IMAGE" reorderEndpoint="/api/media/business/profile/reorder" slot="BUSINESS_GALLERY" storageMode="business" title={mediaT("emptyGallery")} />
           </CardContent>
         </Card>
       </PublicProfileSection>

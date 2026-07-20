@@ -56,7 +56,6 @@ export function TeamMemberForm({
       ) : (
         <>
           <div className="grid gap-5 md:grid-cols-2">
-            <div className="space-y-2"><Label htmlFor={`team-photo-${member.id}`}>{t("fields.photoUrl")}</Label><Input id={`team-photo-${member.id}`} name="photoUrl" type="url" dir="ltr" defaultValue={member.photoUrl} placeholder="https://" /></div>
             <div className="space-y-2"><Label htmlFor={`team-specialties-${member.id}`}>{t("fields.specialties")}</Label><Input id={`team-specialties-${member.id}`} name="specialties" defaultValue={member.specialties.join(", ")} /></div>
             <div className="space-y-2 md:col-span-2"><Label htmlFor={`team-bio-${member.id}`}>{t("fields.bio")}</Label><Textarea id={`team-bio-${member.id}`} name="bio" defaultValue={member.bio} maxLength={1000} /></div>
             <Label className="flex min-h-11 items-center gap-3 rounded-lg border p-3 font-normal"><Checkbox name="isPublicProfessional" defaultChecked={member.isPublicProfessional} />{t("fields.publicProfileEnabled")}</Label>

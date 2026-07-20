@@ -1,6 +1,7 @@
 import { API_BASE_URL } from "../config/api";
 import { readMobileSessionCookie } from "../auth/session-cookie";
 import type { MobileApiError } from "../types/marketplace";
+import { resolveMobileManagedMediaPaths } from "../config/media-url";
 
 export class MobileApiRequestError extends Error {
   constructor(
@@ -28,7 +29,7 @@ export async function mobileApiRequest<T>(
     authenticated?: boolean;
     body?: unknown;
     headers?: Record<string, string>;
-    method?: "DELETE" | "GET" | "PATCH" | "POST";
+    method?: "DELETE" | "GET" | "PATCH" | "POST" | "PUT";
     params?: Record<string, boolean | string | number | undefined>;
     signal?: AbortSignal;
   } = {},
@@ -54,7 +55,10 @@ export async function mobileApiRequest<T>(
     method: options.method ?? "GET",
     signal: options.signal,
   });
-  const payload = (await response.json().catch(() => null)) as
+  const payload = resolveMobileManagedMediaPaths(
+    await response.json().catch(() => null),
+    API_BASE_URL,
+  ) as
     | MobileApiError
     | T
     | null;

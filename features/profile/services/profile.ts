@@ -2,6 +2,8 @@ import "server-only";
 
 import { getCurrentIdentity } from "@/features/identity/server";
 import type { ProfileDetails } from "@/features/profile/types";
+import { resolveMediaFallback } from "@/features/media/services/media-query";
+import { prisma } from "@/lib/db/prisma";
 
 function splitName(name: string): { firstName: string; lastName: string } {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -21,6 +23,15 @@ export async function getCurrentProfile(): Promise<ProfileDetails | null> {
 
   const { person, session } = identity;
   const fallbackName = splitName(session.user.name);
+  const container = await prisma.mediaContainer.findFirst({
+    where: { kind: "CUSTOMER_PROFILE", personId: person.id },
+    include: { bindings: { where: { slot: "CUSTOMER_AVATAR" }, include: { asset: true } } },
+  });
+  const avatar = resolveMediaFallback(
+    "CUSTOMER_AVATAR",
+    container?.bindings ?? [],
+    [person.avatarUrl, session.user.image],
+  )[0]?.stableDeliveryPath ?? "";
 
   return {
     firstName: person.firstName || fallbackName.firstName,
@@ -28,6 +39,6 @@ export async function getCurrentProfile(): Promise<ProfileDetails | null> {
     displayName: person.displayName ?? "",
     phone: person.phone ?? "",
     email: session.user.email,
-    avatarUrl: person.avatarUrl ?? session.user.image ?? "",
+    avatarUrl: avatar,
   };
 }
