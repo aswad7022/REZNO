@@ -322,7 +322,7 @@ export async function materializePaymentsGate5cEvidence(prisma: PrismaClient) {
         settlementDoubleInclusionRejected,
         settlementImmutable,
       });
-    }, { isolationLevel: "Serializable" });
+    }, { isolationLevel: "Serializable", timeout: 30_000 });
   } catch (error) {
     if (error instanceof FixtureRollback) return { evidence: error.evidence, fingerprint: error.fingerprint };
     throw error;
