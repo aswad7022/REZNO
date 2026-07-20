@@ -36,7 +36,7 @@ const baseStore = {
 };
 
 test("Stage 3A Merchant Store domain contracts", async (t) => {
-  await t.test("Owner effective permissions remain the fixed complete 12-permission baseline", () => {
+  await t.test("Owner effective permissions remain the fixed complete 15-permission baseline", () => {
     assert.deepEqual(effectiveCommercePermissions({ commercePermissions: [], systemRole: "OWNER" }), OWNER_DEFAULT_COMMERCE_PERMISSIONS);
   });
 

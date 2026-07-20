@@ -511,7 +511,7 @@ test("Gate 3A Merchant Store PostgreSQL end-to-end", { concurrency: false }, asy
   await t.test("37 Owner fixed Commerce baseline remains effective even if persisted array drifts", async () => {
     await prisma.role.update({ where: { id: owner.roleId }, data: { commercePermissions: [] } });
     const actor = await resolveMerchantCommerceContext(owner.reference, "STORE_MANAGE");
-    assert.equal(actor.permissions.length, 12);
+    assert.equal(actor.permissions.length, 15);
   });
   await t.test("38 Manager explicit STORE_VIEW is effective and STORE_MANAGE is not", async () => {
     const manager = await createMerchant("manager-explicit", { organizationId: owner.organization.id, permissions: ["STORE_VIEW", "STORE_MANAGE"], role: "MANAGER" });

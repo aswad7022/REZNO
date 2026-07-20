@@ -237,7 +237,7 @@ test("Gate 1A onboarding, tenant RBAC, backfill, and conversation boundaries", {
       where: { id: { in: [eligible.roleId, manager.roleId, receptionist.roleId, staff.roleId, inactive.roleId, deleted.roleId, suspended.roleId] } },
       select: { commercePermissions: true, id: true },
     });
-    assert.equal(roles.find((role) => role.id === eligible.roleId)?.commercePermissions.length, 12);
+    assert.equal(roles.find((role) => role.id === eligible.roleId)?.commercePermissions.length, 15);
     for (const roleId of [manager.roleId, receptionist.roleId, staff.roleId, inactive.roleId, deleted.roleId, suspended.roleId]) {
       assert.deepEqual(roles.find((role) => role.id === roleId)?.commercePermissions, []);
     }

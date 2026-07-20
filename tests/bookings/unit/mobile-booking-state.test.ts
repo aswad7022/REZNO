@@ -115,6 +115,9 @@ test("mobile management pagination de-duplicates and classifies recovery", () =>
     endsAt: "2026-07-20T08:30:00.000Z",
     timezone: "Asia/Baghdad",
     price: "25000",
+    currency: "IQD",
+    paymentMethod: null,
+    paymentStatus: "UNPAID" as const,
     status: "CONFIRMED" as const,
     createdAt: "2026-07-14T08:00:00.000Z",
     cancellation: {

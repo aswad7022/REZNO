@@ -102,8 +102,8 @@ jobs:
         run: |
           node -e 'const name = new URL(process.env.DATABASE_URL).pathname.slice(1); if (!/(?:_test|test_)/.test(name)) throw new Error(`Refusing non-test database: ${name}`)'
           migration_count="$(find prisma/migrations -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')"
-          if [[ "$migration_count" != "40" ]]; then
-            echo "Expected 40 migrations, found $migration_count" >&2
+          if [[ "$migration_count" != "41" ]]; then
+            echo "Expected 41 migrations, found $migration_count" >&2
             exit 1
           fi
 
@@ -119,10 +119,16 @@ jobs:
       - name: Run focused Gate 5A storage contracts
         run: npm run test:storage:unit
 
+      - name: Run focused Gate 5C payment contracts
+        run: npm run test:payments:unit
+
       - name: Run complete unit suite including Gate 5B media contracts
         run: npm run test:unit
 
-      - name: Run PostgreSQL regressions including Gate 4D and Gate 5B media
+      - name: Run focused Gate 5C PostgreSQL financial integrity
+        run: npm run test:payments:postgres
+
+      - name: Run PostgreSQL regressions including Gate 4D, Gate 5B media, and Gate 5C payments
         run: npm run test:integration
 
       - name: Confirm database validation did not modify tracked files
@@ -175,6 +181,7 @@ jobs:
         shell: bash
         env:
           COMMERCE_HTTP_BASE_URL: http://127.0.0.1:3000
+          PAYMENT_HTTP_BASE_URL: http://127.0.0.1:3000
           STORAGE_HTTP_BASE_URL: http://127.0.0.1:3000
         run: |
           npm run start >"$RUNNER_TEMP/rezno-next.log" 2>&1 &
