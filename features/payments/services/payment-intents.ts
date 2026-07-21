@@ -464,8 +464,9 @@ export async function applyCapture(
   });
   if (existingJournal) return loadIntentDto(transaction, intent.id);
   const captureAmount = paymentDecimal(input.amount, "captureAmount");
-  const remaining = intent.amount.minus(intent.capturedAmount);
-  if (captureAmount.greaterThan(remaining)) paymentError("PAYMENT_AMOUNT_MISMATCH", "Capture exceeds the remaining authorized amount.");
+  if (!intent.capturedAmount.isZero() || !captureAmount.equals(intent.amount)) {
+    paymentError("PAYMENT_AMOUNT_MISMATCH", "Capture must exactly match the authoritative payment amount.");
+  }
   const newCaptured = intent.capturedAmount.plus(captureAmount);
   const snapshot = paymentCommissionPolicy.calculate(newCaptured);
   const newCommission = paymentDecimal(snapshot.amount, "commissionAmount", { allowZero: true });

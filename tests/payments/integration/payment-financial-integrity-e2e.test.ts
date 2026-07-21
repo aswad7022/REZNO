@@ -258,6 +258,21 @@ test("Gate 5C payment lifecycle is authorized, exact-once, balanced, refundable,
     assert.equal(forgedSmallerLength.probe.cancelCount, 1);
     assert.equal(forgedSmallerLength.probe.pullCount, 2);
 
+    const partialCapture = provider.signWebhook({
+      amount: "8000.000",
+      currency: "IQD",
+      eventId: "partial-capture-" + randomUUID(),
+      occurredAt: now,
+      outcome: "CAPTURED",
+      providerReference: stored.providerReference!,
+      safeCode: null,
+    }, now);
+    await assert.rejects(
+      processPaymentProviderWebhook({ ...partialCapture, receivedAt: now }),
+      code("PAYMENT_AMOUNT_MISMATCH"),
+    );
+    assert.equal((await prisma.paymentIntent.findUniqueOrThrow({ where: { id: pending.id } })).capturedAmount.toFixed(3), "0.000");
+
     const first = await processGuardedPaymentWebhook(paymentWebhookRequest(capturedEvent));
     const duplicate = await processGuardedPaymentWebhook(paymentWebhookRequest(capturedEvent));
     assert.equal(first.status, "PROCESSED");
@@ -312,6 +327,28 @@ test("Gate 5C payment lifecycle is authorized, exact-once, balanced, refundable,
       assert.notEqual(opposite.side, posting.side);
     }
     await assert.rejects(prisma.financialJournal.delete({ where: { id: original.id } }));
+    const postedPostingCount = await prisma.financialPosting.count({ where: { journalId: original.id } });
+    await assert.rejects(prisma.financialPosting.create({
+      data: {
+        accountId: original.postings[0]!.accountId,
+        amount: "1.000",
+        journalId: original.id,
+        side: original.postings[0]!.side,
+      },
+    }));
+    assert.equal(await prisma.financialPosting.count({ where: { journalId: original.id } }), postedPostingCount);
+    const draftJournal = await prisma.financialJournal.create({
+      data: {
+        currency: "IQD",
+        idempotencyKey: "posting-move:" + randomUUID(),
+        sourceId: randomUUID(),
+        sourceType: "RECONCILIATION",
+      },
+    });
+    await assert.rejects(prisma.financialPosting.update({
+      where: { id: original.postings[0]!.id },
+      data: { journalId: draftJournal.id },
+    }));
 
     const invalidOrder = await createPayableOrder({ customerId: fixture.customer.person.id, storeId: fixture.store.id, total: "7000.000" });
     const invalidPayment = await createCustomerPaymentIntent(fixture.customer.person.id, {
@@ -368,6 +405,93 @@ test("Gate 5C payment lifecycle is authorized, exact-once, balanced, refundable,
     const finalized = finalizedResult.value;
     assert.equal(finalized.status, "FINALIZED");
     await assert.rejects(prisma.settlementBatch.update({ where: { id: finalized.id }, data: { merchantNet: "1.000" } }));
+    await assert.rejects(prisma.settlementBatch.update({
+      where: { id: finalized.id },
+      data: { merchantNet: "1.000", status: "VOID", voidedAt: new Date(), version: { increment: 1 } },
+    }));
+    const remainingDraft = finalizations[0]!.status === "rejected" ? firstDraft : competingDraft;
+    await assert.rejects(prisma.settlementBatch.update({
+      where: { id: remainingDraft.id },
+      data: { status: "VOID", voidedAt: new Date(), version: { increment: 1 } },
+    }));
+    await assert.rejects(prisma.settlementBatch.create({
+      data: {
+        captureGross: "0.000",
+        commission: "0.000",
+        currency: "IQD",
+        finalizedAt: new Date(),
+        idempotencyKey: randomUUID(),
+        merchantNet: "0.000",
+        organizationId: fixture.organization.id,
+        periodEnd,
+        periodStart,
+        refunds: "0.000",
+        requestHash: "0".repeat(64),
+        status: "FINALIZED",
+      },
+    }));
+    const scopedOrder = await createPayableOrder({
+      customerId: fixture.customer.person.id,
+      storeId: fixture.store.id,
+      total: "4000.000",
+    });
+    await createCustomerPaymentIntent(fixture.customer.person.id, {
+      idempotencyKey: randomUUID(),
+      targetId: scopedOrder.id,
+      targetType: "ORDER",
+    });
+    const scopedDraft = await previewSettlement(fixture.adminContext, {
+      currency: "IQD",
+      idempotencyKey: randomUUID(),
+      organizationId: fixture.organization.id,
+      periodEnd,
+      periodStart,
+    });
+    assert.ok(scopedDraft.lines.length > 0);
+    await assert.rejects(prisma.settlementBatch.update({
+      where: { id: scopedDraft.id },
+      data: {
+        finalizedAt: new Date(),
+        finalizedByAdminId: fixture.adminContext.userId,
+        organizationId: fixture.foreignOrganization.id,
+        status: "FINALIZED",
+        version: { increment: 1 },
+      },
+    }));
+    await assert.rejects(prisma.settlementBatch.update({
+      where: { id: scopedDraft.id },
+      data: {
+        finalizedAt: new Date(),
+        finalizedByAdminId: fixture.adminContext.userId,
+        periodEnd: new Date(Date.now() + 48 * 60 * 60 * 1000),
+        periodStart: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        status: "FINALIZED",
+        version: { increment: 1 },
+      },
+    }));
+    const emptyDraft = await previewSettlement(fixture.adminContext, {
+      currency: "IQD",
+      idempotencyKey: randomUUID(),
+      organizationId: fixture.organization.id,
+      periodEnd: new Date(Date.now() + 72 * 60 * 60 * 1000),
+      periodStart: new Date(Date.now() + 48 * 60 * 60 * 1000),
+    });
+    assert.equal(emptyDraft.lines.length, 0);
+    await assert.rejects(prisma.settlementBatch.update({
+      where: { id: emptyDraft.id },
+      data: {
+        finalizedAt: new Date(),
+        finalizedByAdminId: fixture.adminContext.userId,
+        status: "FINALIZED",
+        version: { increment: 1 },
+      },
+    }));
+    const voided = await prisma.settlementBatch.update({
+      where: { id: finalized.id },
+      data: { status: "VOID", voidedAt: new Date(), version: { increment: 1 } },
+    });
+    assert.equal(voided.status, "VOID");
+    await assert.rejects(prisma.settlementBatch.update({ where: { id: voided.id }, data: { merchantNet: "1.000" } }));
     await assert.rejects(prisma.financialJournal.update({ where: { id: finalized.lines[0]!.journalId }, data: { sourceId: randomUUID() } }));
     const posting = await prisma.financialPosting.findFirstOrThrow({ where: { journalId: finalized.lines[0]!.journalId } });
     await assert.rejects(prisma.financialPosting.delete({ where: { id: posting.id } }));

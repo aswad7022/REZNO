@@ -1,6 +1,6 @@
 # Gate 5C — Payments and Financial Integrity Foundation
 
-Status: implementation, complete local validation, and real staging passed; exact-head PR closure pending
+Status: independent-review fixes locally validated; Draft, staging, and exact-new-head closure pending
 
 Baseline: `cb32cf401bc0f060940ec71dffba76f8d5089733`
 
@@ -232,6 +232,11 @@ body. Duplicate and out-of-order events reconcile deterministically. A signed
 provider event or trusted synchronous server result can confirm capture; a
 browser return never can.
 
+Gate 5C permits exactly one full capture. The verified capture amount must equal
+the server-authoritative intent amount and a nonzero prior capture is rejected.
+The persisted partial-capture enum remains for schema compatibility; no Gate 5C
+service transition produces it and no later provider policy is assumed here.
+
 ### Refunds
 
 `PaymentRefund` derives currency and refundable balance from the locked intent.
@@ -309,15 +314,24 @@ currency and amount bounds, Organization enablement, action/refund support. In
 production baseline, online control is disabled and API creation fails with
 `PAYMENT_PROVIDER_NOT_CONFIGURED`; offline methods continue to work.
 
-## Migration 41 and database integrity evidence
+## Migrations 41–42 and database integrity evidence
 
-Migration 41, `payments_financial_integrity_foundation`, is required. It is
-forward-only and is the sole Gate 5C migration. Migrations 1–40 remain byte-for-byte
-unchanged. It adds the canonical models/enums/indexes/checks, exact-target
+Migration 41, `payments_financial_integrity_foundation`, is required and
+forward-only. Migrations 1–40 remain byte-for-byte unchanged. It adds the
+canonical models/enums/indexes/checks, exact-target
 constraint, amount/capture/refund/commission/net bounds, currency checks,
 positive versions/postings, attempt/event/mutation uniqueness, posted-ledger
 balance and immutability triggers, reversal validity, and settlement inclusion
 protection.
+
+Migration 42, `payment_financial_integrity_closure`, is the bounded independent-
+review correction required because migration 41 had already reached staging.
+It prevents insertion or movement of postings after a Journal is posted, forces
+Settlement batches to start as DRAFT, rejects DRAFT→VOID, and permits
+FINALIZED→VOID only without rewriting immutable statement fields. Finalization
+also requires at least one ledger line and revalidates its final Organization,
+currency, Journal state, source, and period scope. Editing the already-applied
+migration 41 in place would invalidate migration history.
 
 It preserves all Order, Booking and Payment history. Existing Payment rows
 remain visibly pre-ledger by nullable canonical linkage/no journal evidence. No
@@ -410,7 +424,12 @@ proof.
 
 ## Security findings and acceptance boundary
 
-The explicit Gate 5C security review found zero remaining P0/P1/P2. Ownership,
+The final independent review found three blockers on the former PR head: a
+posted-Journal posting insertion/move gap, non-exact partial capture, and
+settlement state/immutability gaps. The bounded remediation closes those paths
+with exact service checks, migration 42, and direct PostgreSQL regression tests.
+No known P0/P1/P2 remains after local validation; staging, exact-new-head CI,
+Vercel, and independent review remain required before Ready or merge. Ownership,
 Person, Organization, active-Business and current-Admin checks were exercised;
 amount, currency, commission, provider and redirect inputs are not client
 selectable. Concurrent attempt/refund tests prove one provider call per active
@@ -456,6 +475,10 @@ or payment-instrument collection path exists.
   representative historical fingerprint
   `ae3d86d79b541b2aa38d369d20e95cdb` unchanged, the legacy Payment unlinked,
   Booking still `UNPAID`, and zero fabricated canonical payment rows.
+- Independent-review closure rehearsal: fresh 1→42 passed; a separate exact
+  1→41 database applied only migration 42, reached 42/42 with zero failed or
+  rolled-back rows, and a second deploy was a no-op. Historical migrations
+  1–41 were not edited.
 - Local staging rehearsal reached 41/41. Two fixture runs produced identical
   fingerprint `b313552ea282376da895de0f9ff0cd264fc47c79a9e00ad144dbb63f8299f6cf`.
   Focused smoke proved production provider `NOT_CONFIGURED`, deterministic

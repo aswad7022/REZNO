@@ -29,11 +29,11 @@ export async function assertPaymentsGate5cStaging(
     FROM "_prisma_migrations"
   `;
   if (
-    migrations?.total !== BigInt(41) ||
-    migrations.applied !== BigInt(41) ||
+    migrations?.total !== BigInt(42) ||
+    migrations.applied !== BigInt(42) ||
     migrations.failed !== BigInt(0)
   ) {
-    throw new Error("Gate 5C fixture requires an exact healthy 41/41 migration state.");
+    throw new Error("Gate 5C fixture requires an exact healthy 42/42 migration state.");
   }
-  return { database: "rezno_staging" as const, migrations: "41/41" as const };
+  return { database: "rezno_staging" as const, migrations: "42/42" as const };
 }
