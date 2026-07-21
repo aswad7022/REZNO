@@ -122,13 +122,19 @@ jobs:
       - name: Run focused Gate 5C payment contracts
         run: npm run test:payments:unit
 
-      - name: Run complete unit suite including Gate 5B media contracts
+      - name: Run focused Gate 5D closure contracts
+        run: npm run test:stage5-closure:unit
+
+      - name: Run complete unit suite including Gate 5B media and Gate 5D closure contracts
         run: npm run test:unit
 
       - name: Run focused Gate 5C PostgreSQL financial integrity
         run: npm run test:payments:postgres
 
-      - name: Run PostgreSQL regressions including Gate 4D, Gate 5B media, and Gate 5C payments
+      - name: Run focused Gate 5D cross-gate PostgreSQL closure
+        run: npm run test:stage5-closure:postgres
+
+      - name: Run PostgreSQL regressions including Gate 4D and Gate 5A through Gate 5D
         run: npm run test:integration
 
       - name: Confirm database validation did not modify tracked files
@@ -177,11 +183,13 @@ jobs:
       - name: Build Next.js production application
         run: npm run build
 
-      - name: Run complete HTTP suite including Gate 4D and Gate 5B media routes
+      - name: Run complete HTTP suite including Gate 4D and Gate 5A through Gate 5D
         shell: bash
         env:
           COMMERCE_HTTP_BASE_URL: http://127.0.0.1:3000
+          MEDIA_HTTP_BASE_URL: http://127.0.0.1:3000
           PAYMENT_HTTP_BASE_URL: http://127.0.0.1:3000
+          STAGE5_HTTP_BASE_URL: http://127.0.0.1:3000
           STORAGE_HTTP_BASE_URL: http://127.0.0.1:3000
         run: |
           npm run start >"$RUNNER_TEMP/rezno-next.log" 2>&1 &
