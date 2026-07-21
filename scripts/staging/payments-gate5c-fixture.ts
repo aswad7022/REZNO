@@ -221,14 +221,9 @@ export async function seedPaymentsGate5cFixture(prisma: PrismaClient) {
       mutation(1, "PROCESS_PROVIDER_EVENT", "PROVIDER", "provider:deterministic", null, intentIds[3]!, orderIds[3]!, "ORDER"),
       mutation(2, "REQUEST_REFUND", "MERCHANT", `merchant:${memberIds[0]}`, personIds[2]!, intentIds[4]!, orderIds[4]!, "ORDER"),
     ] });
-    await transaction.financialAccount.createMany({ data: [
-      { createdAt: baseTime, currency: "IQD", family: "MERCHANT_PAYABLE", id: accountIds.merchant, organizationId: organizationIds[0]! },
-      { createdAt: baseTime, currency: "IQD", family: "PLATFORM_REVENUE", id: accountIds.platform },
-      { createdAt: baseTime, currency: "IQD", family: "PROVIDER_CLEARING", id: accountIds.provider },
-      { createdAt: baseTime, currency: "IQD", family: "CUSTOMER_REFUND_CLEARING", id: accountIds.refund },
-    ] });
+    const resolvedAccountIds = await ensureFixtureFinancialAccounts(transaction);
     await transaction.financialJournal.createMany({ data: journalDefinitions() });
-    await transaction.financialPosting.createMany({ data: postingDefinitions() });
+    await transaction.financialPosting.createMany({ data: postingDefinitions(resolvedAccountIds) });
     await transaction.settlementBatch.createMany({ data: settlementBatchIds.map((batchId, index) => ({
       createdAt: at(80 + index),
       currency: "IQD",
@@ -495,13 +490,64 @@ function journalDefinitions(): Prisma.FinancialJournalCreateManyInput[] {
   }));
 }
 
-function postingDefinitions(): Prisma.FinancialPostingCreateManyInput[] {
+async function ensureFixtureFinancialAccounts(transaction: Prisma.TransactionClient) {
+  await transaction.$queryRaw`
+    SELECT pg_advisory_xact_lock(
+      hashtextextended('rezno:payments:gate5c:platform-accounts', 0)
+    )::text AS locked
+  `;
+  const platformDefinitions = [
+    { family: "PLATFORM_REVENUE" as const, id: accountIds.platform, key: "platform" as const },
+    { family: "PROVIDER_CLEARING" as const, id: accountIds.provider, key: "provider" as const },
+    { family: "CUSTOMER_REFUND_CLEARING" as const, id: accountIds.refund, key: "refund" as const },
+  ];
+  const existing = await transaction.financialAccount.findMany({
+    where: {
+      currency: "IQD",
+      family: { in: platformDefinitions.map((definition) => definition.family) },
+      organizationId: null,
+    },
+    select: { family: true, id: true },
+  });
+  const existingByFamily = new Map(existing.map((account) => [account.family, account.id]));
+  await transaction.financialAccount.createMany({
+    data: [
+      {
+        createdAt: baseTime,
+        currency: "IQD",
+        family: "MERCHANT_PAYABLE",
+        id: accountIds.merchant,
+        organizationId: organizationIds[0]!,
+      },
+      ...platformDefinitions
+        .filter((definition) => !existingByFamily.has(definition.family))
+        .map((definition) => ({
+          createdAt: baseTime,
+          currency: "IQD",
+          family: definition.family,
+          id: definition.id,
+        })),
+    ],
+  });
+  return platformDefinitions.reduce<Record<keyof typeof accountIds, string>>(
+    (resolved, definition) => {
+      resolved[definition.key] =
+        existingByFamily.get(definition.family) ?? definition.id;
+      return resolved;
+    },
+    { merchant: accountIds.merchant, platform: "", provider: "", refund: "" },
+  );
+}
+
+function postingDefinitions(
+  resolvedAccountIds: Record<keyof typeof accountIds, string>,
+): Prisma.FinancialPostingCreateManyInput[] {
   const amounts = ["13000.000", "14000.000", "5000.000", "15000.000", "15000.000", "18000.000", "18000.000"];
   return journalIds.flatMap((journalId, index) => {
     const refund = index === 2 || index === 4;
     return [
-      { accountId: refund ? accountIds.merchant : accountIds.provider, amount: amounts[index]!, createdAt: at(70 + index), id: postingIds[index * 2]!, journalId, side: "DEBIT" as const },
-      { accountId: refund ? accountIds.refund : accountIds.merchant, amount: amounts[index]!, createdAt: at(70 + index), id: postingIds[index * 2 + 1]!, journalId, side: "CREDIT" as const },
+      { accountId: refund ? resolvedAccountIds.merchant : resolvedAccountIds.provider, amount: amounts[index]!, createdAt: at(70 + index), id: postingIds[index * 2]!, journalId, side: "DEBIT" as const },
+      { accountId: refund ? resolvedAccountIds.refund : resolvedAccountIds.merchant, amount: amounts[index]!, createdAt: at(70 + index), id: postingIds[index * 2 + 1]!, journalId, side: "CREDIT" as const },
     ];
   });
 }

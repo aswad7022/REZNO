@@ -34,10 +34,10 @@ export async function assertMediaGate5bStaging(
       )::bigint AS failed
     FROM "_prisma_migrations"
   `;
-  if (migrations?.total !== BigInt(40)
-    || migrations.applied !== BigInt(40)
+  if (migrations?.total !== BigInt(42)
+    || migrations.applied !== BigInt(42)
     || migrations.failed !== BigInt(0)) {
-    throw new Error("Gate 5B fixture requires an exact healthy 40/40 migration state.");
+    throw new Error("Gate 5B fixture requires the current exact healthy 42/42 Stage 5 migration state.");
   }
-  return { database: "rezno_staging" as const, migrations: "40/40" as const };
+  return { database: "rezno_staging" as const, migrations: "42/42" as const };
 }
