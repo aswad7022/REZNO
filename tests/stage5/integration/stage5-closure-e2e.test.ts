@@ -19,6 +19,24 @@ test(
   { concurrency: false },
   async (t) => {
     await cleanupStage5ClosureFixture(prisma);
+    const sharedPlatformAccountIds: string[] = [];
+    const createdSharedPlatformAccountIds: string[] = [];
+    for (const family of [
+      "PLATFORM_REVENUE",
+      "PROVIDER_CLEARING",
+      "CUSTOMER_REFUND_CLEARING",
+    ] as const) {
+      let account = await prisma.financialAccount.findFirst({
+        where: { currency: "IQD", family, organizationId: null },
+      });
+      if (!account) {
+        account = await prisma.financialAccount.create({
+          data: { currency: "IQD", family, id: randomUUID() },
+        });
+        createdSharedPlatformAccountIds.push(account.id);
+      }
+      sharedPlatformAccountIds.push(account.id);
+    }
     const sentinelId = `stage5-foreign-${randomUUID()}`;
     await prisma.user.create({
       data: {
@@ -32,6 +50,9 @@ test(
     t.after(async () => {
       await cleanupStage5ClosureFixture(prisma);
       await prisma.user.deleteMany({ where: { id: sentinelId } });
+      await prisma.financialAccount.deleteMany({
+        where: { id: { in: createdSharedPlatformAccountIds } },
+      });
       await prisma.$disconnect();
     });
 
@@ -112,6 +133,12 @@ test(
     const cleanup = await cleanupStage5ClosureFixture(prisma);
     assert.ok(stage5CleanupTotal(cleanup) > 0);
     assert.ok(await prisma.user.findUnique({ where: { id: sentinelId } }));
+    assert.equal(
+      await prisma.financialAccount.count({
+        where: { id: { in: sharedPlatformAccountIds } },
+      }),
+      sharedPlatformAccountIds.length,
+    );
 
     const secondCleanup = await cleanupStage5ClosureFixture(prisma);
     assert.equal(stage5CleanupTotal(secondCleanup), 0);

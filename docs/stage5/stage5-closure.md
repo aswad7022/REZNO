@@ -50,6 +50,18 @@ Closure review also corrected three repository inconsistencies:
 3. live PR CI now supplies the media and Stage 5 base URLs, preventing the
    accepted media and closure live suites from silently skipping.
 
+The first exact-head CI run then exposed one additional cross-gate fixture
+defect: Gate 5C staging evidence assumed that the three platform-level IQD
+financial accounts were absent. A prior legal payment test or operation can
+already own those globally unique accounts. The fixture now takes a
+transaction-scoped advisory lock, reuses exact existing platform
+family/currency accounts, creates only missing platform accounts plus its
+Organization merchant account, and continues to delete only deterministic
+fixture-owned account IDs. The Gate 5D PostgreSQL test precreates shared
+platform accounts and proves both fixture runs, Journals/Postings, and repeated
+cleanup preserve them. The exact failing CI sequence—Gate 5C PostgreSQL followed
+by Gate 5D PostgreSQL—passes locally after the correction.
+
 The root development dependency path was also pinned from vulnerable
 `brace-expansion` 1.1.15 to fixed 1.1.16. The root and Mobile audits now both
 report zero known vulnerabilities.
