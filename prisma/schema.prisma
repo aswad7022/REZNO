@@ -2153,25 +2153,32 @@ model PlatformJobSchedule {
 }
 
 model PlatformJobMutation {
-  id               String                    @id @default(uuid()) @db.Uuid
-  actorAdminUserId String
-  actorPersonId    String                    @db.Uuid
-  action           PlatformJobMutationAction
-  idempotencyKey   String                    @db.Uuid
-  requestHash      String                    @db.VarChar(64)
-  jobId            String?                   @db.Uuid
-  scheduleId       String?                   @db.Uuid
-  result           Json
-  createdAt        DateTime                  @default(now()) @db.Timestamptz(6)
-  actorAdmin       User                      @relation("PlatformJobMutationActorUser", fields: [actorAdminUserId], references: [id], onDelete: Restrict)
-  actorPerson      Person                    @relation("PlatformJobMutationActorPerson", fields: [actorPersonId], references: [id], onDelete: Restrict)
-  job              PlatformJob?              @relation(fields: [jobId], references: [id], onDelete: Restrict)
-  schedule         PlatformJobSchedule?      @relation(fields: [scheduleId], references: [id], onDelete: Restrict)
+  id                      String                    @id @default(uuid()) @db.Uuid
+  actorAdminUserId        String
+  actorPersonId           String                    @db.Uuid
+  action                  PlatformJobMutationAction
+  idempotencyKey          String                    @db.Uuid
+  requestHash             String                    @db.VarChar(64)
+  jobId                   String?                   @db.Uuid
+  scheduleId              String?                   @db.Uuid
+  result                  Json
+  operationBatchSize      Int?                      @db.SmallInt
+  operationWorkerId       String?                   @db.VarChar(96)
+  operationLeaseToken     String?                   @db.Uuid
+  operationFencingToken   BigInt?
+  operationLeaseExpiresAt DateTime?                 @db.Timestamptz(6)
+  operationCompletedAt    DateTime?                 @db.Timestamptz(6)
+  createdAt               DateTime                  @default(now()) @db.Timestamptz(6)
+  actorAdmin              User                      @relation("PlatformJobMutationActorUser", fields: [actorAdminUserId], references: [id], onDelete: Restrict)
+  actorPerson             Person                    @relation("PlatformJobMutationActorPerson", fields: [actorPersonId], references: [id], onDelete: Restrict)
+  job                     PlatformJob?              @relation(fields: [jobId], references: [id], onDelete: Restrict)
+  schedule                PlatformJobSchedule?      @relation(fields: [scheduleId], references: [id], onDelete: Restrict)
 
   @@unique([actorAdminUserId, idempotencyKey])
   @@index([jobId, action, createdAt, id])
   @@index([scheduleId, action, createdAt, id])
   @@index([actorAdminUserId, createdAt, id])
+  @@index([action, operationLeaseExpiresAt, id])
 }
 
 model CustomerFavoriteStore {

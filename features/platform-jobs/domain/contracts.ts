@@ -6,6 +6,7 @@ export const PLATFORM_JOB_LIMITS = {
   maxListPage: 50,
   defaultListPage: 20,
   maxWorkerBatch: 10,
+  workerOperationLeaseSeconds: 120,
   maxSchedulerBatch: 10,
   maxAttempts: 10,
   minLeaseSeconds: 30,

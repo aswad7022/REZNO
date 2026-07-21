@@ -20,6 +20,11 @@ import {
 import { parsePlatformJobPayload, parsePlatformJobResult, isRetryablePlatformJobError } from "@/features/platform-jobs/domain/registry";
 import { prisma } from "@/lib/db/prisma";
 import { runPlatformJobSerializable } from "@/features/platform-jobs/services/transaction";
+import {
+  assertPlatformJobOperationOwned,
+  platformJobDatabaseNow,
+  type PlatformJobOperationAuthority,
+} from "@/features/platform-jobs/services/operation-lease";
 
 export type ClaimedPlatformJob = {
   attemptCount: number;
@@ -125,6 +130,22 @@ export async function claimPlatformJobs(input: {
   now?: Date;
   workerId: string;
 }): Promise<ClaimedPlatformJob[]> {
+  return prisma.$transaction(
+    (transaction) => claimPlatformJobsInTransaction(transaction, input),
+    { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted },
+  );
+}
+
+export async function claimPlatformJobsInTransaction(
+  transaction: Prisma.TransactionClient,
+  input: {
+    batchSize: number;
+    leaseSeconds?: number;
+    now?: Date;
+    operation?: PlatformJobOperationAuthority;
+    workerId: string;
+  },
+): Promise<ClaimedPlatformJob[]> {
   if (!/^[A-Za-z0-9][A-Za-z0-9_.:-]{7,95}$/.test(input.workerId)) {
     platformJobError("VALIDATION_ERROR", "The server-generated worker identity is invalid.");
   }
@@ -132,8 +153,9 @@ export async function claimPlatformJobs(input: {
     platformJobError("VALIDATION_ERROR", "The worker batch is outside the accepted bound.");
   }
   const now = input.now ?? new Date();
+  if (input.operation) await assertPlatformJobOperationOwned(transaction, input.operation, now);
   const leaseExpiresAt = platformLeaseExpiry(now, input.leaseSeconds ?? PLATFORM_JOB_LIMITS.defaultLeaseSeconds);
-  return prisma.$transaction(async (transaction) => transaction.$queryRaw<ClaimedPlatformJob[]>(Prisma.sql`
+  return transaction.$queryRaw<ClaimedPlatformJob[]>(Prisma.sql`
     WITH candidates AS (
       SELECT job."id"
       FROM "PlatformJob" AS job
@@ -184,7 +206,7 @@ export async function claimPlatformJobs(input: {
            claimed."leaseExpiresAt" AS "leaseExpiresAt"
     FROM claimed
     ORDER BY claimed."id"
-  `), { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted });
+  `);
 }
 
 export async function startPlatformJob(input: {
@@ -192,10 +214,14 @@ export async function startPlatformJob(input: {
   jobId: string;
   leaseToken: string;
   now?: Date;
+  operation?: PlatformJobOperationAuthority;
   workerId: string;
 }) {
   const now = input.now ?? new Date();
   return runPlatformJobSerializable(async (transaction) => {
+    if (input.operation) {
+      await assertPlatformJobOperationOwned(transaction, input.operation, await platformJobDatabaseNow(transaction));
+    }
     const updated = await transaction.platformJob.updateMany({
       where: {
         id: input.jobId,
@@ -267,11 +293,15 @@ export async function completePlatformJob(input: {
   jobId: string;
   leaseToken: string;
   now?: Date;
+  operation?: PlatformJobOperationAuthority;
   result: unknown;
   workerId: string;
 }) {
   const now = input.now ?? new Date();
   return runPlatformJobSerializable(async (transaction) => {
+    if (input.operation) {
+      await assertPlatformJobOperationOwned(transaction, input.operation, await platformJobDatabaseNow(transaction));
+    }
     const attempt = await transaction.platformJobAttempt.findUnique({
       where: { jobId_leaseToken: { jobId: input.jobId, leaseToken: input.leaseToken } },
       include: { job: { select: { jobType: true } } },
@@ -330,11 +360,15 @@ export async function failPlatformJob(input: {
   jobId: string;
   leaseToken: string;
   now?: Date;
+  operation?: PlatformJobOperationAuthority;
   retryable: boolean;
   workerId: string;
 }) {
   const now = input.now ?? new Date();
   return runPlatformJobSerializable(async (transaction) => {
+    if (input.operation) {
+      await assertPlatformJobOperationOwned(transaction, input.operation, await platformJobDatabaseNow(transaction));
+    }
     const attempt = await transaction.platformJobAttempt.findUnique({
       where: { jobId_leaseToken: { jobId: input.jobId, leaseToken: input.leaseToken } },
       include: { job: true },
@@ -391,11 +425,14 @@ export async function failPlatformJob(input: {
 export async function recoverExpiredPlatformJobLeases(
   now = new Date(),
   batchSize: number = PLATFORM_JOB_LIMITS.maxWorkerBatch,
+  scope?: { operation?: PlatformJobOperationAuthority; workerId?: string },
 ) {
   if (!Number.isInteger(batchSize) || batchSize < 1 || batchSize > PLATFORM_JOB_LIMITS.maxWorkerBatch) {
     platformJobError("VALIDATION_ERROR", "The recovery batch is outside the accepted bound.");
   }
   return prisma.$transaction(async (transaction) => {
+    const recoveryNow = scope?.operation ? await platformJobDatabaseNow(transaction) : now;
+    if (scope?.operation) await assertPlatformJobOperationOwned(transaction, scope.operation, recoveryNow);
     const expired = await transaction.$queryRaw<Array<{
       attemptCount: number;
       id: string;
@@ -406,7 +443,8 @@ export async function recoverExpiredPlatformJobLeases(
       SELECT job."id", job."attemptCount", job."maxAttempts", job."leaseToken"::text AS "leaseToken", job."startedAt"
       FROM "PlatformJob" AS job
       WHERE job."status" IN ('CLAIMED', 'RUNNING')
-        AND job."leaseExpiresAt" <= ${now}
+        AND job."leaseExpiresAt" <= ${recoveryNow}
+        ${scope?.workerId ? Prisma.sql`AND job."leaseOwner" = ${scope.workerId}` : Prisma.empty}
       ORDER BY job."leaseExpiresAt", job."id"
       FOR UPDATE SKIP LOCKED
       LIMIT ${batchSize}
@@ -419,9 +457,9 @@ export async function recoverExpiredPlatformJobLeases(
       await transaction.platformJob.update({
         where: { id: job.id },
         data: {
-          availableAt: terminal ? now : safeFutureDate(now, delay),
+          availableAt: terminal ? recoveryNow : safeFutureDate(recoveryNow, delay),
           claimedAt: null,
-          failedAt: terminal ? now : null,
+          failedAt: terminal ? recoveryNow : null,
           heartbeatAt: null,
           lastErrorCode: "LEASE_EXPIRED",
           leaseExpiresAt: null,
@@ -429,13 +467,13 @@ export async function recoverExpiredPlatformJobLeases(
           leaseToken: null,
           startedAt: terminal ? job.startedAt : null,
           status: terminal ? "DEAD_LETTERED" : "RETRY_WAIT",
-          updatedAt: now,
+          updatedAt: recoveryNow,
           version: { increment: 1 },
         },
       });
       const attempt = await transaction.platformJobAttempt.updateMany({
         where: { jobId: job.id, leaseToken: job.leaseToken, status: { in: ["CLAIMED", "RUNNING"] } },
-        data: { errorCode: "LEASE_EXPIRED", finishedAt: now, status: "LEASE_EXPIRED", updatedAt: now },
+        data: { errorCode: "LEASE_EXPIRED", finishedAt: recoveryNow, status: "LEASE_EXPIRED", updatedAt: recoveryNow },
       });
       if (attempt.count !== 1) platformJobError("CONFLICT", "Lease recovery could not close the canonical attempt.");
       if (terminal) deadLettered += 1;
