@@ -63,6 +63,9 @@ model Person {
   mediaMutations                  MediaMutation[]
   paymentIntents                  PaymentIntent[]                     @relation("PaymentIntentCustomer")
   paymentMutations                PaymentMutation[]                   @relation("PaymentMutationActorPerson")
+  createdPlatformJobs             PlatformJob[]                       @relation("PlatformJobCreatedByPerson")
+  createdPlatformJobSchedules     PlatformJobSchedule[]               @relation("PlatformJobScheduleCreatedByPerson")
+  platformJobMutations            PlatformJobMutation[]               @relation("PlatformJobMutationActorPerson")
 
   @@index([phone])
 }
@@ -110,6 +113,8 @@ model Organization {
   paymentMutations               PaymentMutation[]
   settlementBatches              SettlementBatch[]
   settlementLines                SettlementLine[]
+  platformJobs                   PlatformJob[]
+  platformJobSchedules           PlatformJobSchedule[]
 
   @@index([vertical])
   @@index([status, isActive, deletedAt])
@@ -727,6 +732,9 @@ model User {
   communicationCampaignMutations CommunicationCampaignMutation[]
   adminAccess                    AdminAccess?
   grantedAdminAccesses           AdminAccess[]                   @relation("AdminAccessGrantedBy")
+  createdPlatformJobs            PlatformJob[]                   @relation("PlatformJobCreatedByUser")
+  createdPlatformJobSchedules    PlatformJobSchedule[]           @relation("PlatformJobScheduleCreatedByUser")
+  platformJobMutations           PlatformJobMutation[]           @relation("PlatformJobMutationActorUser")
 
   @@map("user")
 }
@@ -2034,6 +2042,138 @@ model SettlementLine {
   @@index([organizationId, createdAt, id])
 }
 
+model PlatformJob {
+  id                   String                @id @default(uuid()) @db.Uuid
+  jobType              PlatformJobType
+  status               PlatformJobStatus     @default(AVAILABLE)
+  source               PlatformJobSource
+  payloadVersion       Int
+  payload              Json
+  payloadHash          String                @db.VarChar(64)
+  scopeKey             String                @db.VarChar(64)
+  organizationId       String?               @db.Uuid
+  createdByAdminUserId String?
+  createdByPersonId    String?               @db.Uuid
+  scheduleId           String?               @db.Uuid
+  deduplicationKey     String                @db.VarChar(160)
+  priority             Int                   @default(5) @db.SmallInt
+  availableAt          DateTime              @db.Timestamptz(6)
+  maxAttempts          Int                   @default(5) @db.SmallInt
+  attemptCount         Int                   @default(0) @db.SmallInt
+  leaseOwner           String?               @db.VarChar(96)
+  leaseToken           String?               @db.Uuid
+  fencingToken         BigInt                @default(0)
+  leaseExpiresAt       DateTime?             @db.Timestamptz(6)
+  heartbeatAt          DateTime?             @db.Timestamptz(6)
+  claimedAt            DateTime?             @db.Timestamptz(6)
+  startedAt            DateTime?             @db.Timestamptz(6)
+  completedAt          DateTime?             @db.Timestamptz(6)
+  failedAt             DateTime?             @db.Timestamptz(6)
+  cancelledAt          DateTime?             @db.Timestamptz(6)
+  lastErrorCode        PlatformJobErrorCode?
+  resultMetadata       Json?
+  resultHash           String?               @db.VarChar(64)
+  version              Int                   @default(1)
+  requeueRootJobId     String?               @db.Uuid
+  requeueSequence      Int                   @default(0) @db.SmallInt
+  requeueCount         Int                   @default(0) @db.SmallInt
+  createdAt            DateTime              @default(now()) @db.Timestamptz(6)
+  updatedAt            DateTime              @updatedAt @db.Timestamptz(6)
+  organization         Organization?         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  createdByAdmin       User?                 @relation("PlatformJobCreatedByUser", fields: [createdByAdminUserId], references: [id], onDelete: Restrict)
+  createdByPerson      Person?               @relation("PlatformJobCreatedByPerson", fields: [createdByPersonId], references: [id], onDelete: Restrict)
+  schedule             PlatformJobSchedule?  @relation(fields: [scheduleId], references: [id], onDelete: Restrict)
+  attempts             PlatformJobAttempt[]
+  mutations            PlatformJobMutation[]
+  requeueRoot          PlatformJob?          @relation("PlatformJobRequeueRoot", fields: [requeueRootJobId], references: [id], onDelete: Restrict)
+  requeuedJobs         PlatformJob[]         @relation("PlatformJobRequeueRoot")
+
+  @@unique([jobType, scopeKey, deduplicationKey])
+  @@unique([requeueRootJobId, requeueSequence])
+  @@index([status, priority, availableAt, id])
+  @@index([status, leaseExpiresAt, id])
+  @@index([organizationId, status, createdAt, id])
+  @@index([createdAt, id])
+  @@index([scheduleId, createdAt, id])
+}
+
+model PlatformJobAttempt {
+  id             String                   @id @default(uuid()) @db.Uuid
+  jobId          String                   @db.Uuid
+  attemptNumber  Int                      @db.SmallInt
+  status         PlatformJobAttemptStatus @default(CLAIMED)
+  workerId       String                   @db.VarChar(96)
+  leaseToken     String                   @db.Uuid
+  fencingToken   BigInt
+  startedAt      DateTime?                @db.Timestamptz(6)
+  heartbeatAt    DateTime?                @db.Timestamptz(6)
+  finishedAt     DateTime?                @db.Timestamptz(6)
+  errorCode      PlatformJobErrorCode?
+  resultMetadata Json?
+  resultHash     String?                  @db.VarChar(64)
+  createdAt      DateTime                 @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime                 @updatedAt @db.Timestamptz(6)
+  job            PlatformJob              @relation(fields: [jobId], references: [id], onDelete: Restrict)
+
+  @@unique([jobId, attemptNumber])
+  @@unique([jobId, leaseToken])
+  @@index([jobId, createdAt, id])
+  @@index([status, heartbeatAt, id])
+}
+
+model PlatformJobSchedule {
+  id                   String                 @id @default(uuid()) @db.Uuid
+  scheduleKey          PlatformJobScheduleKey
+  jobType              PlatformJobType
+  payloadVersion       Int
+  payload              Json
+  payloadHash          String                 @db.VarChar(64)
+  scopeKey             String                 @db.VarChar(64)
+  organizationId       String?                @db.Uuid
+  createdByAdminUserId String
+  createdByPersonId    String                 @db.Uuid
+  cadenceSeconds       Int
+  catchupLimit         Int                    @default(1) @db.SmallInt
+  enabled              Boolean                @default(false)
+  nextRunAt            DateTime               @db.Timestamptz(6)
+  lastTickAt           DateTime?              @db.Timestamptz(6)
+  version              Int                    @default(1)
+  createdAt            DateTime               @default(now()) @db.Timestamptz(6)
+  updatedAt            DateTime               @updatedAt @db.Timestamptz(6)
+  organization         Organization?          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  createdByAdmin       User                   @relation("PlatformJobScheduleCreatedByUser", fields: [createdByAdminUserId], references: [id], onDelete: Restrict)
+  createdByPerson      Person                 @relation("PlatformJobScheduleCreatedByPerson", fields: [createdByPersonId], references: [id], onDelete: Restrict)
+  jobs                 PlatformJob[]
+  mutations            PlatformJobMutation[]
+
+  @@unique([scheduleKey, scopeKey])
+  @@index([enabled, nextRunAt, id])
+  @@index([organizationId, enabled, nextRunAt, id])
+  @@index([createdAt, id])
+}
+
+model PlatformJobMutation {
+  id               String                    @id @default(uuid()) @db.Uuid
+  actorAdminUserId String
+  actorPersonId    String                    @db.Uuid
+  action           PlatformJobMutationAction
+  idempotencyKey   String                    @db.Uuid
+  requestHash      String                    @db.VarChar(64)
+  jobId            String?                   @db.Uuid
+  scheduleId       String?                   @db.Uuid
+  result           Json
+  createdAt        DateTime                  @default(now()) @db.Timestamptz(6)
+  actorAdmin       User                      @relation("PlatformJobMutationActorUser", fields: [actorAdminUserId], references: [id], onDelete: Restrict)
+  actorPerson      Person                    @relation("PlatformJobMutationActorPerson", fields: [actorPersonId], references: [id], onDelete: Restrict)
+  job              PlatformJob?              @relation(fields: [jobId], references: [id], onDelete: Restrict)
+  schedule         PlatformJobSchedule?      @relation(fields: [scheduleId], references: [id], onDelete: Restrict)
+
+  @@unique([actorAdminUserId, idempotencyKey])
+  @@index([jobId, action, createdAt, id])
+  @@index([scheduleId, action, createdAt, id])
+  @@index([actorAdminUserId, createdAt, id])
+}
+
 model CustomerFavoriteStore {
   id         String   @id @default(uuid()) @db.Uuid
   customerId String   @db.Uuid
@@ -2065,6 +2205,61 @@ enum AccountStatus {
   ACTIVE
   SUSPENDED
   BLOCKED
+}
+
+enum PlatformJobType {
+  PLATFORM_HEALTH_PROBE
+}
+
+enum PlatformJobStatus {
+  SCHEDULED
+  AVAILABLE
+  CLAIMED
+  RUNNING
+  SUCCEEDED
+  RETRY_WAIT
+  FAILED
+  DEAD_LETTERED
+  CANCELLED
+}
+
+enum PlatformJobSource {
+  ADMIN_MANUAL
+  SCHEDULE
+}
+
+enum PlatformJobAttemptStatus {
+  CLAIMED
+  RUNNING
+  SUCCEEDED
+  RETRY_SCHEDULED
+  FAILED
+  DEAD_LETTERED
+  LEASE_EXPIRED
+  CANCELLED
+}
+
+enum PlatformJobErrorCode {
+  LEASE_EXPIRED
+  HANDLER_TIMEOUT
+  HANDLER_ABORTED
+  HANDLER_EXCEPTION
+  TRANSIENT_FAILURE
+  PERMANENT_FAILURE
+}
+
+enum PlatformJobScheduleKey {
+  PLATFORM_HEALTH_PROBE
+}
+
+enum PlatformJobMutationAction {
+  MANUAL_TRIGGER
+  CANCEL
+  REQUEUE
+  SCHEDULE_ENABLE
+  SCHEDULE_DISABLE
+  WORKER_BATCH
+  SCHEDULER_TICK
 }
 
 enum StoragePurpose {
