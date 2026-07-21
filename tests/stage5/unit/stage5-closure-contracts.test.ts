@@ -132,7 +132,7 @@ test("payment handoffs preserve the official Stage 6, 7, 8, and AI ownership", (
   ]);
 });
 
-test("Gate 5D adds no migration 43 and preserves migrations 41 and 42", async () => {
+test("Gate 6A preserves the accepted Gate 5D migrations and owns the sole additive migration 43", async () => {
   const migrations = (
     await readdir(new URL("../../../prisma/migrations/", import.meta.url), {
       withFileTypes: true,
@@ -141,7 +141,7 @@ test("Gate 5D adds no migration 43 and preserves migrations 41 and 42", async ()
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
     .sort();
-  assert.equal(migrations.length, 42);
+  assert.equal(migrations.length, 43);
   assert.equal(
     migrations.includes("20260720140000_payments_financial_integrity_foundation"),
     true,
@@ -150,7 +150,11 @@ test("Gate 5D adds no migration 43 and preserves migrations 41 and 42", async ()
     migrations.includes("20260721130000_payment_financial_integrity_closure"),
     true,
   );
-  assert.equal(migrations.some((name) => /gate5d|stage5.*closure/i.test(name)), false);
+  assert.equal(
+    migrations.includes("20260721160000_platform_jobs_foundation"),
+    true,
+  );
+  assert.equal(migrations.filter((name) => name > "20260721130000_payment_financial_integrity_closure").length, 1);
 });
 
 test("provider registries reject production test-provider activation", async () => {
