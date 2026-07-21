@@ -20,6 +20,10 @@ No open P0, P1, or P2 finding is accepted for Gate 6A. The following controls ar
 | secrets/private business data | strict payload rejects credentials, headers, signed URLs, webhook bodies, instruments, VIN, contact/address and unknown text |
 | oversized/malformed input | streamed actual-byte 8 KiB limit, exact content type, fatal UTF-8, strict JSON schemas |
 | idempotency change | actor+key uniqueness plus canonical request hash; changed replay conflicts |
+| worker crash/permanent processing | durable operation identity, original batch bound, random lease, monotonic fencing, canonical-attempt recovery/finalization |
+| concurrent/stale operation owner | advisory serialization plus database-clock token/generation/expiry checks and an operation-row lock in claim, start, outcome, recovery, and finalization transactions |
+| batch expansion/duplicate execution | after the first canonical attempt exists the operation cannot claim again; result derives only from its bounded attempt set |
+| revoked worker operator | every exact replay/acquisition/reclaim revalidates active Person and current Admin grant/permission transactionally |
 | concurrent claim | locked `SKIP LOCKED` claim and unique attempt constraints |
 | stale worker/fencing | random lease token plus monotonic generation required on every execution mutation |
 | lease theft | active jobs are outside claim candidates; recovery requires expired timestamp |
@@ -34,7 +38,7 @@ No open P0, P1, or P2 finding is accepted for Gate 6A. The following controls ar
 | cursor forgery | HKDF-domain-separated HMAC, constant-time verify, scope/filter/page/kind binding |
 | pagination loss | exact six-digit PostgreSQL timestamps, snapshot ordering, UUID tie-breaker |
 | database cleanup overreach | exact fixture actor/IDs, dependency-ordered deletion, second-cleanup zero, non-fixture fingerprint |
-| Neon TLS proxy misclassification | exact direct `.neon.tech` DSN, matching database/role, and explicit `sslmode=verify-full`; pooler/weak/mismatched URLs fail closed |
+| staging identity/TLS substitution | authenticated expected host/role, exact direct `.neon.tech` DSN, URL/current-user equality, `sslmode=verify-full`, and actual-session `pg_stat_ssl=true` are all mandatory; pooler/weak/missing/mismatched metadata fails closed |
 
 ## Fencing limitations and future handlers
 
@@ -50,8 +54,12 @@ Cursor signing derives a 32-byte key from `BETTER_AUTH_SECRET` using HKDF info `
 
 ## Privacy and logging
 
-List/detail DTOs omit payload content/hash, lease token, worker ID, request hash, and raw errors. Worker/owner values are one-way SHA-256 fingerprints. Safe result metadata is a closed 2 KiB object. No request body, exception message, provider response, database URL, credential, authorization header, payment instrument, full VIN, contact or address is intentionally logged or persisted in Gate 6A tables.
+List/detail DTOs omit payload content/hash, job and operation lease tokens, raw worker/operation identity, operation fencing, request hash, and raw errors. Worker/owner values shown in job DTOs are one-way SHA-256 fingerprints. Safe result metadata is a closed 2 KiB object. No request body, exception message, provider response, database URL, credential, authorization header, payment instrument, full VIN, contact or address is intentionally logged or persisted in Gate 6A tables.
 
 ## Provider truth
 
 No storage upload, payment, refund, payout, bank settlement, external queue, Redis worker, cron, or provider event is activated. Storage/payment providers remain `NOT_CONFIGURED`; automatic scheduler and always-on worker remain `NOT_CONNECTED`.
+
+## Current closure blockers
+
+The authenticated 2026-07-22 Neon preflight matched the expected direct endpoint, database, and role but the actual session reported `pg_stat_ssl=false`; the fail-closed guard correctly prevented Migration 44 and every fixture mutation. The root production dependency audit also reports three high and five moderate registry advisories whose automatic remediation requires broad or breaking dependency changes outside the two PR #125 review fixes. Neither condition is waived: PR #125 remains Draft and Gate 6A remains open.

@@ -13,9 +13,10 @@ PostgreSQL is the canonical durable truth.
 - `PlatformJob` is the one canonical job row.
 - `PlatformJobAttempt` records one immutable claim generation and its terminal outcome.
 - `PlatformJobSchedule` stores one closed schedule identity per scope.
-- `PlatformJobMutation` stores actor-scoped Admin idempotency results.
+- `PlatformJobMutation` stores actor-scoped Admin idempotency results and durable worker-operation ownership.
 
 Migration 43, `20260721160000_platform_jobs_foundation`, is additive and creates no data. Migrations 1–42 are unchanged.
+Migration 44, `20260722090000_platform_worker_operation_recovery`, additively equips worker-batch mutations with their original batch bound, a server-owned operation identity, random operation lease token, monotonic operation fencing generation, lease expiry, completion timestamp, and recovery indexes. It backfills existing worker mutations without creating a mutation, job, or attempt; migrations 1–43 remain unchanged.
 
 The closed lifecycle is:
 
@@ -38,6 +39,14 @@ The authority is the pair of an unpredictable lease token and the current monoto
 Heartbeat extensions are at most 120 seconds and never move beyond 900 seconds from the original claim. Gate 6A does not expose a public heartbeat route; only server-owned worker code can call it, preventing client-driven write amplification.
 
 Expired claims are recovered in bounded, locked batches. A recoverable attempt becomes `RETRY_WAIT`; an exhausted attempt becomes `DEAD_LETTERED`. The old attempt is closed as `LEASE_EXPIRED`, so its token and generation can never apply completion.
+
+## Crash-recoverable worker operations
+
+Every manual worker request has a deterministic internal identity derived from the current Admin actor, idempotency key, and canonical request hash. That identity is persisted only as internal attempt/mutation evidence and never returned. The mutation acquires a random 120-second operation lease and monotonic operation fencing generation inside the same serializable transaction that revalidates current `PLATFORM_JOBS_MANAGE` authority.
+
+An exact replay returns the stored terminal result, returns a bounded `PROCESSING` response while live canonical work still owns an unexpired lease, or reclaims an expired operation lease. A crash before claim may resume and claim only the original stored batch bound. Once any canonical attempt exists, the operation never claims another job: it waits for active attempts, recovers only its own expired attempts, and derives its terminal counts from those attempts. Canonically terminal attempts allow immediate fenced finalization even when the lost caller's operation lease has not yet expired. This prevents permanent `PROCESSING`, batch expansion, duplicate job execution, and recovery of unrelated workers' jobs.
+
+Claim, start, job outcome, and operation finalization validate both authorities transactionally: the current operation token/generation and the current job token/generation. A stale operation owner cannot start, complete, fail, recover, or finalize work. Changed input with the same actor/key conflicts. Every replay/reclaim revalidates active Person, current Admin grant, permission, and environment-superadmin state.
 
 ## Completion, failure, and retry
 
@@ -70,6 +79,7 @@ Schedules are disabled when created by internal fixture/future-domain code. Ther
 | safe error-code field | 64 characters |
 | list page | 50 |
 | worker batch | 10 |
+| worker-operation lease | 120 seconds |
 | scheduler batch | 10 |
 | maximum attempts | 10 |
 | lease duration | 30–300 seconds |

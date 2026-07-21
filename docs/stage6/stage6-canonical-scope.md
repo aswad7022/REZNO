@@ -206,12 +206,13 @@ truth directly.
 
 ## Migration policy
 
-Gate 6A requires exactly one additive migration 43 for the new canonical job,
-attempt, schedule, and mutation persistence. Migrations 1–42 are immutable.
-Migration 43 must add closed enums, foreign keys, constraints, uniqueness, and
-claim/schedule indexes without creating jobs, schedules, actors, or business
-rows. Fresh 1→43 must pass twice; populated 42→43 must preserve the historical
-Stage 5 fingerprint; a second deploy must be a no-op.
+Gate 6A uses additive Migration 43 for the canonical job, attempt, schedule,
+and mutation persistence. Remediation Migration 44 adds only durable
+worker-operation lease/fencing and recovery fields/indexes required to close
+the crash-recovery invariant. Migrations 1–43 are immutable. Neither migration
+creates jobs, schedules, actors, mutations, or business rows. Fresh 1→44 must
+pass twice; populated 43→44 must preserve existing Gate 6A and Stage 5 evidence;
+a second deploy must be a no-op.
 
 ## Deployment and runtime assumptions
 
@@ -229,8 +230,10 @@ Stage 5 fingerprint; a second deploy must be a no-op.
 ## Staging requirements
 
 Staging must authenticate without printing credentials, select exact project
-`rezno-staging` and database `rezno_staging`, start healthy at 42/42, apply only
-migration 43, finish healthy at 43/43, and prove a second deploy is a no-op. A
+`rezno-staging` and database `rezno_staging`, start healthy at 43/43, apply only
+migration 44, finish healthy at 44/44, and prove a second deploy is a no-op. A
+direct non-pooler Neon URL, `verify-full`, authenticated expected host/role,
+URL/current-user equality, and actual-session `pg_stat_ssl=true` are mandatory. A
 deterministic exact-ID fixture must run twice with one fingerprint and prove
 single-winner claims, lease recovery, fencing, heartbeat ownership,
 completion/retry/dead-letter, cancel/requeue, duplicate schedule suppression,
@@ -262,4 +265,3 @@ Stage 8 owns broad visual redesign, final brand consistency, motion, and polish.
 ## AI boundary
 
 AI work remains blocked until Stage 8 is fully reviewed, merged, and complete.
-
