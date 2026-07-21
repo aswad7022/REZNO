@@ -4,10 +4,13 @@ import { paymentProvider } from "../../features/payments/providers/registry";
 import { configuredStorageProvider } from "../../features/storage/providers/registry";
 import { STAGE_6_ARCHITECTURE } from "../../features/platform-jobs/domain/contracts";
 import { PlatformJobDomainError } from "../../features/platform-jobs/domain/errors";
+import { platformJobHash } from "../../features/platform-jobs/domain/canonical";
+import { platformHealthPayload } from "../../features/platform-jobs/domain/registry";
 import { claimPlatformJobs, completePlatformJob, failPlatformJob, heartbeatPlatformJob, recoverExpiredPlatformJobLeases, startPlatformJob } from "../../features/platform-jobs/services/jobs";
 import { cancelPlatformJob, requeuePlatformJob } from "../../features/platform-jobs/services/mutations";
 import { getPlatformJobDetail, listPlatformJobs } from "../../features/platform-jobs/services/queries";
 import { runPlatformSchedulerTick, setPlatformJobScheduleEnabled } from "../../features/platform-jobs/services/schedules";
+import { runPlatformWorkerBatch, setPlatformWorkerTestHook } from "../../features/platform-jobs/services/worker";
 import { prisma } from "../../lib/db/prisma";
 import { PLATFORM_JOBS_GATE6A_MARKER, platformJobsGate6aFixtureFingerprint, platformJobsGate6aFixtureIds as ids, platformJobsGate6aNonFixtureFingerprint } from "./platform-jobs-gate6a-fixture";
 import { assertPlatformJobsGate6aStaging } from "./platform-jobs-gate6a-safety";
@@ -19,6 +22,16 @@ const keys = {
   requeue: "6a000000-0000-4000-8000-000000000033",
   schedule: "6a000000-0000-4000-8000-000000000034",
   tick: "6a000000-0000-4000-8000-000000000035",
+  workerBeforeClaim: "6a000000-0000-4000-8000-000000000036",
+  workerAfterClaim: "6a000000-0000-4000-8000-000000000037",
+  workerAfterSuccess: "6a000000-0000-4000-8000-000000000038",
+  workerRevoked: "6a000000-0000-4000-8000-000000000039",
+} as const;
+const operationJobs = {
+  beforeClaim: "6a000000-0000-4000-8000-000000000041",
+  afterClaim: "6a000000-0000-4000-8000-000000000042",
+  afterSuccess: "6a000000-0000-4000-8000-000000000043",
+  revoked: "6a000000-0000-4000-8000-000000000044",
 } as const;
 
 async function main() {
@@ -96,7 +109,69 @@ async function main() {
   assert.equal(await prisma.platformJob.count({ where: { scheduleId: schedule.id } }), 2);
   checks += 4;
 
-  const list = await listPlatformJobs(context, { limit: 10 });
+  await createWorkerSmokeJob(operationJobs.beforeClaim, "before-claim");
+  setPlatformWorkerTestHook(({ phase }) => {
+    if (phase === "AFTER_OPERATION_ACQUIRED_BEFORE_CLAIM") throw new Error("staging crash before claim");
+  });
+  await assert.rejects(runPlatformWorkerBatch(context, { batchSize: 1, idempotencyKey: keys.workerBeforeClaim }), /crash before claim/u);
+  setPlatformWorkerTestHook(undefined);
+  await expireOperation(keys.workerBeforeClaim, false);
+  const beforeClaim = await runPlatformWorkerBatch(context, { batchSize: 1, idempotencyKey: keys.workerBeforeClaim });
+  assert.equal(beforeClaim.state, "COMPLETE");
+  assert.equal("succeeded" in beforeClaim ? beforeClaim.succeeded : -1, 1);
+  checks += 4;
+
+  await createWorkerSmokeJob(operationJobs.afterClaim, "after-claim");
+  setPlatformWorkerTestHook(({ phase }) => {
+    if (phase === "AFTER_JOB_CLAIM_BEFORE_HANDLER") throw new Error("staging crash after claim");
+  });
+  await assert.rejects(runPlatformWorkerBatch(context, { batchSize: 1, idempotencyKey: keys.workerAfterClaim }), /crash after claim/u);
+  setPlatformWorkerTestHook(undefined);
+  const afterClaimMutation = await workerMutation(keys.workerAfterClaim);
+  const afterClaimAttempt = await prisma.platformJobAttempt.findFirstOrThrow({ where: { workerId: afterClaimMutation.operationWorkerId! } });
+  assert.equal((await runPlatformWorkerBatch(context, { batchSize: 1, idempotencyKey: keys.workerAfterClaim })).state, "PROCESSING");
+  await expireOperation(keys.workerAfterClaim, false);
+  assert.equal((await runPlatformWorkerBatch(context, { batchSize: 1, idempotencyKey: keys.workerAfterClaim })).state, "PROCESSING");
+  assert.equal((await prisma.platformJobAttempt.findUniqueOrThrow({ where: { id: afterClaimAttempt.id } })).leaseToken, afterClaimAttempt.leaseToken);
+  await expireOperation(keys.workerAfterClaim, true);
+  const afterClaim = await runPlatformWorkerBatch(context, { batchSize: 1, idempotencyKey: keys.workerAfterClaim });
+  assert.equal(afterClaim.state, "COMPLETE");
+  assert.equal("recovered" in afterClaim ? afterClaim.recovered : -1, 1);
+  assert.equal(await prisma.platformJobAttempt.count({ where: { workerId: afterClaimMutation.operationWorkerId! } }), 1);
+  checks += 8;
+
+  await createWorkerSmokeJob(operationJobs.afterSuccess, "after-success");
+  setPlatformWorkerTestHook(({ phase }) => {
+    if (phase === "BEFORE_OPERATION_FINALIZATION") throw new Error("staging crash after success");
+  });
+  await assert.rejects(runPlatformWorkerBatch(context, { batchSize: 1, idempotencyKey: keys.workerAfterSuccess }), /crash after success/u);
+  setPlatformWorkerTestHook(undefined);
+  const successMutation = await workerMutation(keys.workerAfterSuccess);
+  const successAttempts = await prisma.platformJobAttempt.count({ where: { workerId: successMutation.operationWorkerId! } });
+  const finalized = await runPlatformWorkerBatch(context, { batchSize: 1, idempotencyKey: keys.workerAfterSuccess });
+  assert.equal(finalized.state, "COMPLETE");
+  assert.equal(await prisma.platformJobAttempt.count({ where: { workerId: successMutation.operationWorkerId! } }), successAttempts);
+  await assert.rejects(runPlatformWorkerBatch(context, { batchSize: 2, idempotencyKey: keys.workerAfterSuccess }), code("IDEMPOTENCY_CONFLICT"));
+  checks += 5;
+
+  await createWorkerSmokeJob(operationJobs.revoked, "revoked");
+  setPlatformWorkerTestHook(({ phase }) => {
+    if (phase === "AFTER_OPERATION_ACQUIRED_BEFORE_CLAIM") throw new Error("staging revoked-operation crash");
+  });
+  await assert.rejects(runPlatformWorkerBatch(context, { batchSize: 1, idempotencyKey: keys.workerRevoked }), /revoked-operation/u);
+  setPlatformWorkerTestHook(undefined);
+  await expireOperation(keys.workerRevoked, false);
+  await prisma.adminAccess.update({ where: { id: ids.adminAccessId }, data: { status: "REVOKED" } });
+  try {
+    await assert.rejects(runPlatformWorkerBatch(context, { batchSize: 1, idempotencyKey: keys.workerRevoked }), code("FORBIDDEN"));
+    assert.equal(await prisma.platformJobAttempt.count({ where: { workerId: (await workerMutation(keys.workerRevoked)).operationWorkerId! } }), 0);
+  } finally {
+    await prisma.adminAccess.update({ where: { id: ids.adminAccessId }, data: { status: "ACTIVE" } });
+  }
+  assert.equal((await runPlatformWorkerBatch(context, { batchSize: 1, idempotencyKey: keys.workerRevoked })).state, "COMPLETE");
+  checks += 4;
+
+  const list = await listPlatformJobs(context, { limit: 50 });
   assert.ok(list.items.length > 0);
   assert.equal(list.items.every((item) => item.payload.containsReferencesOnly), true);
   const detail = await getPlatformJobDetail(context, success.id);
@@ -125,4 +200,51 @@ function code(expected: string) {
   return (error: unknown) => error instanceof PlatformJobDomainError && error.code === expected;
 }
 
-main().finally(() => prisma.$disconnect());
+async function createWorkerSmokeJob(id: string, key: string) {
+  const payload = platformHealthPayload();
+  await prisma.platformJob.create({
+    data: {
+      availableAt: new Date("2026-07-21T00:00:00.000Z"),
+      createdByAdminUserId: ids.userId,
+      createdByPersonId: ids.personId,
+      deduplicationKey: `staging:${PLATFORM_JOBS_GATE6A_MARKER}:worker:${key}`,
+      id,
+      jobType: "PLATFORM_HEALTH_PROBE",
+      maxAttempts: 2,
+      payload,
+      payloadHash: platformJobHash(payload),
+      payloadVersion: 1,
+      priority: 9,
+      scopeKey: "platform",
+      source: "ADMIN_MANUAL",
+      status: "AVAILABLE",
+    },
+  });
+}
+
+async function workerMutation(idempotencyKey: string) {
+  return prisma.platformJobMutation.findUniqueOrThrow({
+    where: { actorAdminUserId_idempotencyKey: { actorAdminUserId: ids.userId, idempotencyKey } },
+  });
+}
+
+async function expireOperation(idempotencyKey: string, expireJobs: boolean) {
+  const mutation = await workerMutation(idempotencyKey);
+  await prisma.$transaction([
+    prisma.platformJobMutation.update({
+      where: { id: mutation.id },
+      data: { operationLeaseExpiresAt: new Date("2000-01-01T00:00:00.000Z") },
+    }),
+    ...(expireJobs && mutation.operationWorkerId
+      ? [prisma.platformJob.updateMany({
+        where: { leaseOwner: mutation.operationWorkerId, status: { in: ["CLAIMED", "RUNNING"] } },
+        data: { leaseExpiresAt: new Date("2000-01-01T00:00:00.000Z") },
+      })]
+      : []),
+  ]);
+}
+
+main().finally(() => {
+  setPlatformWorkerTestHook(undefined);
+  return prisma.$disconnect();
+});

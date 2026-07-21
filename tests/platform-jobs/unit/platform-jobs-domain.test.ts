@@ -14,6 +14,7 @@ import { assertPlatformJobTransition, isPlatformJobCancellable, isPlatformJobReq
 import { isRetryablePlatformJobError, parsePlatformJobPayload, parsePlatformJobResult, platformHealthPayload, platformJobPayloadSummary } from "../../../features/platform-jobs/domain/registry";
 import { calculatePlatformScheduleTick } from "../../../features/platform-jobs/domain/schedule";
 import { executePlatformJobHandler, setPlatformJobHandlerForTests } from "../../../features/platform-jobs/services/handlers";
+import { setPlatformWorkerTestHook } from "../../../features/platform-jobs/services/worker";
 import { assertPlatformJobsGate6aStaging, PLATFORM_JOBS_GATE6A_CONFIRMATION } from "../../../scripts/staging/platform-jobs-gate6a-safety";
 
 const secret = "gate6a-cursor-secret-with-sufficient-entropy-2026-07-21";
@@ -45,6 +46,7 @@ test("Gate 6A exposes one inert closed job type and explicit finite bounds", () 
   assert.equal(PLATFORM_JOB_LIMITS.maxPayloadBytes, 4_096);
   assert.equal(PLATFORM_JOB_LIMITS.maxResultBytes, 2_048);
   assert.equal(PLATFORM_JOB_LIMITS.maxWorkerBatch, 10);
+  assert.equal(PLATFORM_JOB_LIMITS.workerOperationLeaseSeconds, 120);
   assert.equal(PLATFORM_JOB_LIMITS.maxSchedulerBatch, 10);
   assert.equal(PLATFORM_JOB_LIMITS.maxAttempts, 10);
   assert.equal(PLATFORM_JOB_LIMITS.maxScheduleCatchup, 10);
@@ -174,17 +176,20 @@ test("health handler succeeds with bounded metadata and converts raw exceptions 
   setPlatformJobHandlerForTests("PLATFORM_HEALTH_PROBE");
 });
 
-test("production-only guards and migration 43 are explicit in source", async () => {
-  const [cursorSource, handlerSource, migrations] = await Promise.all([
+test("production-only guards and additive migrations 43-44 are explicit in source", async () => {
+  const [cursorSource, handlerSource, workerSource, migrations] = await Promise.all([
     readFile(new URL("../../../features/platform-jobs/domain/cursor-signing.ts", import.meta.url), "utf8"),
     readFile(new URL("../../../features/platform-jobs/services/handlers.ts", import.meta.url), "utf8"),
+    readFile(new URL("../../../features/platform-jobs/services/worker.ts", import.meta.url), "utf8"),
     readdir(new URL("../../../prisma/migrations/", import.meta.url), { withFileTypes: true }),
   ]);
   assert.match(cursorSource, /NODE_ENV === "production"/);
   assert.match(handlerSource, /NODE_ENV === "production"/);
+  assert.match(workerSource, /NODE_ENV === "production"/);
   const names = migrations.filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort();
-  assert.equal(names.length, 43);
-  assert.equal(names.at(-1), "20260721160000_platform_jobs_foundation");
+  assert.equal(names.length, 44);
+  assert.equal(names.at(-2), "20260721160000_platform_jobs_foundation");
+  assert.equal(names.at(-1), "20260722090000_platform_worker_operation_recovery");
 });
 
 test("production runtime refuses cursor-secret and handler test overrides", () => {
@@ -193,68 +198,79 @@ test("production runtime refuses cursor-secret and handler test overrides", () =
   try {
     assert.throws(() => setPlatformJobCursorSigningSecretForTests(secret), /unavailable/u);
     assert.throws(() => setPlatformJobHandlerForTests("PLATFORM_HEALTH_PROBE", async () => ({ errorCode: "PERMANENT_FAILURE", outcome: "FAILED", retryable: false })), /unavailable/u);
+    assert.throws(() => setPlatformWorkerTestHook(async () => undefined), /unavailable/u);
   } finally {
     Object.defineProperty(process.env, "NODE_ENV", { configurable: true, enumerable: true, value: original, writable: true });
   }
 });
 
-test("Gate 6A staging safety requires exact environment, encrypted database, and healthy 43/43", async () => {
-  const environment = { NODE_ENV: "test", REZNO_ENV: "staging", REZNO_STAGE6_GATE6A_CONFIRM: PLATFORM_JOBS_GATE6A_CONFIRMATION } as NodeJS.ProcessEnv;
-  const calls = [
-    [{ database: "rezno_staging", encrypted: true, user: "rezno_staging_owner" }],
-    [{ applied: BigInt(43), failed: BigInt(0), rolledBack: BigInt(0), total: BigInt(43) }],
-  ];
-  assert.deepEqual(await assertPlatformJobsGate6aStaging({ $queryRaw: async () => calls.shift() } as never, environment), {
-    database: "rezno_staging", encrypted: true, migrations: "43/43", role: "rezno_staging_owner", rolledBack: 0,
+test("Gate 6A staging safety accepts only exact direct Neon verification or exact loopback test override", async () => {
+  const direct = stagingEnvironment();
+  assert.deepEqual(await assertPlatformJobsGate6aStaging(safetyClient(), direct), {
+    database: "rezno_staging", encrypted: true, migrations: "44/44", role: "neondb_owner", rolledBack: 0,
   });
-  await assert.rejects(assertPlatformJobsGate6aStaging({ $queryRaw: async () => [{ database: "rezno_production", encrypted: true, user: "owner" }] } as never, environment), /rezno_staging/u);
-  let unencryptedCalls = 0;
-  await assert.rejects(assertPlatformJobsGate6aStaging({ $queryRaw: async () => {
-    unencryptedCalls += 1;
-    return unencryptedCalls === 1 ? [{ database: "rezno_staging", encrypted: false, user: "owner" }] : [];
-  } } as never, environment), /encrypted/u);
-  const localCalls = [
-    [{ database: "rezno_staging", encrypted: false, user: "postgres" }],
-    [{ applied: BigInt(43), failed: BigInt(0), rolledBack: BigInt(0), total: BigInt(43) }],
-  ];
-  assert.deepEqual(await assertPlatformJobsGate6aStaging({ $queryRaw: async () => localCalls.shift() } as never, {
-    ...environment,
-    DATABASE_URL: "postgresql://postgres:local-only@127.0.0.1:55436/rezno_staging",
+  assert.deepEqual(await assertPlatformJobsGate6aStaging(safetyClient({ encrypted: false, user: "postgres" }), {
+    NODE_ENV: "test",
+    REZNO_ENV: "staging",
     REZNO_STAGE6_GATE6A_ALLOW_LOCAL_UNENCRYPTED: "true",
+    REZNO_STAGE6_GATE6A_CONFIRM: PLATFORM_JOBS_GATE6A_CONFIRMATION,
+    DATABASE_URL: "postgresql://postgres:local-only@127.0.0.1:55436/rezno_staging?sslmode=disable",
   }), {
-    database: "rezno_staging", encrypted: false, migrations: "43/43", role: "postgres", rolledBack: 0,
+    database: "rezno_staging", encrypted: false, migrations: "44/44", role: "postgres", rolledBack: 0,
   });
-  await assert.rejects(assertPlatformJobsGate6aStaging({ $queryRaw: async () => [{ database: "rezno_staging", encrypted: false, user: "neondb_owner" }] } as never, {
-    ...environment,
-    DATABASE_URL: "postgresql://neondb_owner:secret@ep-example.neon.tech/rezno_staging",
-    REZNO_STAGE6_GATE6A_ALLOW_LOCAL_UNENCRYPTED: "true",
-  }), /encrypted/u);
-  const neonProxyCalls = [
-    [{ database: "rezno_staging", encrypted: false, user: "neondb_owner" }],
-    [{ applied: BigInt(43), failed: BigInt(0), rolledBack: BigInt(0), total: BigInt(43) }],
-  ];
-  assert.deepEqual(await assertPlatformJobsGate6aStaging({ $queryRaw: async () => neonProxyCalls.shift() } as never, {
-    ...environment,
-    DATABASE_URL: "postgresql://neondb_owner:secret@ep-example.neon.tech/rezno_staging?sslmode=verify-full",
-  }), {
-    database: "rezno_staging", encrypted: true, migrations: "43/43", role: "neondb_owner", rolledBack: 0,
-  });
-  await assert.rejects(assertPlatformJobsGate6aStaging({ $queryRaw: async () => [{ database: "rezno_staging", encrypted: false, user: "neondb_owner" }] } as never, {
-    ...environment,
-    DATABASE_URL: "postgresql://neondb_owner:secret@ep-example-pooler.neon.tech/rezno_staging?sslmode=verify-full",
-  }), /encrypted/u);
-  await assert.rejects(assertPlatformJobsGate6aStaging({ $queryRaw: async () => [{ database: "rezno_staging", encrypted: false, user: "neondb_owner" }] } as never, {
-    ...environment,
-    DATABASE_URL: "postgresql://neondb_owner:secret@ep-example.neon.tech/rezno_staging?sslmode=require",
-  }), /encrypted/u);
-  let unhealthyCalls = 0;
-  await assert.rejects(assertPlatformJobsGate6aStaging({ $queryRaw: async () => {
-    unhealthyCalls += 1;
-    return unhealthyCalls === 1
-      ? [{ database: "rezno_staging", encrypted: true, user: "owner" }]
-      : [{ applied: BigInt(42), failed: BigInt(1), rolledBack: BigInt(0), total: BigInt(43) }];
-  } } as never, environment), /43\/43/u);
 });
+
+test("Gate 6A staging safety fails closed for URL, TLS, host, role, database, and migration mismatches", async () => {
+  const direct = stagingEnvironment();
+  for (const [environment, pattern] of [
+    [{ ...direct, DATABASE_URL: undefined }, /DATABASE_URL/u],
+    [{ ...direct, DATABASE_URL: "not-a-url" }, /parseable/u],
+    [{ ...direct, DATABASE_URL: "https://neondb_owner:secret@ep-gate6a.neon.tech/rezno_staging?sslmode=verify-full" }, /PostgreSQL/u],
+    [{ ...direct, DATABASE_URL: "postgresql://neondb_owner:secret@ep-gate6a.neon.tech/other?sslmode=verify-full" }, /exact rezno_staging path/u],
+    [{ ...direct, DATABASE_URL: "postgresql://neondb_owner:secret@ep-gate6a.neon.tech/rezno_staging?sslmode=require" }, /verify-full/u],
+    [{ ...direct, DATABASE_URL: "postgresql://neondb_owner:secret@ep-gate6a.neon.tech/rezno_staging" }, /verify-full/u],
+    [{ ...direct, DATABASE_URL: "postgresql://neondb_owner:secret@ep-gate6a.neon.tech/rezno_staging?sslmode=verify-full&sslmode=require" }, /at most one sslmode/u],
+    [{ ...direct, DATABASE_URL: "postgresql://neondb_owner:secret@ep-gate6a-pooler.neon.tech/rezno_staging?sslmode=verify-full", REZNO_STAGE6_GATE6A_EXPECTED_DATABASE_HOST: "ep-gate6a-pooler.neon.tech" }, /non-pooler/u],
+    [{ ...direct, DATABASE_URL: "postgresql://neondb_owner:secret@db.example.test/rezno_staging?sslmode=verify-full", REZNO_STAGE6_GATE6A_EXPECTED_DATABASE_HOST: "db.example.test" }, /Neon/u],
+    [{ ...direct, DATABASE_URL: "postgresql://other:secret@ep-gate6a.neon.tech/rezno_staging?sslmode=verify-full" }, /username/u],
+    [{ ...direct, REZNO_STAGE6_GATE6A_EXPECTED_DATABASE_ROLE: "other" }, /role/u],
+    [{ ...direct, REZNO_STAGE6_GATE6A_EXPECTED_DATABASE_HOST: "ep-other.neon.tech" }, /host/u],
+  ] as Array<[NodeJS.ProcessEnv, RegExp]>) {
+    await assert.rejects(assertPlatformJobsGate6aStaging(safetyClient(), environment), pattern);
+  }
+  await assert.rejects(assertPlatformJobsGate6aStaging(safetyClient({ encrypted: false }), direct), /pg_stat_ssl/u);
+  await assert.rejects(assertPlatformJobsGate6aStaging(safetyClient({ database: "rezno_production" }), direct), /rezno_staging/u);
+  await assert.rejects(assertPlatformJobsGate6aStaging(safetyClient({ database: "rezno_live" }), direct), /rezno_staging/u);
+  await assert.rejects(assertPlatformJobsGate6aStaging(safetyClient(undefined, { applied: BigInt(43), total: BigInt(44) }), direct), /44\/44/u);
+  await assert.rejects(assertPlatformJobsGate6aStaging(safetyClient(undefined, { applied: BigInt(43), failed: BigInt(1), total: BigInt(44) }), direct), /44\/44/u);
+  await assert.rejects(assertPlatformJobsGate6aStaging(safetyClient(undefined, { applied: BigInt(43), rolledBack: BigInt(1), total: BigInt(44) }), direct), /44\/44/u);
+  await assert.rejects(assertPlatformJobsGate6aStaging(safetyClient({ encrypted: false }), {
+    ...direct,
+    REZNO_STAGE6_GATE6A_ALLOW_LOCAL_UNENCRYPTED: "true",
+  }), /loopback/u);
+});
+
+function stagingEnvironment(): NodeJS.ProcessEnv {
+  return {
+    DATABASE_URL: "postgresql://neondb_owner:secret@ep-gate6a.neon.tech/rezno_staging?sslmode=verify-full",
+    NODE_ENV: "test",
+    REZNO_ENV: "staging",
+    REZNO_STAGE6_GATE6A_CONFIRM: PLATFORM_JOBS_GATE6A_CONFIRMATION,
+    REZNO_STAGE6_GATE6A_EXPECTED_DATABASE_HOST: "ep-gate6a.neon.tech",
+    REZNO_STAGE6_GATE6A_EXPECTED_DATABASE_ROLE: "neondb_owner",
+  };
+}
+
+function safetyClient(
+  connection: Partial<{ database: string; encrypted: boolean; user: string }> = {},
+  migration: { applied: bigint; failed?: bigint; rolledBack?: bigint; total: bigint } = { applied: BigInt(44), total: BigInt(44) },
+) {
+  const calls = [
+    [{ database: "rezno_staging", encrypted: true, user: "neondb_owner", ...connection }],
+    [{ ...migration, failed: migration.failed ?? BigInt(0), rolledBack: migration.rolledBack ?? BigInt(0) }],
+  ];
+  return { $queryRaw: async () => calls.shift() } as never;
+}
 
 function code(expected: string) {
   return (error: unknown) => error instanceof PlatformJobDomainError && error.code === expected;
