@@ -1623,7 +1623,9 @@
       "PAYMENTS_REFUND": "Manage payment refunds",
       "PAYMENTS_RECONCILE": "Run payment reconciliation",
       "SETTLEMENTS_VIEW": "View settlement statements",
-      "SETTLEMENTS_MANAGE": "Manage settlement statements"
+      "SETTLEMENTS_MANAGE": "Manage settlement statements",
+      "PLATFORM_JOBS_VIEW": "View durable platform jobs",
+      "PLATFORM_JOBS_MANAGE": "Operate durable platform jobs"
     }
   },
   "Media": {

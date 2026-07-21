@@ -27,6 +27,8 @@ export const adminPermissions = [
   "PAYMENTS_RECONCILE",
   "SETTLEMENTS_VIEW",
   "SETTLEMENTS_MANAGE",
+  "PLATFORM_JOBS_VIEW",
+  "PLATFORM_JOBS_MANAGE",
 ] as const;
 
 export type AdminPermission = (typeof adminPermissions)[number];
@@ -66,6 +68,7 @@ export const adminPermissionDependencies: Readonly<
   PAYMENTS_REFUND: ["PAYMENTS_VIEW"],
   PAYMENTS_RECONCILE: ["PAYMENTS_VIEW"],
   SETTLEMENTS_MANAGE: ["SETTLEMENTS_VIEW"],
+  PLATFORM_JOBS_MANAGE: ["PLATFORM_JOBS_VIEW"],
 };
 
 export function hasAnyCommerceAdminPermission(
@@ -147,6 +150,8 @@ export const adminPermissionLabels: Record<AdminPermission, string> = {
   PAYMENTS_RECONCILE: "Run manual payment reconciliation",
   SETTLEMENTS_VIEW: "View settlement statements",
   SETTLEMENTS_MANAGE: "Preview and finalize settlement statements",
+  PLATFORM_JOBS_VIEW: "View durable platform jobs and schedules",
+  PLATFORM_JOBS_MANAGE: "Operate bounded durable jobs and schedules",
 };
 
 export function normalizeAdminPermissions(
