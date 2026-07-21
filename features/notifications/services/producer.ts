@@ -79,7 +79,7 @@ function categoryEnabled(
   if (!preference) return true;
   if (category === "BOOKINGS") return preference.bookingsEnabled;
   if (category === "RESTAURANT") return preference.restaurantEnabled;
-  if (category === "COMMERCE") return preference.commerceEnabled;
+  if (category === "COMMERCE" || category === "PAYMENTS") return preference.commerceEnabled;
   if (category === "MESSAGES") return preference.messagesEnabled;
   return preference.adminAnnouncementsEnabled;
 }
@@ -111,6 +111,9 @@ function legacyDestination(event: CanonicalNotificationEvent) {
     case "BUSINESS_COMMERCE_ORDER": return event.destinationTargetId ? `/business/commerce/orders/${event.destinationTargetId}` : "/business/notifications";
     case "BUSINESS_NOTIFICATIONS": return "/business/notifications";
     case "ADMIN_COMMERCE_STORES": return "/admin/commerce/stores";
+    case "CUSTOMER_PAYMENT": return event.destinationTargetId ? `/customer/payments/${event.destinationTargetId}` : "/customer/notifications";
+    case "BUSINESS_PAYMENTS": return "/business/payments";
+    case "ADMIN_PAYMENTS": return "/admin/payments";
     default: return undefined;
   }
 }

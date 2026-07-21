@@ -169,9 +169,9 @@ function pageQuery(params: URLSearchParams, cursor: string) {
 function notificationCenterCopy(locale: string) {
   const ar = locale.toLowerCase().startsWith("ar");
   const ku = locale.toLowerCase().startsWith("ku");
-  const categories = ar ? { BOOKINGS: "الحجوزات", RESTAURANT: "المطاعم", COMMERCE: "التجارة", MESSAGES: "الرسائل", ACCOUNT: "الحساب", ADMIN_ANNOUNCEMENT: "إعلانات المنصة" } :
-    ku ? { BOOKINGS: "حجزەکان", RESTAURANT: "چێشتخانە", COMMERCE: "بازرگانی", MESSAGES: "پەیامەکان", ACCOUNT: "هەژمار", ADMIN_ANNOUNCEMENT: "ڕاگەیاندن" } :
-      { BOOKINGS: "Bookings", RESTAURANT: "Restaurant", COMMERCE: "Commerce", MESSAGES: "Messages", ACCOUNT: "Account", ADMIN_ANNOUNCEMENT: "Platform announcements" };
+  const categories = ar ? { BOOKINGS: "الحجوزات", RESTAURANT: "المطاعم", COMMERCE: "التجارة", MESSAGES: "الرسائل", ACCOUNT: "الحساب", ADMIN_ANNOUNCEMENT: "إعلانات المنصة", PAYMENTS: "المدفوعات" } :
+    ku ? { BOOKINGS: "حجزەکان", RESTAURANT: "چێشتخانە", COMMERCE: "بازرگانی", MESSAGES: "پەیامەکان", ACCOUNT: "هەژمار", ADMIN_ANNOUNCEMENT: "ڕاگەیاندن", PAYMENTS: "پارەدان" } :
+      { BOOKINGS: "Bookings", RESTAURANT: "Restaurant", COMMERCE: "Commerce", MESSAGES: "Messages", ACCOUNT: "Account", ADMIN_ANNOUNCEMENT: "Platform announcements", PAYMENTS: "Payments" };
   return ar ? {
     archive: "أرشفة", categories, filters: { all: "الكل", archived: "المؤرشف", important: "المهم", read: "مقروء", unread: "غير مقروء" },
     filtersLabel: "مرشحات الإشعارات", mandatory: "إلزامي", markAll: "تحديد الكل كمقروء", markRead: "تحديد كمقروء", markUnread: "تحديد كغير مقروء", next: "المزيد", preferenceHelp: "الإشعارات الإلزامية للأمان وحالة الطلب لا يمكن تعطيلها.", preferences: "تفضيلات الإشعارات", restore: "استعادة", save: "حفظ التفضيلات", unread: "غير مقروء", notice: (code: string) => noticeText(code, "ar"),

@@ -27,6 +27,11 @@ export const customerOrderInclude = {
   history: { orderBy: [{ createdAt: "asc" as const }, { id: "asc" as const }] },
   items: { orderBy: [{ createdAt: "asc" as const }, { id: "asc" as const }] },
   payment: true,
+  paymentIntents: {
+    orderBy: [{ createdAt: "desc" as const }, { id: "desc" as const }],
+    select: { id: true, status: true },
+    take: 1,
+  },
 } satisfies Prisma.OrderInclude;
 
 export type CustomerOrderRecord = Prisma.OrderGetPayload<{ include: typeof customerOrderInclude }>;

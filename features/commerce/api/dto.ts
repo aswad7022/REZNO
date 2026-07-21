@@ -123,6 +123,22 @@ type CheckoutReceiptRecord = {
   payment: { method: string; status: string } | null;
   paymentMethod: string;
   paymentStatus: string;
+  paymentIntents?: Array<{
+    id: string;
+    status: string;
+    amount: Prisma.Decimal;
+    capturedAmount: Prisma.Decimal;
+    refundedAmount: Prisma.Decimal;
+    currency: string;
+    version: number;
+    expiresAt: Date | null;
+    attempts: Array<{
+      actionExpiresAt: Date | null;
+      actionReference: string | null;
+      requiresAction: boolean;
+      status: string;
+    }>;
+  }>;
   reservationExpiresAt: Date;
   status: string;
   storeLogoUrlSnapshot: string | null;
@@ -174,6 +190,26 @@ export function serializeCheckoutReceipt(order: CheckoutReceiptRecord) {
     orderNumber: order.orderNumber,
     paymentMethod: order.payment?.method ?? order.paymentMethod,
     paymentStatus: order.payment?.status ?? order.paymentStatus,
+    onlinePayment: order.paymentIntents?.[0]
+      ? {
+          id: order.paymentIntents[0].id,
+          status: order.paymentIntents[0].status,
+          amount: decimalString(order.paymentIntents[0].amount),
+          capturedAmount: decimalString(order.paymentIntents[0].capturedAmount),
+          refundedAmount: decimalString(order.paymentIntents[0].refundedAmount),
+          currency: "IQD" as const,
+          version: order.paymentIntents[0].version,
+          expiresAt: order.paymentIntents[0].expiresAt?.toISOString() ?? null,
+          action: order.paymentIntents[0].attempts[0]?.requiresAction &&
+              order.paymentIntents[0].attempts[0].actionReference
+            ? {
+                kind: "PROVIDER_ACTION" as const,
+                reference: order.paymentIntents[0].attempts[0].actionReference,
+                expiresAt: order.paymentIntents[0].attempts[0].actionExpiresAt?.toISOString() ?? null,
+              }
+            : null,
+        }
+      : null,
     status: order.status,
     store: {
       logoUrl: safePublicImageUrlOrNull(order.storeLogoUrlSnapshot),
@@ -251,6 +287,9 @@ export function serializeCustomerOrderSummary(order: CustomerOrderRecord) {
     orderNumber: order.orderNumber,
     paymentMethod: order.paymentMethod,
     paymentStatus: order.paymentStatus,
+    onlinePayment: order.paymentIntents?.[0]
+      ? { id: order.paymentIntents[0].id, status: order.paymentIntents[0].status }
+      : null,
     primaryItem: primaryItem
       ? {
           imageUrl: safePublicImageUrlOrNull(primaryItem.imageUrlSnapshot),

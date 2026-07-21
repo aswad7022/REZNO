@@ -32,6 +32,9 @@ export function serializePersistedBookingDetail(booking: {
   endsAt: Date;
   status: PersistedBookingDetail["status"];
   priceSnapshot: { toString(): string };
+  currency: string;
+  paymentMethod: PersistedBookingDetail["paymentMethod"];
+  paymentStatus: PersistedBookingDetail["paymentStatus"];
   createdAt: Date;
   branch: { name: string; timezone: string };
   organization: { name: string };
@@ -49,6 +52,9 @@ export function serializePersistedBookingDetail(booking: {
     endsAt: booking.endsAt.toISOString(),
     timezone: booking.branch.timezone,
     price: booking.priceSnapshot.toString(),
+    currency: booking.currency,
+    paymentMethod: booking.paymentMethod,
+    paymentStatus: booking.paymentStatus,
     status: booking.status,
     createdAt: booking.createdAt.toISOString(),
   };

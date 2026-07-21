@@ -38,6 +38,11 @@ export function effectiveCommercePermissions(input: {
       (permission) => permission !== "ORDER_MANAGE" && permission !== "ORDER_CANCEL",
     );
   }
+  if (!effective.includes("PAYMENT_VIEW")) {
+    return effective.filter(
+      (permission) => permission !== "PAYMENT_REFUND" && permission !== "SETTLEMENT_VIEW",
+    );
+  }
   return effective;
 }
 
@@ -52,6 +57,10 @@ export function isValidCommercePermissionCombination(
     !assigned.has("ORDER_VIEW")
   ) return false;
   if (systemRole === "STAFF" && assigned.has("ORDER_CANCEL")) return false;
+  if (
+    (assigned.has("PAYMENT_REFUND") || assigned.has("SETTLEMENT_VIEW")) &&
+    !assigned.has("PAYMENT_VIEW")
+  ) return false;
   return true;
 }
 

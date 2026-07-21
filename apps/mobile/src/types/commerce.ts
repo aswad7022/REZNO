@@ -182,6 +182,17 @@ export type CommerceReceipt = {
   orderNumber: string;
   paymentMethod: string;
   paymentStatus: string;
+  onlinePayment: {
+    id: string;
+    status: string;
+    amount: string;
+    capturedAmount: string;
+    refundedAmount: string;
+    currency: CommerceCurrency;
+    version: number;
+    expiresAt: string | null;
+    action: { kind: "PROVIDER_ACTION"; reference: string; expiresAt: string | null } | null;
+  } | null;
   status: string;
   store: { logoUrl: string | null; name: string; slug: string };
   subtotal: string;
@@ -200,6 +211,7 @@ export type CommerceOrderSummary = {
   orderNumber: string;
   paymentMethod: string;
   paymentStatus: string;
+  onlinePayment: { id: string; status: string } | null;
   primaryItem: {
     imageUrl: string | null;
     productName: string;

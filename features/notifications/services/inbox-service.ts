@@ -264,9 +264,12 @@ function visibilitySql(context: NotificationActorContext) {
   if (context.mode === "customer") return Prisma.sql`(
     n."audience" = 'ALL'::"NotificationAudience" OR
     n."audience" = 'CUSTOMERS'::"NotificationAudience" OR
-    (n."audience" = 'USER'::"NotificationAudience" AND n."recipientPersonId" = ${context.personId}::uuid)
+    (n."audience" = 'USER'::"NotificationAudience" AND n."recipientPersonId" = ${context.personId}::uuid
+      AND n."destinationKind" NOT IN ('BUSINESS_PAYMENTS'::"NotificationDestinationKind", 'ADMIN_PAYMENTS'::"NotificationDestinationKind"))
   )`;
-  const direct = Prisma.sql`(n."audience" = 'USER'::"NotificationAudience" AND n."recipientPersonId" = ${context.personId}::uuid)`;
+  const direct = Prisma.sql`(n."audience" = 'USER'::"NotificationAudience" AND n."recipientPersonId" = ${context.personId}::uuid
+    AND n."destinationKind" <> 'CUSTOMER_PAYMENT'::"NotificationDestinationKind"
+    AND (n."destinationKind" <> 'BUSINESS_PAYMENTS'::"NotificationDestinationKind" OR ${context.effectiveCommercePermissions.includes("PAYMENT_VIEW") || context.effectiveCommercePermissions.includes("SETTLEMENT_VIEW")}))`;
   if (context.systemRole === "STAFF") return Prisma.sql`(n."audience" = 'ALL'::"NotificationAudience" OR ${direct})`;
   const organizationId = context.organizationId!;
   return Prisma.sql`(
@@ -290,7 +293,8 @@ async function authorizeDestinations(transaction: Prisma.TransactionClient, cont
   const bookingIds = uniqueTargets(records, ["CUSTOMER_BOOKING", "CUSTOMER_RESTAURANT", "BUSINESS_BOOKING", "BUSINESS_RESTAURANT"]);
   const orderIds = uniqueTargets(records, ["CUSTOMER_COMMERCE_ORDER", "BUSINESS_COMMERCE_ORDER"]);
   const conversationIds = uniqueTargets(records, ["CUSTOMER_MESSAGES", "BUSINESS_MESSAGES"]);
-  const [bookings, orders, conversations] = await Promise.all([
+  const paymentIds = uniqueTargets(records, ["CUSTOMER_PAYMENT", "BUSINESS_PAYMENTS"]);
+  const [bookings, orders, conversations, paymentIntents, settlements] = await Promise.all([
     bookingIds.length ? transaction.booking.findMany({
       where: { id: { in: bookingIds } },
       select: { customerId: true, id: true, memberId: true, organizationId: true, restaurantReservation: { select: { id: true } } },
@@ -308,11 +312,19 @@ async function authorizeDestinations(transaction: Prisma.TransactionClient, cont
         id: true,
       },
     }) : [],
+    paymentIds.length ? transaction.paymentIntent.findMany({
+      where: { id: { in: paymentIds } },
+      select: { customerPersonId: true, id: true, organizationId: true },
+    }) : [],
+    paymentIds.length ? transaction.settlementBatch.findMany({
+      where: { id: { in: paymentIds } },
+      select: { id: true, organizationId: true },
+    }) : [],
   ]);
   const result = new Map<string, { href: string; kind: NotificationDestinationKind; targetId: string | null }>();
   for (const record of records) {
     const targetId = record.destinationTargetId;
-    const destination = destinationFor(context, record.destinationKind, targetId, { bookings, conversations, orders });
+    const destination = destinationFor(context, record.destinationKind, targetId, { bookings, conversations, orders, paymentIntents, settlements });
     result.set(record.id, destination ?? fallbackDestination(context));
   }
   return result;
@@ -331,6 +343,8 @@ function destinationFor(
       id: string;
     }>;
     orders: Array<{ customerId: string; id: string; store: { organizationId: string } }>;
+    paymentIntents: Array<{ customerPersonId: string; id: string; organizationId: string }>;
+    settlements: Array<{ id: string; organizationId: string }>;
   },
 ) {
   if (kind === "NOTIFICATIONS") return fallbackDestination(context);
@@ -370,6 +384,16 @@ function destinationFor(
     canAccessBusinessCommerceOrderDestination(context) &&
     data.orders.some((order) => order.id === targetId && order.store.organizationId === context.organizationId)) {
     return destination(kind, targetId, `/business/commerce/orders/${targetId}`);
+  }
+  if (kind === "CUSTOMER_PAYMENT" && context.mode === "customer" && targetId &&
+    data.paymentIntents.some((intent) => intent.id === targetId && intent.customerPersonId === context.personId)) {
+    return destination(kind, targetId, `/customer/payments/${targetId}`);
+  }
+  if (kind === "BUSINESS_PAYMENTS" && context.mode === "business" && targetId &&
+    (context.effectiveCommercePermissions.includes("PAYMENT_VIEW") || context.effectiveCommercePermissions.includes("SETTLEMENT_VIEW")) &&
+    (data.paymentIntents.some((intent) => intent.id === targetId && intent.organizationId === context.organizationId) ||
+      data.settlements.some((batch) => batch.id === targetId && batch.organizationId === context.organizationId))) {
+    return destination(kind, targetId, "/business/payments");
   }
   if (kind === "BUSINESS_CALENDAR" && context.mode === "business") return destination(kind, null, "/business/calendar");
   if (kind === "BUSINESS_NOTIFICATIONS" && context.mode === "business") return destination(kind, null, "/business/notifications");

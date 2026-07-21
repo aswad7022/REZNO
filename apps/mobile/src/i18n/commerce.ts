@@ -60,6 +60,9 @@ export type CommerceCopy = {
   outOfStock: string;
   payAtPickup: string;
   payment: string;
+  onlinePayment: string;
+  onlinePaymentUnavailable: string;
+  paymentActionPending: string;
   phone: string;
   pickup: string;
   priceAsc: string;
@@ -113,7 +116,7 @@ export const commerceCopy: Record<MobileLocale, CommerceCopy> = {
     noNotifications: "لا توجد إشعارات حقيقية حالياً.", notifications: "إشعارات الطلبات",
     notAvailable: "غير متاح", order: "الطلب", orderCancelled: "تم إلغاء الطلب.", orderHistory: "سجل الحالة",
     orderItems: "عناصر الطلب", orderNumber: "رقم الطلب", orders: "طلباتي", outOfStock: "نفد المخزون",
-    payAtPickup: "الدفع عند الاستلام", payment: "الدفع", phone: "رقم الهاتف", pickup: "استلام من المتجر",
+    payAtPickup: "الدفع عند الاستلام", payment: "الدفع", onlinePayment: "الدفع الإلكتروني", onlinePaymentUnavailable: "الدفع الإلكتروني غير متاح حالياً.", paymentActionPending: "الدفع يتطلب إكمال خطوة آمنة ثم تحديث الحالة.", phone: "رقم الهاتف", pickup: "استلام من المتجر",
     priceAsc: "السعر: الأقل", priceDesc: "السعر: الأعلى", product: "منتج", products: "المنتجات",
     quantity: "الكمية", rateLimited: "طلبات كثيرة. انتظر قليلاً ثم أعد المحاولة.", receipt: "إيصال الطلب",
     recipientName: "اسم المستلم", remove: "إزالة", replaceCart: "استبدال السلة",
@@ -145,7 +148,7 @@ export const commerceCopy: Record<MobileLocale, CommerceCopy> = {
     notAvailable: "بەردەست نییە", order: "داواکاری", orderCancelled: "داواکاری هەڵوەشێنرایەوە.",
     orderHistory: "مێژووی دۆخ", orderItems: "بەرهەمەکانی داواکاری", orderNumber: "ژمارەی داواکاری",
     orders: "داواکارییەکانم", outOfStock: "کۆگا بەتاڵە", payAtPickup: "پارەدان لە وەرگرتن",
-    payment: "پارەدان", phone: "ژمارەی تەلەفۆن", pickup: "وەرگرتن لە فرۆشگا", priceAsc: "نرخی کەمتر",
+    payment: "پارەدان", onlinePayment: "پارەدانی ئۆنلاین", onlinePaymentUnavailable: "پارەدانی ئۆنلاین ئێستا بەردەست نییە.", paymentActionPending: "پارەدان پێویستی بە تەواوکردنی هەنگاوێکی پارێزراو هەیە.", phone: "ژمارەی تەلەفۆن", pickup: "وەرگرتن لە فرۆشگا", priceAsc: "نرخی کەمتر",
     priceDesc: "نرخی زیاتر", product: "بەرهەم", products: "بەرهەمەکان", quantity: "ژمارە",
     rateLimited: "داواکاری زۆرە. کەمێک چاوەڕێ بکە.", receipt: "وەسڵی داواکاری", recipientName: "ناوی وەرگر",
     remove: "لابردن", replaceCart: "گۆڕینی سەبەتە", replaceCartBody: "سەبەتەکەت بەرهەمی فرۆشگایەکی تر هەیە.",
@@ -173,7 +176,7 @@ export const commerceCopy: Record<MobileLocale, CommerceCopy> = {
     noNotifications: "There are no real notifications yet.", notifications: "Order notifications",
     notAvailable: "Unavailable", order: "Order", orderCancelled: "Order cancelled.", orderHistory: "Status history",
     orderItems: "Order items", orderNumber: "Order number", orders: "My orders", outOfStock: "Out of stock",
-    payAtPickup: "Pay at pickup", payment: "Payment", phone: "Phone", pickup: "Customer pickup",
+    payAtPickup: "Pay at pickup", payment: "Payment", onlinePayment: "Online payment", onlinePaymentUnavailable: "Online payment is currently unavailable.", paymentActionPending: "Payment requires a safe provider step, then a status refresh.", phone: "Phone", pickup: "Customer pickup",
     priceAsc: "Price: low", priceDesc: "Price: high", product: "Product", products: "Products", quantity: "Quantity",
     rateLimited: "Too many requests. Wait briefly and retry.", receipt: "Order receipt", recipientName: "Recipient name",
     remove: "Remove", replaceCart: "Replace cart", replaceCartBody: "Your cart contains products from another store. Replacing it removes the current cart atomically.",

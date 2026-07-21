@@ -1271,14 +1271,16 @@
       "commerceProducts": "Products",
       "commerceInventory": "Inventory",
       "commerceOrders": "Orders",
-      "commerceReports": "Operational reports"
+      "commerceReports": "Operational reports",
+      "payments": "Payments"
     },
     "customer": {
       "dashboard": "Dashboard",
       "marketplace": "Marketplace",
       "bookings": "My bookings",
       "favorites": "Favorites",
-      "notifications": "Notifications"
+      "notifications": "Notifications",
+      "payments": "Payments"
     },
     "actions": {
       "addService": "Add service",
@@ -1332,7 +1334,8 @@
         "commerceProducts": "Products",
         "commerceInventory": "Inventory",
         "commerceOrders": "Orders",
-        "commerceReports": "Operational reports"
+        "commerceReports": "Operational reports",
+        "payments": "Payments"
       }
     },
     "openMenu": "Open navigation menu",
@@ -1615,7 +1618,12 @@
       "COMMERCE_ORDERS_VIEW": "View commerce Orders",
       "COMMERCE_ORDERS_MANAGE": "Manage commerce Orders",
       "STORAGE_RECORDS_VIEW": "View managed storage records",
-      "STORAGE_RECORDS_MANAGE": "Manage managed storage lifecycle"
+      "STORAGE_RECORDS_MANAGE": "Manage managed storage lifecycle",
+      "PAYMENTS_VIEW": "View payments",
+      "PAYMENTS_REFUND": "Manage payment refunds",
+      "PAYMENTS_RECONCILE": "Run payment reconciliation",
+      "SETTLEMENTS_VIEW": "View settlement statements",
+      "SETTLEMENTS_MANAGE": "Manage settlement statements"
     }
   },
   "Media": {

@@ -6,6 +6,7 @@ export type CheckoutSemanticInput = {
   cartVersion: number;
   customerInstructions: string | null;
   fulfillmentMethod: FulfillmentMethod;
+  paymentMethod?: "ONLINE_PROVIDER";
 };
 
 export type CheckoutAttempt = { key: string; signature: string };
@@ -21,6 +22,7 @@ export type CheckoutDraft = {
   cartId: string;
   customerInstructions: string;
   fulfillmentMethod: FulfillmentMethod;
+  paymentMethod?: "ONLINE_PROVIDER";
   storeId: string;
 };
 
@@ -48,6 +50,7 @@ export function checkoutSemanticSignature(input: CheckoutSemanticInput) {
     cartVersion: input.cartVersion,
     customerInstructions: normalizeInstructions(input.customerInstructions),
     fulfillmentMethod: input.fulfillmentMethod,
+    paymentMethod: input.paymentMethod ?? null,
   });
 }
 

@@ -57,7 +57,6 @@ test("Stage 2D closure domain keeps role scopes and routes fail-closed", () => {
 test("Deferred Business routes preserve the locked pre-AI stage ownership", () => {
   assert.deepEqual(deferredBusinessRouteRegistry, {
     "/business/media": "Stage 5 Media, Storage and Payments Foundation",
-    "/business/payments": "Stage 5 Media, Storage and Payments Foundation",
     "/business/platform": "Stage 6 Admin and Platform Operations",
     "/business/release": "Stage 7 Release QA",
     "/business/visual": "Stage 8 Final Visual Polish",
@@ -79,6 +78,11 @@ test("Deferred Business routes preserve the locked pre-AI stage ownership", () =
     "/business/communications" in deferredBusinessRouteRegistry,
     false,
     "Gate 4A replaces the deferred communications root with a concrete route",
+  );
+  assert.equal(
+    "/business/payments" in deferredBusinessRouteRegistry,
+    false,
+    "Gate 5C replaces the deferred payments root with a concrete route",
   );
 });
 

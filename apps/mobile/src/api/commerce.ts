@@ -64,6 +64,7 @@ export const commerceApi = {
       cartVersion: number;
       customerInstructions: string | null;
       fulfillmentMethod: FulfillmentMethod;
+      paymentMethod?: "ONLINE_PROVIDER";
     },
     idempotencyKey: string,
   ) => authenticated<CommerceReceipt>("/api/commerce/customer/checkout", "POST", input, {

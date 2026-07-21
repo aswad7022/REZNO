@@ -32,7 +32,7 @@ test("canonical organization and Commerce role defaults fail closed", () => {
     OWNER_DEFAULT_COMMERCE_PERMISSIONS,
   );
   assert.deepEqual(defaultCommercePermissionsForRole("MANAGER"), []);
-  assert.equal(new Set(OWNER_DEFAULT_COMMERCE_PERMISSIONS).size, 12);
+  assert.equal(new Set(OWNER_DEFAULT_COMMERCE_PERMISSIONS).size, 15);
 
   assert.equal(
     hasCommercePermission({

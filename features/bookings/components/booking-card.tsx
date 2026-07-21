@@ -55,6 +55,8 @@ export function BookingCard({
     waitingForCustomer: string;
     waitingForBusiness: string;
     transitions: Record<"CONFIRMED" | "CANCELLED" | "COMPLETED" | "NO_SHOW", string>;
+    paymentStatus?: string;
+    viewPayment?: string;
   };
   audience: "customer" | "business";
   canOperate?: boolean;
@@ -214,8 +216,18 @@ export function BookingCard({
         )}
         <p>
           <span className="text-muted-foreground">{labels.price}: </span>
-          {booking.price}
+          {booking.price} {booking.currency}
         </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-muted-foreground">{labels.paymentStatus ?? "Payment"}: </span>
+          <Badge variant="secondary">{booking.payment.status}</Badge>
+          {booking.payment.intentStatus ? <Badge variant="outline">{booking.payment.intentStatus}</Badge> : null}
+          {audience === "customer" && booking.payment.intentId ? (
+            <Button asChild size="sm" variant="outline">
+              <Link href={`/customer/payments/${booking.payment.intentId}`}>{labels.viewPayment ?? "View payment"}</Link>
+            </Button>
+          ) : null}
+        </div>
         {audience === "customer" && booking.contactPhone ? (
           <div className="flex flex-wrap gap-2">
             <Button asChild size="sm" variant="outline">

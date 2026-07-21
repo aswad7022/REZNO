@@ -17,6 +17,7 @@ const links = [
   ["/admin/commerce", "التجارة", "COMMERCE_ANY"],
   ["/admin/communications", "الاتصالات", "NOTIFICATIONS_VIEW"],
   ["/admin/messages", "الرسائل", "MESSAGES_VIEW"],
+  ["/admin/payments", "المدفوعات", "PAYMENTS_VIEW"],
   ["/admin/access", "صلاحيات الأدمن", "SUPER_ADMIN"],
   ["/admin/settings", "الإعدادات", "SETTINGS_VIEW"],
 ] as const;

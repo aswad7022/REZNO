@@ -1,0 +1,64 @@
+export type PaymentErrorCode =
+  | "VALIDATION_ERROR"
+  | "UNAUTHORIZED"
+  | "FORBIDDEN"
+  | "NOT_FOUND"
+  | "STALE_VERSION"
+  | "IDEMPOTENCY_CONFLICT"
+  | "PAYMENT_PROVIDER_NOT_CONFIGURED"
+  | "PAYMENT_PROVIDER_FAILURE"
+  | "PAYMENT_NOT_PAYABLE"
+  | "PAYMENT_ALREADY_CAPTURED"
+  | "PAYMENT_REQUIRES_ACTION"
+  | "PAYMENT_AMOUNT_MISMATCH"
+  | "PAYMENT_CURRENCY_MISMATCH"
+  | "PAYMENT_STATE_CONFLICT"
+  | "REFUND_AMOUNT_EXCEEDED"
+  | "REFUND_NOT_ALLOWED"
+  | "WEBHOOK_INVALID_SIGNATURE"
+  | "FINANCIAL_LEDGER_IMBALANCE"
+  | "RECONCILIATION_MISMATCH"
+  | "RATE_LIMITED"
+  | "INVALID_CURSOR";
+
+const statuses: Record<PaymentErrorCode, number> = {
+  VALIDATION_ERROR: 400,
+  UNAUTHORIZED: 401,
+  FORBIDDEN: 403,
+  NOT_FOUND: 404,
+  STALE_VERSION: 409,
+  IDEMPOTENCY_CONFLICT: 409,
+  PAYMENT_PROVIDER_NOT_CONFIGURED: 503,
+  PAYMENT_PROVIDER_FAILURE: 503,
+  PAYMENT_NOT_PAYABLE: 409,
+  PAYMENT_ALREADY_CAPTURED: 409,
+  PAYMENT_REQUIRES_ACTION: 409,
+  PAYMENT_AMOUNT_MISMATCH: 409,
+  PAYMENT_CURRENCY_MISMATCH: 409,
+  PAYMENT_STATE_CONFLICT: 409,
+  REFUND_AMOUNT_EXCEEDED: 409,
+  REFUND_NOT_ALLOWED: 409,
+  WEBHOOK_INVALID_SIGNATURE: 400,
+  FINANCIAL_LEDGER_IMBALANCE: 409,
+  RECONCILIATION_MISMATCH: 409,
+  RATE_LIMITED: 429,
+  INVALID_CURSOR: 400,
+};
+
+export class PaymentDomainError extends Error {
+  readonly status: number;
+
+  constructor(
+    readonly code: PaymentErrorCode,
+    message: string,
+    readonly details?: { retryAfterSeconds?: number },
+  ) {
+    super(message);
+    this.name = "PaymentDomainError";
+    this.status = statuses[code];
+  }
+}
+
+export function paymentError(code: PaymentErrorCode, message: string): never {
+  throw new PaymentDomainError(code, message);
+}
