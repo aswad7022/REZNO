@@ -149,13 +149,13 @@ test("Customer Mobile resolves only trusted managed media paths against its API 
   });
 });
 
-test("Gate 5B staging fixture fails closed outside exact staging and 40/40", async () => {
+test("Gate 5B staging fixture fails closed outside exact staging and the current Stage 5 42/42", async () => {
   const exactEnvironment = {
     NODE_ENV: "test",
     REZNO_ENV: "staging",
     REZNO_MEDIA_GATE5B_CONFIRM: MEDIA_GATE5B_CONFIRMATION,
   } as NodeJS.ProcessEnv;
-  const client = (database: string, applied = BigInt(40), total = BigInt(40)) => {
+  const client = (database: string, applied = BigInt(42), total = BigInt(42)) => {
     const rows = [
       [{ database }],
       [{ applied, failed: BigInt(0), total }],
@@ -167,10 +167,10 @@ test("Gate 5B staging fixture fails closed outside exact staging and 40/40", asy
     REZNO_MEDIA_GATE5B_CONFIRM: "wrong",
   }), /exact staging environment/u);
   await assert.rejects(assertMediaGate5bStaging(client("rezno_production"), exactEnvironment), /exact rezno_staging/u);
-  await assert.rejects(assertMediaGate5bStaging(client("rezno_staging", BigInt(39), BigInt(39)), exactEnvironment), /40\/40/u);
+  await assert.rejects(assertMediaGate5bStaging(client("rezno_staging", BigInt(41), BigInt(41)), exactEnvironment), /42\/42/u);
   assert.deepEqual(await assertMediaGate5bStaging(client("rezno_staging"), exactEnvironment), {
     database: "rezno_staging",
-    migrations: "40/40",
+    migrations: "42/42",
   });
 });
 
