@@ -213,6 +213,22 @@ test("Gate 6A staging safety requires exact environment, encrypted database, and
     unencryptedCalls += 1;
     return unencryptedCalls === 1 ? [{ database: "rezno_staging", encrypted: false, user: "owner" }] : [];
   } } as never, environment), /encrypted/u);
+  const localCalls = [
+    [{ database: "rezno_staging", encrypted: false, user: "postgres" }],
+    [{ applied: BigInt(43), failed: BigInt(0), rolledBack: BigInt(0), total: BigInt(43) }],
+  ];
+  assert.deepEqual(await assertPlatformJobsGate6aStaging({ $queryRaw: async () => localCalls.shift() } as never, {
+    ...environment,
+    DATABASE_URL: "postgresql://postgres:local-only@127.0.0.1:55436/rezno_staging",
+    REZNO_STAGE6_GATE6A_ALLOW_LOCAL_UNENCRYPTED: "true",
+  }), {
+    database: "rezno_staging", encrypted: false, migrations: "43/43", role: "postgres", rolledBack: 0,
+  });
+  await assert.rejects(assertPlatformJobsGate6aStaging({ $queryRaw: async () => [{ database: "rezno_staging", encrypted: false, user: "neondb_owner" }] } as never, {
+    ...environment,
+    DATABASE_URL: "postgresql://neondb_owner:secret@ep-example.neon.tech/rezno_staging",
+    REZNO_STAGE6_GATE6A_ALLOW_LOCAL_UNENCRYPTED: "true",
+  }), /encrypted/u);
   const neonProxyCalls = [
     [{ database: "rezno_staging", encrypted: false, user: "neondb_owner" }],
     [{ applied: BigInt(43), failed: BigInt(0), rolledBack: BigInt(0), total: BigInt(43) }],

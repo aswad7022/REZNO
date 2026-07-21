@@ -23,10 +23,11 @@ export async function assertPlatformJobsGate6aStaging(
     throw new Error("Gate 6A fixture requires the exact rezno_staging database.");
   }
   const verifiedClientTls = hasVerifiedDirectNeonTls(environment.DATABASE_URL, connection.user);
+  const localUnencrypted = hasExplicitLocalUnencryptedOverride(environment, connection.user);
   if (
     !connection.encrypted
     && !verifiedClientTls
-    && environment.REZNO_STAGE6_GATE6A_ALLOW_LOCAL_UNENCRYPTED !== "true"
+    && !localUnencrypted
   ) {
     throw new Error("Gate 6A staging requires an encrypted PostgreSQL connection.");
   }
@@ -51,6 +52,24 @@ export async function assertPlatformJobsGate6aStaging(
     role: connection.user,
     rolledBack: 0 as const,
   };
+}
+
+function hasExplicitLocalUnencryptedOverride(environment: NodeJS.ProcessEnv, expectedUser: string) {
+  if (
+    environment.NODE_ENV !== "test"
+    || environment.REZNO_STAGE6_GATE6A_ALLOW_LOCAL_UNENCRYPTED !== "true"
+    || !environment.DATABASE_URL
+  ) return false;
+  try {
+    const parsed = new URL(environment.DATABASE_URL);
+    return (parsed.protocol === "postgresql:" || parsed.protocol === "postgres:")
+      && parsed.pathname === "/rezno_staging"
+      && decodeURIComponent(parsed.username) === expectedUser
+      && ["127.0.0.1", "::1", "localhost"].includes(parsed.hostname)
+      && !parsed.searchParams.has("sslmode");
+  } catch {
+    return false;
+  }
 }
 
 function hasVerifiedDirectNeonTls(databaseUrl: string | undefined, expectedUser: string) {

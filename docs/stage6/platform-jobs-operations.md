@@ -74,7 +74,7 @@ Use the authenticated direct (non-pooler) Neon connection to exact project/datab
 6. Run `npm run cleanup:staging:platform-jobs-gate6a` twice; the second removed count must be zero.
 7. Confirm the non-fixture fingerprint remained identical through seed, smoke, and cleanup.
 
-The fixture is scoped to the exact `6a000000-…` IDs and actor `rezno.qa.stage6.gate6a.admin`. Cleanup deletes mutations and attempts first, requeued children before roots, and then the exact schedule/actor/Organization records. The local-unencrypted override exists only to test the scripts against a disposable local PostgreSQL container and must never be used for real staging.
+The fixture is scoped to the exact `6a000000-…` IDs and actor `rezno.qa.stage6.gate6a.admin`. Cleanup deletes mutations and attempts first, requeued children before roots, and then the exact schedule/actor/Organization records. The local-unencrypted override is enforced only for `NODE_ENV=test`, an exact loopback host, and the matching local database/role; it exists only to test the scripts against a disposable local PostgreSQL container and cannot authorize real staging.
 
 ## Accepted Gate 6A staging evidence
 
