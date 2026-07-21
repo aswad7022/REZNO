@@ -31,7 +31,10 @@ const context: PlatformJobAdminContext = {
 const cursorSecret = "gate6a-postgres-cursor-secret-with-sufficient-entropy-2026";
 
 test.before(async () => {
-  assert.match(process.env.DATABASE_URL ?? "", /rezno_gate6a/u);
+  const databaseUrl = process.env.DATABASE_URL;
+  assert.ok(databaseUrl, "DATABASE_URL is required for Gate 6A integration tests.");
+  const databaseName = new URL(databaseUrl).pathname.slice(1);
+  assert.match(databaseName, /(?:_test|test_)/u, `Refusing Gate 6A integration tests against ${databaseName}`);
   process.env.REZNO_ADMIN_EMAILS = "";
   setPlatformJobCursorSigningSecretForTests(cursorSecret);
   await cleanupPlatformRows();
