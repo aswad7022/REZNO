@@ -22,7 +22,12 @@ export async function assertPlatformJobsGate6aStaging(
   if (connection?.database !== "rezno_staging" || /prod(?:uction)?|live/i.test(connection?.database ?? "")) {
     throw new Error("Gate 6A fixture requires the exact rezno_staging database.");
   }
-  if (!connection.encrypted && environment.REZNO_STAGE6_GATE6A_ALLOW_LOCAL_UNENCRYPTED !== "true") {
+  const verifiedClientTls = hasVerifiedDirectNeonTls(environment.DATABASE_URL, connection.user);
+  if (
+    !connection.encrypted
+    && !verifiedClientTls
+    && environment.REZNO_STAGE6_GATE6A_ALLOW_LOCAL_UNENCRYPTED !== "true"
+  ) {
     throw new Error("Gate 6A staging requires an encrypted PostgreSQL connection.");
   }
   const [migrations] = await prisma.$queryRaw<Array<{ applied: bigint; failed: bigint; rolledBack: bigint; total: bigint }>>`
@@ -41,9 +46,24 @@ export async function assertPlatformJobsGate6aStaging(
 
   return {
     database: "rezno_staging" as const,
-    encrypted: connection.encrypted,
+    encrypted: connection.encrypted || verifiedClientTls,
     migrations: "43/43" as const,
     role: connection.user,
     rolledBack: 0 as const,
   };
+}
+
+function hasVerifiedDirectNeonTls(databaseUrl: string | undefined, expectedUser: string) {
+  if (!databaseUrl) return false;
+  try {
+    const parsed = new URL(databaseUrl);
+    return (parsed.protocol === "postgresql:" || parsed.protocol === "postgres:")
+      && parsed.pathname === "/rezno_staging"
+      && decodeURIComponent(parsed.username) === expectedUser
+      && parsed.searchParams.get("sslmode") === "verify-full"
+      && parsed.hostname.endsWith(".neon.tech")
+      && !parsed.hostname.includes("-pooler.");
+  } catch {
+    return false;
+  }
 }

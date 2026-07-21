@@ -213,6 +213,24 @@ test("Gate 6A staging safety requires exact environment, encrypted database, and
     unencryptedCalls += 1;
     return unencryptedCalls === 1 ? [{ database: "rezno_staging", encrypted: false, user: "owner" }] : [];
   } } as never, environment), /encrypted/u);
+  const neonProxyCalls = [
+    [{ database: "rezno_staging", encrypted: false, user: "neondb_owner" }],
+    [{ applied: BigInt(43), failed: BigInt(0), rolledBack: BigInt(0), total: BigInt(43) }],
+  ];
+  assert.deepEqual(await assertPlatformJobsGate6aStaging({ $queryRaw: async () => neonProxyCalls.shift() } as never, {
+    ...environment,
+    DATABASE_URL: "postgresql://neondb_owner:secret@ep-example.neon.tech/rezno_staging?sslmode=verify-full",
+  }), {
+    database: "rezno_staging", encrypted: true, migrations: "43/43", role: "neondb_owner", rolledBack: 0,
+  });
+  await assert.rejects(assertPlatformJobsGate6aStaging({ $queryRaw: async () => [{ database: "rezno_staging", encrypted: false, user: "neondb_owner" }] } as never, {
+    ...environment,
+    DATABASE_URL: "postgresql://neondb_owner:secret@ep-example-pooler.neon.tech/rezno_staging?sslmode=verify-full",
+  }), /encrypted/u);
+  await assert.rejects(assertPlatformJobsGate6aStaging({ $queryRaw: async () => [{ database: "rezno_staging", encrypted: false, user: "neondb_owner" }] } as never, {
+    ...environment,
+    DATABASE_URL: "postgresql://neondb_owner:secret@ep-example.neon.tech/rezno_staging?sslmode=require",
+  }), /encrypted/u);
   let unhealthyCalls = 0;
   await assert.rejects(assertPlatformJobsGate6aStaging({ $queryRaw: async () => {
     unhealthyCalls += 1;

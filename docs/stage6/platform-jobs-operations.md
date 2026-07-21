@@ -64,7 +64,7 @@ Application rollback is safe while no later gate depends on Migration 43: old co
 
 ## Staging runbook
 
-Use an encrypted connection to exact project/database `rezno-staging`/`rezno_staging`, a non-production `NODE_ENV`, `REZNO_ENV=staging`, and exact confirmation `REZNO_STAGE6_GATE6A_CONFIRM=REZNO_STAGE6_GATE6A_STAGING_ONLY`. Do not print connection strings or credentials.
+Use the authenticated direct (non-pooler) Neon connection to exact project/database `rezno-staging`/`rezno_staging` with `sslmode=verify-full`, a non-production `NODE_ENV`, `REZNO_ENV=staging`, and exact confirmation `REZNO_STAGE6_GATE6A_CONFIRM=REZNO_STAGE6_GATE6A_STAGING_ONLY`. Do not print connection strings or credentials. Neon terminates client TLS at its proxy, so `pg_stat_ssl` can describe the internal proxy-to-compute hop as unencrypted; the guard accepts that topology only when the client DSN is the direct `.neon.tech` host, the database and role match the authenticated connection, and certificate/hostname verification is explicitly required.
 
 1. Confirm initial healthy 42/42 and Migration 43 absent.
 2. Run canonical `prisma migrate deploy`.
@@ -75,3 +75,9 @@ Use an encrypted connection to exact project/database `rezno-staging`/`rezno_sta
 7. Confirm the non-fixture fingerprint remained identical through seed, smoke, and cleanup.
 
 The fixture is scoped to the exact `6a000000-…` IDs and actor `rezno.qa.stage6.gate6a.admin`. Cleanup deletes mutations and attempts first, requeued children before roots, and then the exact schedule/actor/Organization records. The local-unencrypted override exists only to test the scripts against a disposable local PostgreSQL container and must never be used for real staging.
+
+## Accepted Gate 6A staging evidence
+
+The 2026-07-21 authenticated run selected only Neon project `rezno-staging`, database `rezno_staging`, role `neondb_owner`, and the direct certificate/hostname-verified endpoint. Preflight was healthy at 42/42 with Migration 43 absent. Canonical deploy applied only `20260721160000_platform_jobs_foundation`; postflight was healthy at 43/43 with zero failed or rolled-back migrations, and the second deploy was a no-op. The historical-data fingerprint stayed `abd477e983bc76e893c400d5502b98861bf2b59ea972de5a606f51d60d77f6b5` across the schema-only migration.
+
+Both exact-ID seed runs produced fixture fingerprint `260f58ac3c8fbbf9a2f62e68806a33c9a8dc9dd6c585fdf12d9c099f66816d17`. The smoke passed 38 checks and retained provider/runtime truth. The non-fixture fingerprint remained `51f91a54f3d34335477ad613342c374803a26d6b401271973f7cffa89613d2d2` through seed, smoke, and cleanup. Exact cleanup removed 23 fixture rows; the second cleanup removed zero, and final historical-data postflight retained the pre-migration fingerprint.

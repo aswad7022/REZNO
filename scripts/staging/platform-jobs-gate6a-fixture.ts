@@ -137,7 +137,7 @@ export async function seedPlatformJobsGate6aFixture(prisma: PrismaClient) {
       },
       update: {},
     });
-  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 30_000 });
   return platformJobsGate6aFixtureFingerprint(prisma);
 }
 
@@ -186,7 +186,7 @@ export async function cleanupPlatformJobsGate6aFixture(prisma: PrismaClient) {
     person: (await transaction.person.deleteMany({ where: { id: ids.personId } })).count,
     user: (await transaction.user.deleteMany({ where: { id: ids.userId } })).count,
     organization: (await transaction.organization.deleteMany({ where: { id: ids.organizationId } })).count,
-  }), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  }), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 30_000 });
   return cleanup;
 }
 

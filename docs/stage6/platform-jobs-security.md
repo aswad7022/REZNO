@@ -34,6 +34,7 @@ No open P0, P1, or P2 finding is accepted for Gate 6A. The following controls ar
 | cursor forgery | HKDF-domain-separated HMAC, constant-time verify, scope/filter/page/kind binding |
 | pagination loss | exact six-digit PostgreSQL timestamps, snapshot ordering, UUID tie-breaker |
 | database cleanup overreach | exact fixture actor/IDs, dependency-ordered deletion, second-cleanup zero, non-fixture fingerprint |
+| Neon TLS proxy misclassification | exact direct `.neon.tech` DSN, matching database/role, and explicit `sslmode=verify-full`; pooler/weak/mismatched URLs fail closed |
 
 ## Fencing limitations and future handlers
 
