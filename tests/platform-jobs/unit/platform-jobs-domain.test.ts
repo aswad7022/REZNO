@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
+import { Socket } from "node:net";
 import test from "node:test";
 
 import { readBoundedPlatformJobJson, parsePlatformJobListQuery, parsePlatformJobTrigger } from "../../../features/platform-jobs/api/validation";
@@ -15,6 +16,14 @@ import { isRetryablePlatformJobError, parsePlatformJobPayload, parsePlatformJobR
 import { calculatePlatformScheduleTick } from "../../../features/platform-jobs/domain/schedule";
 import { executePlatformJobHandler, setPlatformJobHandlerForTests } from "../../../features/platform-jobs/services/handlers";
 import { setPlatformWorkerTestHook } from "../../../features/platform-jobs/services/worker";
+import {
+  assertGate6aTransportEvidence,
+  createGate6aVerifiedPoolConfig,
+  gate6aTransportEvidenceBinding,
+  inspectEstablishedTlsSocket,
+  stripConnectionStringTlsParameters,
+  type Gate6aTransportEvidence,
+} from "../../../lib/db/postgres-transport";
 import { assertPlatformJobsGate6aStaging, PLATFORM_JOBS_GATE6A_CONFIRMATION } from "../../../scripts/staging/platform-jobs-gate6a-safety";
 
 const secret = "gate6a-cursor-secret-with-sufficient-entropy-2026-07-21";
@@ -206,8 +215,20 @@ test("production runtime refuses cursor-secret and handler test overrides", () =
 
 test("Gate 6A staging safety accepts only exact direct Neon verification or exact loopback test override", async () => {
   const direct = stagingEnvironment();
-  assert.deepEqual(await assertPlatformJobsGate6aStaging(safetyClient(), direct), {
-    database: "rezno_staging", encrypted: true, migrations: "44/44", role: "neondb_owner", rolledBack: 0,
+  const evidence = validTransportEvidence(direct);
+  assert.deepEqual(await assertPlatformJobsGate6aStaging(safetyClient(), direct, evidence), {
+    backendPgStatSsl: true,
+    clientTlsVerified: true,
+    database: "rezno_staging",
+    encrypted: true,
+    hostnameVerified: true,
+    migrations: "44/44",
+    prismaUsedAttestedPhysicalClient: true,
+    role: "neondb_owner",
+    rolledBack: 0,
+    tlsProtocol: "TLSv1.3",
+    transport: "TCP_POSTGRESQL_TLS",
+    transportConfigurationSha256: evidence.transportConfigurationSha256,
   });
   assert.deepEqual(await assertPlatformJobsGate6aStaging(safetyClient({ encrypted: false, user: "postgres" }), {
     NODE_ENV: "test",
@@ -216,8 +237,108 @@ test("Gate 6A staging safety accepts only exact direct Neon verification or exac
     REZNO_STAGE6_GATE6A_CONFIRM: PLATFORM_JOBS_GATE6A_CONFIRMATION,
     DATABASE_URL: "postgresql://postgres:local-only@127.0.0.1:55436/rezno_staging?sslmode=disable",
   }), {
-    database: "rezno_staging", encrypted: false, migrations: "44/44", role: "postgres", rolledBack: 0,
+    backendPgStatSsl: false,
+    clientTlsVerified: false,
+    database: "rezno_staging",
+    encrypted: false,
+    hostnameVerified: false,
+    migrations: "44/44",
+    prismaUsedAttestedPhysicalClient: false,
+    role: "postgres",
+    rolledBack: 0,
+    tlsProtocol: null,
+    transport: "LOCAL_TEST_TCP",
+    transportConfigurationSha256: null,
   });
+});
+
+test("Gate 6A accepts valid client TLS proof whether backend pg_stat_ssl is true or false", async () => {
+  const direct = stagingEnvironment();
+  for (const backendPgStatSsl of [true, false]) {
+    const evidence = invalidTransportEvidence(direct, { backendPgStatSsl });
+    assert.doesNotThrow(() => assertGate6aTransportEvidence(evidence, direct));
+    const result = await assertPlatformJobsGate6aStaging(
+      safetyClient({ encrypted: backendPgStatSsl }),
+      direct,
+      evidence,
+    );
+    assert.equal(result.clientTlsVerified, true);
+    assert.equal(result.backendPgStatSsl, backendPgStatSsl);
+  }
+});
+
+test("Gate 6A verified pool strips URL TLS parameters and pins explicit system-CA verification", () => {
+  const environment = stagingEnvironment();
+  const config = createGate6aVerifiedPoolConfig(environment);
+  assert.equal(config.connectionString, undefined);
+  assert.equal(config.host, "ep-gate6a.neon.tech");
+  assert.equal(config.database, "rezno_staging");
+  assert.equal(config.user, "neondb_owner");
+  assert.equal(config.port, 5432);
+  assert.equal(config.max, 1);
+  assert.deepEqual(config.ssl, { rejectUnauthorized: true, servername: "ep-gate6a.neon.tech" });
+  const stripped = new URL(stripConnectionStringTlsParameters(
+    "postgresql://role:secret@host.test/db?sslmode=no-verify&sslcert=a&sslkey=b&sslrootcert=c&application_name=gate6a",
+  ));
+  for (const key of ["sslmode", "sslcert", "sslkey", "sslrootcert"]) assert.equal(stripped.searchParams.has(key), false);
+  assert.equal(stripped.searchParams.get("application_name"), "gate6a");
+});
+
+test("Gate 6A rejects incomplete TLS, certificate, hostname, endpoint, identity, and configuration evidence", () => {
+  const direct = stagingEnvironment();
+  for (const overrides of [
+    { authorized: false, authorizationErrorAbsent: false },
+    { hostnameVerified: false },
+    { peerCertificatePresent: false },
+    { encrypted: false, streamIsTlsSocket: false },
+    { socketServernameMatches: false },
+    { databaseMatches: false },
+    { roleMatches: false },
+    { nonPooler: false },
+    { remoteAddressNotLoopback: false },
+    { rejectUnauthorized: false },
+    { peerCertificateCurrentlyValid: false },
+    { configurationMatchesPrisma: false },
+    { prismaUsedAttestedPhysicalClient: false },
+  ]) assert.throws(
+    () => assertGate6aTransportEvidence(invalidTransportEvidence(direct, overrides), direct),
+    /incomplete|invalid/u,
+  );
+  assert.throws(
+    () => assertGate6aTransportEvidence(
+      invalidTransportEvidence(direct, { transportConfigurationSha256: "0".repeat(64) }),
+      direct,
+    ),
+    /does not match/u,
+  );
+  assert.throws(
+    () => assertGate6aTransportEvidence(invalidTransportEvidence(direct, { protocol: "TLSv1.1" }), direct),
+    /TLS 1\.2 or TLS 1\.3/u,
+  );
+  const plaintext = inspectEstablishedTlsSocket(
+    { connection: { stream: new Socket() } } as never,
+    "ep-gate6a.neon.tech",
+    new Date(),
+  );
+  assert.equal(plaintext.streamIsTlsSocket, false);
+  assert.equal(plaintext.encrypted, false);
+});
+
+test("Gate 6A rejects malformed discovery metadata and fails before any database or fixture mutation", async () => {
+  const direct = stagingEnvironment();
+  for (const expectedHost of ["", "https://ep-gate6a.neon.tech", "127.0.0.1", "-bad.neon.tech", "ep-gate6a-pooler.neon.tech"]) {
+    assert.throws(
+      () => gate6aTransportEvidenceBinding({ ...direct, REZNO_STAGE6_GATE6A_EXPECTED_DATABASE_HOST: expectedHost }),
+      /host|metadata|Neon/u,
+    );
+  }
+  let databaseQueries = 0;
+  const untouchedClient = { $queryRaw: async () => { databaseQueries += 1; return []; } } as never;
+  await assert.rejects(
+    assertPlatformJobsGate6aStaging(untouchedClient, direct),
+    /client-side TLS attestation/u,
+  );
+  assert.equal(databaseQueries, 0);
 });
 
 test("Gate 6A staging safety fails closed for URL, TLS, host, role, database, and migration mismatches", async () => {
@@ -230,24 +351,27 @@ test("Gate 6A staging safety fails closed for URL, TLS, host, role, database, an
     [{ ...direct, DATABASE_URL: "postgresql://neondb_owner:secret@ep-gate6a.neon.tech/rezno_staging?sslmode=require" }, /verify-full/u],
     [{ ...direct, DATABASE_URL: "postgresql://neondb_owner:secret@ep-gate6a.neon.tech/rezno_staging" }, /verify-full/u],
     [{ ...direct, DATABASE_URL: "postgresql://neondb_owner:secret@ep-gate6a.neon.tech/rezno_staging?sslmode=verify-full&sslmode=require" }, /at most one sslmode/u],
-    [{ ...direct, DATABASE_URL: "postgresql://neondb_owner:secret@ep-gate6a-pooler.neon.tech/rezno_staging?sslmode=verify-full", REZNO_STAGE6_GATE6A_EXPECTED_DATABASE_HOST: "ep-gate6a-pooler.neon.tech" }, /non-pooler/u],
+    [{ ...direct, DATABASE_URL: "postgresql://neondb_owner:secret@ep-gate6a-pooler.neon.tech/rezno_staging?sslmode=verify-full", REZNO_STAGE6_GATE6A_EXPECTED_DATABASE_HOST: "ep-gate6a-pooler.neon.tech" }, /direct Neon|non-pooler/u],
     [{ ...direct, DATABASE_URL: "postgresql://neondb_owner:secret@db.example.test/rezno_staging?sslmode=verify-full", REZNO_STAGE6_GATE6A_EXPECTED_DATABASE_HOST: "db.example.test" }, /Neon/u],
-    [{ ...direct, DATABASE_URL: "postgresql://other:secret@ep-gate6a.neon.tech/rezno_staging?sslmode=verify-full" }, /username/u],
+    [{ ...direct, DATABASE_URL: "postgresql://other:secret@ep-gate6a.neon.tech/rezno_staging?sslmode=verify-full" }, /username|role/u],
     [{ ...direct, REZNO_STAGE6_GATE6A_EXPECTED_DATABASE_ROLE: "other" }, /role/u],
     [{ ...direct, REZNO_STAGE6_GATE6A_EXPECTED_DATABASE_HOST: "ep-other.neon.tech" }, /host/u],
   ] as Array<[NodeJS.ProcessEnv, RegExp]>) {
-    await assert.rejects(assertPlatformJobsGate6aStaging(safetyClient(), environment), pattern);
+    await assert.rejects(
+      assertPlatformJobsGate6aStaging(safetyClient(), environment, validTransportEvidence(direct)),
+      pattern,
+    );
   }
-  await assert.rejects(assertPlatformJobsGate6aStaging(safetyClient({ encrypted: false }), direct), /pg_stat_ssl/u);
-  await assert.rejects(assertPlatformJobsGate6aStaging(safetyClient({ database: "rezno_production" }), direct), /rezno_staging/u);
-  await assert.rejects(assertPlatformJobsGate6aStaging(safetyClient({ database: "rezno_live" }), direct), /rezno_staging/u);
-  await assert.rejects(assertPlatformJobsGate6aStaging(safetyClient(undefined, { applied: BigInt(43), total: BigInt(44) }), direct), /44\/44/u);
-  await assert.rejects(assertPlatformJobsGate6aStaging(safetyClient(undefined, { applied: BigInt(43), failed: BigInt(1), total: BigInt(44) }), direct), /44\/44/u);
-  await assert.rejects(assertPlatformJobsGate6aStaging(safetyClient(undefined, { applied: BigInt(43), rolledBack: BigInt(1), total: BigInt(44) }), direct), /44\/44/u);
+  const evidence = validTransportEvidence(direct);
+  await assert.rejects(assertPlatformJobsGate6aStaging(safetyClient({ database: "rezno_production" }), direct, evidence), /rezno_staging/u);
+  await assert.rejects(assertPlatformJobsGate6aStaging(safetyClient({ database: "rezno_live" }), direct, evidence), /rezno_staging/u);
+  await assert.rejects(assertPlatformJobsGate6aStaging(safetyClient(undefined, { applied: BigInt(43), total: BigInt(44) }), direct, evidence), /44\/44/u);
+  await assert.rejects(assertPlatformJobsGate6aStaging(safetyClient(undefined, { applied: BigInt(43), failed: BigInt(1), total: BigInt(44) }), direct, evidence), /44\/44/u);
+  await assert.rejects(assertPlatformJobsGate6aStaging(safetyClient(undefined, { applied: BigInt(43), rolledBack: BigInt(1), total: BigInt(44) }), direct, evidence), /44\/44/u);
   await assert.rejects(assertPlatformJobsGate6aStaging(safetyClient({ encrypted: false }), {
     ...direct,
     REZNO_STAGE6_GATE6A_ALLOW_LOCAL_UNENCRYPTED: "true",
-  }), /loopback/u);
+  }), /confirmation|loopback/u);
 });
 
 function stagingEnvironment(): NodeJS.ProcessEnv {
@@ -259,6 +383,53 @@ function stagingEnvironment(): NodeJS.ProcessEnv {
     REZNO_STAGE6_GATE6A_EXPECTED_DATABASE_HOST: "ep-gate6a.neon.tech",
     REZNO_STAGE6_GATE6A_EXPECTED_DATABASE_ROLE: "neondb_owner",
   };
+}
+
+function validTransportEvidence(environment: NodeJS.ProcessEnv): Gate6aTransportEvidence {
+  return {
+    authorizationErrorAbsent: true,
+    authorized: true,
+    backendPgStatSsl: true,
+    clientTlsVerified: true,
+    configurationMatchesPrisma: true,
+    database: "rezno_staging",
+    databaseMatches: true,
+    encrypted: true,
+    harmlessTimestampObserved: true,
+    hostnameVerified: true,
+    inetServerAddressNotLoopback: true,
+    inetServerAddressPresent: true,
+    inetServerPortPresent: true,
+    migrationApplied: 44,
+    migrationFailed: 0,
+    migrationRolledBack: 0,
+    migrationTotal: 44,
+    nonPooler: true,
+    peerCertificateCurrentlyValid: true,
+    peerCertificatePresent: true,
+    prismaDatabaseMatches: true,
+    prismaRoleMatches: true,
+    prismaUsedAttestedPhysicalClient: true,
+    protocol: "TLSv1.3",
+    rejectUnauthorized: true,
+    remoteAddressNotLoopback: true,
+    remoteAddressPresent: true,
+    remotePortMatches: true,
+    role: "neondb_owner",
+    roleMatches: true,
+    socketServernameMatches: true,
+    streamIsTlsSocket: true,
+    systemCaVerification: true,
+    transport: "TCP_POSTGRESQL_TLS",
+    ...gate6aTransportEvidenceBinding(environment),
+  };
+}
+
+function invalidTransportEvidence(
+  environment: NodeJS.ProcessEnv,
+  overrides: Record<string, unknown>,
+) {
+  return { ...validTransportEvidence(environment), ...overrides } as Gate6aTransportEvidence;
 }
 
 function safetyClient(
