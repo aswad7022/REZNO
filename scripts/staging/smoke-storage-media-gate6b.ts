@@ -301,7 +301,6 @@ async function main() {
   checks += 2;
 
   const scheduler = await runPlatformSchedulerTick(context, {
-    
     batchSize: 10,
     idempotencyKey: randomUUID(),
     now: new Date("2026-07-23T00:00:00Z"),
