@@ -37,7 +37,7 @@ test.after(() => {
 
 test("Stage 6 architecture locks the accepted title, gate order, providers, and later-stage boundaries", () => {
   assert.equal(STAGE_6_ARCHITECTURE.title, "Stage 6 — Admin and Platform Operations");
-  assert.deepEqual(Object.values(STAGE_6_ARCHITECTURE.gates), ["ACTIVE", "UNSTARTED", "UNSTARTED", "UNSTARTED"]);
+  assert.deepEqual(Object.values(STAGE_6_ARCHITECTURE.gates), ["ACCEPTED", "ACTIVE", "UNSTARTED", "UNSTARTED"]);
   assert.equal(STAGE_6_ARCHITECTURE.runtime.durableStore, "POSTGRESQL");
   assert.equal(STAGE_6_ARCHITECTURE.runtime.externalQueueProvider, "NOT_CONFIGURED");
   assert.equal(STAGE_6_ARCHITECTURE.runtime.automaticScheduler, "NOT_CONNECTED");
@@ -49,8 +49,19 @@ test("Stage 6 architecture locks the accepted title, gate order, providers, and 
   assert.equal(STAGE_6_ARCHITECTURE.boundaries.ai, "AFTER_STAGE_8");
 });
 
-test("Gate 6A exposes one inert closed job type and explicit finite bounds", () => {
-  assert.deepEqual(PLATFORM_JOB_ALLOWED_TYPES, ["PLATFORM_HEALTH_PROBE"]);
+test("Gate 6B extends the accepted Gate 6A registry with only the closed storage and media job types", () => {
+  assert.deepEqual(PLATFORM_JOB_ALLOWED_TYPES, [
+    "PLATFORM_HEALTH_PROBE",
+    "STORAGE_MAINTENANCE_DISCOVERY",
+    "STORAGE_ORPHAN_CLEANUP",
+    "STORAGE_ASSET_DELETE_RETRY",
+    "STORAGE_RESCAN_DISCOVERY",
+    "STORAGE_ASSET_RESCAN",
+    "MEDIA_RENDITION_DISCOVERY",
+    "MEDIA_RENDITION_GENERATE",
+    "MEDIA_RENDITION_CLEANUP_DISCOVERY",
+    "MEDIA_RENDITION_DELETE",
+  ]);
   assert.equal(PLATFORM_JOB_LIMITS.maxRequestBytes, 8_192);
   assert.equal(PLATFORM_JOB_LIMITS.maxPayloadBytes, 4_096);
   assert.equal(PLATFORM_JOB_LIMITS.maxResultBytes, 2_048);
@@ -185,7 +196,7 @@ test("health handler succeeds with bounded metadata and converts raw exceptions 
   setPlatformJobHandlerForTests("PLATFORM_HEALTH_PROBE");
 });
 
-test("production-only guards and additive migrations 43-44 are explicit in source", async () => {
+test("production-only guards and additive migrations 43-45 are explicit in source", async () => {
   const [cursorSource, handlerSource, workerSource, migrations] = await Promise.all([
     readFile(new URL("../../../features/platform-jobs/domain/cursor-signing.ts", import.meta.url), "utf8"),
     readFile(new URL("../../../features/platform-jobs/services/handlers.ts", import.meta.url), "utf8"),
@@ -196,9 +207,10 @@ test("production-only guards and additive migrations 43-44 are explicit in sourc
   assert.match(handlerSource, /NODE_ENV === "production"/);
   assert.match(workerSource, /NODE_ENV === "production"/);
   const names = migrations.filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort();
-  assert.equal(names.length, 44);
-  assert.equal(names.at(-2), "20260721160000_platform_jobs_foundation");
-  assert.equal(names.at(-1), "20260722090000_platform_worker_operation_recovery");
+  assert.equal(names.length, 45);
+  assert.equal(names.at(-3), "20260721160000_platform_jobs_foundation");
+  assert.equal(names.at(-2), "20260722090000_platform_worker_operation_recovery");
+  assert.equal(names.at(-1), "20260722150000_storage_media_automation");
 });
 
 test("production runtime refuses cursor-secret and handler test overrides", () => {

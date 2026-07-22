@@ -173,10 +173,11 @@ test("Gate 4C production HTML, RSC, redirect, and Customer Mobile outbound contr
       },
     })),
   });
-  await prisma.communicationCampaign.update({
-    where: { id: campaign.id },
-    data: { createdAt: new Date() },
-  });
+  await prisma.$executeRaw`
+    UPDATE "CommunicationCampaign"
+    SET "createdAt" = clock_timestamp()
+    WHERE "id" = ${campaign.id}::uuid
+  `;
   const deliveryRows = deliveryRecipients.map((item) => ({
     campaignId: campaign.id,
     personId: item.personId,

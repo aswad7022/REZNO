@@ -65,14 +65,14 @@ test.after(async () => {
   await prisma.$disconnect();
 });
 
-test("migration chain is healthy at 44/44 and Gate 6A creates no rows", async () => {
+test("migration chain is healthy at 45/45 and the additive Gate 6B migration creates no platform rows", async () => {
   const migrationRows = await prisma.$queryRaw<Array<{ applied: bigint; failed: bigint; total: bigint }>>(Prisma.sql`
     SELECT COUNT(*) FILTER (WHERE "finished_at" IS NOT NULL AND "rolled_back_at" IS NULL) AS applied,
            COUNT(*) FILTER (WHERE "finished_at" IS NULL AND "rolled_back_at" IS NULL) AS failed,
            COUNT(*) AS total
     FROM "_prisma_migrations"
   `);
-  assert.deepEqual(migrationRows[0], { applied: BigInt(44), failed: BigInt(0), total: BigInt(44) });
+  assert.deepEqual(migrationRows[0], { applied: BigInt(45), failed: BigInt(0), total: BigInt(45) });
   assert.equal(await prisma.platformJob.count(), 0);
   assert.equal(await prisma.platformJobSchedule.count(), 0);
   assert.equal(await prisma.platformJobAttempt.count(), 0);
@@ -497,7 +497,7 @@ test("database constraints reject forged scope, excessive priority, and oversize
   assert.deepEqual(unchanged.payload, platformHealthPayload());
 });
 
-test("claim and recovery indexes plus all Gate 6A foreign keys exist", async () => {
+test("claim and recovery indexes plus all Gate 6A and Gate 6B foreign keys exist", async () => {
   const indexes = await prisma.$queryRaw<Array<{ indexname: string }>>(Prisma.sql`
     SELECT indexname FROM pg_indexes
     WHERE schemaname = 'public' AND tablename IN ('PlatformJob', 'PlatformJobSchedule', 'PlatformJobAttempt', 'PlatformJobMutation')
@@ -512,14 +512,30 @@ test("claim and recovery indexes plus all Gate 6A foreign keys exist", async () 
     "PlatformJobMutation_action_operationLeaseExpiresAt_id_idx",
     "PlatformJobAttempt_workerId_createdAt_id_idx",
   ]) assert.equal(names.has(name), true, name);
-  const foreignKeys = await prisma.$queryRaw<Array<{ count: bigint }>>(Prisma.sql`
-    SELECT COUNT(*) AS count FROM pg_constraint
+  const foreignKeys = await prisma.$queryRaw<Array<{ name: string }>>(Prisma.sql`
+    SELECT conname AS name FROM pg_constraint
     WHERE contype = 'f' AND conrelid IN (
       '"PlatformJob"'::regclass, '"PlatformJobAttempt"'::regclass,
       '"PlatformJobSchedule"'::regclass, '"PlatformJobMutation"'::regclass
     )
+    ORDER BY conname
   `);
-  assert.equal(foreignKeys[0].count, BigInt(13));
+  assert.deepEqual(foreignKeys.map((row) => row.name), [
+    "PlatformJobAttempt_jobId_fkey",
+    "PlatformJobMutation_actorAdminUserId_fkey",
+    "PlatformJobMutation_actorPersonId_fkey",
+    "PlatformJobMutation_jobId_fkey",
+    "PlatformJobMutation_scheduleId_fkey",
+    "PlatformJobSchedule_createdByAdminUserId_fkey",
+    "PlatformJobSchedule_createdByPersonId_fkey",
+    "PlatformJobSchedule_organizationId_fkey",
+    "PlatformJob_createdByAdminUserId_fkey",
+    "PlatformJob_createdByPersonId_fkey",
+    "PlatformJob_organizationId_fkey",
+    "PlatformJob_parentJobId_fkey",
+    "PlatformJob_requeueRootJobId_fkey",
+    "PlatformJob_scheduleId_fkey",
+  ]);
 });
 
 async function workerMutation(idempotencyKey: string) {
