@@ -102,8 +102,8 @@ jobs:
         run: |
           node -e 'const name = new URL(process.env.DATABASE_URL).pathname.slice(1); if (!/(?:_test|test_)/.test(name)) throw new Error(`Refusing non-test database: ${name}`)'
           migration_count="$(find prisma/migrations -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')"
-          if [[ "$migration_count" != "42" ]]; then
-            echo "Expected 42 migrations, found $migration_count" >&2
+          if [[ "$migration_count" != "44" ]]; then
+            echo "Expected 44 migrations, found $migration_count" >&2
             exit 1
           fi
 
@@ -125,6 +125,9 @@ jobs:
       - name: Run focused Gate 5D closure contracts
         run: npm run test:stage5-closure:unit
 
+      - name: Run focused Gate 6A durable jobs contracts
+        run: npm run test:platform-jobs:unit
+
       - name: Run complete unit suite including Gate 5B media and Gate 5D closure contracts
         run: npm run test:unit
 
@@ -133,6 +136,9 @@ jobs:
 
       - name: Run focused Gate 5D cross-gate PostgreSQL closure
         run: npm run test:stage5-closure:postgres
+
+      - name: Run focused Gate 6A durable jobs PostgreSQL integrity
+        run: npm run test:platform-jobs:postgres
 
       - name: Run PostgreSQL regressions including Gate 4D and Gate 5A through Gate 5D
         run: npm run test:integration
@@ -189,6 +195,7 @@ jobs:
           COMMERCE_HTTP_BASE_URL: http://127.0.0.1:3000
           MEDIA_HTTP_BASE_URL: http://127.0.0.1:3000
           PAYMENT_HTTP_BASE_URL: http://127.0.0.1:3000
+          PLATFORM_JOBS_HTTP_BASE_URL: http://127.0.0.1:3000
           STAGE5_HTTP_BASE_URL: http://127.0.0.1:3000
           STORAGE_HTTP_BASE_URL: http://127.0.0.1:3000
         run: |

@@ -1546,7 +1546,9 @@
       "PAYMENTS_REFUND": "إدارة استرداد المدفوعات",
       "PAYMENTS_RECONCILE": "تشغيل مطابقة المدفوعات",
       "SETTLEMENTS_VIEW": "عرض كشوف التسوية",
-      "SETTLEMENTS_MANAGE": "إدارة كشوف التسوية"
+      "SETTLEMENTS_MANAGE": "إدارة كشوف التسوية",
+      "PLATFORM_JOBS_VIEW": "عرض مهام المنصة الدائمة",
+      "PLATFORM_JOBS_MANAGE": "تشغيل مهام المنصة الدائمة"
     }
   },
   "Media": {
