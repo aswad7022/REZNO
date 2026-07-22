@@ -1,12 +1,13 @@
 # Stage 6 — Admin and Platform Operations
 
-Status: canonical Stage 6 scope and internal gate decomposition confirmed before
-Gate 6A implementation.
+Status: canonical Stage 6 scope. Gate 6A is accepted and merged; Gate 6B is
+active. Gates 6C and 6D remain unstarted.
 
-Baseline: `origin/main` at
-`761e0451b433a6ed017e5aad910f4060793f31d5`, the merge commit of PR #124,
-with exactly 42 repository migrations and no migration 43. PR #100 remains an
-untouched Open Draft at `e46454df993ecccb06180060dda4353ec88e2641`.
+Gate 6B baseline: `origin/main` at
+`e30c51468cc93388e210f636cadc1b097e481ebf`, the merge commit of PR #125,
+with exactly 44 repository migrations. PR #125 merged Gate 6A from exact head
+`c7f0f8a99eb27bf0dcc5fa853275e13963868ad5`. PR #100 remains an untouched
+Open Draft at `e46454df993ecccb06180060dda4353ec88e2641`.
 
 ## Accepted repository evidence
 
@@ -95,6 +96,8 @@ Stage 6 excludes:
 
 ### Gate 6A — Durable Jobs and Scheduling Foundation
 
+Status: **ACCEPTED** through merged PR #125.
+
 - PostgreSQL-backed canonical jobs, attempts, schedules, and idempotent
   mutations;
 - closed server-owned job types and versioned reference-only payload schemas;
@@ -109,12 +112,17 @@ Stage 6 excludes:
 
 ### Gate 6B — Storage and Media Automation
 
+Status: **ACTIVE**. The authoritative design and acceptance record is
+`docs/stage6/gate6b-storage-media-automation.md`.
+
 - automatic bounded exact-key storage cleanup and rescan orchestration;
 - persistent rendition-processing orchestration;
 - provider-independent storage/media retry lifecycle;
 - no fabricated provider and no expansion of accepted media ownership.
 
 ### Gate 6C — Communications and Payment Automation
+
+Status: **UNSTARTED**.
 
 - outbound dispatch scheduling over accepted campaign/delivery truth;
 - asynchronous processing of already authenticated provider events;
@@ -123,6 +131,8 @@ Stage 6 excludes:
 - no bank payout, arbitrary messaging, or client-derived financial authority.
 
 ### Gate 6D — Platform Operations Closure
+
+Status: **UNSTARTED**.
 
 - distributed rate limiting and coordination;
 - bounded operational health, queue metrics, Admin operations views, alerts,
