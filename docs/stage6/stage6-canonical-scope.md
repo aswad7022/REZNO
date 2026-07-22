@@ -233,7 +233,11 @@ Staging must authenticate without printing credentials, select exact project
 `rezno-staging` and database `rezno_staging`, start healthy at 43/43, apply only
 migration 44, finish healthy at 44/44, and prove a second deploy is a no-op. A
 direct non-pooler Neon URL, `verify-full`, authenticated expected host/role,
-URL/current-user equality, and actual-session `pg_stat_ssl=true` are mandatory. A
+URL/current-user equality, an authorized client `TLSSocket`, system-CA and
+hostname/SNI verification, TLS 1.2/1.3, direct non-loopback transport, and exact
+reuse of the attested Pool/backend by Prisma are mandatory. Same-client
+`pg_stat_ssl` remains diagnostic at the Neon proxy boundary rather than the sole
+TLS authority. A
 deterministic exact-ID fixture must run twice with one fingerprint and prove
 single-winner claims, lease recovery, fencing, heartbeat ownership,
 completion/retry/dead-letter, cancel/requeue, duplicate schedule suppression,

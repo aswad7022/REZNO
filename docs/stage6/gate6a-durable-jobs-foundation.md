@@ -116,6 +116,20 @@ Admin list cursors are HMAC-SHA256 authenticated with HKDF domain separation, bi
 
 The manual worker and scheduler endpoints run only one bounded operation inside the current Web runtime. They do not imply continuous processing, crash-free long execution, Redis, BullMQ, SQS, Cloud Tasks, Vercel Cron, bank payout, real upload, or real payment capability.
 
+## Verified staging database transport
+
+Gate 6A staging uses the repository's installed `pg` TCP PostgreSQL driver through an externally constructed `pg.Pool` supplied directly to `PrismaPg`. Authenticated Neon discovery remains the source of the direct non-pooler host, database, role, and credential, but the discovered URL is decomposed before use. No `connectionString` is passed to the verified Pool, so `sslmode`, `sslcert`, `sslkey`, or `sslrootcert` cannot overwrite its explicit `ssl` object. The Pool pins `rejectUnauthorized: true`, system CAs, SNI `servername` equal to the discovered host, port 5432, channel binding, and `max:1`.
+
+Before a Gate 6A staging script can mutate data, the shared Pool establishes a Node `TLSSocket` and proves encryption, certificate authorization, TLS 1.2/1.3, certificate validity, Node hostname verification, exact SNI, direct remote port, non-loopback address, current database/role, and non-pooler identity. The attested client reads `pg_stat_ssl` on that same connection. After release, Prisma must reuse the same Pool and same backend identity; otherwise the gate fails closed. The live 2026-07-22 probe passed every client-side check with TLS 1.3 while the backend diagnostic remained `false`. Neon documents that all PostgreSQL connections pass through the Neon proxy and that client connections require TLS, so this combination is recorded as client TLS termination at the proxy boundary, not plaintext.
+
+The authenticated staging run advanced exactly 43/43→44/44, the second deploy was a no-op, both seeds shared one deterministic fixture fingerprint, all 59 smoke checks passed, cleanup removed 35 scoped rows and then zero, and the final non-fixture fingerprint exactly matched the pre-migration value.
+
+The local exception remains limited to `NODE_ENV=test`, an explicit marker, an exact loopback database, matching role, and disabled/no SSL metadata. It cannot authorize a remote target.
+
+## Dependency security disposition
+
+The initial registry inventory contained three High and five Moderate package findings. Gate 6A upgraded `sharp` to 0.35.3, forced the patched compatible `fast-uri` 3.1.4 line, overrode only the Prisma CLI's vulnerable `@prisma/dev` leaf to 0.24.14 while retaining the regression-tested Prisma 7.8 runtime, and moved the CSS/CLI-only `shadcn` package to `devDependencies`. The post-remediation production audit is zero. The full audit retains three Moderate findings only under the development-only `shadcn → @modelcontextprotocol/sdk → @hono/node-server` chain; source and production bundle scans show no application/Gate 6A import and no server, browser, or Mobile artifact reachability. Their accepted classification is P3 and is detailed in `gate6a-dependency-advisory-review.md`.
+
 ## Handoffs and non-goals
 
 Gate 6B owns storage cleanup, rescans, and rendition orchestration. Gate 6C owns communication dispatch, verified provider-event processing, payment retry, reconciliation, and settlement-statement scheduling. Gate 6D owns distributed rate limiting, expanded metrics/dashboards, alerts, incidents, and Stage 6 closure. All remain unstarted.

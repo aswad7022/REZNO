@@ -38,7 +38,9 @@ No open P0, P1, or P2 finding is accepted for Gate 6A. The following controls ar
 | cursor forgery | HKDF-domain-separated HMAC, constant-time verify, scope/filter/page/kind binding |
 | pagination loss | exact six-digit PostgreSQL timestamps, snapshot ordering, UUID tie-breaker |
 | database cleanup overreach | exact fixture actor/IDs, dependency-ordered deletion, second-cleanup zero, non-fixture fingerprint |
-| staging identity/TLS substitution | authenticated expected host/role, exact direct `.neon.tech` DSN, URL/current-user equality, `sslmode=verify-full`, and actual-session `pg_stat_ssl=true` are all mandatory; pooler/weak/missing/mismatched metadata fails closed |
+| staging identity/TLS substitution | authenticated direct host/role/database, URL/current-user equality, explicit system-CA `rejectUnauthorized: true`, exact SNI, authorized/current peer certificate, Node hostname verification, TLS 1.2/1.3, direct non-loopback socket, and exact Prisma Pool/backend reuse are mandatory; pooler/plaintext/weak/missing/mismatched evidence fails before mutation |
+| TLS diagnostic confusion | `pg_stat_ssl` is queried on the attested physical client but is diagnostic only; `false` is acceptable solely with complete client `TLSSocket` proof at the documented Neon proxy boundary |
+| dependency advisory reachability | production audit zero; patched Sharp/Fast-URI and `@prisma/dev`; Prisma runtime stays on regression-safe 7.8; remaining three Moderate findings are confined to the dev-only shadcn CLI chain and absent from server/browser/Mobile bundles and Gate 6A imports |
 
 ## Fencing limitations and future handlers
 
@@ -60,6 +62,6 @@ List/detail DTOs omit payload content/hash, job and operation lease tokens, raw 
 
 No storage upload, payment, refund, payout, bank settlement, external queue, Redis worker, cron, or provider event is activated. Storage/payment providers remain `NOT_CONFIGURED`; automatic scheduler and always-on worker remain `NOT_CONNECTED`.
 
-## Current closure blockers
+## Gate 6A closure findings
 
-The authenticated 2026-07-22 Neon preflight matched the expected direct endpoint, database, and role but the actual session reported `pg_stat_ssl=false`; the fail-closed guard correctly prevented Migration 44 and every fixture mutation. The root production dependency audit also reports three high and five moderate registry advisories whose automatic remediation requires broad or breaking dependency changes outside the two PR #125 review fixes. Neither condition is waived: PR #125 remains Draft and Gate 6A remains open.
+The 2026-07-22 live transport probe closed the earlier ambiguity without weakening TLS: the exact Pool used by Prisma passed client-side certificate, hostname, SNI, protocol, endpoint, identity, and same-physical-client verification. `backendPgStatSsl=false` is retained as transparent proxy-boundary evidence. The authenticated 43/43→44/44 run preserved the non-fixture fingerprint through migration, two identical seeds, 59 smoke checks, and exact cleanup; the second deploy and second cleanup were no-ops. The dependency review closed all High and production findings. Three Moderate P3 findings remain only in the development `shadcn` CLI graph; exploitation requires running its unused Windows static server with protected prefix-mounted content, a condition absent from every REZNO runtime and artifact. No P0/P1/P2 remains from either gate.

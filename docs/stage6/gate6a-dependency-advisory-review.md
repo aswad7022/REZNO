@@ -1,0 +1,37 @@
+# Gate 6A Dependency Advisory Review
+
+## Decision
+
+The initial 2026-07-22 root inventory was 3 High, 5 Moderate, 0 Critical. The final production inventory is zero. The final full inventory is 0 High, 3 Moderate, 0 Critical, confined to the `shadcn` development CLI chain. Mobile is zero before and after. No open P0/P1/P2 remains.
+
+The review used `npm audit --json`, `npm audit --omit=dev --json`, the Mobile audit, `npm ls --all`, and `npm explain` for all eight reported package nodes. It also searched repository imports, Gate 6A handlers/routes, the Next server output, browser chunks, and the Mobile dependency graph. Sanitized machine-readable results are preserved in `evidence/gate6a-dependency-audit-evidence.json`.
+
+## Exact initial inventory and disposition
+
+| ID inherited by package node | Severity | Package/version | Vulnerable / fixed range | Directness and exact dependency path | Scope and artifact reachability | Exploit prerequisite | Remediation and breaking impact | Final classification |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| GHSA-frvp-7c67-39w9 | Moderate | `@hono/node-server@1.19.13` | `<2.0.5` / `>=2.0.5` | transitive: root `shadcn@4.12.0 → @modelcontextprotocol/sdk@1.29.0 → @hono/node-server`; also initial `prisma@7.8.0 → @prisma/dev@0.24.3 → @hono/node-server` | development; application import no; Next server no; browser no; Hermes no; Gate 6A no | a Windows runtime actively using Hono `serve-static` with prefix-mounted protected files and an encoded backslash request | `@prisma/dev@0.24.14` removes the Prisma path; shadcn moved to dev. Forcing Hono 2 across MCP's `^1.19.9` line is a separate major compatibility change, so the unused remaining dev path is retained | P3 accepted; Moderate dev-only remains |
+| GHSA-frvp-7c67-39w9 (propagated) | Moderate | `@modelcontextprotocol/sdk@1.29.0` | audit node `>=1.25.0`; clears only when Hono path clears | transitive: root `shadcn → @modelcontextprotocol/sdk` | development only; imported no; all four artifacts no; Gate 6A no | same Windows Hono static-server prerequisite; REZNO does not start an MCP server | shadcn moved to dev; audit proposes a broad shadcn downgrade to 3.8.3, which is incompatible with the current CSS toolchain and unnecessary for production | P3 accepted; Moderate dev-only remains |
+| GHSA-frvp-7c67-39w9 (propagated) | Moderate | `@prisma/dev@0.24.3` | `<=0.24.13` / `>=0.24.14` | transitive: root dev `prisma@7.8.0 → @prisma/dev` | development; imported no; Next/browser/Hermes/Gate 6A no | invoking the vulnerable embedded development server path on Windows | targeted override to 0.24.14; Prisma format/validate/generate, migration rehearsals, and regressions prove compatibility without changing runtime Client/adapter | P3 resolved |
+| GHSA-v2hh-gcrm-f6hx / CVE-2026-16221 | High | `fast-uri@3.1.3` | `3.0.0–3.1.3` / `>=3.1.4 <4` | transitive through AJV under initial shadcn/MCP/dotenvx and Prisma streams-local | development/build; imported no; Next server no; browser no; Hermes no; Gate 6A no | using Fast-URI for a host policy, then sending the same literal-backslash URL to Node URL/fetch | exact patch override `3.1.4`; no API-line change; full tests/build required and passed | P2 resolved |
+| GHSA-f88m-g3jw-g9cj (propagated) | High | `next@16.2.10` | audit propagation from vulnerable Sharp | direct production: root `next → optional sharp@0.34.5` | production server yes; browser no; Hermes no; Gate 6A routes do not process images | server processing untrusted images through vulnerable prebuilt libvips | global Sharp 0.35.3 override; no Next API change; Next production build and complete tests prove repository compatibility | P2 resolved |
+| GHSA-frvp-7c67-39w9 (propagated) | Moderate | `prisma@7.8.0` | audit node `6.20.0-dev.1–7.9.0-dev.31`; clears when vulnerable `@prisma/dev` path clears | direct development CLI; peer-optional metadata from auth/client packages | build/migration only; application imports `@prisma/client`, not CLI; all runtime artifacts/Gate 6A no | invoking the vulnerable old Prisma development-server dependency path on Windows | keep Prisma runtime/CLI at 7.8.0 and override only `@prisma/dev` to 0.24.14. A 7.9 trial was unnecessary after the apparent cursor regressions were traced to a missing test-only signing secret rather than Prisma | P3 resolved |
+| GHSA-frvp-7c67-39w9 (propagated) | Moderate | `shadcn@4.12.0` | audit node `>=3.8.4`; only proposed registry fix is downgrade `3.8.3` | initially direct production metadata, actually CSS/CLI build use; path to MCP/Hono above | moved to development; CSS compiled at build; JS imported no; Next server/browser/Hermes/Gate 6A no | explicitly running the unused MCP/Hono Windows static-server facility | moved to dev and updated 4.13.1; a 3.8.3 downgrade is a separately scoped toolchain regression | P3 accepted; Moderate dev-only remains |
+| GHSA-f88m-g3jw-g9cj | High | `sharp@0.34.5` | `<0.35.0` / `>=0.35.0` | direct production and Next optional dependency | imported by storage inspection and Next server; server yes; browser/Hermes no; Gate 6A handlers no | processing an untrusted image with the affected bundled libvips decoders | upgrade/override to maintainer-recommended 0.35.3 with libvips 8.18.3; 0.x minor requires compatibility proof, supplied by storage suites and Next build | P2 resolved |
+
+GitHub's reviewed advisories describe the Hono Windows/prefix-mounted-static-files prerequisite, the Fast-URI parser/policy-use desynchronization, and Sharp's untrusted-image/libvips exposure: [Hono](https://github.com/advisories/GHSA-frvp-7c67-39w9), [Fast-URI](https://github.com/advisories/GHSA-v2hh-gcrm-f6hx), and [Sharp](https://github.com/advisories/GHSA-f88m-g3jw-g9cj).
+
+## Remediation proof
+
+- `sharp@0.35.3` is the single root/Next instance; it is present only in the production server side and absent from browser and Hermes output.
+- `fast-uri@3.1.4` is the single patched instance for all AJV consumers and is absent from production server/browser/Mobile output.
+- Prisma Client, adapter, and CLI remain pinned at regression-safe 7.8.0; the targeted `@prisma/dev@0.24.14` override no longer brings Hono.
+- `shadcn@4.13.1` is a dev dependency. Its compiled Tailwind CSS is used, but its CLI/MCP/Hono JavaScript is absent from production artifacts.
+- `@swc/helpers@0.5.17` is an explicit development peer for `next-intl`'s `@swc/core@1.15.43`; Next retains its own exact `@swc/helpers@0.5.15`, and final `npm ls --all` reports no problems.
+- `npm audit --omit=dev --json`: 0 total.
+- Mobile `npm audit --json`: 0 total.
+- Full `npm audit --json`: 3 Moderate, 0 High, 0 Critical, all on the accepted development-only shadcn/MCP/Hono path.
+
+## Compensating controls and re-review
+
+REZNO never imports or starts shadcn, MCP SDK, or Hono server code; deploys Linux serverless/Node output rather than a Windows Hono static server; and ships no dev dependencies to browser or Mobile bundles. The full audit remains visible rather than waived. Re-review the P3 chain when shadcn/MCP supports Hono 2.x or when the UI build toolchain is next changed. Any future runtime import, MCP server, Windows deployment, or Hono static serving invalidates this classification immediately.
