@@ -44,6 +44,17 @@ export type DownloadTargetResult =
 
 export type DeleteObjectResult = Readonly<{ outcome: StorageProviderOutcome }>;
 
+export type WriteObjectResult =
+  | Readonly<{
+      checksumSha256: string;
+      contentType: string;
+      objectVersion: string | null;
+      outcome: "READY";
+      sizeBytes: number;
+      writeOnce: true;
+    }>
+  | Readonly<{ outcome: Exclude<StorageProviderOutcome, "READY" | "NOT_FOUND"> }>;
+
 export interface StorageProvider {
   readonly kind: StorageProviderKind;
   createUploadTarget(input: Readonly<{
@@ -59,6 +70,11 @@ export interface StorageProvider {
     visibility: "PUBLIC" | "PRIVATE" | "INTERNAL";
   }): Promise<DownloadTargetResult>;
   deleteObject(input: SafeObjectReference): Promise<DeleteObjectResult>;
+  writeObject?(input: SafeObjectReference & {
+    bytes: Uint8Array;
+    checksumSha256: string;
+    contentType: string;
+  }): Promise<WriteObjectResult>;
 }
 
 /** Converts every adapter/SDK throw into a classified result without exposing raw provider detail. */
@@ -88,6 +104,9 @@ export class NotConfiguredStorageProvider implements StorageProvider {
     return { outcome: "NOT_CONFIGURED" };
   }
   async deleteObject(): Promise<DeleteObjectResult> {
+    return { outcome: "NOT_CONFIGURED" };
+  }
+  async writeObject(): Promise<WriteObjectResult> {
     return { outcome: "NOT_CONFIGURED" };
   }
 }

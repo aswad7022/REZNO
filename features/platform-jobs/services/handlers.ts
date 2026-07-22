@@ -4,6 +4,7 @@ import type { PlatformJobErrorCode, PlatformJobType } from "@prisma/client";
 
 import { PLATFORM_JOB_LIMITS } from "@/features/platform-jobs/domain/contracts";
 import { parsePlatformJobPayload } from "@/features/platform-jobs/domain/registry";
+import { runStorageMediaAutomationHandler } from "@/features/storage-automation/services/handlers";
 
 export type PlatformJobHandlerContext = {
   fencingToken: bigint;
@@ -36,6 +37,24 @@ const productionHandlers: Record<PlatformJobType, PlatformJobHandler> = {
       outcome: "SUCCEEDED",
     };
   },
+  STORAGE_MAINTENANCE_DISCOVERY: (payload, context) =>
+    runStorageMediaAutomationHandler("STORAGE_MAINTENANCE_DISCOVERY", payload, context),
+  STORAGE_ORPHAN_CLEANUP: (payload, context) =>
+    runStorageMediaAutomationHandler("STORAGE_ORPHAN_CLEANUP", payload, context),
+  STORAGE_ASSET_DELETE_RETRY: (payload, context) =>
+    runStorageMediaAutomationHandler("STORAGE_ASSET_DELETE_RETRY", payload, context),
+  STORAGE_RESCAN_DISCOVERY: (payload, context) =>
+    runStorageMediaAutomationHandler("STORAGE_RESCAN_DISCOVERY", payload, context),
+  STORAGE_ASSET_RESCAN: (payload, context) =>
+    runStorageMediaAutomationHandler("STORAGE_ASSET_RESCAN", payload, context),
+  MEDIA_RENDITION_DISCOVERY: (payload, context) =>
+    runStorageMediaAutomationHandler("MEDIA_RENDITION_DISCOVERY", payload, context),
+  MEDIA_RENDITION_GENERATE: (payload, context) =>
+    runStorageMediaAutomationHandler("MEDIA_RENDITION_GENERATE", payload, context),
+  MEDIA_RENDITION_CLEANUP_DISCOVERY: (payload, context) =>
+    runStorageMediaAutomationHandler("MEDIA_RENDITION_CLEANUP_DISCOVERY", payload, context),
+  MEDIA_RENDITION_DELETE: (payload, context) =>
+    runStorageMediaAutomationHandler("MEDIA_RENDITION_DELETE", payload, context),
 };
 
 const testHandlers = new Map<PlatformJobType, PlatformJobHandler>();

@@ -19,13 +19,14 @@ export const PLATFORM_JOB_LIMITS = {
   maxScheduleCatchup: 10,
   maxRequeues: 3,
   executionTimeoutMs: 5_000,
+  maxDomainDiscoveryBatch: 50,
 } as const;
 
 export const STAGE_6_ARCHITECTURE = {
   title: "Stage 6 — Admin and Platform Operations",
   gates: {
-    gate6A: "ACTIVE",
-    gate6B: "UNSTARTED",
+    gate6A: "ACCEPTED",
+    gate6B: "ACTIVE",
     gate6C: "UNSTARTED",
     gate6D: "UNSTARTED",
   },
@@ -47,7 +48,25 @@ export const STAGE_6_ARCHITECTURE = {
   },
 } as const;
 
-export const PLATFORM_JOB_ALLOWED_TYPES = ["PLATFORM_HEALTH_PROBE"] as const;
+export const PLATFORM_JOB_ALLOWED_TYPES = [
+  "PLATFORM_HEALTH_PROBE",
+  "STORAGE_MAINTENANCE_DISCOVERY",
+  "STORAGE_ORPHAN_CLEANUP",
+  "STORAGE_ASSET_DELETE_RETRY",
+  "STORAGE_RESCAN_DISCOVERY",
+  "STORAGE_ASSET_RESCAN",
+  "MEDIA_RENDITION_DISCOVERY",
+  "MEDIA_RENDITION_GENERATE",
+  "MEDIA_RENDITION_CLEANUP_DISCOVERY",
+  "MEDIA_RENDITION_DELETE",
+] as const;
+
+export const PLATFORM_JOB_DISCOVERY_TYPES = [
+  "STORAGE_MAINTENANCE_DISCOVERY",
+  "STORAGE_RESCAN_DISCOVERY",
+  "MEDIA_RENDITION_DISCOVERY",
+  "MEDIA_RENDITION_CLEANUP_DISCOVERY",
+] as const;
 export const PLATFORM_JOB_SAFE_ERROR_CODES = [
   "LEASE_EXPIRED",
   "HANDLER_TIMEOUT",

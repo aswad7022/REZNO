@@ -29,8 +29,8 @@ export async function createPlatformJobSchedule(
     scheduleKey: PlatformJobScheduleKey;
   },
 ) {
-  if (input.scheduleKey !== "PLATFORM_HEALTH_PROBE" || input.jobType !== "PLATFORM_HEALTH_PROBE") {
-    platformJobError("VALIDATION_ERROR", "The Gate 6A schedule mapping is not registered.");
+  if (!scheduleMappingIsRegistered(input.scheduleKey, input.jobType)) {
+    platformJobError("VALIDATION_ERROR", "The closed platform schedule mapping is not registered.");
   }
   if (!Number.isInteger(input.cadenceSeconds) || input.cadenceSeconds < 60 || input.cadenceSeconds > 604_800) {
     platformJobError("VALIDATION_ERROR", "The platform-job schedule cadence is invalid.");
@@ -74,6 +74,16 @@ export async function createPlatformJobSchedule(
     },
   });
   return { replay: false as const, schedule };
+}
+
+function scheduleMappingIsRegistered(scheduleKey: PlatformJobScheduleKey, jobType: PlatformJobType) {
+  return scheduleKey === jobType && [
+    "PLATFORM_HEALTH_PROBE",
+    "STORAGE_MAINTENANCE_DISCOVERY",
+    "STORAGE_RESCAN_DISCOVERY",
+    "MEDIA_RENDITION_DISCOVERY",
+    "MEDIA_RENDITION_CLEANUP_DISCOVERY",
+  ].includes(scheduleKey);
 }
 
 export async function setPlatformJobScheduleEnabled(

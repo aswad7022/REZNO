@@ -17,6 +17,7 @@ import {
   STORAGE_SESSION_TTL_MS,
   STORAGE_TARGET_TTL_SECONDS,
   STORAGE_QUOTA_LIMITS,
+  STORAGE_INSPECTION_POLICY_VERSION,
   generateStorageObjectKey,
   isUuid,
   normalizeChecksum,
@@ -73,6 +74,10 @@ export function setStorageMalwareScannerForTests(scanner: MalwareScanner | undef
     throw new Error("Storage scanner test configuration is unavailable in production.");
   }
   malwareScanner = scanner ?? new NotConfiguredMalwareScanner();
+}
+
+export function configuredStorageMalwareScanner() {
+  return malwareScanner;
 }
 
 export async function createUploadSession(
@@ -334,6 +339,7 @@ export async function finalizeUpload(
           width: inspection.width,
         },
         inspectionOutcome: inspection.outcome,
+        inspectionPolicyVersion: STORAGE_INSPECTION_POLICY_VERSION,
         mimeType: metadata.contentType,
         objectKey: session.objectKey,
         organizationId: session.organizationId,

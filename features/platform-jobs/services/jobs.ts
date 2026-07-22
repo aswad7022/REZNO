@@ -48,6 +48,7 @@ export async function enqueuePlatformJob(
     jobType: PlatformJobType;
     maxAttempts?: number;
     organizationId?: string | null;
+    parentJobId?: string | null;
     payload: unknown;
     payloadVersion: number;
     priority?: number;
@@ -70,7 +71,9 @@ export async function enqueuePlatformJob(
   if (!/^[A-Za-z0-9][A-Za-z0-9._:~-]{0,159}$/.test(input.deduplicationKey)) {
     platformJobError("VALIDATION_ERROR", "The server-generated deduplication key is invalid.");
   }
-  if ((input.source === "SCHEDULE") !== Boolean(input.scheduleId)) {
+  if ((input.source === "SCHEDULE") !== Boolean(input.scheduleId)
+    || (input.source === "DOMAIN_DISCOVERY") !== Boolean(input.parentJobId)
+    || (input.source !== "DOMAIN_DISCOVERY" && Boolean(input.parentJobId))) {
     platformJobError("VALIDATION_ERROR", "The job source and schedule reference disagree.");
   }
   const scopeKey = input.organizationId ? `organization:${input.organizationId}` : "platform";
@@ -109,6 +112,7 @@ export async function enqueuePlatformJob(
       jobType: input.jobType,
       maxAttempts,
       organizationId: input.organizationId ?? null,
+      parentJobId: input.parentJobId ?? null,
       payload: payload as Prisma.InputJsonValue,
       payloadHash,
       payloadVersion: input.payloadVersion,

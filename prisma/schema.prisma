@@ -801,6 +801,12 @@ model StoredAsset {
   inspectionOutcome        StorageInspectionOutcome
   scannerOutcome           StorageScannerOutcome
   inspectionMetadata       Json?
+  inspectionPolicyVersion  Int?
+  lastRescannedAt          DateTime?                @db.Timestamptz(6)
+  rescanClaimJobId         String?                  @db.Uuid
+  rescanClaimLeaseToken    String?                  @db.Uuid
+  rescanClaimFencingToken  BigInt?
+  rescanClaimExpiresAt     DateTime?                @db.Timestamptz(6)
   failureCode              String?                  @db.VarChar(80)
   version                  Int                      @default(1)
   readyAt                  DateTime?                @db.Timestamptz(6)
@@ -815,6 +821,8 @@ model StoredAsset {
   organization             Organization?            @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   createdByPerson          Person                   @relation("StoredAssetCreatedByPerson", fields: [createdByPersonId], references: [id], onDelete: Restrict)
   mediaBindings            MediaBinding[]
+  mediaRenditions          MediaRendition[]
+  rescanClaimJob           PlatformJob?             @relation("StoredAssetRescanClaimJob", fields: [rescanClaimJobId], references: [id], onDelete: Restrict)
 
   @@index([ownerPersonId, createdAt, id])
   @@index([organizationId, createdAt, id])
@@ -824,6 +832,8 @@ model StoredAsset {
   @@index([state, createdAt, id])
   @@index([state, deleteRequestedAt, id])
   @@index([purpose, state, createdAt, id])
+  @@index([state, inspectionPolicyVersion, updatedAt, id])
+  @@index([rescanClaimExpiresAt, id])
 }
 
 model UploadSession {
@@ -946,6 +956,43 @@ model MediaBinding {
   @@index([containerId, slot, createdAt, id])
   @@index([assetId, state])
   @@index([productVariantId, state])
+}
+
+model MediaRendition {
+  id                          String                @id @default(uuid()) @db.Uuid
+  sourceAssetId               String                @db.Uuid
+  sourceAssetVersion          Int
+  sourceChecksumSha256        String                @db.VarChar(64)
+  sourceProviderObjectVersion String?               @db.VarChar(180)
+  sourceFingerprint           String                @db.VarChar(64)
+  profile                     MediaRenditionProfile
+  state                       MediaRenditionState   @default(PENDING)
+  provider                    StorageProviderKind
+  objectKey                   String                @unique @db.VarChar(512)
+  providerObjectVersion       String?               @db.VarChar(180)
+  mimeType                    String?               @db.VarChar(100)
+  sizeBytes                   BigInt?
+  checksumSha256              String?               @db.VarChar(64)
+  width                       Int?
+  height                      Int?
+  claimJobId                  String?               @db.Uuid
+  claimLeaseToken             String?               @db.Uuid
+  claimFencingToken           BigInt?
+  claimExpiresAt              DateTime?             @db.Timestamptz(6)
+  failureCode                 String?               @db.VarChar(80)
+  version                     Int                   @default(1)
+  readyAt                     DateTime?             @db.Timestamptz(6)
+  deleteRequestedAt           DateTime?             @db.Timestamptz(6)
+  deletedAt                   DateTime?             @db.Timestamptz(6)
+  createdAt                   DateTime              @default(now()) @db.Timestamptz(6)
+  updatedAt                   DateTime              @updatedAt @db.Timestamptz(6)
+  sourceAsset                 StoredAsset           @relation(fields: [sourceAssetId], references: [id], onDelete: Restrict)
+  claimJob                    PlatformJob?          @relation("MediaRenditionClaimJob", fields: [claimJobId], references: [id], onDelete: Restrict)
+
+  @@unique([sourceAssetId, sourceAssetVersion, profile])
+  @@index([state, updatedAt, id])
+  @@index([sourceAssetId, state, profile, id])
+  @@index([claimExpiresAt, id])
 }
 
 model MediaMutation {
@@ -2055,6 +2102,7 @@ model PlatformJob {
   createdByAdminUserId String?
   createdByPersonId    String?               @db.Uuid
   scheduleId           String?               @db.Uuid
+  parentJobId          String?               @db.Uuid
   deduplicationKey     String                @db.VarChar(160)
   priority             Int                   @default(5) @db.SmallInt
   availableAt          DateTime              @db.Timestamptz(6)
@@ -2083,8 +2131,12 @@ model PlatformJob {
   createdByAdmin       User?                 @relation("PlatformJobCreatedByUser", fields: [createdByAdminUserId], references: [id], onDelete: Restrict)
   createdByPerson      Person?               @relation("PlatformJobCreatedByPerson", fields: [createdByPersonId], references: [id], onDelete: Restrict)
   schedule             PlatformJobSchedule?  @relation(fields: [scheduleId], references: [id], onDelete: Restrict)
+  parentJob            PlatformJob?          @relation("PlatformJobDiscoveryChildren", fields: [parentJobId], references: [id], onDelete: Restrict)
+  childJobs            PlatformJob[]         @relation("PlatformJobDiscoveryChildren")
   attempts             PlatformJobAttempt[]
   mutations            PlatformJobMutation[]
+  assetRescanClaims    StoredAsset[]         @relation("StoredAssetRescanClaimJob")
+  mediaRenditionClaims MediaRendition[]      @relation("MediaRenditionClaimJob")
   requeueRoot          PlatformJob?          @relation("PlatformJobRequeueRoot", fields: [requeueRootJobId], references: [id], onDelete: Restrict)
   requeuedJobs         PlatformJob[]         @relation("PlatformJobRequeueRoot")
 
@@ -2095,6 +2147,7 @@ model PlatformJob {
   @@index([organizationId, status, createdAt, id])
   @@index([createdAt, id])
   @@index([scheduleId, createdAt, id])
+  @@index([parentJobId, createdAt, id])
 }
 
 model PlatformJobAttempt {
@@ -2216,6 +2269,15 @@ enum AccountStatus {
 
 enum PlatformJobType {
   PLATFORM_HEALTH_PROBE
+  STORAGE_MAINTENANCE_DISCOVERY
+  STORAGE_ORPHAN_CLEANUP
+  STORAGE_ASSET_DELETE_RETRY
+  STORAGE_RESCAN_DISCOVERY
+  STORAGE_ASSET_RESCAN
+  MEDIA_RENDITION_DISCOVERY
+  MEDIA_RENDITION_GENERATE
+  MEDIA_RENDITION_CLEANUP_DISCOVERY
+  MEDIA_RENDITION_DELETE
 }
 
 enum PlatformJobStatus {
@@ -2233,6 +2295,7 @@ enum PlatformJobStatus {
 enum PlatformJobSource {
   ADMIN_MANUAL
   SCHEDULE
+  DOMAIN_DISCOVERY
 }
 
 enum PlatformJobAttemptStatus {
@@ -2257,6 +2320,10 @@ enum PlatformJobErrorCode {
 
 enum PlatformJobScheduleKey {
   PLATFORM_HEALTH_PROBE
+  STORAGE_MAINTENANCE_DISCOVERY
+  STORAGE_RESCAN_DISCOVERY
+  MEDIA_RENDITION_DISCOVERY
+  MEDIA_RENDITION_CLEANUP_DISCOVERY
 }
 
 enum PlatformJobMutationAction {
@@ -2371,6 +2438,22 @@ enum MediaSlot {
 enum MediaBindingState {
   ACTIVE
   DETACHED
+}
+
+enum MediaRenditionProfile {
+  AVATAR_256_WEBP
+  CARD_640_WEBP
+  HERO_1600_WEBP
+}
+
+enum MediaRenditionState {
+  PENDING
+  PROCESSING
+  READY
+  FAILED
+  SUPERSEDED
+  DELETE_PENDING
+  DELETED
 }
 
 enum MediaMutationAction {
