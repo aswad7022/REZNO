@@ -7,8 +7,19 @@ const MAX_TRANSACTION_ATTEMPTS = 4;
 
 function retryable(error: unknown) {
   if (error instanceof PlatformJobDomainError) return false;
-  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034") return true;
-  return error instanceof Error && /40001|40P01|serialization|deadlock|TransactionWriteConflict/i.test(error.message);
+  if (
+    error instanceof Prisma.PrismaClientKnownRequestError
+    && (error.code === "P2034" || error.code === "P2028")
+  ) return true;
+  if (error instanceof Error && /40001|40P01|serialization|deadlock|TransactionWriteConflict/i.test(error.message)) {
+    return true;
+  }
+  if (typeof error !== "object" || error === null || !("cause" in error)) return false;
+  const cause = error.cause;
+  if (typeof cause !== "object" || cause === null) return false;
+  const originalCode = "originalCode" in cause ? String(cause.originalCode) : "";
+  const kind = "kind" in cause ? String(cause.kind) : "";
+  return originalCode === "40001" || originalCode === "40P01" || kind === "TransactionWriteConflict";
 }
 
 export async function runPlatformJobSerializable<T>(
