@@ -4,7 +4,11 @@ import { Prisma } from "@prisma/client";
 
 import { mediaError } from "@/features/media/domain/errors";
 import { mediaSlotPolicy } from "@/features/media/domain/slot-registry";
+import { mediaRenditionProfileForSlot } from "@/features/media/domain/rendition-registry";
 import { isUuid } from "@/features/storage/domain/policy";
+import { STORAGE_TARGET_TTL_SECONDS } from "@/features/storage/domain/policy";
+import { storageProviderFor } from "@/features/storage/providers/registry";
+import { callStorageProvider } from "@/features/storage/providers/provider";
 import { createDownloadTarget } from "@/features/storage/services/storage-assets";
 import type { StorageBusinessActor, StorageCustomerActor } from "@/features/storage/services/actor";
 import { assertStorageActorCurrent } from "@/features/storage/services/actor";
@@ -13,22 +17,22 @@ import { resolveWritableMediaTarget } from "@/features/media/services/targets";
 
 export async function createPublicMediaDownloadTarget(assetId: string) {
   if (!isUuid(assetId)) mediaError("VALIDATION_ERROR", "assetId must be a UUID.");
-  await assertPublicBinding(assetId);
-  const target = await createDownloadTarget(null, assetId);
+  const binding = await assertPublicBinding(assetId);
+  const target = await createPreferredDownloadTarget(assetId, binding.slot, null);
   await assertPublicBinding(assetId);
   return target;
 }
 
 export async function createPrivateAvatarDownloadTarget(actor: StorageCustomerActor, assetId: string) {
   if (!isUuid(assetId)) mediaError("VALIDATION_ERROR", "assetId must be a UUID.");
-  await assertPrivateAvatarBinding(actor, assetId);
-  const target = await createDownloadTarget(actor, assetId);
+  const binding = await assertPrivateAvatarBinding(actor, assetId);
+  const target = await createPreferredDownloadTarget(assetId, binding.slot, actor);
   await assertPrivateAvatarBinding(actor, assetId);
   return target;
 }
 
 async function assertPrivateAvatarBinding(actor: StorageCustomerActor, assetId: string) {
-  await mediaSerializable(async (transaction) => {
+  return mediaSerializable(async (transaction) => {
     await assertStorageActorCurrent(transaction, actor);
     const binding = await transaction.mediaBinding.findFirst({
       where: {
@@ -38,22 +42,23 @@ async function assertPrivateAvatarBinding(actor: StorageCustomerActor, assetId: 
         container: { kind: "CUSTOMER_PROFILE", personId: actor.personId },
         asset: { ownerPersonId: actor.personId, organizationId: null, state: "READY", visibility: "PRIVATE" },
       },
-      select: { id: true },
+      select: { id: true, slot: true },
     });
     if (!binding) mediaError("NOT_FOUND", "Customer avatar was not found.");
+    return binding;
   });
 }
 
 export async function createBusinessMediaDownloadTarget(actor: StorageBusinessActor, assetId: string) {
   if (!isUuid(assetId)) mediaError("VALIDATION_ERROR", "assetId must be a UUID.");
-  await assertBusinessBinding(actor, assetId);
-  const target = await createDownloadTarget(actor, assetId);
+  const binding = await assertBusinessBinding(actor, assetId);
+  const target = await createPreferredDownloadTarget(assetId, binding.slot, actor);
   await assertBusinessBinding(actor, assetId);
   return target;
 }
 
 async function assertBusinessBinding(actor: StorageBusinessActor, assetId: string) {
-  await mediaSerializable(async (transaction) => {
+  return mediaSerializable(async (transaction) => {
     await assertStorageActorCurrent(transaction, actor);
     const binding = await transaction.mediaBinding.findFirst({
       where: {
@@ -75,6 +80,7 @@ async function assertBusinessBinding(actor: StorageBusinessActor, assetId: strin
       mediaError("NOT_FOUND", "Business media was not found.");
     }
     await resolveWritableMediaTarget(transaction, actor, businessTarget(binding.container));
+    return binding;
   });
 }
 
@@ -109,7 +115,75 @@ async function assertPublicBinding(assetId: string) {
       || !(await publicTargetIsLegal(transaction, binding.container))) {
       mediaError("NOT_FOUND", "Public media was not found.");
     }
+    return binding;
   });
+}
+
+async function createPreferredDownloadTarget(
+  assetId: string,
+  slot: Parameters<typeof mediaRenditionProfileForSlot>[0],
+  actor: StorageBusinessActor | StorageCustomerActor | null,
+) {
+  const profile = mediaRenditionProfileForSlot(slot);
+  const rendition = await mediaSerializable((transaction) => transaction.mediaRendition.findFirst({
+    where: {
+      profile,
+      sourceAssetId: assetId,
+      state: "READY",
+      sourceAsset: { state: "READY" },
+    },
+    include: { sourceAsset: true },
+    orderBy: [
+      { sourceAssetVersion: "desc" },
+      { createdAt: "desc" },
+    ],
+  }));
+  if (!rendition || rendition.sourceAssetVersion !== rendition.sourceAsset.version) {
+    return createDownloadTarget(actor, assetId);
+  }
+  const expiresAt = new Date(Date.now() + STORAGE_TARGET_TTL_SECONDS * 1_000);
+  const provider = storageProviderFor(rendition.provider);
+  const target = await callStorageProvider(() => provider.createDownloadTarget({
+    expiresAt,
+    objectKey: rendition.objectKey,
+    provider: rendition.provider,
+    visibility: rendition.sourceAsset.visibility,
+  }));
+  if (target.outcome !== "READY") {
+    return createDownloadTarget(actor, assetId);
+  }
+  if (target.expiresAt.getTime() !== expiresAt.getTime() || !safeHttpsTarget(target.url)) {
+    return createDownloadTarget(actor, assetId);
+  }
+  const current = await mediaSerializable((transaction) => transaction.mediaRendition.findFirst({
+    where: {
+      id: rendition.id,
+      profile,
+      sourceAssetId: assetId,
+      sourceAssetVersion: rendition.sourceAssetVersion,
+      state: "READY",
+      version: rendition.version,
+      sourceAsset: { state: "READY", version: rendition.sourceAssetVersion },
+    },
+    select: { id: true },
+  }));
+  if (!current) return createDownloadTarget(actor, assetId);
+  return {
+    type: "DOWNLOAD_TARGET" as const,
+    assetId,
+    expiresAt: target.expiresAt.toISOString(),
+    url: target.url,
+  };
+}
+
+function safeHttpsTarget(value: string) {
+  if (value.length > 8_192) return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && Boolean(url.hostname) && !url.username && !url.password && !url.hash;
+  } catch {
+    return false;
+  }
 }
 
 async function publicTargetIsLegal(transaction: Prisma.TransactionClient, container: {
