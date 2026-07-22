@@ -1,16 +1,16 @@
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
-import { Pool } from "pg";
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
-
-const adapter = new PrismaPg(pool);
+import { createPrismaPostgresPool } from "./postgres-transport";
 
 const globalForPrisma = globalThis as {
+  postgresPool?: ReturnType<typeof createPrismaPostgresPool>;
   prisma?: PrismaClient;
 };
+
+export const postgresPool = globalForPrisma.postgresPool ?? createPrismaPostgresPool();
+
+const adapter = new PrismaPg(postgresPool);
 
 export const prisma =
   globalForPrisma.prisma ??
@@ -19,5 +19,6 @@ export const prisma =
   });
 
 if (process.env.NODE_ENV !== "production") {
+  globalForPrisma.postgresPool = postgresPool;
   globalForPrisma.prisma = prisma;
 }

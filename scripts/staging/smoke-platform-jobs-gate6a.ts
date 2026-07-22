@@ -11,7 +11,8 @@ import { cancelPlatformJob, requeuePlatformJob } from "../../features/platform-j
 import { getPlatformJobDetail, listPlatformJobs } from "../../features/platform-jobs/services/queries";
 import { runPlatformSchedulerTick, setPlatformJobScheduleEnabled } from "../../features/platform-jobs/services/schedules";
 import { runPlatformWorkerBatch, setPlatformWorkerTestHook } from "../../features/platform-jobs/services/worker";
-import { prisma } from "../../lib/db/prisma";
+import { postgresPool, prisma } from "../../lib/db/prisma";
+import { attestGate6aPrismaTransport } from "../../lib/db/postgres-transport";
 import { PLATFORM_JOBS_GATE6A_MARKER, platformJobsGate6aFixtureFingerprint, platformJobsGate6aFixtureIds as ids, platformJobsGate6aNonFixtureFingerprint } from "./platform-jobs-gate6a-fixture";
 import { assertPlatformJobsGate6aStaging } from "./platform-jobs-gate6a-safety";
 
@@ -35,7 +36,8 @@ const operationJobs = {
 } as const;
 
 async function main() {
-  const safety = await assertPlatformJobsGate6aStaging(prisma);
+  const transport = await attestGate6aPrismaTransport(postgresPool, prisma);
+  const safety = await assertPlatformJobsGate6aStaging(prisma, process.env, transport);
   const nonFixtureBefore = await platformJobsGate6aNonFixtureFingerprint(prisma);
   let checks = 0;
 
@@ -244,7 +246,15 @@ async function expireOperation(idempotencyKey: string, expireJobs: boolean) {
   ]);
 }
 
-main().finally(() => {
-  setPlatformWorkerTestHook(undefined);
-  return prisma.$disconnect();
-});
+const keepAlive = setInterval(() => undefined, 1_000);
+main()
+  .catch(() => {
+    process.exitCode = 1;
+    console.error("Gate 6A staging smoke failed closed.");
+  })
+  .finally(async () => {
+    setPlatformWorkerTestHook(undefined);
+    await prisma.$disconnect();
+    await postgresPool.end();
+    clearInterval(keepAlive);
+  });

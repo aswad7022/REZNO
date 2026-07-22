@@ -1,5 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 
+import { assertGate6aTransportEvidence, type Gate6aTransportEvidence } from "../../lib/db/postgres-transport";
+
 export const PLATFORM_JOBS_GATE6A_CONFIRMATION = "REZNO_STAGE6_GATE6A_STAGING_ONLY";
 const EXPECTED_MIGRATIONS = BigInt(44);
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "::1", "localhost"]);
@@ -9,6 +11,7 @@ type SafetyClient = Pick<PrismaClient, "$queryRaw">;
 export async function assertPlatformJobsGate6aStaging(
   prisma: SafetyClient,
   environment: NodeJS.ProcessEnv = process.env,
+  transportEvidence?: Gate6aTransportEvidence,
 ) {
   if (
     environment.NODE_ENV === "production"
@@ -17,6 +20,10 @@ export async function assertPlatformJobsGate6aStaging(
   ) throw new Error("Gate 6A fixture requires the exact non-production staging environment and confirmation marker.");
 
   const target = parseDatabaseTarget(environment.DATABASE_URL);
+  const localOverrideRequested = isExactLocalTestTarget(environment, target);
+  if (!localOverrideRequested) {
+    assertGate6aTransportEvidence(transportEvidence, environment);
+  }
   const [connection] = await prisma.$queryRaw<Array<{ database: string; encrypted: boolean; user: string }>>`
     SELECT current_database() AS database,
            current_user AS user,
@@ -50,11 +57,22 @@ export async function assertPlatformJobsGate6aStaging(
   ) throw new Error("Gate 6A fixture requires an exact healthy 44/44 migration state.");
 
   return {
+    backendPgStatSsl: localUnencrypted ? connection.encrypted : transportEvidence!.backendPgStatSsl,
+    clientTlsVerified: localUnencrypted ? false : transportEvidence!.clientTlsVerified,
     database: "rezno_staging" as const,
-    encrypted: connection.encrypted,
+    encrypted: localUnencrypted ? connection.encrypted : transportEvidence!.encrypted,
+    hostnameVerified: localUnencrypted ? false : transportEvidence!.hostnameVerified,
     migrations: "44/44" as const,
+    prismaUsedAttestedPhysicalClient: localUnencrypted
+      ? false
+      : transportEvidence!.prismaUsedAttestedPhysicalClient,
     role: connection.user,
     rolledBack: 0 as const,
+    tlsProtocol: localUnencrypted ? null : transportEvidence!.protocol,
+    transport: localUnencrypted ? "LOCAL_TEST_TCP" as const : transportEvidence!.transport,
+    transportConfigurationSha256: localUnencrypted
+      ? null
+      : transportEvidence!.transportConfigurationSha256,
   };
 }
 
@@ -117,6 +135,14 @@ function isExactLocalTestOverride(
   return true;
 }
 
+function isExactLocalTestTarget(environment: NodeJS.ProcessEnv, target: DatabaseTarget) {
+  return environment.REZNO_STAGE6_GATE6A_ALLOW_LOCAL_UNENCRYPTED === "true"
+    && environment.NODE_ENV === "test"
+    && LOOPBACK_HOSTS.has(target.host)
+    && target.database === "rezno_staging"
+    && (target.sslmode === null || target.sslmode === "disable");
+}
+
 function assertExactRealStagingTarget(
   environment: NodeJS.ProcessEnv,
   target: DatabaseTarget,
@@ -140,8 +166,5 @@ function assertExactRealStagingTarget(
   }
   if (expectedRole !== connection.user || expectedRole !== target.user) {
     throw new Error("Gate 6A database role does not match authenticated Neon discovery.");
-  }
-  if (!connection.encrypted) {
-    throw new Error("Gate 6A staging requires pg_stat_ssl proof for the actual session.");
   }
 }
