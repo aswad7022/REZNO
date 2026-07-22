@@ -173,6 +173,46 @@ inspection-policy/rescan fields, foreign keys, checks, and due-state indexes.
 It creates no jobs, schedules, renditions, assets, sessions, bindings, orders,
 actors, Organizations, or provider state. Migrations 1–44 are immutable.
 
+## Staging, rollback, and recovery
+
+Staging starts at the authenticated healthy 44/44 state, uses the accepted
+direct non-pooler client-side TLS/physical-Pool attestation, records the whole
+non-fixture fingerprint, applies only Migration 45, and finishes healthy 45/45
+with a second deploy no-op. The exact-ID fixture runs twice with one fingerprint;
+the bounded smoke exercises cleanup, rescan, rendition and Gate 5A/5B/6A
+regressions; exact cleanup runs twice and preserves foreign sentinel hashes and
+the original database fingerprint. Operational detail is in
+`storage-automation-operations.md`, `media-rendition-operations.md`,
+`gate6b-security.md`, and `gate6b-test-plan.md`.
+
+Application rollback disconnects invocation and deploys the previous code while
+retaining the additive schema and all job/domain evidence. Migrations and enum
+values are not reversed automatically. Recovery uses only expired Gate 6A
+leases, canonical item-claim revalidation, exact provider state, and authorized
+bounded requeue; no operator edits rows or assumes timeout means success.
+
+## Completion criteria
+
+Gate 6B requires complete local matrices, two fresh and one populated migration
+rehearsal, real-staging TLS/migration/fixture/smoke/cleanup evidence, production
+audit zero, explicit classification of any development-only advisory, no open
+P0/P1/P2, exact-head Actions and Vercel success, zero unresolved review threads,
+independent review, and merge. Until then it remains ACTIVE and its PR remains
+Draft.
+
+## Current evidence
+
+Local validation passed 7 focused unit, 434 complete unit, 14 focused
+PostgreSQL, 385 complete PostgreSQL, 6 focused built-server HTTP, and 114
+complete HTTP tests. Build, Mobile TypeScript, Expo dependency/Doctor, and both
+Hermes exports passed. Two fresh 1→45 rehearsals and a populated 44→45 rehearsal
+passed without data drift. Authenticated staging reached healthy 45/45, ran two
+identical seeds, passed 64 Gate 6B checks and 75/50/59 Gate 5A/5B/6A successor
+checks, removed 58 fixture rows then zero, and retained non-fixture fingerprint
+`51f91a54f3d34335477ad613342c374803a26d6b401271973f7cffa89613d2d2`.
+Exact-head CI, Vercel, review threads, independent review, and merge remain
+pending, so Gate 6B is not accepted.
+
 ## Explicit non-goals
 
 Gate 6B does not implement communication/payment automation, provider webhooks,
