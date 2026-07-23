@@ -21,25 +21,27 @@ invented types and provider/key/profile fields, strict query/JSON/byte bounds,
 safe errors, rendition delivery/fallback/denial, and response redaction. No
 focused route is allowed to skip.
 
-## Local evidence — 2026-07-22
+## Local evidence — 2026-07-23 closure rerun
 
-- focused Gate 6B unit: 7/7;
-- complete unit: 434/434;
-- focused Gate 6B PostgreSQL: 14/14;
-- complete PostgreSQL/integration: 385/385, zero skip;
-- focused built-server Gate 6B HTTP: 6/6;
-- complete built-server HTTP/RSC/API: 114/114, zero skip;
-- storage PostgreSQL aggregate: 37; media aggregate: 11; Gate 6A platform jobs:
-  22;
+- focused Gate 6A: unit 22/22 and PostgreSQL 27/27;
+- focused Gate 6B: unit 7/7, PostgreSQL 21/21, and built-server HTTP 6/6;
+- complete unit: 435/435;
+- complete PostgreSQL/integration: 397/397, zero skip;
+- complete built-server HTTP/RSC/API: 6/6 route contracts plus 114/114 live
+  contracts, zero skip;
+- full regression total: 952;
 - ESLint with zero warnings, non-incremental root TypeScript, Mobile TypeScript,
-  Prisma format/validate/generate, and Next 16.2.10 production build passed;
+  Prisma format/validate/generate, and Next 16.2.11 production build passed;
 - Expo dependency check and Expo Doctor 20/20 passed;
 - iOS and Android Hermes exports passed;
 - production dependency audit 0, Mobile audit 0, and `npm ls --all` passed;
 - full audit residual: three Moderate development-only findings classified in
   `gate6b-security.md`;
-- complete HTTP rerun closed a flaky Stage 4C fixture by using PostgreSQL
-  `clock_timestamp()` for database ordering; the final run was 114/114.
+- the newly published Next.js High advisories were removed by the exact
+  16.2.11 patch before the final build and HTTP rerun;
+- the initial complete PostgreSQL run lacked the CI-only cursor secret and
+  therefore failed nine Stage 4 cursor cases; the environment-correct rerun
+  passed 397/397 and required no product change.
 
 ## Migration rehearsal
 
@@ -55,6 +57,15 @@ focused route is allowed to skip.
   Gate 6B row was fabricated;
 - Migrations 1–44 are byte-unchanged; Migration 45 SHA-256 is
   `bf1ca0d7d061948ff42af1ad4668d7ee81741afba49ff1fdf44e0bb920014389`.
+- remediation fresh A and B each deployed 1→46, finished healthy 46/46, and
+  made their second deploy a no-op;
+- populated remediation first deployed 1→45, seeded the deterministic Gate 6B
+  fixture, then applied only Migration 46; the fixture/non-fixture state was
+  unchanged and the second deploy was a no-op;
+- Migrations 1–45 aggregate remained
+  `52d3f988e7b3e1df36d888bbc906fd4a4b73a0272af8d3bcc005d336bb858435`;
+  Migration 46 SHA-256 is
+  `6f445d9598f0d93651ad4905afe7161824e20653011e10e4453ffdb8a35f0d33`.
 
 ## Staging protocol
 
@@ -62,17 +73,19 @@ Before mutation, authenticated Neon discovery and the Gate 6A client-side TLS
 attestation must prove exact project/database, ready primary, direct non-pooler
 host, role equality, authorized/current peer certificate, hostname/SNI, TLS
 1.2/1.3, non-loopback transport, and Prisma reuse of the exact attested Pool
-backend. Record the healthy 44/44 preflight and non-fixture fingerprint, apply
-only Migration 45 with canonical `prisma migrate deploy`, prove healthy 45/45,
-zero failed/rolled-back, exact checksum, no fabricated Gate 6B rows, unchanged
-fingerprint, and a second deploy no-op.
+backend. The original run records 44/44→45/45. Remediation closure records the
+healthy 45/45 preflight, zero claimless/partial/illegal rendition claims, and
+the non-fixture fingerprint; applies only Migration 46 with canonical
+`prisma migrate deploy`; and proves healthy 46/46, zero failed/rolled-back,
+exact checksum, no fabricated Gate 6B rows, unchanged fingerprint, and a
+second deploy no-op.
 
 Seed twice must return one deterministic fixture fingerprint. The Gate 6B smoke
 must cover cleanup, rescan, rendition, provider/runtime truth, Gate 5A/5B/6A
 regressions, foreign sentinel preservation, and non-fixture equality. Cleanup
 must remove only fixture ownership in documented order, then remove zero on its
-second pass. Final 45/45 and the original pre-migration fingerprint are exit
-conditions.
+second pass. Final 46/46 and the original pre-migration fingerprint are closure
+exit conditions.
 
 The staging scripts themselves were rehearsed locally on a disposable healthy
 45/45 PostgreSQL database: both seed runs returned fixture fingerprint
@@ -116,9 +129,47 @@ bounded transaction classifiers now retry `P2028`, `P2034`, PostgreSQL
 domain error. Gate 5A then passed completely and all successor fixtures were
 cleaned; the final Gate 6B fingerprint remained unchanged.
 
+## Authenticated remediation closure — 2026-07-23
+
+Authenticated control-plane inventory proved the exact project was
+`rezno-staging`, the database was `rezno_staging`, the primary endpoint was
+direct/non-pooler, and the exact role was confined to that staging project and
+branch. Vercel project `rezno-staging` Production and Preview were the only
+persistent application consumers; Development did not consume the remote
+database, repository workflows had no real-staging secret, and Vercel project
+`rezno` had no database consumer.
+
+The authorized password reset operated on that exact role once. After the
+provider operation finished, the old credential rejected a new connection
+with PostgreSQL authentication code `28P01` before SQL. The replacement passed
+TLS 1.3, peer authorization/current validity, hostname/SNI, non-loopback and
+non-pooler checks, exact role/database equality, and Prisma reuse of the
+attested physical Pool. Fresh Production and Preview deployments of project
+`rezno-staging` became Ready and authenticated database-backed requests
+returned HTTP 200. Project `rezno` remained untouched.
+
+Preflight was healthy 45/45, Migration 46 absent, failed/rolled-back zero, and
+claimless/partial/illegal-state counts all zero. Canonical deployment applied
+Migration 46 exactly once, matched repository checksum
+`6f445d9598f0d93651ad4905afe7161824e20653011e10e4453ffdb8a35f0d33`,
+kept all Migrations 1–45 checksums unchanged, created no job, schedule,
+rendition, asset, or binding, and made the second deploy a no-op.
+
+Both seeds returned fixture fingerprint
+`98ade600392f56b98166320f4caf05581c14fe661f2cdb58add5352112d768c6`.
+The initial expanded smoke stopped at the rendition-write revocation assertion
+while the database retained a complete `PROCESSING` claim and published no
+READY rendition. Exact reseed and rerun passed all 101 checks. Gate 5A, Gate
+5B, and Gate 6A successor smokes passed 75/50/59 after their historical safety
+checks were made to admit healthy 46/46 only under the exact Gate 6B
+confirmation marker. Exact Gate 6B cleanup removed 70 rows, its second pass
+removed zero, all fixture counters were zero, foreign sentinels were stable,
+and the final non-fixture fingerprint equaled the preflight value
+`51f91a54f3d34335477ad613342c374803a26d6b401271973f7cffa89613d2d2`.
+
 ## Exit criteria
 
-Gate 6B remains ACTIVE and its PR remains Draft until real staging, source and
-history secret/privacy scans, exact-head Actions/Vercel, zero unresolved P0/P1/P2
-review threads, independent review, and merge. Gate 6C/6D, Stage 7/8, and AI
-remain unstarted.
+Gate 6B remains ACTIVE and unaccepted until independent review and merge.
+Real-staging closure, source/history secret and privacy scans, exact-head
+Actions/Vercel, and zero unresolved P0/P1/P2 review threads are mandatory
+Ready-for-review evidence. Gate 6C/6D, Stage 7/8, and AI remain unstarted.

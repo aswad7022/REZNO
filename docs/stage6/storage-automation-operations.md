@@ -78,17 +78,19 @@ dead-letter evidence.
 
 ## Deployment, rollback, and staging
 
-Migration 45 is additive and creates no jobs, schedules, sessions, assets,
-renditions, bindings, actors, or provider state. An application rollback keeps
-the schema and operational evidence: disconnect invocation, deploy the prior
-application, retain Migration 45, and prepare a forward fix. Do not drop the
-new columns/table or reverse enum values in an incident.
+Migrations 45 and 46 are additive and create no jobs, schedules, sessions,
+assets, renditions, bindings, actors, or provider state. Migration 46 only
+replaces the rendition claim constraint after a zero-violation preflight. An
+application rollback keeps the schema and operational evidence: disconnect
+invocation, deploy the prior application, retain both migrations, and prepare
+a forward fix. Do not drop the new columns/table, weaken the claim constraint,
+or reverse enum values in an incident.
 
 Staging uses exact database `rezno_staging`, the authenticated direct
 non-pooler Neon endpoint, `sslmode=verify-full`, expected host/role
 confirmations, and the Gate 6A client-side TLS/physical-Pool attestation. The
 Gate 6B scripts additionally require exact confirmation
-`REZNO_STAGE6_GATE6B_STAGING_ONLY` and healthy 45/45:
+`REZNO_STAGE6_GATE6B_STAGING_ONLY` and healthy 46/46:
 
 1. `npm run seed:staging:storage-media-gate6b` twice;
 2. `npm run smoke:staging:storage-media-gate6b`;
@@ -98,13 +100,32 @@ Gate 6B scripts additionally require exact confirmation
 Both seeds must share one fixture fingerprint. The smoke must preserve the
 non-fixture fingerprint and pre-existing foreign Person/Organization sentinel
 hashes. The second cleanup must remove zero, the final non-fixture fingerprint
-must equal the pre-migration value, and migrations must remain healthy 45/45.
+must equal the pre-migration value, and migrations must remain healthy 46/46.
 
 The authenticated 2026-07-22 run satisfied this runbook: healthy 44/44→45/45,
 Migration 45 checksum `bf1ca0d7…14389`, second deploy no-op, seed fingerprint
 `98ade600…d768c6` twice, 64 Gate 6B checks, cleanup 58 then zero, and unchanged
 non-fixture fingerprint `51f91a54…d2d2`. Gate 5A/5B/6A successor smokes passed
 75/50/59 checks after bounded Prisma `P2028` transaction retry was added.
+
+The authenticated 2026-07-23 closure run resumed from healthy 45/45 after an
+authorized rotation of the exact staging-only database role. Only Vercel
+project `rezno-staging` Production and Preview consumers were updated and
+redeployed; the old credential rejected new authentication and project
+`rezno` remained untouched. Replacement transport repeated the full
+TLS/hostname/SNI/database/role/physical-Pool attestation.
+
+Preflight found zero claimless `PROCESSING`, partial/invalid, or illegal-state
+rendition claims. Canonical deploy applied only Migration 46, matched checksum
+`6f445d95…f0d33`, reached healthy 46/46, fabricated no domain row, retained
+non-fixture fingerprint `51f91a54…d2d2`, and made the second deploy a no-op.
+Both seeds returned `98ade600…d768c6`; the expanded smoke passed 101 checks;
+Gate 5A/5B/6A successors passed 75/50/59; cleanup removed 70 rows then zero;
+and final fixture counters were all zero.
+
+Gate 5B and Gate 6A historical staging guards retain their exact 42/42 and
+44/44 modes. They accept 46/46 only when the exact Gate 6B confirmation marker
+is also present; arbitrary forward migration counts still fail closed.
 
 Communication/payment automation remains Gate 6C. Automatic runtime,
 distributed coordination, alerts, incidents, and Stage 6 closure remain Gate

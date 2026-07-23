@@ -1,5 +1,5 @@
 {
-  "capturedAt": "2026-07-22",
+  "capturedAt": "2026-07-23",
   "commands": [
     "npm audit --json",
     "npm audit --omit=dev --json",
@@ -34,6 +34,7 @@
       "@prisma/client": "7.8.0",
       "@swc/helpers": "0.5.17-dev-peer",
       "fast-uri": "3.1.4",
+      "next": "16.2.11",
       "prisma": "7.8.0",
       "shadcn": "4.13.1-dev-only",
       "sharp": "0.35.3"
@@ -65,5 +66,21 @@
     "npmLsAllProblems": 0,
     "nextIntlSwcHelpers": "0.5.17",
     "nextPrivateSwcHelpers": "0.5.15"
+  },
+  "gate6bSecurityClosure": {
+    "affectedNext": "16.2.10",
+    "patchedNext": "16.2.11",
+    "productionAuditAfterPatch": {
+      "critical": 0,
+      "high": 0,
+      "moderate": 0,
+      "low": 0,
+      "total": 0
+    },
+    "postPatchEvidence": {
+      "unit": 435,
+      "http": 120,
+      "nextProductionBuild": "passed"
+    }
   }
 }

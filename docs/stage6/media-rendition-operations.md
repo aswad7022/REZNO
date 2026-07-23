@@ -21,6 +21,13 @@ profile. Its fingerprint also binds source checksum and provider object
 version. The output key is generated server-side from that identity and is
 write-once.
 
+Migration 46 makes the persisted claim lifecycle exact. `PROCESSING` requires
+all of job ID, lease token, positive fencing token, and expiry.
+`DELETE_PENDING` may be idle with no claim or own the same complete claim.
+`PENDING`, `READY`, `FAILED`, `SUPERSEDED`, and `DELETED` must contain no claim
+field. Deployment fails before replacing the constraint when any claimless,
+partial/invalid, or illegal-state row exists; it never invents a claimant.
+
 ## Generation and publication
 
 `MEDIA_RENDITION_DISCOVERY` scans a bounded deterministic page of ACTIVE,
@@ -38,11 +45,17 @@ READY sources missing the current required profile. It creates only exact
 6. writes one server key without overwrite, then HEADs and bounded-reads the
    output to verify MIME, bytes, checksum, dimensions, and provider generation;
 7. reloads the source/binding/rendition and current platform fence before
-   publishing READY.
+   publishing READY, and revalidates the worker operation plus the actor's
+   current joint platform/storage permissions in that same transaction.
 
 If the source, binding, claim, lease, or generation changes, output cannot
 become READY. A known written stale output is persisted as `SUPERSEDED` and
 enters exact deletion; an uncertain write never becomes READY.
+
+If Admin access or either required permission is revoked during provider
+inspection/write, the final publication is denied. The complete expiring claim
+is retained for safe lease recovery; an unauthorized catch path cannot clear,
+rewrite, or publish it.
 
 ## Stable delivery
 

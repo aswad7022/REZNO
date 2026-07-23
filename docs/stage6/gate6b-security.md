@@ -32,6 +32,9 @@ No open P0, P1, or P2 is accepted for independent review.
 | hot loop or retry storm | configuration/stale/permanent policy failures do not retry; transient work uses bounded Gate 6A attempts/backoff and dead-letter |
 | schedule amplification | bounded batch/catch-up, occurrence dedupe, disabled-by-default fixture, no automatic invoker |
 | stale worker | domain publication checks current job row, token, lease expiry and fencing generation |
+| revoked or cross-scope execution | one closed job-type authority registry filters claim/schedule/requeue; every Gate 6B handler revalidates the operation owner, current Person/Admin grant, and joint permissions before claim and again after provider work |
+| cross-Admin duplicate domain work | domain child identity excludes actor provenance, concurrent creation resolves to one canonical child, and the first creator remains immutable |
+| claimless/partial rendition state | Migration 46 fails closed before changing the constraint, then permits only a complete positive-fencing processing claim, an idle-or-complete deletion claim, or a claim-free non-working state |
 | remote serializable timeout/conflict leakage | storage, media and platform-job transaction wrappers retry only bounded Prisma `P2028`/`P2034`, PostgreSQL `40001`/`40P01`, or adapter conflict classifications; domain errors remain terminal and exhaustion maps to a safe closed error |
 | Admin revocation | Person and Admin grant/permissions are read on every operation before mutation |
 | payload privacy | closed reference schemas reject secret, auth, contact, address, VIN, payment, filename, bytes, URL, command and module-shaped data |
@@ -39,7 +42,15 @@ No open P0, P1, or P2 is accepted for independent review.
 
 ## Dependency classification
 
-Production dependency audit is zero and Mobile audit is zero. The full root
+Production dependency audit is zero and Mobile audit is zero. During closure,
+newly published Next.js advisories classified `16.2.10` as affected by
+Proxy/Turbopack authorization bypass, Server Action denial of service, SSRF,
+cache-confusion, and related App Router issues. The direct dependency and
+lockfile were moved to the exact patched `16.2.11` release; the production
+build, 435 unit checks, and 120 built-server HTTP checks passed after the
+upgrade. No High/Critical production advisory remains.
+
+The full root
 audit has three Moderate findings in one development-only chain:
 `shadcn` → `@modelcontextprotocol/sdk` → `@hono/node-server@1.19.13`.
 The advisory concerns Windows encoded-backslash static-file traversal. REZNO
@@ -57,7 +68,20 @@ Physical-device media QA remains Stage 7. Gate 6C owns communications/payment
 automation; Gate 6D owns runtime activation, distributed coordination,
 monitoring, alerts, incidents, and final cross-gate closure.
 
-Authenticated staging completed at healthy 45/45 with the full TLS/identity
-proof, 64 Gate 6B smoke checks, 75/50/59 Gate 5A/Gate 5B/Gate 6A successor
-checks, exact cleanup 58 then zero, stable foreign sentinels, and an unchanged
-whole-database non-fixture fingerprint. No staging finding remains open.
+Authenticated staging completed at healthy 46/46 after the exact staging-role
+rotation, old-credential authentication rejection, and fresh consumer
+deployments. The replacement passed full TLS/identity/physical-Pool proof.
+Migration 46 applied once with matching checksum and made the second deploy a
+no-op. The 101-check Gate 6B smoke, 75/50/59 Gate 5A/Gate 5B/Gate 6A
+successors, exact cleanup 70 then zero, stable foreign sentinels, and unchanged
+whole-database non-fixture fingerprint passed.
+
+The task-owned credential directory was mode 700 with mode-600 files and
+cleanup traps. Exact replacement-value scans found zero repository, protected
+output, task `/tmp`, or process-argument matches before the directory was
+destroyed and its absence verified. Full reachable-history and source scans
+found no token literal or private-key block; PostgreSQL URL findings were
+limited to localhost/CI and explicit test/documentation placeholders. Browser
+and Hermes artifacts contained no connection string, credential value,
+provider key, signed target, or worker-operation authority. No staging
+security finding remains open.

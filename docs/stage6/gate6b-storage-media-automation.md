@@ -1,8 +1,8 @@
 # Gate 6B — Storage and Media Automation
 
-Status: **ACTIVE / IMPLEMENTATION IN PROGRESS**. Acceptance requires an
+Status: **ACTIVE / CLOSURE IN PROGRESS**. Acceptance still requires an
 independent review and merge. This document must not describe Gate 6B as
-accepted while its pull request is Draft.
+accepted while its pull request remains unmerged.
 
 ## Verified baseline
 
@@ -30,8 +30,11 @@ URL, checksum, MIME, bytes, rendition dimensions, or authorization.
 
 Every exact-item handler reloads its canonical row and source generation. It
 does provider work outside long database locks, then locks and revalidates the
-row, current platform lease/fencing generation, and source/binding generation
-before committing a result.
+row, current platform lease/fencing generation, current worker-operation
+authority, current actor and joint permissions, and source/binding generation
+before committing a result. The closed execution-authority registry keeps the
+Gate 6A health probe platform-only and requires both platform-job and storage
+authority for every Gate 6B type.
 
 ## Closed job registry
 
@@ -168,20 +171,29 @@ credentials, raw errors, claim tokens, or fencing authority.
 
 ## Migration policy
 
-Exactly one additive Migration 45 may add the closed enums, rendition model,
-inspection-policy/rescan fields, foreign keys, checks, and due-state indexes.
-It creates no jobs, schedules, renditions, assets, sessions, bindings, orders,
-actors, Organizations, or provider state. Migrations 1–44 are immutable.
+Migration 45 adds the closed enums, rendition model, inspection-policy/rescan
+fields, foreign keys, checks, and due-state indexes. Additive remediation
+Migration 46 tightens `MediaRendition` so `PROCESSING` always owns one complete
+positive-fencing claim, `DELETE_PENDING` is either idle or completely claimed,
+and all other states are claim-free. It first fails closed on claimless,
+partial/invalid, or illegal-state claims and never fabricates ownership.
+Neither migration creates jobs, schedules, renditions, assets, sessions,
+bindings, orders, actors, Organizations, or provider state. Migrations 1–45
+are immutable after Migration 46.
 
 ## Staging, rollback, and recovery
 
-Staging starts at the authenticated healthy 44/44 state, uses the accepted
-direct non-pooler client-side TLS/physical-Pool attestation, records the whole
-non-fixture fingerprint, applies only Migration 45, and finishes healthy 45/45
-with a second deploy no-op. The exact-ID fixture runs twice with one fingerprint;
-the bounded smoke exercises cleanup, rescan, rendition and Gate 5A/5B/6A
-regressions; exact cleanup runs twice and preserves foreign sentinel hashes and
-the original database fingerprint. Operational detail is in
+The original staging run started at authenticated healthy 44/44 and applied
+Migration 45. Closure resumed from healthy 45/45 after the exact staging role
+was safely rotated and all confirmed staging-only consumers were redeployed.
+The accepted direct non-pooler client-side TLS/physical-Pool attestation,
+whole-database fingerprint, and zero-violation preflight preceded canonical
+Migration 46 deployment. The database finished healthy 46/46 with a second
+deploy no-op. The exact-ID fixture ran twice with one fingerprint; the expanded
+smoke exercised execution authority, cleanup, rescan, rendition claims,
+cross-Admin domain deduplication, and Gate 5A/5B/6A successors. Exact cleanup
+ran twice and preserved foreign sentinels and the original database
+fingerprint. Operational detail is in
 `storage-automation-operations.md`, `media-rendition-operations.md`,
 `gate6b-security.md`, and `gate6b-test-plan.md`.
 
@@ -202,16 +214,30 @@ Draft.
 
 ## Current evidence
 
-Local validation passed 7 focused unit, 434 complete unit, 14 focused
-PostgreSQL, 385 complete PostgreSQL, 6 focused built-server HTTP, and 114
-complete HTTP tests. Build, Mobile TypeScript, Expo dependency/Doctor, and both
-Hermes exports passed. Two fresh 1→45 rehearsals and a populated 44→45 rehearsal
-passed without data drift. Authenticated staging reached healthy 45/45, ran two
-identical seeds, passed 64 Gate 6B checks and 75/50/59 Gate 5A/5B/6A successor
-checks, removed 58 fixture rows then zero, and retained non-fixture fingerprint
+Local validation passed Gate 6A 22 unit and 27 PostgreSQL checks; Gate 6B 7
+unit, 21 PostgreSQL, and 6 built-server HTTP checks; and complete totals of 435
+unit, 397 PostgreSQL, and 120 HTTP/RSC/API tests, for 952 regressions. ESLint,
+root and Mobile TypeScript, Prisma format/validate/generate, Next 16.2.11
+production build, Expo dependency validation, Expo Doctor 20/20, and both
+Hermes exports passed. Fresh A/B 1→46 and populated 45→46 rehearsals passed
+without data drift and made the second deploy a no-op.
+
+Authenticated staging rotated only the verified `rezno-staging` role, rejected
+the old credential at authentication, redeployed the Production and Preview
+environments of Vercel project `rezno-staging`, and left project `rezno`
+untouched. Replacement TLS 1.3, hostname/SNI, role/database equality, and
+physical Prisma Pool reuse passed. Migration 46 reached healthy 46/46 with
+checksum
+`6f445d9598f0d93651ad4905afe7161824e20653011e10e4453ffdb8a35f0d33`.
+Both seeds returned
+`98ade600392f56b98166320f4caf05581c14fe661f2cdb58add5352112d768c6`;
+the expanded smoke passed 101 checks; Gate 5A/5B/6A successors passed
+75/50/59; cleanup removed 70 rows then zero; and the non-fixture fingerprint
+remained
 `51f91a54f3d34335477ad613342c374803a26d6b401271973f7cffa89613d2d2`.
-Exact-head CI, Vercel, review threads, independent review, and merge remain
-pending, so Gate 6B is not accepted.
+PR-level closure additionally requires exact-head Actions, both Vercel checks,
+zero unresolved review threads, and independent review. Gate 6B is not accepted
+until the PR is merged.
 
 ## Explicit non-goals
 
