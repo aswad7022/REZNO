@@ -255,8 +255,32 @@ review, staging evidence, exact-head CI/Vercel, independent review, and merge.
 Its pull request remains Draft. Gate 6D must not start here.
 
 Authenticated staging completed the required 47/47→48/48 migration, identical
-two-seed fixture fingerprint, 47-check Gate 6C smoke, all six successor
+two-seed fixture fingerprint, 93-check Gate 6C smoke, all six successor
 smokes, exact cleanup with a zero second run, unchanged foreign sentinels, and
 restoration of the original non-fixture database fingerprint. This evidence
 does not close the gate: exact-head local validation, CI/Vercel, Draft PR
 review, and independent acceptance remain required.
+
+## Financial-capacity and crash-recovery closure
+
+Refundable capacity is one server-owned equation:
+`capturedAmount - refundedAmount - sum(other capacity-reserving refunds)`.
+The sum includes `REQUESTED`, `PROCESSING`, and `FAILED` refunds that are
+retryable, have a retry timestamp and stable provider request reference, and
+have `retryCount < 5`. Success, cancellation, permanent failure, and retry
+exhaustion release capacity. Every retry locks the PaymentIntent before the
+exact PaymentRefund, excludes that refund once, and revalidates exact Decimal
+truth before the provider call. Capacity rejection performs zero provider
+calls, changes no provider identity, creates no journal, and safely finishes
+the mutation.
+
+PaymentAttempt, PaymentRefund, and OutboundDelivery automation claims use
+`platform-job:<jobId>`. Live exact or foreign claims return bounded retryable
+outcomes; expired claims are reclaimed under locking and fencing. Provider
+uncertainty reuses the original request/idempotency identity. Existing
+unfinished delivery attempts are reused without a second attempt number.
+Capture events supersede a processing attempt by cancelling it, clearing its
+claim, and setting `finishedAt` without a duplicate journal. PlatformJob
+success is forbidden while its owned domain operation remains nonterminal.
+
+No Migration 49 was required. Migrations 1–48 remained unchanged.

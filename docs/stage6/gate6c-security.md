@@ -30,7 +30,10 @@ not create a service principal.
 | raw webhook leakage | raw body/signature discarded; normalized fields only |
 | duplicate/changed event | provider+event uniqueness and exact payload hash |
 | duplicate capture | locked totals, full-capture policy, unique journal source |
-| over-refund/race | locked reserved balance and stable refund identity |
+| over-refund/race | intent-first lock and exact Decimal reservation including retryable failed refunds |
+| crash after domain claim | stable `platform-job:<jobId>` ownership, live retryable replay, expired fenced reclaim |
+| provider accepted before DB apply | stable provider identity and exact unfinished-operation reuse |
+| event/attempt capture race | processing attempt cancelled and finished; capture journal remains exact-once |
 | retry amplification | bounded scan, five retries, backoff, terminal failures |
 | exact handler timeout | closed Gate 6C 15-second bound below the 30-second lease; discovery remains at five seconds and abort guards block publication |
 | posted-ledger mutation | PostgreSQL immutable journal/posting triggers |
@@ -83,3 +86,12 @@ consumers were updated and redeployed. The replacement credential passed
 direct non-pooler TLS 1.3, certificate, hostname, role, database, and Prisma
 physical-client attestation. Repository, history, build, export, and temporary
 artifact scans must show zero value matches before the Draft PR is published.
+
+The final remediation run reused the rotated credential without another
+rotation. It proved TLS 1.3, hostname/SNI and system-CA verification, direct
+non-pooler routing, exact database/role, and Prisma physical-client reuse.
+Initial and final state were 48/48 with non-fixture fingerprint
+`51f91a54f3d34335477ad613342c374803a26d6b401271973f7cffa89613d2d2`.
+The expanded smoke passed 93 checks. Final capacity-overcommit, attempt-claim,
+refund-claim, delivery-claim, and duplicate-unfinished-attempt counts were all
+zero. The first exact cleanup removed 152 rows and the second removed zero.

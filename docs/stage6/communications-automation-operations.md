@@ -60,9 +60,16 @@ Exact dispatch:
 5. revalidates authority and lease after provider work;
 6. publishes one sanitized immutable attempt result and canonical state.
 
-Revocation after a provider call leaves the attempt unfinished and publishes
-neither provider result nor campaign success. `ACCEPTED` means provider
-acceptance only. It is never human delivery proof.
+The exact owner is `platform-job:<jobId>`. An own or foreign live claim is
+retryable rather than stale success. After expiry the delivery is reclaimed
+under lock; an existing unfinished attempt and its attempt number are reused;
+and provider replay retains the stable delivery idempotency key.
+
+Revocation before or during provider work recovers the delivery to a legal
+retry state, finishes any unfinished attempt with a sanitized outcome, clears
+claim fields, and publishes no campaign success. Cancellation is re-read
+before resume and prevents provider work. `ACCEPTED` means provider acceptance
+only. It is never human delivery proof.
 
 ## Retry, incident, and rollback
 

@@ -119,7 +119,12 @@ Both exact fixture seeds produced
 `edd7dd5bcbc697272ad375ad9df87b2126ba8260037858acf27a51b2207c53b5`.
 The rollback-only Gate 5C financial evidence fingerprint was
 `b313552ea282376da895de0f9ff0cd264fc47c79a9e00ad144dbb63f8299f6cf`.
-The Gate 6C smoke passed 47 checks. Stage 4C, Stage 4D, and Gate 5C successor
+The remediated Gate 6C smoke passed 93 checks, including retryable-failed
+refund reservation, concurrent request/retry capacity, zero-call rejection,
+attempt/refund/delivery interruption before and after provider work, live and
+expired replay, foreign claim fencing, stable provider identity, permission
+revocation, event/attempt capture race, mutation terminalization, and zero
+unfinished owned work. Stage 4C, Stage 4D, and Gate 5C successor
 smokes passed; Gate 5D passed 105 checks, Gate 6A passed 59, and Gate 6B
 passed 166. The Gate 6B retained-orphan sentinel is derived from the current
 UTC day under the exact Gate 6C successor marker so its 24-hour retention
@@ -132,6 +137,14 @@ were zero for campaigns, deliveries, provider events, refunds, schedules,
 jobs, attempts, and mutations. The final database fingerprint exactly returned
 to the preflight value above. Foreign Person and Organization sentinel hashes
 remained unchanged.
+
+Fresh 1→48 rehearsals A and B each ended 48/48 with zero failed or rolled-back
+rows and a second-deploy no-op. A populated 47→48 rehearsal preserved its
+Person row, created zero PlatformJobs, and ended 48/48. Migration 48 remained
+`04fa9fe4a87c7360ec3eb585951ff49c20e90675c74755d1127d716fbf009192`;
+the migration-tree fingerprint remained
+`a0a7bfd7c87c84e7f15ff1d2ff322766a2863b03038c071ee6c001cca5b3d71d`.
+No Migration 49 exists.
 
 During authenticated operation, one connection-string retrieval was parsed
 with the wrong output mode and the now-revoked staging credential appeared in

@@ -31,10 +31,23 @@ derives amount, currency, provider, expiry, and action from locked truth and
 reuses the persisted provider request reference. It stops at five and cannot
 capture an already captured intent.
 
-Refund retry additionally requires `PAYMENTS_REFUND`. The locked intent
-reserves `REQUESTED` and `PROCESSING` refunds before calculating remaining
-balance. The request reference is stable. Only confirmed provider success
-posts one refund journal; timeout or uncertainty remains failure.
+Refund retry additionally requires `PAYMENTS_REFUND`. Capacity is
+`captured - refunded - other reservations`. Reservations include `REQUESTED`,
+`PROCESSING`, and `FAILED` rows with `retryable=true`, a retry time, a stable
+provider request reference, and fewer than five retries. Success,
+cancellation, permanent failure, and retry exhaustion release capacity.
+
+Before every provider retry the service locks the PaymentIntent and then the
+exact PaymentRefund, re-reads exact Decimal totals, excludes the current
+refund once, and claims it only when the amount fits. A rejected retry makes
+zero provider calls, changes no provider identity, posts no journal, and
+finishes its PaymentMutation safely.
+
+Exact attempt and refund jobs use `platform-job:<jobId>`. Live claims yield a
+bounded retryable result; expired claims are reclaimed with fencing. Provider
+uncertainty replays the stable request reference. A verified capture event
+supersedes an in-flight attempt by cancelling and finishing it without a
+second capture journal.
 
 ## Reconciliation and settlement statements
 
