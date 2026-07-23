@@ -42,6 +42,7 @@ let smokeCheckpoint = "bootstrap";
 
 async function main() {
   validateOutboundStage4cEnvironment(process.env);
+  const expectedMigrations = process.env.REZNO_STAGE6_GATE6C_SUCCESSOR === "true" ? 48 : 38;
   smokeCheckpoint = "aggregate-queries";
   const [
     campaigns,
@@ -112,7 +113,7 @@ async function main() {
     `),
   ]);
 
-  assert.equal(Number(migrations[0]?.count), 38);
+  assert.equal(Number(migrations[0]?.count), expectedMigrations);
   assert.ok(broadcastMutation);
   const [broadcastDeliveries, campaignCount, inAppCampaigns, inAppNotifications, notConfigured, transient, permanent] = await Promise.all([
     prisma.outboundDelivery.count({ where: { campaignId: broadcastMutation.campaignId } }),
@@ -407,7 +408,7 @@ async function main() {
   smokeCheckpoint = "output-redaction";
   const output = {
     fixture: OUTBOUND_STAGE4C_FIXTURE,
-    migrations: 38,
+    migrations: expectedMigrations,
     campaignCount,
     broadcastDeliveries,
     statuses,

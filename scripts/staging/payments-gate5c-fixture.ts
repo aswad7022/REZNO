@@ -3,7 +3,17 @@ import { Prisma, type PrismaClient } from "@prisma/client";
 
 export const PAYMENTS_GATE5C_MARKER = "rezno-qa-payments-gate5c";
 const baseTime = new Date("2026-07-19T14:00:00.123Z");
-const postedTime = new Date("2026-07-19T14:30:00.456Z");
+const postedTime = process.env.REZNO_STAGE6_GATE6C_SUCCESSOR === "true"
+  ? new Date(Date.UTC(
+      new Date().getUTCFullYear(),
+      new Date().getUTCMonth(),
+      new Date().getUTCDate() - 1,
+      14,
+      30,
+      0,
+      456,
+    ))
+  : new Date("2026-07-19T14:30:00.456Z");
 const id = (value: number) => `5c000000-0000-4000-8000-${String(value).padStart(12, "0")}`;
 const hash = (value: string) => createHash("sha256").update(`${PAYMENTS_GATE5C_MARKER}:${value}`).digest("hex");
 
@@ -230,8 +240,8 @@ export async function seedPaymentsGate5cFixture(prisma: PrismaClient) {
       id: batchId,
       idempotencyKey: id(3451 + index),
       organizationId: organizationIds[0]!,
-      periodEnd: new Date("2026-07-20T00:00:00.000Z"),
-      periodStart: new Date("2026-07-19T00:00:00.000Z"),
+      periodEnd: settlementPeriod(index).end,
+      periodStart: settlementPeriod(index).start,
       requestHash: hash(`settlement-${index}`),
       status: "DRAFT",
       updatedAt: at(80 + index),
@@ -395,6 +405,27 @@ function targetPaymentStatus(index: number) {
 
 function providerReference(index: number) {
   return `${PAYMENTS_GATE5C_MARKER}-provider-${index + 1}`;
+}
+
+function settlementPeriod(index: number) {
+  if (process.env.REZNO_STAGE6_GATE6C_SUCCESSOR !== "true") {
+    return index === 0
+      ? {
+          end: new Date("2026-07-20T00:00:00.000Z"),
+          start: new Date("2026-07-19T00:00:00.000Z"),
+        }
+      : {
+          end: new Date("2026-07-19T00:00:00.000Z"),
+          start: new Date("2026-07-18T00:00:00.000Z"),
+        };
+  }
+  const primaryEnd = new Date(Date.UTC(
+    postedTime.getUTCFullYear(),
+    postedTime.getUTCMonth(),
+    postedTime.getUTCDate() + 1,
+  ));
+  const end = new Date(primaryEnd.getTime() - index * 86_400_000);
+  return { end, start: new Date(end.getTime() - 86_400_000) };
 }
 
 function intentDefinitions(): Prisma.PaymentIntentCreateManyInput[] {
