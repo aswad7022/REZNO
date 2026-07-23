@@ -5,15 +5,20 @@ import { createHash } from "node:crypto";
 import { Prisma, type PlatformJobType } from "@prisma/client";
 
 import type { CommerceAdminContext } from "@/features/commerce/services/authorization";
-import { CommunicationDomainError } from "@/features/communications/domain/errors";
 import {
-  claimExactDeliveryForAutomation,
-  processClaimedDeliveries,
+  CommunicationDomainError,
+  CommunicationOperationRetryableError,
+} from "@/features/communications/domain/errors";
+import {
+  processExactDeliveryForAutomation,
   releaseExpiredClaims,
   sendCampaignNow,
   type CommunicationExecutionGuard,
 } from "@/features/communications/services/dispatcher";
-import { PaymentDomainError } from "@/features/payments/domain/errors";
+import {
+  PaymentDomainError,
+  PaymentOperationRetryableError,
+} from "@/features/payments/domain/errors";
 import { retryPaymentAttemptFromAutomation } from "@/features/payments/services/payment-intents";
 import {
   processVerifiedPaymentProviderEvent,
@@ -82,6 +87,16 @@ export async function runCommunicationsPaymentAutomationHandler(
         return success(await generateSettlementDrafts(payload as SettlementPayload, context));
     }
   } catch (error) {
+    if (
+      error instanceof PaymentOperationRetryableError
+      || error instanceof CommunicationOperationRetryableError
+    ) {
+      return {
+        errorCode: "TRANSIENT_FAILURE",
+        outcome: "FAILED",
+        retryable: true,
+      };
+    }
     if (error instanceof AutomationFailure) {
       return {
         errorCode: error.errorCode,
@@ -193,28 +208,16 @@ async function dispatchCampaign(payload: CampaignPayload, context: JobContext) {
 async function dispatchDelivery(payload: DeliveryPayload, context: JobContext) {
   const guard = executionGuard(context);
   const claimOwner = "platform-job:" + context.jobId;
-  const claimed = await claimExactDeliveryForAutomation({
+  const result = await processExactDeliveryForAutomation({
     claimOwner,
     deliveryId: payload.deliveryId,
     executionGuard: guard,
     expectedVersion: payload.expectedVersion,
   });
-  if (!claimed) {
-    const current = await guardedDeliveryState(payload.deliveryId, guard);
-    if (!current) return exact("COMMUNICATION_DELIVERY_DISPATCHED", "ABSENT", "ABSENT");
-    const outcome = current.version !== payload.expectedVersion
-      ? "STALE"
-      : ["ACCEPTED", "PERMANENT_FAILURE", "SUPPRESSED", "CANCELLED"].includes(current.status)
-        ? "SUPERSEDED"
-        : "INELIGIBLE";
-    return exact("COMMUNICATION_DELIVERY_DISPATCHED", outcome, current.status);
-  }
-  await processClaimedDeliveries(claimOwner, [payload.deliveryId], new Date(), guard);
-  const current = await guardedDeliveryState(payload.deliveryId, guard);
   return exact(
     "COMMUNICATION_DELIVERY_DISPATCHED",
-    "COMPLETED",
-    current?.status ?? "ABSENT",
+    result.outcome,
+    result.state,
   );
 }
 
@@ -315,24 +318,24 @@ async function retryPaymentRefund(payload: RefundPayload, context: JobContext) {
     await guard(transaction);
     return transaction.paymentRefund.findUnique({
       where: { id: payload.refundId },
-      select: { status: true, version: true },
+      select: { id: true },
     });
   });
   if (!existing) return exact("PAYMENT_REFUND_RETRIED", "ABSENT", "ABSENT");
-  if (existing.version !== payload.expectedVersion) {
-    return exact("PAYMENT_REFUND_RETRIED", "STALE", existing.status);
-  }
-  if (existing.status !== "FAILED") {
-    return exact("PAYMENT_REFUND_RETRIED", "INELIGIBLE", existing.status);
-  }
   await retryAdminRefund(actor, payload.refundId, {
     expectedVersion: payload.expectedVersion,
     idempotencyKey: context.jobId,
-  }, guard, true);
+  }, guard, {
+    claimOwner: "platform-job:" + context.jobId,
+    requireRetryable: true,
+  });
   const current = await prisma.paymentRefund.findUniqueOrThrow({
     where: { id: payload.refundId },
     select: { status: true },
   });
+  if (current.status === "PROCESSING") {
+    throw new PaymentOperationRetryableError(1, current.status);
+  }
   return exact("PAYMENT_REFUND_RETRIED", "COMPLETED", current.status);
 }
 
@@ -440,19 +443,6 @@ async function currentActor(context: JobContext) {
   return prisma.$transaction(async (transaction) => {
     const { actor } = await assertJobLease(transaction, context);
     return actor;
-  });
-}
-
-async function guardedDeliveryState(
-  deliveryId: string,
-  guard: CommunicationExecutionGuard,
-) {
-  return prisma.$transaction(async (transaction) => {
-    await guard(transaction);
-    return transaction.outboundDelivery.findUnique({
-      where: { id: deliveryId },
-      select: { status: true, version: true },
-    });
   });
 }
 
