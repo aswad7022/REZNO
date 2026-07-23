@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { PaymentRefundReason, Prisma } from "@prisma/client";
+import { Prisma, type PaymentRefundReason } from "@prisma/client";
 
 import {
   assertCommerceAdminCurrent,
@@ -9,7 +9,10 @@ import {
   type MerchantActorReference,
 } from "@/features/commerce/services/authorization";
 import { businessPaymentIntentDto, paymentIntentDtoInclude } from "@/features/payments/domain/dto";
-import { paymentError } from "@/features/payments/domain/errors";
+import {
+  PaymentOperationRetryableError,
+  paymentError,
+} from "@/features/payments/domain/errors";
 import { paymentRequestHash } from "@/features/payments/domain/idempotency";
 import { paymentDecimal, paymentMoneyString } from "@/features/payments/domain/money";
 import { assertPaymentRefundTransition, paymentIntentStatusForTotals } from "@/features/payments/domain/state-machine";
@@ -27,6 +30,46 @@ export interface RefundRequestInput {
   note?: string | null;
   paymentIntentId: string;
   reasonCode: PaymentRefundReason;
+}
+
+const MAX_REFUND_RETRIES = 5;
+const REFUND_OPERATION_CLAIM_MS = 60_000;
+
+type RefundRetryTestPhase =
+  | "AFTER_CLAIM_BEFORE_PROVIDER"
+  | "AFTER_PROVIDER_BEFORE_APPLY";
+
+type RefundRetryTestHook = (event: {
+  claimOwner: string;
+  phase: RefundRetryTestPhase;
+  refundId: string;
+}) => Promise<void> | void;
+
+let refundRetryTestHook: RefundRetryTestHook | undefined;
+
+export function setRefundRetryTestHook(hook: RefundRetryTestHook | undefined) {
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("Refund retry test hooks are unavailable in production.");
+  }
+  refundRetryTestHook = hook;
+}
+
+export function refundReservesCapacity(input: {
+  nextRetryAt: Date | null;
+  providerRequestReference: string | null;
+  retryCount: number;
+  retryable: boolean | null;
+  status: "REQUESTED" | "PROCESSING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
+}) {
+  return input.status === "REQUESTED"
+    || input.status === "PROCESSING"
+    || (
+      input.status === "FAILED"
+      && input.retryable === true
+      && input.nextRetryAt !== null
+      && input.retryCount < MAX_REFUND_RETRIES
+      && input.providerRequestReference !== null
+    );
 }
 
 type RefundActor = {
@@ -86,7 +129,10 @@ export async function retryAdminRefund(
   refundId: string,
   input: { expectedVersion: number; idempotencyKey: string },
   executionGuard?: PaymentExecutionGuard,
-  requireRetryable = false,
+  automation?: {
+    claimOwner: string;
+    requireRetryable: true;
+  },
 ) {
   const organizationId = await adminRefundOrganization(context, refundId);
   return retryRefund({
@@ -97,7 +143,7 @@ export async function retryAdminRefund(
     organizationId,
   }, refundId, input, async (transaction) => {
     await assertCommerceAdminCurrent(transaction, context, "PAYMENTS_REFUND");
-  }, executionGuard, requireRetryable);
+  }, executionGuard, automation);
 }
 
 async function requestRefund(
@@ -152,16 +198,10 @@ async function requestRefund(
     if (intent.commissionBasisPoints !== 0 || !intent.commissionAmount.isZero()) {
       paymentError("REFUND_NOT_ALLOWED", "This commission allocation requires an approved refund policy.");
     }
-    const reserved = await transaction.paymentRefund.aggregate({
-      where: {
-        paymentIntentId: intent.id,
-        status: { in: ["REQUESTED", "PROCESSING"] },
-      },
-      _sum: { amount: true },
-    });
+    const reserved = await reservedRefundAmount(transaction, intent.id);
     const available = intent.capturedAmount
       .minus(intent.refundedAmount)
-      .minus(reserved._sum.amount ?? 0);
+      .minus(reserved);
     if (amount.greaterThan(available)) paymentError("REFUND_AMOUNT_EXCEEDED", "Refund exceeds the refundable balance.");
     const refundId = randomUUID();
     const refund = await transaction.paymentRefund.create({
@@ -244,19 +284,32 @@ async function retryRefund(
   input: { expectedVersion: number; idempotencyKey: string },
   revalidate: (transaction: Prisma.TransactionClient) => Promise<void>,
   executionGuard?: PaymentExecutionGuard,
-  requireRetryable = false,
+  automation?: {
+    claimOwner: string;
+    requireRetryable: true;
+  },
 ) {
   const provider = configuredPaymentProvider();
-  const claimOwner = "refund-retry:" + randomUUID();
+  const claimOwner = automation?.claimOwner ?? "refund-retry:" + randomUUID();
   const prepared = await runPaymentSerializable(async (transaction) => {
     await revalidate(transaction);
     await executionGuard?.(transaction);
+    const identity = await transaction.paymentRefund.findFirst({
+      where: {
+        id: refundId,
+        paymentIntent: { organizationId: actor.organizationId },
+      },
+      select: { paymentIntentId: true },
+    });
+    if (!identity) paymentError("NOT_FOUND", "Refund was not found.");
+    await lockPaymentIntent(transaction, identity.paymentIntentId);
     await lockPaymentRefund(transaction, refundId);
     const refund = await transaction.paymentRefund.findFirst({
       where: { id: refundId, paymentIntent: { organizationId: actor.organizationId } },
       include: { paymentIntent: true },
     });
     if (!refund) paymentError("NOT_FOUND", "Refund was not found.");
+    const now = await refundDatabaseNow(transaction);
     const requestHash = paymentRequestHash({
       action: "RETRY_REFUND",
       actorKey: actor.actorKey,
@@ -268,24 +321,144 @@ async function retryRefund(
     });
     if (replay) {
       if (replay.requestHash !== requestHash) paymentError("IDEMPOTENCY_CONFLICT", "Refund retry key was reused with changed input.");
-      if (replay.status !== "PROCESSING") return { claimOwner: null, mutationStatus: replay.status, refund };
-      const now = new Date();
-      if (refund.status !== "PROCESSING" || (refund.claimExpiresAt && refund.claimExpiresAt > now)) {
-        return { claimOwner: null, mutationStatus: replay.status, refund };
+      if (replay.status !== "PROCESSING") {
+        return {
+          kind: replay.status === "COMPLETED"
+            ? "TERMINAL" as const
+            : "FAILED_MUTATION" as const,
+          refund,
+        };
+      }
+      if (refund.status === "SUCCEEDED") {
+        await completeRefundMutation(
+          transaction,
+          actor.actorKey,
+          input.idempotencyKey,
+          refund,
+        );
+        return { kind: "TERMINAL" as const, refund };
+      }
+      if (refund.status === "FAILED" || refund.status === "CANCELLED") {
+        await failRefundMutation(
+          transaction,
+          actor.actorKey,
+          input.idempotencyKey,
+          refund.safeProviderCode ?? (
+            refund.status === "CANCELLED"
+              ? "REFUND_CANCELLED"
+              : "PAYMENT_PROVIDER_FAILURE"
+          ),
+        );
+        return { kind: "FAILED_MUTATION" as const, refund };
+      }
+      if (
+        refund.status !== "PROCESSING"
+        || refund.version !== input.expectedVersion + 1
+        || !refund.providerRequestReference
+      ) {
+        return { kind: "FAILED_MUTATION" as const, refund };
+      }
+      if (refund.claimExpiresAt && refund.claimExpiresAt > now) {
+        return {
+          kind: "RETRYABLE" as const,
+          refund,
+          retryAfterSeconds: boundedRefundClaimRetrySeconds(
+            now,
+            refund.claimExpiresAt,
+          ),
+        };
+      }
+      const available = await refundableCapacity(
+        transaction,
+        refund.paymentIntent,
+        refund.id,
+      );
+      if (refund.amount.greaterThan(available)) {
+        await terminateCapacityRejectedRefund(
+          transaction,
+          refund.id,
+          actor.actorKey,
+          input.idempotencyKey,
+        );
+        return { kind: "CAPACITY_REJECTED" as const, refund };
       }
       const reclaimed = await transaction.paymentRefund.update({
         where: { id: refund.id },
-        data: { claimedBy: claimOwner, claimExpiresAt: new Date(now.getTime() + 60_000) },
+        data: {
+          claimedBy: claimOwner,
+          claimExpiresAt: new Date(now.getTime() + REFUND_OPERATION_CLAIM_MS),
+        },
         include: { paymentIntent: true },
       });
-      return { claimOwner, mutationStatus: replay.status, refund: reclaimed };
+      return { kind: "CLAIMED" as const, refund: reclaimed };
+    }
+    if (
+      refund.status === "PROCESSING"
+      && refund.claimExpiresAt
+      && refund.claimExpiresAt > now
+    ) {
+      return {
+        kind: "RETRYABLE" as const,
+        refund,
+        retryAfterSeconds: boundedRefundClaimRetrySeconds(
+          now,
+          refund.claimExpiresAt,
+        ),
+      };
     }
     if (refund.version !== input.expectedVersion) paymentError("STALE_VERSION", "Refund changed. Refresh and retry.");
     if (refund.status !== "FAILED") paymentError("REFUND_NOT_ALLOWED", "Only a failed refund can be retried.");
-    if (requireRetryable && (!refund.retryable || !refund.nextRetryAt || refund.nextRetryAt > new Date() || refund.retryCount >= 5)) {
+    if (
+      automation?.requireRetryable
+      && (
+        !refund.retryable
+        || !refund.nextRetryAt
+        || refund.nextRetryAt > now
+        || refund.retryCount >= MAX_REFUND_RETRIES
+      )
+    ) {
       paymentError("REFUND_NOT_ALLOWED", "Refund is not eligible for an automated retry.");
     }
     if (!refund.paymentIntent.providerReference) paymentError("REFUND_NOT_ALLOWED", "Refund provider reference is unavailable.");
+    const providerRequestReference =
+      refund.providerRequestReference ?? "refund_" + refund.id;
+    const available = await refundableCapacity(
+      transaction,
+      refund.paymentIntent,
+      refund.id,
+    );
+    if (refund.amount.greaterThan(available)) {
+      await transaction.paymentMutation.create({
+        data: {
+          action: "RETRY_REFUND",
+          actorKey: actor.actorKey,
+          actorPersonId: actor.actorType === "MERCHANT" ? actor.actorId : null,
+          actorType: actor.actorType,
+          expectedVersion: input.expectedVersion,
+          failureCode: "REFUND_CAPACITY_UNAVAILABLE",
+          id: randomUUID(),
+          idempotencyKey: input.idempotencyKey,
+          organizationId: actor.organizationId,
+          paymentIntentId: refund.paymentIntentId,
+          requestHash,
+          status: "FAILED",
+          targetId: refund.paymentIntent.orderId ?? refund.paymentIntent.bookingId!,
+          targetType: refund.paymentIntent.orderId ? "ORDER" : "BOOKING",
+        },
+      });
+      await transaction.paymentRefund.update({
+        where: { id: refund.id },
+        data: {
+          claimedBy: null,
+          claimExpiresAt: null,
+          nextRetryAt: null,
+          retryable: false,
+          safeProviderCode: "REFUND_CAPACITY_UNAVAILABLE",
+          version: { increment: 1 },
+        },
+      });
+      return { kind: "CAPACITY_REJECTED" as const, refund };
+    }
     await transaction.paymentMutation.create({
       data: {
         action: "RETRY_REFUND",
@@ -307,9 +480,9 @@ async function retryRefund(
       where: { id: refund.id },
       data: {
         claimedBy: claimOwner,
-        claimExpiresAt: new Date(Date.now() + 60_000),
+        claimExpiresAt: new Date(now.getTime() + REFUND_OPERATION_CLAIM_MS),
         nextRetryAt: null,
-        providerRequestReference: refund.providerRequestReference ?? "refund_" + refund.id,
+        providerRequestReference,
         retryable: null,
         retryCount: { increment: 1 },
         safeProviderCode: null,
@@ -331,13 +504,42 @@ async function retryRefund(
         },
       });
     }
-    return { claimOwner, mutationStatus: "PROCESSING" as const, refund: updated };
+    return { kind: "CLAIMED" as const, refund: updated };
   });
-  if (prepared.mutationStatus === "COMPLETED") return loadRefundIntent(refundId);
-  if (prepared.mutationStatus === "FAILED") paymentError("PAYMENT_PROVIDER_FAILURE", "Refund retry failed safely.");
-  if (!prepared.claimOwner) return loadRefundIntent(refundId);
+  if (prepared.kind === "TERMINAL") return loadRefundIntent(refundId);
+  if (prepared.kind === "FAILED_MUTATION") {
+    paymentError("PAYMENT_PROVIDER_FAILURE", "Refund retry failed safely.");
+  }
+  if (prepared.kind === "CAPACITY_REJECTED") {
+    paymentError(
+      "REFUND_AMOUNT_EXCEEDED",
+      "Refund retry no longer fits inside the captured balance.",
+    );
+  }
+  if (prepared.kind === "RETRYABLE") {
+    throw new PaymentOperationRetryableError(
+      prepared.retryAfterSeconds,
+      prepared.refund.status,
+    );
+  }
+  await refundRetryTestHook?.({
+    claimOwner,
+    phase: "AFTER_CLAIM_BEFORE_PROVIDER",
+    refundId,
+  });
   if (executionGuard) {
-    await runPaymentSerializable((transaction) => executionGuard(transaction));
+    try {
+      await runPaymentSerializable((transaction) => executionGuard(transaction));
+    } catch (error) {
+      await recoverRefundAfterInterruption({
+        actorKey: actor.actorKey,
+        claimOwner,
+        idempotencyKey: input.idempotencyKey,
+        refundId,
+        safeCode: "AUTHORITY_REVOKED",
+      });
+      throw error;
+    }
   }
   let result: Awaited<ReturnType<ReturnType<typeof configuredPaymentProvider>["refundPayment"]>>;
   try {
@@ -352,20 +554,32 @@ async function retryRefund(
   } catch {
     result = { outcome: "TRANSIENT_FAILURE", safeCode: "PROVIDER_FAILURE" };
   }
-  const payment = await applyRefundResult(refundId, prepared.claimOwner, result, executionGuard);
-  await runPaymentSerializable(async (transaction) => {
-    await revalidate(transaction);
-    await executionGuard?.(transaction);
-    const current = await transaction.paymentRefund.findUniqueOrThrow({ where: { id: refundId } });
-    if (current.status === "PROCESSING") return;
-    await transaction.paymentMutation.update({
-      where: { actorKey_idempotencyKey: { actorKey: actor.actorKey, idempotencyKey: input.idempotencyKey } },
-      data: current.status === "SUCCEEDED"
-        ? { result: { intentId: current.paymentIntentId, refundId }, resultVersion: current.version, status: "COMPLETED" }
-        : { failureCode: current.safeProviderCode ?? "PAYMENT_PROVIDER_FAILURE", status: "FAILED" },
-    });
+  await refundRetryTestHook?.({
+    claimOwner,
+    phase: "AFTER_PROVIDER_BEFORE_APPLY",
+    refundId,
   });
-  return payment;
+  try {
+    return await applyRefundResult(
+      refundId,
+      claimOwner,
+      result,
+      executionGuard,
+      {
+        actorKey: actor.actorKey,
+        idempotencyKey: input.idempotencyKey,
+      },
+    );
+  } catch (error) {
+    await recoverRefundAfterInterruption({
+      actorKey: actor.actorKey,
+      claimOwner,
+      idempotencyKey: input.idempotencyKey,
+      refundId,
+      safeCode: "PROVIDER_RESULT_UNAPPLIED",
+    });
+    throw error;
+  }
 }
 
 async function applyRefundResult(
@@ -373,21 +587,48 @@ async function applyRefundResult(
   claimOwner: string,
   result: Awaited<ReturnType<ReturnType<typeof configuredPaymentProvider>["refundPayment"]>>,
   executionGuard?: PaymentExecutionGuard,
+  mutation?: {
+    actorKey: string;
+    idempotencyKey: string;
+  },
 ) {
   return runPaymentSerializable(async (transaction) => {
     await executionGuard?.(transaction);
+    const identity = await transaction.paymentRefund.findUnique({
+      where: { id: refundId },
+      select: { paymentIntentId: true },
+    });
+    if (!identity) paymentError("NOT_FOUND", "Refund was not found.");
+    await lockPaymentIntent(transaction, identity.paymentIntentId);
     await lockPaymentRefund(transaction, refundId);
     const refund = await transaction.paymentRefund.findUnique({
       where: { id: refundId },
       include: { paymentIntent: true },
     });
     if (!refund) paymentError("NOT_FOUND", "Refund was not found.");
-    await lockPaymentIntent(transaction, refund.paymentIntentId);
-    if (refund.status === "SUCCEEDED") return loadIntentById(transaction, refund.paymentIntentId);
-    if (refund.status !== "PROCESSING" || refund.claimedBy !== claimOwner) {
+    if (refund.status === "SUCCEEDED") {
+      if (mutation) {
+        await completeRefundMutation(
+          transaction,
+          mutation.actorKey,
+          mutation.idempotencyKey,
+          refund,
+        );
+      }
       return loadIntentById(transaction, refund.paymentIntentId);
     }
-    const now = new Date();
+    if (refund.status !== "PROCESSING" || refund.claimedBy !== claimOwner) {
+      if (mutation && refund.status === "FAILED") {
+        await failRefundMutation(
+          transaction,
+          mutation.actorKey,
+          mutation.idempotencyKey,
+          refund.safeProviderCode ?? "PAYMENT_PROVIDER_FAILURE",
+        );
+      }
+      return loadIntentById(transaction, refund.paymentIntentId);
+    }
+    const now = await refundDatabaseNow(transaction);
     if (result.outcome === "READY" || (result.outcome === "DUPLICATE" && result.providerReference)) {
       assertPaymentRefundTransition(refund.status, "SUCCEEDED");
       const newRefunded = refund.paymentIntent.refundedAmount.plus(refund.amount);
@@ -403,7 +644,7 @@ async function applyRefundResult(
         where: { id: refund.paymentIntentId },
         data: { refundedAmount: newRefunded, status: newStatus, version: { increment: 1 } },
       });
-      await transaction.paymentRefund.update({
+      const completedRefund = await transaction.paymentRefund.update({
         where: { id: refund.id },
         data: {
           completedAt: now,
@@ -417,6 +658,14 @@ async function applyRefundResult(
           version: { increment: 1 },
         },
       });
+      if (mutation) {
+        await completeRefundMutation(
+          transaction,
+          mutation.actorKey,
+          mutation.idempotencyKey,
+          completedRefund,
+        );
+      }
       await postRefundJournal(transaction, {
         amount: refund.amount,
         currency: refund.currency,
@@ -436,11 +685,13 @@ async function applyRefundResult(
       return loadIntentById(transaction, intent.id);
     }
     assertPaymentRefundTransition(refund.status, "FAILED");
-    const retryable = result.outcome === "TRANSIENT_FAILURE" && refund.retryCount < 5;
+    const retryable =
+      result.outcome === "TRANSIENT_FAILURE"
+      && refund.retryCount < MAX_REFUND_RETRIES;
     const nextRetryAt = retryable
       ? new Date(now.getTime() + refundRetryDelayMilliseconds(refund.retryCount))
       : null;
-    await transaction.paymentRefund.update({
+    const failedRefund = await transaction.paymentRefund.update({
       where: { id: refund.id },
       data: {
         claimedBy: null,
@@ -452,6 +703,14 @@ async function applyRefundResult(
         version: { increment: 1 },
       },
     });
+    if (mutation) {
+      await failRefundMutation(
+        transaction,
+        mutation.actorKey,
+        mutation.idempotencyKey,
+        failedRefund.safeProviderCode ?? "PAYMENT_PROVIDER_FAILURE",
+      );
+    }
     await notifyRefundResult(transaction, {
       amount: refund.amount,
       currency: refund.currency,
@@ -461,6 +720,207 @@ async function applyRefundResult(
     });
     return loadIntentById(transaction, refund.paymentIntentId);
   });
+}
+
+async function reservedRefundAmount(
+  transaction: Prisma.TransactionClient,
+  paymentIntentId: string,
+  excludeRefundId?: string,
+) {
+  const reservations = await transaction.paymentRefund.findMany({
+    where: {
+      paymentIntentId,
+      ...(excludeRefundId ? { id: { not: excludeRefundId } } : {}),
+      OR: [
+        { status: "REQUESTED" },
+        { status: "PROCESSING" },
+        {
+          nextRetryAt: { not: null },
+          providerRequestReference: { not: null },
+          retryCount: { lt: MAX_REFUND_RETRIES },
+          retryable: true,
+          status: "FAILED",
+        },
+      ],
+    },
+    select: { amount: true },
+  });
+  return reservations.reduce(
+    (total, reservation) => total.plus(reservation.amount),
+    new Prisma.Decimal(0),
+  );
+}
+
+async function refundableCapacity(
+  transaction: Prisma.TransactionClient,
+  intent: {
+    capturedAmount: Prisma.Decimal;
+    id: string;
+    refundedAmount: Prisma.Decimal;
+  },
+  excludeRefundId?: string,
+) {
+  const reserved = await reservedRefundAmount(
+    transaction,
+    intent.id,
+    excludeRefundId,
+  );
+  return intent.capturedAmount.minus(intent.refundedAmount).minus(reserved);
+}
+
+async function completeRefundMutation(
+  transaction: Prisma.TransactionClient,
+  actorKey: string,
+  idempotencyKey: string,
+  refund: {
+    id: string;
+    paymentIntentId: string;
+    version: number;
+  },
+) {
+  await transaction.paymentMutation.updateMany({
+    where: {
+      actorKey,
+      idempotencyKey,
+      status: "PROCESSING",
+    },
+    data: {
+      failureCode: null,
+      result: {
+        intentId: refund.paymentIntentId,
+        refundId: refund.id,
+      },
+      resultVersion: refund.version,
+      status: "COMPLETED",
+    },
+  });
+}
+
+async function failRefundMutation(
+  transaction: Prisma.TransactionClient,
+  actorKey: string,
+  idempotencyKey: string,
+  failureCode: string,
+) {
+  await transaction.paymentMutation.updateMany({
+    where: {
+      actorKey,
+      idempotencyKey,
+      status: "PROCESSING",
+    },
+    data: {
+      failureCode: failureCode.slice(0, 80),
+      status: "FAILED",
+    },
+  });
+}
+
+async function terminateCapacityRejectedRefund(
+  transaction: Prisma.TransactionClient,
+  refundId: string,
+  actorKey: string,
+  idempotencyKey: string,
+) {
+  const refund = await transaction.paymentRefund.findUniqueOrThrow({
+    where: { id: refundId },
+  });
+  if (refund.status === "PROCESSING") {
+    assertPaymentRefundTransition(refund.status, "FAILED");
+    await transaction.paymentRefund.update({
+      where: { id: refund.id },
+      data: {
+        claimedBy: null,
+        claimExpiresAt: null,
+        nextRetryAt: null,
+        retryable: false,
+        safeProviderCode: "REFUND_CAPACITY_UNAVAILABLE",
+        status: "FAILED",
+        version: { increment: 1 },
+      },
+    });
+  }
+  await failRefundMutation(
+    transaction,
+    actorKey,
+    idempotencyKey,
+    "REFUND_CAPACITY_UNAVAILABLE",
+  );
+}
+
+async function recoverRefundAfterInterruption(input: {
+  actorKey: string;
+  claimOwner: string;
+  idempotencyKey: string;
+  refundId: string;
+  safeCode: string;
+}) {
+  return runPaymentSerializable(async (transaction) => {
+    const identity = await transaction.paymentRefund.findUnique({
+      where: { id: input.refundId },
+      select: { paymentIntentId: true },
+    });
+    if (!identity) return;
+    await lockPaymentIntent(transaction, identity.paymentIntentId);
+    await lockPaymentRefund(transaction, input.refundId);
+    const refund = await transaction.paymentRefund.findUnique({
+      where: { id: input.refundId },
+    });
+    if (!refund) return;
+    if (refund.status === "SUCCEEDED") {
+      await completeRefundMutation(
+        transaction,
+        input.actorKey,
+        input.idempotencyKey,
+        refund,
+      );
+      return;
+    }
+    if (
+      refund.status !== "PROCESSING"
+      || refund.claimedBy !== input.claimOwner
+    ) return;
+    const now = await refundDatabaseNow(transaction);
+    assertPaymentRefundTransition(refund.status, "FAILED");
+    const retryable = refund.retryCount < MAX_REFUND_RETRIES;
+    await transaction.paymentRefund.update({
+      where: { id: refund.id },
+      data: {
+        claimedBy: null,
+        claimExpiresAt: null,
+        nextRetryAt: retryable
+          ? new Date(now.getTime() + refundRetryDelayMilliseconds(refund.retryCount))
+          : null,
+        retryable,
+        safeProviderCode: input.safeCode.slice(0, 80),
+        status: "FAILED",
+        version: { increment: 1 },
+      },
+    });
+    await failRefundMutation(
+      transaction,
+      input.actorKey,
+      input.idempotencyKey,
+      input.safeCode,
+    );
+  });
+}
+
+async function refundDatabaseNow(transaction: Prisma.TransactionClient) {
+  const [clock] = await transaction.$queryRaw<Array<{ now: Date }>>(
+    Prisma.sql`SELECT clock_timestamp() AS now`,
+  );
+  if (!clock?.now) paymentError("PAYMENT_STATE_CONFLICT", "Payment database time is unavailable.");
+  return clock.now;
+}
+
+function boundedRefundClaimRetrySeconds(now: Date, expiresAt: Date) {
+  return Math.max(
+    1,
+    Math.min(
+      Math.ceil(REFUND_OPERATION_CLAIM_MS / 1_000),
+      Math.ceil((expiresAt.getTime() - now.getTime()) / 1_000),
+    ),
+  );
 }
 
 function refundRetryDelayMilliseconds(retryCount: number) {

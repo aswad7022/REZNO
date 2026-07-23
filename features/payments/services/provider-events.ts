@@ -164,6 +164,22 @@ export async function processVerifiedPaymentProviderEvent(input: {
           now: event.verifiedAt,
         });
       }
+      await transaction.paymentAttempt.updateMany({
+        where: {
+          paymentIntentId: current.id,
+          status: "PROCESSING",
+        },
+        data: {
+          claimedBy: null,
+          claimExpiresAt: null,
+          finishedAt: event.verifiedAt,
+          nextRetryAt: null,
+          retryable: null,
+          safeProviderCode: "SUPERSEDED_BY_PROVIDER_EVENT",
+          status: "CANCELLED",
+          version: { increment: 1 },
+        },
+      });
     } else if (event.normalizedType === "AUTHORIZED") {
       if ([
         "AUTHORIZED",

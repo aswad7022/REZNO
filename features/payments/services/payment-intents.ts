@@ -4,10 +4,18 @@ import { Prisma, type PaymentIntentStatus } from "@prisma/client";
 import { requireActiveCommerceCustomer } from "@/features/commerce/services/authorization";
 import { paymentCommissionPolicy } from "@/features/payments/domain/commission";
 import { paymentIntentDto, paymentIntentDtoInclude } from "@/features/payments/domain/dto";
-import { paymentError } from "@/features/payments/domain/errors";
+import {
+  PaymentOperationRetryableError,
+  paymentError,
+} from "@/features/payments/domain/errors";
 import { paymentRequestHash } from "@/features/payments/domain/idempotency";
 import { parsePaymentCurrency, paymentDecimal, paymentMoneyString } from "@/features/payments/domain/money";
-import { assertPaymentIntentTransition, paymentIntentStatusForTotals, targetPaymentStatus } from "@/features/payments/domain/state-machine";
+import {
+  assertPaymentAttemptTransition,
+  assertPaymentIntentTransition,
+  paymentIntentStatusForTotals,
+  targetPaymentStatus,
+} from "@/features/payments/domain/state-machine";
 import { postCaptureJournal } from "@/features/payments/services/ledger";
 import { notifyPaymentCaptured, notifyPaymentFailed } from "@/features/payments/services/payment-notifications";
 import { lockPaymentIntent, runPaymentSerializable } from "@/features/payments/services/transaction";
@@ -21,6 +29,28 @@ import {
 } from "@/features/commerce/services/authorization";
 
 const MAX_ATTEMPTS_PER_INTENT = 5;
+const PAYMENT_OPERATION_CLAIM_MS = 60_000;
+
+type PaymentAttemptRetryTestPhase =
+  | "AFTER_CLAIM_BEFORE_PROVIDER"
+  | "AFTER_PROVIDER_BEFORE_APPLY";
+
+type PaymentAttemptRetryTestHook = (event: {
+  attemptId: string;
+  jobId: string;
+  phase: PaymentAttemptRetryTestPhase;
+}) => Promise<void> | void;
+
+let paymentAttemptRetryTestHook: PaymentAttemptRetryTestHook | undefined;
+
+export function setPaymentAttemptRetryTestHook(
+  hook: PaymentAttemptRetryTestHook | undefined,
+) {
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("Payment attempt retry test hooks are unavailable in production.");
+  }
+  paymentAttemptRetryTestHook = hook;
+}
 
 export type PayableTargetInput =
   | { targetType: "ORDER"; targetId: string }
@@ -385,6 +415,20 @@ async function applyProviderCreateResult(
       return loadIntentDto(transaction, intent.id);
     }
     if (intent.status === "CAPTURED") {
+      assertPaymentAttemptTransition(attempt.status, "CANCELLED");
+      await transaction.paymentAttempt.update({
+        where: { id: attempt.id },
+        data: {
+          claimedBy: null,
+          claimExpiresAt: null,
+          finishedAt: new Date(),
+          nextRetryAt: null,
+          retryable: null,
+          safeProviderCode: "SUPERSEDED_BY_CAPTURE",
+          status: "CANCELLED",
+          version: { increment: 1 },
+        },
+      });
       return loadIntentDto(transaction, intent.id);
     }
     const now = new Date();
@@ -485,39 +529,95 @@ export async function retryPaymentAttemptFromAutomation(
   const prepared = await runPaymentSerializable(async (transaction) => {
     await assertCommerceAdminCurrent(transaction, context, "PAYMENTS_RECONCILE");
     await input.executionGuard(transaction);
-    await transaction.$queryRaw(Prisma.sql`
-      SELECT attempt."id"
-      FROM "PaymentAttempt" AS attempt
-      WHERE attempt."id" = ${input.attemptId}::uuid
-      FOR UPDATE OF attempt
-    `);
+    const identity = await transaction.paymentAttempt.findUnique({
+      where: { id: input.attemptId },
+      select: { paymentIntentId: true },
+    });
+    if (!identity) return { kind: "ABSENT" as const };
+    await lockPaymentIntent(transaction, identity.paymentIntentId);
+    await lockPaymentAttempt(transaction, input.attemptId);
     const attempt = await transaction.paymentAttempt.findUnique({
       where: { id: input.attemptId },
       include: { paymentIntent: true },
     });
-    if (!attempt) return null;
-    await lockPaymentIntent(transaction, attempt.paymentIntentId);
+    if (!attempt) return { kind: "ABSENT" as const };
+    const now = await paymentDatabaseNow(transaction);
+
+    if (attempt.status === "PROCESSING") {
+      if (
+        attempt.paymentIntent.capturedAmount.greaterThan(0)
+        || ["CAPTURED", "PARTIALLY_REFUNDED", "REFUNDED"].includes(
+          attempt.paymentIntent.status,
+        )
+      ) {
+        assertPaymentAttemptTransition(attempt.status, "CANCELLED");
+        await transaction.paymentAttempt.update({
+          where: { id: attempt.id },
+          data: {
+            claimedBy: null,
+            claimExpiresAt: null,
+            finishedAt: now,
+            nextRetryAt: null,
+            retryable: null,
+            safeProviderCode: "SUPERSEDED_BY_CAPTURE",
+            status: "CANCELLED",
+            version: { increment: 1 },
+          },
+        });
+        return { kind: "TERMINAL" as const, state: "CANCELLED" as const };
+      }
+      if (attempt.claimExpiresAt && attempt.claimExpiresAt > now) {
+        return {
+          kind: "RETRYABLE" as const,
+          retryAfterSeconds: boundedClaimRetrySeconds(now, attempt.claimExpiresAt),
+          state: attempt.status,
+        };
+      }
+      if (attempt.version !== input.expectedVersion + 1) {
+        return { kind: "INELIGIBLE" as const, state: attempt.status };
+      }
+      const reclaimed = await transaction.paymentAttempt.update({
+        where: { id: attempt.id },
+        data: {
+          claimedBy: claimOwner,
+          claimExpiresAt: new Date(now.getTime() + PAYMENT_OPERATION_CLAIM_MS),
+          startedAt: attempt.startedAt ?? now,
+        },
+        include: { paymentIntent: true },
+      });
+      return { attempt: reclaimed, kind: "CLAIMED" as const };
+    }
+
+    if (attempt.status !== "FAILED") {
+      if (terminalPaymentAttempt(attempt.status)) {
+        return { kind: "TERMINAL" as const, state: attempt.status };
+      }
+      return { kind: "INELIGIBLE" as const, state: attempt.status };
+    }
+    if (attempt.version !== input.expectedVersion) {
+      if (attempt.version > input.expectedVersion) {
+        return { kind: "TERMINAL" as const, state: attempt.status };
+      }
+      return { kind: "INELIGIBLE" as const, state: attempt.status };
+    }
     if (
-      attempt.version !== input.expectedVersion
-      || attempt.status !== "FAILED"
-      || !attempt.retryable
+      !attempt.retryable
       || !attempt.nextRetryAt
-      || attempt.nextRetryAt > new Date()
+      || attempt.nextRetryAt > now
       || attempt.retryCount >= 5
       || attempt.paymentIntent.capturedAmount.greaterThan(0)
       || !["CREATED", "PROCESSING", "AUTHORIZED"].includes(attempt.paymentIntent.status)
     ) {
       return {
-        eligible: false as const,
+        kind: "INELIGIBLE" as const,
         state: attempt.status,
       };
     }
-    const now = new Date();
     const claimed = await transaction.paymentAttempt.update({
       where: { id: attempt.id },
       data: {
         claimedBy: claimOwner,
-        claimExpiresAt: new Date(now.getTime() + 60_000),
+        claimExpiresAt: new Date(now.getTime() + PAYMENT_OPERATION_CLAIM_MS),
         nextRetryAt: null,
         retryable: null,
         retryCount: { increment: 1 },
@@ -533,12 +633,39 @@ export async function retryPaymentAttemptFromAutomation(
         data: { status: "PROCESSING", version: { increment: 1 } },
       });
     }
-    return { attempt: claimed, eligible: true as const };
+    return { attempt: claimed, kind: "CLAIMED" as const };
   });
-  if (!prepared) return { outcome: "ABSENT" as const, state: "ABSENT" as const };
-  if (!prepared.eligible) return { outcome: "INELIGIBLE" as const, state: prepared.state };
+  if (prepared.kind === "ABSENT") {
+    return { outcome: "ABSENT" as const, state: "ABSENT" as const };
+  }
+  if (prepared.kind === "RETRYABLE") {
+    throw new PaymentOperationRetryableError(
+      prepared.retryAfterSeconds,
+      prepared.state,
+    );
+  }
+  if (prepared.kind === "TERMINAL") {
+    return { outcome: "COMPLETED" as const, state: prepared.state };
+  }
+  if (prepared.kind === "INELIGIBLE") {
+    return { outcome: "INELIGIBLE" as const, state: prepared.state };
+  }
 
-  await runPaymentSerializable((transaction) => input.executionGuard(transaction));
+  await paymentAttemptRetryTestHook?.({
+    attemptId: prepared.attempt.id,
+    jobId: input.jobId,
+    phase: "AFTER_CLAIM_BEFORE_PROVIDER",
+  });
+  try {
+    await runPaymentSerializable((transaction) => input.executionGuard(transaction));
+  } catch (error) {
+    await recoverPaymentAttemptAfterInterruption(
+      prepared.attempt.id,
+      claimOwner,
+      "AUTHORITY_REVOKED",
+    );
+    throw error;
+  }
   const provider = configuredPaymentProvider();
   let result: ProviderResult;
   try {
@@ -562,18 +689,150 @@ export async function retryPaymentAttemptFromAutomation(
       result = { outcome: "TRANSIENT_FAILURE", safeCode: "PROVIDER_FAILURE" };
     }
   }
-  await applyProviderCreateResult(
-    prepared.attempt.paymentIntentId,
-    prepared.attempt.id,
-    claimOwner,
-    result,
-    input.executionGuard,
-  );
+  await paymentAttemptRetryTestHook?.({
+    attemptId: prepared.attempt.id,
+    jobId: input.jobId,
+    phase: "AFTER_PROVIDER_BEFORE_APPLY",
+  });
+  try {
+    await applyProviderCreateResult(
+      prepared.attempt.paymentIntentId,
+      prepared.attempt.id,
+      claimOwner,
+      result,
+      input.executionGuard,
+    );
+  } catch (error) {
+    await recoverPaymentAttemptAfterInterruption(
+      prepared.attempt.id,
+      claimOwner,
+      "PROVIDER_RESULT_UNAPPLIED",
+    );
+    throw error;
+  }
   const current = await prisma.paymentAttempt.findUniqueOrThrow({
     where: { id: prepared.attempt.id },
     select: { status: true },
   });
+  if (current.status === "PROCESSING") {
+    throw new PaymentOperationRetryableError(1, current.status);
+  }
   return { outcome: "COMPLETED" as const, state: current.status };
+}
+
+async function lockPaymentAttempt(
+  transaction: Prisma.TransactionClient,
+  attemptId: string,
+) {
+  await transaction.$queryRaw(Prisma.sql`
+    SELECT attempt."id"
+    FROM "PaymentAttempt" AS attempt
+    WHERE attempt."id" = ${attemptId}::uuid
+    FOR UPDATE OF attempt
+  `);
+}
+
+async function paymentDatabaseNow(transaction: Prisma.TransactionClient) {
+  const [clock] = await transaction.$queryRaw<Array<{ now: Date }>>(
+    Prisma.sql`SELECT clock_timestamp() AS now`,
+  );
+  if (!clock?.now) paymentError("PAYMENT_STATE_CONFLICT", "Payment database time is unavailable.");
+  return clock.now;
+}
+
+async function recoverPaymentAttemptAfterInterruption(
+  attemptId: string,
+  claimOwner: string,
+  safeCode: string,
+) {
+  return runPaymentSerializable(async (transaction) => {
+    const identity = await transaction.paymentAttempt.findUnique({
+      where: { id: attemptId },
+      select: { paymentIntentId: true },
+    });
+    if (!identity) return;
+    await lockPaymentIntent(transaction, identity.paymentIntentId);
+    await lockPaymentAttempt(transaction, attemptId);
+    const attempt = await transaction.paymentAttempt.findUnique({
+      where: { id: attemptId },
+      include: { paymentIntent: true },
+    });
+    if (
+      !attempt
+      || attempt.status !== "PROCESSING"
+      || attempt.claimedBy !== claimOwner
+    ) return;
+    const now = await paymentDatabaseNow(transaction);
+    if (
+      attempt.paymentIntent.capturedAmount.greaterThan(0)
+      || ["CAPTURED", "PARTIALLY_REFUNDED", "REFUNDED"].includes(
+        attempt.paymentIntent.status,
+      )
+    ) {
+      assertPaymentAttemptTransition(attempt.status, "CANCELLED");
+      await transaction.paymentAttempt.update({
+        where: { id: attempt.id },
+        data: {
+          claimedBy: null,
+          claimExpiresAt: null,
+          finishedAt: now,
+          nextRetryAt: null,
+          retryable: null,
+          safeProviderCode: "SUPERSEDED_BY_CAPTURE",
+          status: "CANCELLED",
+          version: { increment: 1 },
+        },
+      });
+      return;
+    }
+    assertPaymentAttemptTransition(attempt.status, "FAILED");
+    const retryable = attempt.retryCount < MAX_ATTEMPTS_PER_INTENT;
+    await transaction.paymentAttempt.update({
+      where: { id: attempt.id },
+      data: {
+        claimedBy: null,
+        claimExpiresAt: null,
+        finishedAt: now,
+        nextRetryAt: retryable
+          ? new Date(now.getTime() + paymentRetryDelayMilliseconds(attempt.retryCount))
+          : null,
+        retryable,
+        safeProviderCode: safeCode,
+        status: "FAILED",
+        version: { increment: 1 },
+      },
+    });
+    if (
+      attempt.paymentIntent.status === "PROCESSING"
+      && attempt.paymentIntent.capturedAmount.isZero()
+    ) {
+      await transaction.paymentIntent.update({
+        where: { id: attempt.paymentIntentId },
+        data: { status: "CREATED", version: { increment: 1 } },
+      });
+    }
+  });
+}
+
+function boundedClaimRetrySeconds(now: Date, expiresAt: Date) {
+  return Math.max(
+    1,
+    Math.min(
+      Math.ceil(PAYMENT_OPERATION_CLAIM_MS / 1_000),
+      Math.ceil((expiresAt.getTime() - now.getTime()) / 1_000),
+    ),
+  );
+}
+
+function terminalPaymentAttempt(status: string) {
+  return [
+    "REQUIRES_ACTION",
+    "AUTHORIZED",
+    "CAPTURED",
+    "FAILED",
+    "CANCELLED",
+    "EXPIRED",
+  ].includes(status);
 }
 
 export async function applyCapture(
