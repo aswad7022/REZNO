@@ -20,6 +20,9 @@ import {
   parsePlatformJobPayload,
   parsePlatformJobResult,
 } from "../../../features/platform-jobs/domain/registry";
+import {
+  refundReservesCapacity,
+} from "../../../features/payments/services/refunds";
 
 const code = (expected: string) => (error: unknown) =>
   error instanceof PlatformJobDomainError && error.code === expected;
@@ -182,6 +185,43 @@ test("Gate 6C manual trigger is strict, bounded, and allow-listed", () => {
     }),
     code("VALIDATION_ERROR"),
   );
+});
+
+test("Gate 6C refundable capacity retains retryable failures until terminal release", () => {
+  const base = {
+    nextRetryAt: null,
+    providerRequestReference: "refund_00000000-0000-4000-8000-000000000001",
+    retryCount: 0,
+    retryable: null,
+  };
+  assert.equal(refundReservesCapacity({ ...base, status: "REQUESTED" }), true);
+  assert.equal(refundReservesCapacity({ ...base, status: "PROCESSING" }), true);
+  assert.equal(refundReservesCapacity({
+    ...base,
+    nextRetryAt: new Date("2030-01-01T00:00:00.000Z"),
+    retryable: true,
+    status: "FAILED",
+  }), true);
+  assert.equal(refundReservesCapacity({
+    ...base,
+    nextRetryAt: new Date("2030-01-01T00:00:00.000Z"),
+    retryCount: 5,
+    retryable: true,
+    status: "FAILED",
+  }), false);
+  assert.equal(refundReservesCapacity({
+    ...base,
+    nextRetryAt: new Date("2030-01-01T00:00:00.000Z"),
+    providerRequestReference: null,
+    retryable: true,
+    status: "FAILED",
+  }), false);
+  assert.equal(refundReservesCapacity({
+    ...base,
+    status: "FAILED",
+  }), false);
+  assert.equal(refundReservesCapacity({ ...base, status: "SUCCEEDED" }), false);
+  assert.equal(refundReservesCapacity({ ...base, status: "CANCELLED" }), false);
 });
 
 test("Migration 48 is additive, actorless only for exact provider events, and creates no rows", async () => {

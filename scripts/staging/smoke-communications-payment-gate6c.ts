@@ -4,19 +4,46 @@ import { randomUUID } from "node:crypto";
 import {
   DeterministicSinkProvider,
   setCommunicationTestProviderFactory,
+  type OutboundProvider,
 } from "../../features/communications/providers/provider";
+import {
+  CommunicationOperationRetryableError,
+} from "../../features/communications/domain/errors";
+import type {
+  CommerceAdminContext,
+} from "../../features/commerce/services/authorization";
 import { setCommunicationTestPushEndpointResolver } from "../../features/communications/services/endpoints";
+import {
+  processExactDeliveryForAutomation,
+  setDeliveryAutomationTestHook,
+} from "../../features/communications/services/dispatcher";
 import {
   communicationsPaymentAutomationStatus,
   triggerGate6CAutomation,
 } from "../../features/communications-payment-automation/services/admin";
-import { PaymentDomainError } from "../../features/payments/domain/errors";
+import {
+  PaymentDomainError,
+  PaymentOperationRetryableError,
+} from "../../features/payments/domain/errors";
 import { DeterministicPaymentProvider } from "../../features/payments/providers/deterministic";
 import {
   paymentProvider,
   setPaymentProviderForTests,
 } from "../../features/payments/providers/registry";
-import { processPaymentProviderWebhook } from "../../features/payments/services/provider-events";
+import {
+  processPaymentProviderWebhook,
+  processVerifiedPaymentProviderEvent,
+  type PaymentExecutionGuard,
+} from "../../features/payments/services/provider-events";
+import {
+  retryPaymentAttemptFromAutomation,
+  setPaymentAttemptRetryTestHook,
+} from "../../features/payments/services/payment-intents";
+import {
+  requestAdminRefund,
+  retryAdminRefund,
+  setRefundRetryTestHook,
+} from "../../features/payments/services/refunds";
 import { STAGE_6_ARCHITECTURE } from "../../features/platform-jobs/domain/contracts";
 import type { PlatformJobAdminContext } from "../../features/platform-jobs/services/admin-context";
 import { runPlatformWorkerBatch } from "../../features/platform-jobs/services/worker";
@@ -51,7 +78,7 @@ async function main() {
   const seeded = await seedCommunicationsPaymentGate6cFixture(prisma);
   const adminAccess = await prisma.adminAccess.findUniqueOrThrow({
     where: { userId: ids.adminUserId },
-    select: { id: true },
+    select: { id: true, permissions: true },
   });
   const context: PlatformJobAdminContext = {
     adminAccessId: adminAccess.id,
@@ -76,24 +103,45 @@ async function main() {
   );
   paymentProviderFixture.configureDefaultScenario("TRANSIENT_FAILURE");
   const attemptProviderReferences: string[] = [];
+  let revokeAttemptDuringProvider = false;
+  let attemptAuthorityRevoked = false;
   const originalCreate =
     paymentProviderFixture.createPayment.bind(paymentProviderFixture);
   paymentProviderFixture.createPayment = async (input) => {
     attemptProviderReferences.push(input.providerRequestReference);
-    return originalCreate(input);
+    const result = await originalCreate(input);
+    if (revokeAttemptDuringProvider) attemptAuthorityRevoked = true;
+    return result;
   };
   const refundProviderReferences: string[] = [];
+  let revokeRefundDuringProvider = false;
+  let refundAuthorityRevoked = false;
   paymentProviderFixture.refundPayment = async (input) => {
     refundProviderReferences.push(input.providerRequestReference);
+    if (revokeRefundDuringProvider) refundAuthorityRevoked = true;
     return {
       outcome: "TRANSIENT_FAILURE",
       safeCode: "TEMPORARY_UNAVAILABLE",
     };
   };
+  const deliveryProviderKeys: string[] = [];
+  let deliveryProviderCalls = 0;
+  let revokeDeliveryDuringProvider = false;
+  let deliveryAuthorityRevoked = false;
   setPaymentProviderForTests(paymentProviderFixture);
-  setCommunicationTestProviderFactory(
-    (channel) => new DeterministicSinkProvider(channel),
-  );
+  setCommunicationTestProviderFactory((channel): OutboundProvider => {
+    const provider = new DeterministicSinkProvider(channel);
+    return {
+      channel,
+      send: async (message) => {
+        deliveryProviderCalls += 1;
+        deliveryProviderKeys.push(message.providerIdempotencyKey);
+        const result = await provider.send(message);
+        if (revokeDeliveryDuringProvider) deliveryAuthorityRevoked = true;
+        return result;
+      },
+    };
+  });
   setCommunicationTestPushEndpointResolver(
     (personIds) =>
       new Map(
@@ -125,6 +173,39 @@ async function main() {
   assert.equal(schedules.length, 5);
   assert.ok(schedules.every((schedule) => !schedule.enabled));
   checks += 2;
+
+  phase = "DURABILITY_CLOSURE";
+  checks += await runDurabilityClosure({
+    attemptProviderReferences,
+    context: {
+      ...context,
+      isSuperAdmin: false,
+      permissions:
+        adminAccess.permissions as CommerceAdminContext["permissions"],
+    },
+    deliveryProviderKeys,
+    getAttemptAuthorityRevoked: () => attemptAuthorityRevoked,
+    getDeliveryAuthorityRevoked: () => deliveryAuthorityRevoked,
+    getDeliveryProviderCalls: () => deliveryProviderCalls,
+    getRefundAuthorityRevoked: () => refundAuthorityRevoked,
+    refundProviderReferences,
+    setAttemptRevocation: (enabled) => {
+      revokeAttemptDuringProvider = enabled;
+      attemptAuthorityRevoked = false;
+    },
+    setDeliveryRevocation: (enabled) => {
+      revokeDeliveryDuringProvider = enabled;
+      deliveryAuthorityRevoked = false;
+    },
+    setRefundRevocation: (enabled) => {
+      revokeRefundDuringProvider = enabled;
+      refundAuthorityRevoked = false;
+    },
+  });
+  attemptProviderReferences.length = 0;
+  deliveryProviderCalls = 0;
+  deliveryProviderKeys.length = 0;
+  refundProviderReferences.length = 0;
 
   phase = "WEBHOOK_BOUNDARY";
   const webhookIntent = await prisma.paymentIntent.findUniqueOrThrow({
@@ -429,6 +510,779 @@ async function main() {
     status: "passed",
     workerRuns,
   }));
+}
+
+async function runDurabilityClosure(input: {
+  attemptProviderReferences: string[];
+  context: CommerceAdminContext;
+  deliveryProviderKeys: string[];
+  getAttemptAuthorityRevoked: () => boolean;
+  getDeliveryAuthorityRevoked: () => boolean;
+  getDeliveryProviderCalls: () => number;
+  getRefundAuthorityRevoked: () => boolean;
+  refundProviderReferences: string[];
+  setAttemptRevocation: (enabled: boolean) => void;
+  setDeliveryRevocation: (enabled: boolean) => void;
+  setRefundRevocation: (enabled: boolean) => void;
+}) {
+  const attemptId = paymentsGate5cFixtureIds.attemptIds[12]!;
+  const attempt = await prisma.paymentAttempt.findUniqueOrThrow({
+    where: { id: attemptId },
+  });
+  const attemptIntent = await prisma.paymentIntent.findUniqueOrThrow({
+    where: { id: attempt.paymentIntentId },
+  });
+  const refund = await prisma.paymentRefund.findUniqueOrThrow({
+    where: { id: ids.refund },
+  });
+  const refundIntent = await prisma.paymentIntent.findUniqueOrThrow({
+    where: { id: refund.paymentIntentId },
+  });
+  const delivery = await prisma.outboundDelivery.findUniqueOrThrow({
+    where: { id: ids.delivery },
+  });
+  const deliveryCampaign = await prisma.communicationCampaign.findUniqueOrThrow({
+    where: { id: delivery.campaignId },
+  });
+  const mutationKeys: string[] = [];
+  const journalCount = await prisma.financialJournal.count();
+  let checks = 0;
+
+  const restoreAttempt = async () => {
+    await prisma.$transaction([
+      prisma.paymentAttempt.update({
+        where: { id: attempt.id },
+        data: {
+          actionExpiresAt: attempt.actionExpiresAt,
+          actionReference: attempt.actionReference,
+          claimedBy: attempt.claimedBy,
+          claimExpiresAt: attempt.claimExpiresAt,
+          finishedAt: attempt.finishedAt,
+          nextRetryAt: attempt.nextRetryAt,
+          providerPaymentReference: attempt.providerPaymentReference,
+          requiresAction: attempt.requiresAction,
+          retryable: attempt.retryable,
+          retryCount: attempt.retryCount,
+          safeProviderCode: attempt.safeProviderCode,
+          startedAt: attempt.startedAt,
+          status: attempt.status,
+          updatedAt: attempt.updatedAt,
+          version: attempt.version,
+        },
+      }),
+      prisma.paymentIntent.update({
+        where: { id: attemptIntent.id },
+        data: {
+          failedAt: attemptIntent.failedAt,
+          status: attemptIntent.status,
+          updatedAt: attemptIntent.updatedAt,
+          version: attemptIntent.version,
+        },
+      }),
+    ]);
+  };
+  const restoreRefund = async () => {
+    await prisma.$transaction([
+      prisma.paymentMutation.deleteMany({
+        where: { idempotencyKey: { in: mutationKeys } },
+      }),
+      prisma.adminAuditLog.deleteMany({
+        where: {
+          adminUserId: ids.adminUserId,
+          idempotencyKey: { in: mutationKeys },
+        },
+      }),
+      prisma.paymentRefund.update({
+        where: { id: refund.id },
+        data: {
+          claimedBy: refund.claimedBy,
+          claimExpiresAt: refund.claimExpiresAt,
+          completedAt: refund.completedAt,
+          nextRetryAt: refund.nextRetryAt,
+          providerReference: refund.providerReference,
+          retryable: refund.retryable,
+          retryCount: refund.retryCount,
+          safeProviderCode: refund.safeProviderCode,
+          status: refund.status,
+          updatedAt: refund.updatedAt,
+          version: refund.version,
+        },
+      }),
+      prisma.paymentIntent.update({
+        where: { id: refundIntent.id },
+        data: {
+          refundedAmount: refundIntent.refundedAmount,
+          status: refundIntent.status,
+          updatedAt: refundIntent.updatedAt,
+          version: refundIntent.version,
+        },
+      }),
+    ]);
+  };
+  const restoreDelivery = async () => {
+    await prisma.$transaction([
+      prisma.outboundDeliveryAttempt.deleteMany({
+        where: { deliveryId: delivery.id },
+      }),
+      prisma.outboundDelivery.update({
+        where: { id: delivery.id },
+        data: {
+          acceptedAt: delivery.acceptedAt,
+          attemptCount: delivery.attemptCount,
+          claimedAt: delivery.claimedAt,
+          claimExpiresAt: delivery.claimExpiresAt,
+          claimOwner: delivery.claimOwner,
+          failedAt: delivery.failedAt,
+          lastProviderCode: delivery.lastProviderCode,
+          nextAttemptAt: delivery.nextAttemptAt,
+          status: delivery.status,
+          suppressionReason: delivery.suppressionReason,
+          updatedAt: delivery.updatedAt,
+          version: delivery.version,
+        },
+      }),
+      prisma.communicationCampaign.update({
+        where: { id: deliveryCampaign.id },
+        data: {
+          completedAt: deliveryCampaign.completedAt,
+          status: deliveryCampaign.status,
+          updatedAt: deliveryCampaign.updatedAt,
+          version: deliveryCampaign.version,
+        },
+      }),
+    ]);
+  };
+
+  try {
+    phase = "DURABILITY_ATTEMPT_CLAIM";
+    const dueAttempt = await prisma.paymentAttempt.update({
+      where: { id: attempt.id },
+      data: {
+        nextRetryAt: new Date(Date.now() - 1_000),
+        retryable: true,
+        retryCount: attempt.retryCount,
+      },
+    });
+    const attemptJob = randomUUID();
+    setPaymentAttemptRetryTestHook(({ phase }) => {
+      if (phase === "AFTER_CLAIM_BEFORE_PROVIDER") {
+        throw new Error("Gate 6C staging attempt interruption.");
+      }
+    });
+    await assert.rejects(retryPaymentAttemptFromAutomation(input.context, {
+      attemptId: dueAttempt.id,
+      executionGuard: noPaymentGuard,
+      expectedVersion: dueAttempt.version,
+      jobId: attemptJob,
+    }));
+    await assert.rejects(
+      retryPaymentAttemptFromAutomation(input.context, {
+        attemptId: dueAttempt.id,
+        executionGuard: noPaymentGuard,
+        expectedVersion: dueAttempt.version,
+        jobId: attemptJob,
+      }),
+      retryablePaymentOperation,
+    );
+    await assert.rejects(
+      retryPaymentAttemptFromAutomation(input.context, {
+        attemptId: dueAttempt.id,
+        executionGuard: noPaymentGuard,
+        expectedVersion: dueAttempt.version + 10,
+        jobId: randomUUID(),
+      }),
+      retryablePaymentOperation,
+    );
+    await prisma.paymentAttempt.update({
+      where: { id: dueAttempt.id },
+      data: { claimExpiresAt: new Date(Date.now() - 1_000) },
+    });
+    setPaymentAttemptRetryTestHook(undefined);
+    await retryPaymentAttemptFromAutomation(input.context, {
+      attemptId: dueAttempt.id,
+      executionGuard: noPaymentGuard,
+      expectedVersion: dueAttempt.version,
+      jobId: attemptJob,
+    });
+    let currentAttempt = await prisma.paymentAttempt.findUniqueOrThrow({
+      where: { id: dueAttempt.id },
+    });
+    assert.equal(currentAttempt.status, "FAILED");
+    assert.equal(currentAttempt.claimedBy, null);
+    assert.equal(
+      currentAttempt.providerRequestReference,
+      attempt.providerRequestReference,
+    );
+    checks += 6;
+
+    phase = "DURABILITY_ATTEMPT_PROVIDER";
+    currentAttempt = await prisma.paymentAttempt.update({
+      where: { id: dueAttempt.id },
+      data: {
+        nextRetryAt: new Date(Date.now() - 1_000),
+        retryable: true,
+        retryCount: attempt.retryCount,
+      },
+    });
+    const uncertainAttemptJob = randomUUID();
+    const attemptCallsBeforeUncertainty = input.attemptProviderReferences.length;
+    setPaymentAttemptRetryTestHook(({ phase }) => {
+      if (phase === "AFTER_PROVIDER_BEFORE_APPLY") {
+        throw new Error("Gate 6C staging attempt provider uncertainty.");
+      }
+    });
+    await assert.rejects(retryPaymentAttemptFromAutomation(input.context, {
+      attemptId: currentAttempt.id,
+      executionGuard: noPaymentGuard,
+      expectedVersion: currentAttempt.version,
+      jobId: uncertainAttemptJob,
+    }));
+    await prisma.paymentAttempt.update({
+      where: { id: currentAttempt.id },
+      data: { claimExpiresAt: new Date(Date.now() - 1_000) },
+    });
+    setPaymentAttemptRetryTestHook(undefined);
+    await retryPaymentAttemptFromAutomation(input.context, {
+      attemptId: currentAttempt.id,
+      executionGuard: noPaymentGuard,
+      expectedVersion: currentAttempt.version,
+      jobId: uncertainAttemptJob,
+    });
+    assert.equal(
+      input.attemptProviderReferences.slice(attemptCallsBeforeUncertainty)
+        .every((reference) => reference === attempt.providerRequestReference),
+      true,
+    );
+    assert.equal(
+      input.attemptProviderReferences.length - attemptCallsBeforeUncertainty,
+      2,
+    );
+    checks += 2;
+
+    phase = "DURABILITY_ATTEMPT_REVOCATION";
+    currentAttempt = await prisma.paymentAttempt.update({
+      where: { id: currentAttempt.id },
+      data: {
+        nextRetryAt: new Date(Date.now() - 1_000),
+        retryable: true,
+        retryCount: attempt.retryCount,
+      },
+    });
+    let attemptGuardCalls = 0;
+    const revokedAfterClaimGuard: PaymentExecutionGuard = async () => {
+      attemptGuardCalls += 1;
+      if (attemptGuardCalls > 1) {
+        throw new Error("Gate 6C staging attempt authority revoked.");
+      }
+    };
+    const callsBeforeAttemptRevocation = input.attemptProviderReferences.length;
+    await assert.rejects(retryPaymentAttemptFromAutomation(input.context, {
+      attemptId: currentAttempt.id,
+      executionGuard: revokedAfterClaimGuard,
+      expectedVersion: currentAttempt.version,
+      jobId: randomUUID(),
+    }));
+    assert.equal(
+      input.attemptProviderReferences.length,
+      callsBeforeAttemptRevocation,
+    );
+    currentAttempt = await prisma.paymentAttempt.update({
+      where: { id: currentAttempt.id },
+      data: {
+        nextRetryAt: new Date(Date.now() - 1_000),
+        retryable: true,
+        retryCount: attempt.retryCount,
+      },
+    });
+    input.setAttemptRevocation(true);
+    await assert.rejects(retryPaymentAttemptFromAutomation(input.context, {
+      attemptId: currentAttempt.id,
+      executionGuard: async () => {
+        if (input.getAttemptAuthorityRevoked()) {
+          throw new Error("Gate 6C staging attempt provider authority revoked.");
+        }
+      },
+      expectedVersion: currentAttempt.version,
+      jobId: randomUUID(),
+    }));
+    input.setAttemptRevocation(false);
+    assert.equal((await prisma.paymentAttempt.findUniqueOrThrow({
+      where: { id: currentAttempt.id },
+    })).status, "FAILED");
+    checks += 3;
+    await restoreAttempt();
+
+    phase = "DURABILITY_REFUND_CAPACITY";
+    const capacityCalls = input.refundProviderReferences.length;
+    await assert.rejects(
+      requestAdminRefund(input.context, {
+        amount: refundIntent.capturedAmount
+          .minus(refundIntent.refundedAmount)
+          .toFixed(3),
+        expectedVersion: refundIntent.version,
+        idempotencyKey: randomUUID(),
+        paymentIntentId: refundIntent.id,
+        reasonCode: "ADMIN_CORRECTION",
+      }),
+      paymentCode("REFUND_AMOUNT_EXCEEDED"),
+    );
+    assert.equal(input.refundProviderReferences.length, capacityCalls);
+    const concurrentRefund = await prisma.paymentRefund.update({
+      where: { id: refund.id },
+      data: {
+        nextRetryAt: new Date(Date.now() - 1_000),
+        retryable: true,
+        retryCount: refund.retryCount,
+      },
+    });
+    const concurrentJob = randomUUID();
+    mutationKeys.push(concurrentJob);
+    const capacityRace = await Promise.allSettled([
+      retryAdminRefund(input.context, concurrentRefund.id, {
+        expectedVersion: concurrentRefund.version,
+        idempotencyKey: concurrentJob,
+      }, noPaymentGuard, {
+        claimOwner: `platform-job:${concurrentJob}`,
+        requireRetryable: true,
+      }),
+      requestAdminRefund(input.context, {
+        amount: refundIntent.capturedAmount
+          .minus(refundIntent.refundedAmount)
+          .toFixed(3),
+        expectedVersion: refundIntent.version,
+        idempotencyKey: randomUUID(),
+        paymentIntentId: refundIntent.id,
+        reasonCode: "ADMIN_CORRECTION",
+      }),
+    ]);
+    assert.equal(
+      capacityRace.filter((result) => result.status === "fulfilled").length,
+      1,
+    );
+    checks += 3;
+
+    phase = "DURABILITY_REFUND_CLAIM";
+    let currentRefund = await prisma.paymentRefund.update({
+      where: { id: refund.id },
+      data: {
+        nextRetryAt: new Date(Date.now() - 1_000),
+        retryable: true,
+        retryCount: refund.retryCount,
+      },
+    });
+    const refundJob = randomUUID();
+    mutationKeys.push(refundJob);
+    setRefundRetryTestHook(({ phase }) => {
+      if (phase === "AFTER_CLAIM_BEFORE_PROVIDER") {
+        throw new Error("Gate 6C staging refund interruption.");
+      }
+    });
+    await assert.rejects(retryAdminRefund(input.context, currentRefund.id, {
+      expectedVersion: currentRefund.version,
+      idempotencyKey: refundJob,
+    }, noPaymentGuard, {
+      claimOwner: `platform-job:${refundJob}`,
+      requireRetryable: true,
+    }));
+    await assert.rejects(retryAdminRefund(input.context, currentRefund.id, {
+      expectedVersion: currentRefund.version,
+      idempotencyKey: refundJob,
+    }, noPaymentGuard, {
+      claimOwner: `platform-job:${refundJob}`,
+      requireRetryable: true,
+    }), retryablePaymentOperation);
+    const foreignRefundJob = randomUUID();
+    await assert.rejects(retryAdminRefund(input.context, currentRefund.id, {
+      expectedVersion: currentRefund.version,
+      idempotencyKey: foreignRefundJob,
+    }, noPaymentGuard, {
+      claimOwner: `platform-job:${foreignRefundJob}`,
+      requireRetryable: true,
+    }), retryablePaymentOperation);
+    await prisma.paymentRefund.update({
+      where: { id: currentRefund.id },
+      data: { claimExpiresAt: new Date(Date.now() - 1_000) },
+    });
+    setRefundRetryTestHook(undefined);
+    await retryAdminRefund(input.context, currentRefund.id, {
+      expectedVersion: currentRefund.version,
+      idempotencyKey: refundJob,
+    }, noPaymentGuard, {
+      claimOwner: `platform-job:${refundJob}`,
+      requireRetryable: true,
+    });
+    checks += 4;
+
+    phase = "DURABILITY_REFUND_PROVIDER";
+    currentRefund = await prisma.paymentRefund.update({
+      where: { id: refund.id },
+      data: {
+        nextRetryAt: new Date(Date.now() - 1_000),
+        retryable: true,
+        retryCount: refund.retryCount,
+      },
+    });
+    const uncertainRefundJob = randomUUID();
+    mutationKeys.push(uncertainRefundJob);
+    const refundCallsBeforeUncertainty = input.refundProviderReferences.length;
+    setRefundRetryTestHook(({ phase }) => {
+      if (phase === "AFTER_PROVIDER_BEFORE_APPLY") {
+        throw new Error("Gate 6C staging refund provider uncertainty.");
+      }
+    });
+    await assert.rejects(retryAdminRefund(input.context, currentRefund.id, {
+      expectedVersion: currentRefund.version,
+      idempotencyKey: uncertainRefundJob,
+    }, noPaymentGuard, {
+      claimOwner: `platform-job:${uncertainRefundJob}`,
+      requireRetryable: true,
+    }));
+    await prisma.paymentRefund.update({
+      where: { id: currentRefund.id },
+      data: { claimExpiresAt: new Date(Date.now() - 1_000) },
+    });
+    setRefundRetryTestHook(undefined);
+    await retryAdminRefund(input.context, currentRefund.id, {
+      expectedVersion: currentRefund.version,
+      idempotencyKey: uncertainRefundJob,
+    }, noPaymentGuard, {
+      claimOwner: `platform-job:${uncertainRefundJob}`,
+      requireRetryable: true,
+    });
+    assert.equal(
+      input.refundProviderReferences.slice(refundCallsBeforeUncertainty)
+        .every((reference) => reference === refund.providerRequestReference),
+      true,
+    );
+    assert.equal(
+      input.refundProviderReferences.length - refundCallsBeforeUncertainty,
+      2,
+    );
+    checks += 2;
+
+    phase = "DURABILITY_REFUND_REVOCATION_AFTER_CLAIM";
+    currentRefund = await prisma.paymentRefund.update({
+      where: { id: refund.id },
+      data: {
+        nextRetryAt: new Date(Date.now() - 1_000),
+        retryable: true,
+        retryCount: refund.retryCount,
+      },
+    });
+    let refundGuardCalls = 0;
+    const refundClaimGuard: PaymentExecutionGuard = async () => {
+      refundGuardCalls += 1;
+      if (refundGuardCalls > 1) {
+        throw new Error("Gate 6C staging refund authority revoked.");
+      }
+    };
+    const refundClaimJob = randomUUID();
+    mutationKeys.push(refundClaimJob);
+    const callsBeforeRefundRevocation = input.refundProviderReferences.length;
+    await assert.rejects(retryAdminRefund(input.context, currentRefund.id, {
+      expectedVersion: currentRefund.version,
+      idempotencyKey: refundClaimJob,
+    }, refundClaimGuard, {
+      claimOwner: `platform-job:${refundClaimJob}`,
+      requireRetryable: true,
+    }));
+    assert.equal(
+      input.refundProviderReferences.length,
+      callsBeforeRefundRevocation,
+    );
+    phase = "DURABILITY_REFUND_REVOCATION_DURING_PROVIDER";
+    currentRefund = await prisma.paymentRefund.update({
+      where: { id: refund.id },
+      data: {
+        nextRetryAt: new Date(Date.now() - 1_000),
+        retryable: true,
+        retryCount: refund.retryCount,
+      },
+    });
+    const refundProviderJob = randomUUID();
+    mutationKeys.push(refundProviderJob);
+    input.setRefundRevocation(true);
+    await assert.rejects(retryAdminRefund(input.context, currentRefund.id, {
+      expectedVersion: currentRefund.version,
+      idempotencyKey: refundProviderJob,
+    }, async () => {
+      if (input.getRefundAuthorityRevoked()) {
+        throw new Error("Gate 6C staging refund provider authority revoked.");
+      }
+    }, {
+      claimOwner: `platform-job:${refundProviderJob}`,
+      requireRetryable: true,
+    }));
+    input.setRefundRevocation(false);
+    phase = "DURABILITY_REFUND_REVOCATION_STATE";
+    assert.equal((await prisma.paymentRefund.findUniqueOrThrow({
+      where: { id: currentRefund.id },
+    })).status, "FAILED");
+    phase = "DURABILITY_REFUND_REVOCATION_MUTATION";
+    assert.equal(await prisma.paymentMutation.count({
+      where: {
+        idempotencyKey: { in: mutationKeys },
+        status: "PROCESSING",
+      },
+    }), 0);
+    checks += 4;
+    await restoreRefund();
+
+    phase = "DURABILITY_DELIVERY_CLAIM";
+    setDeliveryAutomationTestHook(({ phase }) => {
+      if (phase === "AFTER_CLAIM_BEFORE_ATTEMPT") {
+        throw new Error("Gate 6C staging delivery claim interruption.");
+      }
+    });
+    const deliveryOwner = `platform-job:${randomUUID()}`;
+    await assert.rejects(processExactDeliveryForAutomation({
+      claimOwner: deliveryOwner,
+      deliveryId: delivery.id,
+      executionGuard: noCommunicationGuard,
+      expectedVersion: delivery.version,
+    }));
+    await assert.rejects(processExactDeliveryForAutomation({
+      claimOwner: deliveryOwner,
+      deliveryId: delivery.id,
+      executionGuard: noCommunicationGuard,
+      expectedVersion: delivery.version,
+    }), retryableCommunicationOperation);
+    await prisma.outboundDelivery.update({
+      where: { id: delivery.id },
+      data: { claimExpiresAt: new Date(Date.now() - 1_000) },
+    });
+    setDeliveryAutomationTestHook(undefined);
+    await processExactDeliveryForAutomation({
+      claimOwner: deliveryOwner,
+      deliveryId: delivery.id,
+      executionGuard: noCommunicationGuard,
+      expectedVersion: delivery.version,
+    });
+    checks += 3;
+    await restoreDelivery();
+
+    phase = "DURABILITY_DELIVERY_ATTEMPT";
+    setDeliveryAutomationTestHook(({ phase }) => {
+      if (phase === "AFTER_ATTEMPT_BEFORE_PROVIDER") {
+        throw new Error("Gate 6C staging delivery attempt interruption.");
+      }
+    });
+    const attemptDeliveryOwner = `platform-job:${randomUUID()}`;
+    phase = "DURABILITY_DELIVERY_ATTEMPT_INTERRUPT";
+    await assert.rejects(processExactDeliveryForAutomation({
+      claimOwner: attemptDeliveryOwner,
+      deliveryId: delivery.id,
+      executionGuard: noCommunicationGuard,
+      expectedVersion: delivery.version,
+    }));
+    phase = "DURABILITY_DELIVERY_ATTEMPT_UNFINISHED";
+    const unfinishedAttempt =
+      await prisma.outboundDeliveryAttempt.findFirstOrThrow({
+        where: { deliveryId: delivery.id },
+      });
+    phase = "DURABILITY_DELIVERY_ATTEMPT_EXPIRE";
+    await prisma.outboundDelivery.update({
+      where: { id: delivery.id },
+      data: { claimExpiresAt: new Date(Date.now() - 1_000) },
+    });
+    setDeliveryAutomationTestHook(undefined);
+    phase = "DURABILITY_DELIVERY_ATTEMPT_RECOVER";
+    await processExactDeliveryForAutomation({
+      claimOwner: attemptDeliveryOwner,
+      deliveryId: delivery.id,
+      executionGuard: noCommunicationGuard,
+      expectedVersion: delivery.version,
+    });
+    phase = "DURABILITY_DELIVERY_ATTEMPT_VERIFY";
+    assert.equal(await prisma.outboundDeliveryAttempt.count({
+      where: { deliveryId: delivery.id },
+    }), 1);
+    assert.equal((await prisma.outboundDeliveryAttempt.findFirstOrThrow({
+      where: { deliveryId: delivery.id },
+    })).id, unfinishedAttempt.id);
+    checks += 3;
+    await restoreDelivery();
+
+    phase = "DURABILITY_DELIVERY_PROVIDER";
+    const deliveryCallsBeforeUncertainty = input.getDeliveryProviderCalls();
+    const deliveryKeysBeforeUncertainty = input.deliveryProviderKeys.length;
+    setDeliveryAutomationTestHook(({ phase }) => {
+      if (phase === "AFTER_PROVIDER_BEFORE_FINALIZE") {
+        throw new Error("Gate 6C staging delivery provider uncertainty.");
+      }
+    });
+    const uncertainDeliveryOwner = `platform-job:${randomUUID()}`;
+    await assert.rejects(processExactDeliveryForAutomation({
+      claimOwner: uncertainDeliveryOwner,
+      deliveryId: delivery.id,
+      executionGuard: noCommunicationGuard,
+      expectedVersion: delivery.version,
+    }));
+    await prisma.outboundDelivery.update({
+      where: { id: delivery.id },
+      data: { claimExpiresAt: new Date(Date.now() - 1_000) },
+    });
+    setDeliveryAutomationTestHook(undefined);
+    await processExactDeliveryForAutomation({
+      claimOwner: uncertainDeliveryOwner,
+      deliveryId: delivery.id,
+      executionGuard: noCommunicationGuard,
+      expectedVersion: delivery.version,
+    });
+    assert.equal(
+      input.getDeliveryProviderCalls() - deliveryCallsBeforeUncertainty,
+      2,
+    );
+    assert.equal(
+      new Set(input.deliveryProviderKeys.slice(deliveryKeysBeforeUncertainty))
+        .size,
+      1,
+    );
+    assert.equal(await prisma.outboundDeliveryAttempt.count({
+      where: { deliveryId: delivery.id },
+    }), 1);
+    checks += 3;
+    await restoreDelivery();
+
+    phase = "DURABILITY_DELIVERY_REVOCATION";
+    input.setDeliveryRevocation(true);
+    await assert.rejects(processExactDeliveryForAutomation({
+      claimOwner: `platform-job:${randomUUID()}`,
+      deliveryId: delivery.id,
+      executionGuard: async () => {
+        if (input.getDeliveryAuthorityRevoked()) {
+          throw new Error("Gate 6C staging delivery provider authority revoked.");
+        }
+      },
+      expectedVersion: delivery.version,
+    }));
+    input.setDeliveryRevocation(false);
+    assert.equal((await prisma.outboundDelivery.findUniqueOrThrow({
+      where: { id: delivery.id },
+    })).status, "RETRY_SCHEDULED");
+    assert.equal(await prisma.outboundDeliveryAttempt.count({
+      where: { deliveryId: delivery.id, finishedAt: null },
+    }), 0);
+    checks += 3;
+    await restoreDelivery();
+
+    phase = "DURABILITY_EVENT_RACE";
+    const eventIntent = await prisma.paymentIntent.findUniqueOrThrow({
+      where: { id: paymentsGate5cFixtureIds.intentIds[3] },
+    });
+    const eventAttempt = await prisma.paymentAttempt.findFirstOrThrow({
+      where: { paymentIntentId: eventIntent.id },
+    });
+    const eventId = randomUUID();
+    const eventNow = new Date();
+    const eventJournalCount = await prisma.financialJournal.count({
+      where: { paymentIntentId: eventIntent.id, sourceType: "CAPTURE" },
+    });
+    try {
+      await prisma.paymentAttempt.update({
+        where: { id: eventAttempt.id },
+        data: {
+          claimedBy: `platform-job:${randomUUID()}`,
+          claimExpiresAt: new Date(Date.now() + 60_000),
+          finishedAt: null,
+          nextRetryAt: null,
+          retryable: null,
+          safeProviderCode: null,
+          status: "PROCESSING",
+          version: { increment: 1 },
+        },
+      });
+      await prisma.paymentProviderEvent.create({
+        data: {
+          id: eventId,
+          normalizedAmount: eventIntent.amount,
+          normalizedCurrency: eventIntent.currency,
+          normalizedType: "CAPTURED",
+          occurredAt: eventNow,
+          payloadHash: "a".repeat(64),
+          paymentIntentId: eventIntent.id,
+          processingVersion: 1,
+          provider: eventIntent.provider,
+          providerEventId:
+            `${COMMUNICATIONS_PAYMENT_GATE6C_MARKER}-durability-event`,
+          providerReference: eventIntent.providerReference,
+          status: "VERIFIED",
+          verifiedAt: eventNow,
+        },
+      });
+      const eventResult = await processVerifiedPaymentProviderEvent({
+        eventId,
+        executionGuard: noPaymentGuard,
+        expectedVersion: 1,
+      });
+      assert.equal(eventResult.state, "IGNORED");
+      const superseded = await prisma.paymentAttempt.findUniqueOrThrow({
+        where: { id: eventAttempt.id },
+      });
+      assert.equal(superseded.status, "CANCELLED");
+      assert.equal(superseded.claimedBy, null);
+      assert.notEqual(superseded.finishedAt, null);
+      assert.equal(await prisma.financialJournal.count({
+        where: { paymentIntentId: eventIntent.id, sourceType: "CAPTURE" },
+      }), eventJournalCount);
+      checks += 5;
+    } finally {
+      await prisma.$transaction([
+        prisma.paymentProviderEvent.deleteMany({ where: { id: eventId } }),
+        prisma.paymentAttempt.update({
+          where: { id: eventAttempt.id },
+          data: {
+            claimedBy: eventAttempt.claimedBy,
+            claimExpiresAt: eventAttempt.claimExpiresAt,
+            finishedAt: eventAttempt.finishedAt,
+            nextRetryAt: eventAttempt.nextRetryAt,
+            retryable: eventAttempt.retryable,
+            safeProviderCode: eventAttempt.safeProviderCode,
+            status: eventAttempt.status,
+            updatedAt: eventAttempt.updatedAt,
+            version: eventAttempt.version,
+          },
+        }),
+      ]);
+    }
+    assert.equal(await prisma.financialJournal.count(), journalCount);
+    assert.equal(await prisma.paymentAttempt.count({
+      where: { id: attempt.id, status: "PROCESSING" },
+    }), 0);
+    assert.equal(await prisma.paymentRefund.count({
+      where: { id: refund.id, status: "PROCESSING" },
+    }), 0);
+    assert.equal(await prisma.outboundDelivery.count({
+      where: { id: delivery.id, status: "CLAIMED" },
+    }), 0);
+    assert.equal(await prisma.outboundDeliveryAttempt.count({
+      where: { deliveryId: delivery.id, finishedAt: null },
+    }), 0);
+    checks += 5;
+    phase = "DURABILITY_CLOSURE_COMPLETE";
+  } finally {
+    setDeliveryAutomationTestHook(undefined);
+    setPaymentAttemptRetryTestHook(undefined);
+    setRefundRetryTestHook(undefined);
+    input.setAttemptRevocation(false);
+    input.setDeliveryRevocation(false);
+    input.setRefundRevocation(false);
+    await restoreAttempt();
+    await restoreRefund();
+    await restoreDelivery();
+  }
+  return checks;
+}
+
+const noPaymentGuard: PaymentExecutionGuard = async () => undefined;
+const noCommunicationGuard = async () => undefined;
+
+function retryablePaymentOperation(error: unknown) {
+  return error instanceof PaymentOperationRetryableError;
+}
+
+function retryableCommunicationOperation(error: unknown) {
+  return error instanceof CommunicationOperationRetryableError;
 }
 
 async function runUntilIdle(context: PlatformJobAdminContext) {

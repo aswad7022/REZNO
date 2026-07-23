@@ -195,14 +195,16 @@ test("Gate 6C communication discovery and exact delivery use durable authority",
     const attempt = await prisma.outboundDeliveryAttempt.findFirstOrThrow({
       where: { deliveryId: delivery.id },
     });
-    assert.equal(attempt.finishedAt, null);
-    assert.equal(attempt.outcome, null);
+    assert.notEqual(attempt.finishedAt, null);
+    assert.equal(attempt.outcome, "TRANSIENT_FAILURE");
     assert.equal(attempt.providerName, null);
     assert.equal(attempt.providerMessageId, null);
-    assert.notEqual(
-      (await prisma.outboundDelivery.findUniqueOrThrow({ where: { id: delivery.id } })).status,
-      "ACCEPTED",
-    );
+    const recovered = await prisma.outboundDelivery.findUniqueOrThrow({
+      where: { id: delivery.id },
+    });
+    assert.equal(recovered.status, "RETRY_SCHEDULED");
+    assert.equal(recovered.claimOwner, null);
+    assert.equal(recovered.claimExpiresAt, null);
   });
 });
 
