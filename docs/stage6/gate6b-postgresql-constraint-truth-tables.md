@@ -65,7 +65,7 @@ Two fresh rehearsals migrated 1→47, finished healthy 47/47 with no failed or
 rolled-back row, fabricated no protected domain row, and made a second deploy a
 no-op. The populated 46→47 rehearsal preserved all counts and both fixture and
 non-fixture fingerprints. Migrations 1–46 retained aggregate SHA-256
-`8990391ed58ff9418ba145e9439a0041a04b4474e6374852cf11a6340a24fb67`;
+`bb70769bd809e2581a113f4bf14eb6738020505129e5825cecaa9f953969ec5d`;
 Migration 47 SHA-256 is
 `9596d3e94b852e5e8a794c9fc47f30decf67ad50e890ced7d5bc366704ee8b7d`.
 
