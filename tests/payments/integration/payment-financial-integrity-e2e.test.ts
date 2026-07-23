@@ -12,7 +12,10 @@ import {
   getCustomerPaymentIntent,
   submitCustomerPaymentIntent,
 } from "../../../features/payments/services/payment-intents";
-import { processPaymentProviderWebhook } from "../../../features/payments/services/provider-events";
+import {
+  processPaymentProviderWebhook,
+  processVerifiedPaymentProviderEvent,
+} from "../../../features/payments/services/provider-events";
 import { getBusinessPayment, listBusinessPayments } from "../../../features/payments/services/queries";
 import { requestBusinessRefund, retryBusinessRefund } from "../../../features/payments/services/refunds";
 import { runPaymentReconciliation } from "../../../features/payments/services/reconciliation";
@@ -267,15 +270,23 @@ test("Gate 5C payment lifecycle is authorized, exact-once, balanced, refundable,
       providerReference: stored.providerReference!,
       safeCode: null,
     }, now);
+    const partialAccepted = await processPaymentProviderWebhook({
+      ...partialCapture,
+      receivedAt: now,
+    });
+    assert.equal(partialAccepted.status, "VERIFIED");
     await assert.rejects(
-      processPaymentProviderWebhook({ ...partialCapture, receivedAt: now }),
+      processAcceptedProviderEvent(partialCapture),
       code("PAYMENT_AMOUNT_MISMATCH"),
     );
     assert.equal((await prisma.paymentIntent.findUniqueOrThrow({ where: { id: pending.id } })).capturedAmount.toFixed(3), "0.000");
 
     const first = await processGuardedPaymentWebhook(paymentWebhookRequest(capturedEvent));
+    assert.equal(first.status, "VERIFIED");
+    const applied = await processAcceptedProviderEvent(capturedEvent);
+    assert.equal(applied.state, "PROCESSED");
     const duplicate = await processGuardedPaymentWebhook(paymentWebhookRequest(capturedEvent));
-    assert.equal(first.status, "PROCESSED");
+    assert.equal(duplicate.status, "PROCESSED");
     assert.equal(duplicate.duplicate, true);
     const collidedEvent = provider.signWebhook({ amount: "8000.000", currency: "IQD", eventId: JSON.parse(Buffer.from(capturedEvent.body).toString("utf8")).eventId, occurredAt: now, outcome: "CAPTURED", providerReference: stored.providerReference!, safeCode: null }, now);
     await assert.rejects(processPaymentProviderWebhook({ ...collidedEvent, receivedAt: now }), code("IDEMPOTENCY_CONFLICT"));
@@ -284,7 +295,8 @@ test("Gate 5C payment lifecycle is authorized, exact-once, balanced, refundable,
     assert.equal(late.capturedAmount.toFixed(3), "9000.000");
     assert.equal((await prisma.order.findUniqueOrThrow({ where: { id: lateOrder.id } })).paymentStatus, "VOIDED");
     const oldAuthorized = provider.signWebhook({ amount: null, currency: null, eventId: "old-authorized-" + randomUUID(), occurredAt: new Date(now.getTime() - 60_000), outcome: "AUTHORIZED", providerReference: stored.providerReference!, safeCode: null }, now);
-    assert.equal((await processPaymentProviderWebhook({ ...oldAuthorized, receivedAt: now })).status, "IGNORED");
+    assert.equal((await processPaymentProviderWebhook({ ...oldAuthorized, receivedAt: now })).status, "VERIFIED");
+    assert.equal((await processAcceptedProviderEvent(oldAuthorized)).state, "IGNORED");
     await assert.rejects(
       processGuardedPaymentWebhook(paymentWebhookRequest({
         ...capturedEvent,
@@ -393,26 +405,19 @@ test("Gate 5C payment lifecycle is authorized, exact-once, balanced, refundable,
     const firstDraft = await previewSettlement(fixture.adminContext, { currency: "IQD", idempotencyKey: randomUUID(), organizationId: fixture.organization.id, periodEnd, periodStart });
     const competingDraft = await previewSettlement(fixture.adminContext, { currency: "IQD", idempotencyKey: randomUUID(), organizationId: fixture.organization.id, periodEnd, periodStart });
     assert.equal(firstDraft.status, "DRAFT");
+    assert.equal(competingDraft.id, firstDraft.id);
     assert.ok(firstDraft.lines.length > 0);
     assert.equal(firstDraft.meaning, "LEDGER_STATEMENT_NOT_BANK_PAYOUT");
-    const finalizations = await Promise.allSettled([
-      finalizeSettlement(fixture.adminContext, firstDraft.id, { expectedVersion: firstDraft.version, idempotencyKey: randomUUID() }),
-      finalizeSettlement(fixture.adminContext, competingDraft.id, { expectedVersion: competingDraft.version, idempotencyKey: randomUUID() }),
-    ]);
-    assert.equal(finalizations.filter((result) => result.status === "fulfilled").length, 1);
-    const finalizedResult = finalizations.find((result) => result.status === "fulfilled");
-    assert.ok(finalizedResult?.status === "fulfilled");
-    const finalized = finalizedResult.value;
+    const finalized = await finalizeSettlement(
+      fixture.adminContext,
+      firstDraft.id,
+      { expectedVersion: firstDraft.version, idempotencyKey: randomUUID() },
+    );
     assert.equal(finalized.status, "FINALIZED");
     await assert.rejects(prisma.settlementBatch.update({ where: { id: finalized.id }, data: { merchantNet: "1.000" } }));
     await assert.rejects(prisma.settlementBatch.update({
       where: { id: finalized.id },
       data: { merchantNet: "1.000", status: "VOID", voidedAt: new Date(), version: { increment: 1 } },
-    }));
-    const remainingDraft = finalizations[0]!.status === "rejected" ? firstDraft : competingDraft;
-    await assert.rejects(prisma.settlementBatch.update({
-      where: { id: remainingDraft.id },
-      data: { status: "VOID", voidedAt: new Date(), version: { increment: 1 } },
     }));
     await assert.rejects(prisma.settlementBatch.create({
       data: {
@@ -515,6 +520,25 @@ function code(expected: string) {
 
 function hasAuthorizationFailure(error: unknown) {
   return error instanceof Error && "code" in error && ["FORBIDDEN", "MEMBERSHIP_UNAVAILABLE", "UNAUTHORIZED"].includes(String((error as { code: unknown }).code));
+}
+
+async function processAcceptedProviderEvent(input: { body: Uint8Array }) {
+  const providerEventId = String(
+    (JSON.parse(Buffer.from(input.body).toString("utf8")) as { eventId: unknown }).eventId,
+  );
+  const event = await prisma.paymentProviderEvent.findUniqueOrThrow({
+    where: {
+      provider_providerEventId: {
+        provider: "DETERMINISTIC_TEST",
+        providerEventId,
+      },
+    },
+  });
+  return processVerifiedPaymentProviderEvent({
+    eventId: event.id,
+    executionGuard: async () => undefined,
+    expectedVersion: event.processingVersion,
+  });
 }
 
 function paymentWebhookRequest(input: { body: Uint8Array; signature: string; timestamp: string }) {

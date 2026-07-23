@@ -44,7 +44,7 @@ test.after(() => {
 
 test("Stage 6 architecture locks the accepted title, gate order, providers, and later-stage boundaries", () => {
   assert.equal(STAGE_6_ARCHITECTURE.title, "Stage 6 — Admin and Platform Operations");
-  assert.deepEqual(Object.values(STAGE_6_ARCHITECTURE.gates), ["ACCEPTED", "ACTIVE", "UNSTARTED", "UNSTARTED"]);
+  assert.deepEqual(Object.values(STAGE_6_ARCHITECTURE.gates), ["ACCEPTED", "ACCEPTED", "ACTIVE", "UNSTARTED"]);
   assert.equal(STAGE_6_ARCHITECTURE.runtime.durableStore, "POSTGRESQL");
   assert.equal(STAGE_6_ARCHITECTURE.runtime.externalQueueProvider, "NOT_CONFIGURED");
   assert.equal(STAGE_6_ARCHITECTURE.runtime.automaticScheduler, "NOT_CONNECTED");
@@ -56,7 +56,7 @@ test("Stage 6 architecture locks the accepted title, gate order, providers, and 
   assert.equal(STAGE_6_ARCHITECTURE.boundaries.ai, "AFTER_STAGE_8");
 });
 
-test("Gate 6B extends the accepted Gate 6A registry with only the closed storage and media job types", () => {
+test("Gate 6C extends the accepted registry with only the closed automation job types", () => {
   assert.deepEqual(PLATFORM_JOB_ALLOWED_TYPES, [
     "PLATFORM_HEALTH_PROBE",
     "STORAGE_MAINTENANCE_DISCOVERY",
@@ -68,6 +68,16 @@ test("Gate 6B extends the accepted Gate 6A registry with only the closed storage
     "MEDIA_RENDITION_GENERATE",
     "MEDIA_RENDITION_CLEANUP_DISCOVERY",
     "MEDIA_RENDITION_DELETE",
+    "COMMUNICATION_CAMPAIGN_DISCOVERY",
+    "COMMUNICATION_DELIVERY_DISCOVERY",
+    "COMMUNICATION_CAMPAIGN_DISPATCH",
+    "COMMUNICATION_DELIVERY_DISPATCH",
+    "PAYMENT_PROVIDER_EVENT_PROCESS",
+    "PAYMENT_RETRY_DISCOVERY",
+    "PAYMENT_ATTEMPT_RETRY",
+    "PAYMENT_REFUND_RETRY",
+    "PAYMENT_RECONCILIATION",
+    "SETTLEMENT_STATEMENT_GENERATE",
   ]);
   assert.equal(PLATFORM_JOB_LIMITS.maxRequestBytes, 8_192);
   assert.equal(PLATFORM_JOB_LIMITS.maxPayloadBytes, 4_096);
@@ -100,6 +110,19 @@ test("execution authority registries keep health platform-only and require joint
     "PLATFORM_JOBS_MANAGE",
     "STORAGE_RECORDS_MANAGE",
   ]).length, 5);
+  assert.deepEqual(requiredPlatformJobPermissions("COMMUNICATION_DELIVERY_DISPATCH"), [
+    "PLATFORM_JOBS_MANAGE",
+    "COMMUNICATIONS_DISPATCH",
+  ]);
+  assert.deepEqual(requiredPlatformJobPermissions("PAYMENT_REFUND_RETRY"), [
+    "PLATFORM_JOBS_MANAGE",
+    "PAYMENTS_REFUND",
+    "PAYMENTS_RECONCILE",
+  ]);
+  assert.deepEqual(requiredPlatformSchedulePermissions("SETTLEMENT_STATEMENT_GENERATE"), [
+    "PLATFORM_JOBS_MANAGE",
+    "SETTLEMENTS_MANAGE",
+  ]);
 });
 
 test("canonical JSON and hashes ignore object key order but preserve changed values", () => {
@@ -225,7 +248,7 @@ test("health handler succeeds with bounded metadata and converts raw exceptions 
   setPlatformJobHandlerForTests("PLATFORM_HEALTH_PROBE");
 });
 
-test("production-only guards and additive migrations 43-47 are explicit in source", async () => {
+test("production-only guards and additive migrations 43-48 are explicit in source", async () => {
   const [cursorSource, handlerSource, workerSource, migrations] = await Promise.all([
     readFile(new URL("../../../features/platform-jobs/domain/cursor-signing.ts", import.meta.url), "utf8"),
     readFile(new URL("../../../features/platform-jobs/services/handlers.ts", import.meta.url), "utf8"),
@@ -236,12 +259,13 @@ test("production-only guards and additive migrations 43-47 are explicit in sourc
   assert.match(handlerSource, /NODE_ENV === "production"/);
   assert.match(workerSource, /NODE_ENV === "production"/);
   const names = migrations.filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort();
-  assert.equal(names.length, 47);
-  assert.equal(names.at(-5), "20260721160000_platform_jobs_foundation");
-  assert.equal(names.at(-4), "20260722090000_platform_worker_operation_recovery");
-  assert.equal(names.at(-3), "20260722150000_storage_media_automation");
-  assert.equal(names.at(-2), "20260723120000_media_rendition_claim_integrity");
-  assert.equal(names.at(-1), "20260723150000_gate6a_gate6b_constraint_truth_tables");
+  assert.equal(names.length, 48);
+  assert.equal(names.at(-6), "20260721160000_platform_jobs_foundation");
+  assert.equal(names.at(-5), "20260722090000_platform_worker_operation_recovery");
+  assert.equal(names.at(-4), "20260722150000_storage_media_automation");
+  assert.equal(names.at(-3), "20260723120000_media_rendition_claim_integrity");
+  assert.equal(names.at(-2), "20260723150000_gate6a_gate6b_constraint_truth_tables");
+  assert.equal(names.at(-1), "20260723180000_communications_payment_automation");
 });
 
 test("production runtime refuses cursor-secret and handler test overrides", () => {
