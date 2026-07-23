@@ -13,7 +13,12 @@ import { notifyPaymentCaptured, notifyPaymentFailed } from "@/features/payments/
 import { lockPaymentIntent, runPaymentSerializable } from "@/features/payments/services/transaction";
 import { configuredPaymentProvider } from "@/features/payments/providers/registry";
 import type { ProviderResult } from "@/features/payments/providers/provider";
+import type { PaymentExecutionGuard } from "@/features/payments/services/provider-events";
 import { prisma } from "@/lib/db/prisma";
+import {
+  assertCommerceAdminCurrent,
+  type CommerceAdminContext,
+} from "@/features/commerce/services/authorization";
 
 const MAX_ATTEMPTS_PER_INTENT = 5;
 
@@ -312,7 +317,7 @@ export async function submitCustomerPaymentIntent(
     });
     await transaction.paymentAttempt.update({
       where: { id: attemptId },
-      data: { startedAt: now, status: "PROCESSING" },
+      data: { startedAt: now, status: "PROCESSING", version: { increment: 1 } },
     });
     if (intent.status !== "PROCESSING") {
       assertPaymentIntentTransition(intent.status, "PROCESSING");
@@ -353,7 +358,11 @@ export async function submitCustomerPaymentIntent(
       result = { outcome: "TRANSIENT_FAILURE", safeCode: "PROVIDER_FAILURE" };
     }
   }
-  return applyProviderCreateResult(paymentIntentId, attempt.id, claimed.claimOwner!, result);
+  const applied = await applyProviderCreateResult(paymentIntentId, attempt.id, claimed.claimOwner!, result);
+  if (result.outcome === "NOT_CONFIGURED") {
+    paymentError("PAYMENT_PROVIDER_NOT_CONFIGURED", "Online payment provider is not configured.");
+  }
+  return applied;
 }
 
 async function applyProviderCreateResult(
@@ -361,8 +370,10 @@ async function applyProviderCreateResult(
   attemptId: string,
   claimOwner: string,
   result: ProviderResult,
+  executionGuard?: PaymentExecutionGuard,
 ) {
   return runPaymentSerializable(async (transaction) => {
+    await executionGuard?.(transaction);
     await lockPaymentIntent(transaction, paymentIntentId);
     const intent = await transaction.paymentIntent.findUnique({
       where: { id: paymentIntentId },
@@ -401,6 +412,7 @@ async function applyProviderCreateResult(
           requiresAction: true,
           safeProviderCode: result.safeCode,
           status: "REQUIRES_ACTION",
+          version: { increment: 1 },
         },
       });
       await transaction.paymentIntent.update({
@@ -413,7 +425,15 @@ async function applyProviderCreateResult(
       assertPaymentIntentTransition(intent.status, "AUTHORIZED");
       await transaction.paymentAttempt.update({
         where: { id: attemptId },
-        data: { claimedBy: null, claimExpiresAt: null, finishedAt: now, providerPaymentReference: result.providerReference, safeProviderCode: result.safeCode, status: "AUTHORIZED" },
+        data: {
+          claimedBy: null,
+          claimExpiresAt: null,
+          finishedAt: now,
+          providerPaymentReference: result.providerReference,
+          safeProviderCode: result.safeCode,
+          status: "AUTHORIZED",
+          version: { increment: 1 },
+        },
       });
       await transaction.paymentIntent.update({
         where: { id: intent.id },
@@ -422,9 +442,22 @@ async function applyProviderCreateResult(
       return loadIntentDto(transaction, intent.id);
     }
     const permanent = result.outcome === "PERMANENT_FAILURE" || result.outcome === "NOT_FOUND";
+    const retryable = !permanent && result.outcome !== "NOT_CONFIGURED" && attempt.retryCount < 5;
+    const nextRetryAt = retryable
+      ? new Date(now.getTime() + paymentRetryDelayMilliseconds(attempt.retryCount))
+      : null;
     await transaction.paymentAttempt.update({
       where: { id: attemptId },
-      data: { claimedBy: null, claimExpiresAt: null, finishedAt: now, safeProviderCode: result.safeCode ?? "PROVIDER_FAILURE", status: "FAILED" },
+      data: {
+        claimedBy: null,
+        claimExpiresAt: null,
+        finishedAt: now,
+        nextRetryAt,
+        retryable,
+        safeProviderCode: result.safeCode ?? "PROVIDER_FAILURE",
+        status: "FAILED",
+        version: { increment: 1 },
+      },
     });
     await transaction.paymentIntent.update({
       where: { id: intent.id },
@@ -435,11 +468,112 @@ async function applyProviderCreateResult(
     if (permanent) {
       await notifyPaymentFailed(transaction, { eventId: attempt.id, paymentIntentId: intent.id });
     }
-    if (result.outcome === "NOT_CONFIGURED") {
-      paymentError("PAYMENT_PROVIDER_NOT_CONFIGURED", "Online payment provider is not configured.");
-    }
     return loadIntentDto(transaction, intent.id);
   });
+}
+
+export async function retryPaymentAttemptFromAutomation(
+  context: CommerceAdminContext,
+  input: {
+    attemptId: string;
+    executionGuard: PaymentExecutionGuard;
+    expectedVersion: number;
+    jobId: string;
+  },
+) {
+  const claimOwner = "platform-job:" + input.jobId;
+  const prepared = await runPaymentSerializable(async (transaction) => {
+    await assertCommerceAdminCurrent(transaction, context, "PAYMENTS_RECONCILE");
+    await input.executionGuard(transaction);
+    await transaction.$queryRaw(Prisma.sql`
+      SELECT attempt."id"
+      FROM "PaymentAttempt" AS attempt
+      WHERE attempt."id" = ${input.attemptId}::uuid
+      FOR UPDATE OF attempt
+    `);
+    const attempt = await transaction.paymentAttempt.findUnique({
+      where: { id: input.attemptId },
+      include: { paymentIntent: true },
+    });
+    if (!attempt) return null;
+    await lockPaymentIntent(transaction, attempt.paymentIntentId);
+    if (
+      attempt.version !== input.expectedVersion
+      || attempt.status !== "FAILED"
+      || !attempt.retryable
+      || !attempt.nextRetryAt
+      || attempt.nextRetryAt > new Date()
+      || attempt.retryCount >= 5
+      || attempt.paymentIntent.capturedAmount.greaterThan(0)
+      || !["CREATED", "PROCESSING", "AUTHORIZED"].includes(attempt.paymentIntent.status)
+    ) {
+      return {
+        eligible: false as const,
+        state: attempt.status,
+      };
+    }
+    const now = new Date();
+    const claimed = await transaction.paymentAttempt.update({
+      where: { id: attempt.id },
+      data: {
+        claimedBy: claimOwner,
+        claimExpiresAt: new Date(now.getTime() + 60_000),
+        nextRetryAt: null,
+        retryable: null,
+        retryCount: { increment: 1 },
+        startedAt: now,
+        status: "PROCESSING",
+        version: { increment: 1 },
+      },
+      include: { paymentIntent: true },
+    });
+    if (claimed.paymentIntent.status !== "PROCESSING") {
+      await transaction.paymentIntent.update({
+        where: { id: claimed.paymentIntentId },
+        data: { status: "PROCESSING", version: { increment: 1 } },
+      });
+    }
+    return { attempt: claimed, eligible: true as const };
+  });
+  if (!prepared) return { outcome: "ABSENT" as const, state: "ABSENT" as const };
+  if (!prepared.eligible) return { outcome: "INELIGIBLE" as const, state: prepared.state };
+
+  await runPaymentSerializable((transaction) => input.executionGuard(transaction));
+  const provider = configuredPaymentProvider();
+  let result: ProviderResult;
+  try {
+    result = await provider.createPayment({
+      amount: paymentMoneyString(prepared.attempt.paymentIntent.amount),
+      currency: parsePaymentCurrency(prepared.attempt.paymentIntent.currency),
+      expiresAt: prepared.attempt.paymentIntent.expiresAt ?? new Date(Date.now() + 10 * 60 * 1000),
+      paymentIntentId: prepared.attempt.paymentIntentId,
+      providerRequestReference: prepared.attempt.providerRequestReference,
+    });
+  } catch {
+    result = { outcome: "TRANSIENT_FAILURE", safeCode: "PROVIDER_FAILURE" };
+  }
+  if (result.outcome === "DUPLICATE" && result.providerReference) {
+    try {
+      result = await provider.inspectPayment({
+        paymentIntentId: prepared.attempt.paymentIntentId,
+        providerReference: result.providerReference,
+      });
+    } catch {
+      result = { outcome: "TRANSIENT_FAILURE", safeCode: "PROVIDER_FAILURE" };
+    }
+  }
+  await applyProviderCreateResult(
+    prepared.attempt.paymentIntentId,
+    prepared.attempt.id,
+    claimOwner,
+    result,
+    input.executionGuard,
+  );
+  const current = await prisma.paymentAttempt.findUniqueOrThrow({
+    where: { id: prepared.attempt.id },
+    select: { status: true },
+  });
+  return { outcome: "COMPLETED" as const, state: current.status };
 }
 
 export async function applyCapture(
@@ -520,6 +654,9 @@ export async function applyCapture(
         providerPaymentReference: input.providerReference,
         requiresAction: false,
         status: "CAPTURED",
+        retryable: null,
+        nextRetryAt: null,
+        version: { increment: 1 },
       },
     });
   }
@@ -530,6 +667,12 @@ export async function applyCapture(
       : true);
   if (!lateTarget) await syncTargetProjection(transaction, updated, input.now);
   return loadIntentDto(transaction, intent.id);
+}
+
+function paymentRetryDelayMilliseconds(retryCount: number) {
+  return [60_000, 5 * 60_000, 30 * 60_000, 2 * 60 * 60_000, 12 * 60 * 60_000][
+    Math.min(Math.max(retryCount, 0), 4)
+  ]!;
 }
 
 export async function syncTargetProjection(

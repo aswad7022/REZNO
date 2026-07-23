@@ -25,6 +25,16 @@ const automationDiscovery = idempotency.extend({
   ]),
 }).strict();
 const automationRescan = versioned.extend({ assetId: uuid }).strict();
+const gate6cTrigger = idempotency.extend({
+  batchSize: z.number().int().min(1).max(PLATFORM_JOB_LIMITS.maxDomainDiscoveryBatch),
+  jobType: z.enum([
+    "COMMUNICATION_CAMPAIGN_DISCOVERY",
+    "COMMUNICATION_DELIVERY_DISCOVERY",
+    "PAYMENT_RETRY_DISCOVERY",
+    "PAYMENT_RECONCILIATION",
+    "SETTLEMENT_STATEMENT_GENERATE",
+  ]),
+}).strict();
 
 export async function readBoundedPlatformJobJson(request: Request) {
   const contentType = request.headers.get("content-type")?.trim().toLowerCase() ?? "";
@@ -102,6 +112,10 @@ export function parseStorageAutomationRescan(raw: unknown) {
   return parse(automationRescan, raw);
 }
 
+export function parseGate6CTrigger(raw: unknown) {
+  return parse(gate6cTrigger, raw);
+}
+
 export function assertNoPlatformJobQuery(url: URL) {
   strictQuery(url.searchParams, []);
 }
@@ -111,7 +125,10 @@ export function parsePlatformJobListQuery(url: URL) {
   const limit = parseLimit(url.searchParams.get("limit"));
   const cursor = optionalCursor(url.searchParams.get("cursor"));
   const jobType = optionalEnum(url.searchParams.get("jobType"), PLATFORM_JOB_ALLOWED_TYPES);
-  const source = optionalEnum(url.searchParams.get("source"), ["ADMIN_MANUAL", "SCHEDULE", "DOMAIN_DISCOVERY"] as const);
+  const source = optionalEnum(
+    url.searchParams.get("source"),
+    ["ADMIN_MANUAL", "SCHEDULE", "DOMAIN_DISCOVERY", "PROVIDER_EVENT"] as const,
+  );
   const status = optionalEnum(url.searchParams.get("status"), [
     "SCHEDULED", "AVAILABLE", "CLAIMED", "RUNNING", "SUCCEEDED",
     "RETRY_WAIT", "FAILED", "DEAD_LETTERED", "CANCELLED",

@@ -18,6 +18,7 @@ import { notifyRefundResult } from "@/features/payments/services/payment-notific
 import { syncTargetProjection } from "@/features/payments/services/payment-intents";
 import { lockPaymentIntent, lockPaymentRefund, runPaymentSerializable } from "@/features/payments/services/transaction";
 import { configuredPaymentProvider } from "@/features/payments/providers/registry";
+import type { PaymentExecutionGuard } from "@/features/payments/services/provider-events";
 
 export interface RefundRequestInput {
   amount: string;
@@ -84,6 +85,8 @@ export async function retryAdminRefund(
   context: CommerceAdminContext,
   refundId: string,
   input: { expectedVersion: number; idempotencyKey: string },
+  executionGuard?: PaymentExecutionGuard,
+  requireRetryable = false,
 ) {
   const organizationId = await adminRefundOrganization(context, refundId);
   return retryRefund({
@@ -94,7 +97,7 @@ export async function retryAdminRefund(
     organizationId,
   }, refundId, input, async (transaction) => {
     await assertCommerceAdminCurrent(transaction, context, "PAYMENTS_REFUND");
-  });
+  }, executionGuard, requireRetryable);
 }
 
 async function requestRefund(
@@ -149,18 +152,29 @@ async function requestRefund(
     if (intent.commissionBasisPoints !== 0 || !intent.commissionAmount.isZero()) {
       paymentError("REFUND_NOT_ALLOWED", "This commission allocation requires an approved refund policy.");
     }
-    const available = intent.capturedAmount.minus(intent.refundedAmount);
+    const reserved = await transaction.paymentRefund.aggregate({
+      where: {
+        paymentIntentId: intent.id,
+        status: { in: ["REQUESTED", "PROCESSING"] },
+      },
+      _sum: { amount: true },
+    });
+    const available = intent.capturedAmount
+      .minus(intent.refundedAmount)
+      .minus(reserved._sum.amount ?? 0);
     if (amount.greaterThan(available)) paymentError("REFUND_AMOUNT_EXCEEDED", "Refund exceeds the refundable balance.");
+    const refundId = randomUUID();
     const refund = await transaction.paymentRefund.create({
       data: {
         amount,
         claimedBy: claimOwner,
         claimExpiresAt: new Date(Date.now() + 60_000),
         currency: intent.currency,
-        id: randomUUID(),
+        id: refundId,
         idempotencyKey: input.idempotencyKey,
         note: boundedNote(input.note),
         paymentIntentId: intent.id,
+        providerRequestReference: "refund_" + refundId,
         reasonCode: input.reasonCode,
         requestHash,
         requestedByActorId: actor.actorId,
@@ -215,7 +229,7 @@ async function requestRefund(
       currency: "IQD",
       paymentIntentId: refund.paymentIntentId,
       providerReference: refund.paymentIntent.providerReference!,
-      providerRequestReference: "refund_" + refund.id + "_v" + refund.version,
+      providerRequestReference: refund.providerRequestReference!,
       refundId: refund.id,
     });
   } catch {
@@ -229,11 +243,14 @@ async function retryRefund(
   refundId: string,
   input: { expectedVersion: number; idempotencyKey: string },
   revalidate: (transaction: Prisma.TransactionClient) => Promise<void>,
+  executionGuard?: PaymentExecutionGuard,
+  requireRetryable = false,
 ) {
   const provider = configuredPaymentProvider();
   const claimOwner = "refund-retry:" + randomUUID();
   const prepared = await runPaymentSerializable(async (transaction) => {
     await revalidate(transaction);
+    await executionGuard?.(transaction);
     await lockPaymentRefund(transaction, refundId);
     const refund = await transaction.paymentRefund.findFirst({
       where: { id: refundId, paymentIntent: { organizationId: actor.organizationId } },
@@ -265,6 +282,9 @@ async function retryRefund(
     }
     if (refund.version !== input.expectedVersion) paymentError("STALE_VERSION", "Refund changed. Refresh and retry.");
     if (refund.status !== "FAILED") paymentError("REFUND_NOT_ALLOWED", "Only a failed refund can be retried.");
+    if (requireRetryable && (!refund.retryable || !refund.nextRetryAt || refund.nextRetryAt > new Date() || refund.retryCount >= 5)) {
+      paymentError("REFUND_NOT_ALLOWED", "Refund is not eligible for an automated retry.");
+    }
     if (!refund.paymentIntent.providerReference) paymentError("REFUND_NOT_ALLOWED", "Refund provider reference is unavailable.");
     await transaction.paymentMutation.create({
       data: {
@@ -288,6 +308,10 @@ async function retryRefund(
       data: {
         claimedBy: claimOwner,
         claimExpiresAt: new Date(Date.now() + 60_000),
+        nextRetryAt: null,
+        providerRequestReference: refund.providerRequestReference ?? "refund_" + refund.id,
+        retryable: null,
+        retryCount: { increment: 1 },
         safeProviderCode: null,
         status: "PROCESSING",
         version: { increment: 1 },
@@ -312,6 +336,9 @@ async function retryRefund(
   if (prepared.mutationStatus === "COMPLETED") return loadRefundIntent(refundId);
   if (prepared.mutationStatus === "FAILED") paymentError("PAYMENT_PROVIDER_FAILURE", "Refund retry failed safely.");
   if (!prepared.claimOwner) return loadRefundIntent(refundId);
+  if (executionGuard) {
+    await runPaymentSerializable((transaction) => executionGuard(transaction));
+  }
   let result: Awaited<ReturnType<ReturnType<typeof configuredPaymentProvider>["refundPayment"]>>;
   try {
     result = await provider.refundPayment({
@@ -319,15 +346,16 @@ async function retryRefund(
       currency: "IQD",
       paymentIntentId: prepared.refund.paymentIntentId,
       providerReference: prepared.refund.paymentIntent.providerReference!,
-      providerRequestReference: "refund_retry_" + input.idempotencyKey,
+      providerRequestReference: prepared.refund.providerRequestReference ?? "refund_" + prepared.refund.id,
       refundId,
     });
   } catch {
     result = { outcome: "TRANSIENT_FAILURE", safeCode: "PROVIDER_FAILURE" };
   }
-  const payment = await applyRefundResult(refundId, prepared.claimOwner, result);
+  const payment = await applyRefundResult(refundId, prepared.claimOwner, result, executionGuard);
   await runPaymentSerializable(async (transaction) => {
     await revalidate(transaction);
+    await executionGuard?.(transaction);
     const current = await transaction.paymentRefund.findUniqueOrThrow({ where: { id: refundId } });
     if (current.status === "PROCESSING") return;
     await transaction.paymentMutation.update({
@@ -344,8 +372,10 @@ async function applyRefundResult(
   refundId: string,
   claimOwner: string,
   result: Awaited<ReturnType<ReturnType<typeof configuredPaymentProvider>["refundPayment"]>>,
+  executionGuard?: PaymentExecutionGuard,
 ) {
   return runPaymentSerializable(async (transaction) => {
+    await executionGuard?.(transaction);
     await lockPaymentRefund(transaction, refundId);
     const refund = await transaction.paymentRefund.findUnique({
       where: { id: refundId },
@@ -380,6 +410,8 @@ async function applyRefundResult(
           claimedBy: null,
           claimExpiresAt: null,
           providerReference: result.providerReference,
+          nextRetryAt: null,
+          retryable: null,
           safeProviderCode: result.safeCode,
           status: "SUCCEEDED",
           version: { increment: 1 },
@@ -404,11 +436,17 @@ async function applyRefundResult(
       return loadIntentById(transaction, intent.id);
     }
     assertPaymentRefundTransition(refund.status, "FAILED");
+    const retryable = result.outcome === "TRANSIENT_FAILURE" && refund.retryCount < 5;
+    const nextRetryAt = retryable
+      ? new Date(now.getTime() + refundRetryDelayMilliseconds(refund.retryCount))
+      : null;
     await transaction.paymentRefund.update({
       where: { id: refund.id },
       data: {
         claimedBy: null,
         claimExpiresAt: null,
+        nextRetryAt,
+        retryable,
         safeProviderCode: result.safeCode ?? "REFUND_PROVIDER_FAILURE",
         status: "FAILED",
         version: { increment: 1 },
@@ -423,6 +461,12 @@ async function applyRefundResult(
     });
     return loadIntentById(transaction, refund.paymentIntentId);
   });
+}
+
+function refundRetryDelayMilliseconds(retryCount: number) {
+  return [60_000, 5 * 60_000, 30 * 60_000, 2 * 60 * 60_000, 12 * 60 * 60_000][
+    Math.min(Math.max(retryCount, 0), 4)
+  ]!;
 }
 
 async function loadRefundForProvider(refundId: string) {

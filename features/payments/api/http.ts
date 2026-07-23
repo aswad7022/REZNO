@@ -15,7 +15,7 @@ import { NextResponse } from "next/server";
 
 const NO_STORE = { "Cache-Control": "no-store, max-age=0" } as const;
 
-export function paymentData(data: unknown, status: 200 | 201 = 200) {
+export function paymentData(data: unknown, status: 200 | 201 | 202 = 200) {
   return { data, status };
 }
 
@@ -78,13 +78,13 @@ export async function handleProviderWebhookRequest(
 ) {
   return handlePaymentRequest(scope, async () => {
     assertPaymentWebhookRequestAllowed(request, scope, provider);
-    return { data: await operation() };
+    return { data: await operation(), status: 202 as const };
   });
 }
 
 async function handlePaymentRequest(
   scope: string,
-  operation: () => Promise<{ data: unknown; status?: 200 | 201 }>,
+  operation: () => Promise<{ data: unknown; status?: 200 | 201 | 202 }>,
 ) {
   try {
     const result = await operation();

@@ -70,6 +70,9 @@ export type SnapshotDiagnostics = {
 
 type SnapshotDiagnosticsTestHook = (diagnostics: SnapshotDiagnostics) => Promise<void> | void;
 let snapshotDiagnosticsTestHook: SnapshotDiagnosticsTestHook | undefined;
+export type CommunicationExecutionGuard = (
+  transaction: Prisma.TransactionClient,
+) => Promise<void>;
 
 export function setCommunicationSnapshotDiagnosticsTestHook(
   hook: SnapshotDiagnosticsTestHook | undefined,
@@ -84,6 +87,7 @@ export async function sendCampaignNow(
   context: CommunicationAdminContext,
   rawInput: unknown,
   now = new Date(),
+  executionGuard?: CommunicationExecutionGuard,
 ): Promise<CampaignSummaryDto> {
   const input = parseOrValidationError(sendCampaignSchema, rawInput);
   const requestHash = communicationRequestHash({
@@ -98,6 +102,7 @@ export async function sendCampaignNow(
       context,
       "NOTIFICATIONS_SEND",
     );
+    await executionGuard?.(transaction);
     await lockCampaignMutationKey(transaction, currentContext.userId, input.idempotencyKey);
     const replay = await mutationReplay(
       transaction,
@@ -123,6 +128,7 @@ export async function sendCampaignNow(
       idempotencyKey: input.idempotencyKey,
       now,
       requestHash,
+      executionGuard,
     });
   });
 }
@@ -273,6 +279,7 @@ export async function claimDueDeliveries(
           "claimedAt" = ${now},
           "claimOwner" = ${claimOwner},
           "claimExpiresAt" = ${claimExpiresAt},
+          "version" = delivery."version" + 1,
           "updatedAt" = ${now}
       FROM due
       WHERE delivery."id" = due."id"
@@ -282,8 +289,43 @@ export async function claimDueDeliveries(
   }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted });
 }
 
-export async function releaseExpiredClaims(now = new Date()): Promise<number> {
+export async function claimExactDeliveryForAutomation(input: {
+  claimOwner: string;
+  deliveryId: string;
+  executionGuard: CommunicationExecutionGuard;
+  expectedVersion: number;
+  now?: Date;
+}): Promise<boolean> {
+  const now = input.now ?? new Date();
+  const claimExpiresAt = new Date(now.getTime() + CLAIM_LEASE_MS);
   return prisma.$transaction(async (transaction) => {
+    await input.executionGuard(transaction);
+    const claimed = await transaction.$executeRaw(Prisma.sql`
+      UPDATE "OutboundDelivery" AS delivery
+      SET "status" = 'CLAIMED',
+          "claimedAt" = ${now},
+          "claimOwner" = ${input.claimOwner},
+          "claimExpiresAt" = ${claimExpiresAt},
+          "version" = delivery."version" + 1,
+          "updatedAt" = ${now}
+      FROM "CommunicationCampaign" AS campaign
+      WHERE delivery."id" = ${input.deliveryId}::uuid
+        AND delivery."version" = ${input.expectedVersion}
+        AND delivery."campaignId" = campaign."id"
+        AND delivery."status" IN ('PENDING', 'RETRY_SCHEDULED')
+        AND (delivery."nextAttemptAt" IS NULL OR delivery."nextAttemptAt" <= ${now})
+        AND campaign."status" = 'DISPATCHING'
+    `);
+    return claimed === 1;
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+}
+
+export async function releaseExpiredClaims(
+  now = new Date(),
+  executionGuard?: CommunicationExecutionGuard,
+): Promise<number> {
+  return prisma.$transaction(async (transaction) => {
+    await executionGuard?.(transaction);
     const expired = await transaction.outboundDelivery.findMany({
       where: { status: "CLAIMED", claimExpiresAt: { lt: now } },
       select: { id: true, attemptCount: true },
@@ -305,6 +347,7 @@ export async function releaseExpiredClaims(now = new Date()): Promise<number> {
           claimedAt: null,
           claimExpiresAt: null,
           lastProviderCode: "CLAIM_EXPIRED",
+          version: { increment: 1 },
         },
       });
       await transaction.outboundDeliveryAttempt.updateMany({
@@ -327,10 +370,11 @@ export async function processClaimedDeliveries(
   claimOwner: string,
   deliveryIds: string[],
   now = new Date(),
+  executionGuard?: CommunicationExecutionGuard,
 ): Promise<DispatchResultDto> {
   const result = emptyDispatchResult();
   for (const deliveryId of deliveryIds) {
-    const prepared = await prepareProviderMessage(deliveryId, claimOwner, now);
+    const prepared = await prepareProviderMessage(deliveryId, claimOwner, now, executionGuard);
     if (!prepared) {
       result.suppressed += 1;
       continue;
@@ -354,6 +398,7 @@ export async function processClaimedDeliveries(
       deliveryId,
       now: new Date(),
       providerResult,
+      executionGuard,
     });
     result.attemptsFinalized += 1;
     if (status === "ACCEPTED") result.providerAccepted += 1;
@@ -392,8 +437,10 @@ async function enqueueCampaign(
     idempotencyKey: string;
     now: Date;
     requestHash: string;
+    executionGuard?: CommunicationExecutionGuard;
   },
 ): Promise<CampaignSummaryDto> {
+  await input.executionGuard?.(transaction);
   const snapshotStartedAt = Date.now();
   const recipients = await assertAudienceWithinLimit(transaction, input.campaign);
   let inAppNotificationId: string | null = input.campaign.inAppNotificationId;
@@ -476,6 +523,7 @@ async function enqueueCampaign(
   });
   const counts = countersFromGroups(groups);
   const final = campaignFinalStatus(counts, Boolean(inAppNotificationId));
+  await input.executionGuard?.(transaction);
   const updated = await transaction.communicationCampaign.update({
     where: { id: input.campaign.id },
     data: {
@@ -543,8 +591,10 @@ async function prepareProviderMessage(
   deliveryId: string,
   claimOwner: string,
   now: Date,
+  executionGuard?: CommunicationExecutionGuard,
 ): Promise<{ attemptId: string; message: SafeProviderMessage } | null> {
   return prisma.$transaction(async (transaction) => {
+    await executionGuard?.(transaction);
     const rows = await transaction.$queryRaw<Array<{ id: string }>>(Prisma.sql`
       SELECT delivery."id"
       FROM "OutboundDelivery" AS delivery
@@ -596,7 +646,7 @@ async function prepareProviderMessage(
     });
     await transaction.outboundDelivery.update({
       where: { id: delivery.id },
-      data: { attemptCount: attemptNumber },
+      data: { attemptCount: attemptNumber, version: { increment: 1 } },
     });
     return {
       attemptId: attempt.id,
@@ -611,8 +661,10 @@ async function finalizeProviderAttempt(input: {
   deliveryId: string;
   now: Date;
   providerResult: Awaited<ReturnType<ReturnType<typeof resolveOutboundProvider>["send"]>>;
+  executionGuard?: CommunicationExecutionGuard;
 }): Promise<"ACCEPTED" | "RETRY_SCHEDULED" | "PERMANENT_FAILURE"> {
   return prisma.$transaction(async (transaction) => {
+    await input.executionGuard?.(transaction);
     await transaction.$queryRaw(Prisma.sql`
       SELECT delivery."id"
       FROM "OutboundDelivery" AS delivery
@@ -659,6 +711,7 @@ async function finalizeProviderAttempt(input: {
         providerName: input.providerResult.providerName,
         providerMessageId: input.providerResult.providerMessageId,
         lastProviderCode: input.providerResult.safeCode,
+        version: { increment: 1 },
       },
     });
     await finalizeCampaignState(transaction, delivery.campaignId, input.now);
@@ -704,6 +757,7 @@ async function suppressClaimedDelivery(
       claimedAt: null,
       claimExpiresAt: null,
       nextAttemptAt: null,
+      version: { increment: 1 },
     },
   });
   await finalizeCampaignState(transaction, delivery.campaignId, now);

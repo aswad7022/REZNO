@@ -63,7 +63,16 @@ export function setStorageAutomationErrorTestHook(hook: AutomationErrorTestHook 
 }
 
 export async function runStorageMediaAutomationHandler(
-  jobType: Exclude<PlatformJobType, "PLATFORM_HEALTH_PROBE">,
+  jobType:
+    | "STORAGE_MAINTENANCE_DISCOVERY"
+    | "STORAGE_ORPHAN_CLEANUP"
+    | "STORAGE_ASSET_DELETE_RETRY"
+    | "STORAGE_RESCAN_DISCOVERY"
+    | "STORAGE_ASSET_RESCAN"
+    | "MEDIA_RENDITION_DISCOVERY"
+    | "MEDIA_RENDITION_GENERATE"
+    | "MEDIA_RENDITION_CLEANUP_DISCOVERY"
+    | "MEDIA_RENDITION_DELETE",
   payload: unknown,
   context: JobContext,
 ): Promise<PlatformJobHandlerResult> {

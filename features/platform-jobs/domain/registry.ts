@@ -36,6 +36,30 @@ const renditionDeletePayload = z.object({
   expectedVersion: z.number().int().min(1).max(2_147_483_647),
   renditionId: z.string().uuid(),
 }).strict();
+const exactCampaignPayload = z.object({
+  campaignId: z.string().uuid(),
+  expectedVersion: z.number().int().min(1).max(2_147_483_647),
+}).strict();
+const exactDeliveryPayload = z.object({
+  deliveryId: z.string().uuid(),
+  expectedVersion: z.number().int().min(1).max(2_147_483_647),
+}).strict();
+const exactProviderEventPayload = z.object({
+  expectedVersion: z.number().int().min(1).max(2_147_483_647),
+  providerEventId: z.string().uuid(),
+}).strict();
+const exactPaymentAttemptPayload = z.object({
+  attemptId: z.string().uuid(),
+  expectedVersion: z.number().int().min(1).max(2_147_483_647),
+}).strict();
+const exactRefundPayload = z.object({
+  expectedVersion: z.number().int().min(1).max(2_147_483_647),
+  refundId: z.string().uuid(),
+}).strict();
+const settlementPayload = z.object({
+  batchSize: z.number().int().min(1).max(PLATFORM_JOB_LIMITS.maxDomainDiscoveryBatch),
+  periodDays: z.literal(1),
+}).strict();
 
 function discoveryResult(kind: string) {
   return z.object({
@@ -62,6 +86,30 @@ const renditionResult = z.object({
   state: z.literal("READY"),
   width: z.number().int().min(1).max(1_600),
 }).strict();
+const automationExactResult = (kind: string) => z.object({
+  kind: z.literal(kind),
+  outcome: z.enum(["COMPLETED", "ABSENT", "STALE", "SUPERSEDED", "INELIGIBLE"]),
+  state: z.string().regex(/^[A-Z][A-Z0-9_]{0,39}$/),
+}).strict();
+const reconciliationResult = z.object({
+  counts: z.object({
+    DATABASE_AHEAD: z.number().int().min(0).max(PLATFORM_JOB_LIMITS.maxDomainDiscoveryBatch),
+    LEDGER_MISMATCH: z.number().int().min(0).max(PLATFORM_JOB_LIMITS.maxDomainDiscoveryBatch),
+    MATCHED: z.number().int().min(0).max(PLATFORM_JOB_LIMITS.maxDomainDiscoveryBatch),
+    MISSING_PROVIDER_RECORD: z.number().int().min(0).max(PLATFORM_JOB_LIMITS.maxDomainDiscoveryBatch),
+    NOT_CONFIGURED: z.number().int().min(0).max(PLATFORM_JOB_LIMITS.maxDomainDiscoveryBatch),
+    PROVIDER_AHEAD: z.number().int().min(0).max(PLATFORM_JOB_LIMITS.maxDomainDiscoveryBatch),
+    TARGET_STATE_MISMATCH: z.number().int().min(0).max(PLATFORM_JOB_LIMITS.maxDomainDiscoveryBatch),
+  }).strict(),
+  kind: z.literal("PAYMENT_RECONCILED"),
+  scanned: z.number().int().min(0).max(PLATFORM_JOB_LIMITS.maxDomainDiscoveryBatch),
+}).strict();
+const settlementResult = z.object({
+  created: z.number().int().min(0).max(PLATFORM_JOB_LIMITS.maxDomainDiscoveryBatch),
+  kind: z.literal("SETTLEMENT_DRAFTS_GENERATED"),
+  scanned: z.number().int().min(0).max(PLATFORM_JOB_LIMITS.maxDomainDiscoveryBatch),
+  skipped: z.number().int().min(0).max(PLATFORM_JOB_LIMITS.maxDomainDiscoveryBatch),
+}).strict();
 
 const retryableErrors = new Set(["TRANSIENT_FAILURE", "HANDLER_TIMEOUT", "HANDLER_EXCEPTION"]);
 
@@ -81,6 +129,16 @@ const registry = {
   MEDIA_RENDITION_GENERATE: definition(renditionGeneratePayload, renditionResult),
   MEDIA_RENDITION_CLEANUP_DISCOVERY: definition(discoveryPayload, discoveryResult("MEDIA_RENDITION_CLEANUP_DISCOVERED")),
   MEDIA_RENDITION_DELETE: definition(renditionDeletePayload, exactItemResult("MEDIA_RENDITION_DELETED")),
+  COMMUNICATION_CAMPAIGN_DISCOVERY: definition(discoveryPayload, discoveryResult("COMMUNICATION_CAMPAIGNS_DISCOVERED")),
+  COMMUNICATION_DELIVERY_DISCOVERY: definition(discoveryPayload, discoveryResult("COMMUNICATION_DELIVERIES_DISCOVERED")),
+  COMMUNICATION_CAMPAIGN_DISPATCH: definition(exactCampaignPayload, automationExactResult("COMMUNICATION_CAMPAIGN_DISPATCHED")),
+  COMMUNICATION_DELIVERY_DISPATCH: definition(exactDeliveryPayload, automationExactResult("COMMUNICATION_DELIVERY_DISPATCHED")),
+  PAYMENT_PROVIDER_EVENT_PROCESS: definition(exactProviderEventPayload, automationExactResult("PAYMENT_PROVIDER_EVENT_PROCESSED")),
+  PAYMENT_RETRY_DISCOVERY: definition(discoveryPayload, discoveryResult("PAYMENT_RETRIES_DISCOVERED")),
+  PAYMENT_ATTEMPT_RETRY: definition(exactPaymentAttemptPayload, automationExactResult("PAYMENT_ATTEMPT_RETRIED")),
+  PAYMENT_REFUND_RETRY: definition(exactRefundPayload, automationExactResult("PAYMENT_REFUND_RETRIED")),
+  PAYMENT_RECONCILIATION: definition(discoveryPayload, reconciliationResult),
+  SETTLEMENT_STATEMENT_GENERATE: definition(settlementPayload, settlementResult),
 } as const satisfies Record<PlatformJobType, {
   payloadVersion: number;
   payload: z.ZodType;
