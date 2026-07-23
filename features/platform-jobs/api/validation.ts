@@ -3,6 +3,7 @@ import "server-only";
 import { z } from "zod";
 
 import { PLATFORM_JOB_LIMITS } from "@/features/platform-jobs/domain/contracts";
+import { PLATFORM_JOB_ALLOWED_TYPES } from "@/features/platform-jobs/domain/contracts";
 import { platformJobError } from "@/features/platform-jobs/domain/errors";
 
 const uuid = z.string().uuid();
@@ -14,6 +15,16 @@ const boundedBatch = idempotency.extend({
   batchSize: z.number().int().min(1).max(PLATFORM_JOB_LIMITS.maxWorkerBatch),
 }).strict();
 const scheduleState = versioned.extend({ enabled: z.boolean() }).strict();
+const automationDiscovery = idempotency.extend({
+  batchSize: z.number().int().min(1).max(PLATFORM_JOB_LIMITS.maxDomainDiscoveryBatch),
+  jobType: z.enum([
+    "STORAGE_MAINTENANCE_DISCOVERY",
+    "STORAGE_RESCAN_DISCOVERY",
+    "MEDIA_RENDITION_DISCOVERY",
+    "MEDIA_RENDITION_CLEANUP_DISCOVERY",
+  ]),
+}).strict();
+const automationRescan = versioned.extend({ assetId: uuid }).strict();
 
 export async function readBoundedPlatformJobJson(request: Request) {
   const contentType = request.headers.get("content-type")?.trim().toLowerCase() ?? "";
@@ -83,12 +94,24 @@ export function parsePlatformJobScheduleState(raw: unknown) {
   return parse(scheduleState, raw);
 }
 
+export function parseStorageAutomationDiscovery(raw: unknown) {
+  return parse(automationDiscovery, raw);
+}
+
+export function parseStorageAutomationRescan(raw: unknown) {
+  return parse(automationRescan, raw);
+}
+
+export function assertNoPlatformJobQuery(url: URL) {
+  strictQuery(url.searchParams, []);
+}
+
 export function parsePlatformJobListQuery(url: URL) {
   strictQuery(url.searchParams, ["cursor", "jobType", "limit", "source", "status"]);
   const limit = parseLimit(url.searchParams.get("limit"));
   const cursor = optionalCursor(url.searchParams.get("cursor"));
-  const jobType = optionalEnum(url.searchParams.get("jobType"), ["PLATFORM_HEALTH_PROBE"] as const);
-  const source = optionalEnum(url.searchParams.get("source"), ["ADMIN_MANUAL", "SCHEDULE"] as const);
+  const jobType = optionalEnum(url.searchParams.get("jobType"), PLATFORM_JOB_ALLOWED_TYPES);
+  const source = optionalEnum(url.searchParams.get("source"), ["ADMIN_MANUAL", "SCHEDULE", "DOMAIN_DISCOVERY"] as const);
   const status = optionalEnum(url.searchParams.get("status"), [
     "SCHEDULED", "AVAILABLE", "CLAIMED", "RUNNING", "SUCCEEDED",
     "RETRY_WAIT", "FAILED", "DEAD_LETTERED", "CANCELLED",

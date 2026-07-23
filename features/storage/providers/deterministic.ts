@@ -9,6 +9,7 @@ import type {
   StorageProvider,
   StorageProviderOutcome,
   UploadTargetResult,
+  WriteObjectResult,
 } from "@/features/storage/providers/provider";
 import { isServerGeneratedStorageKey, sha256Hex } from "@/features/storage/domain/policy";
 
@@ -137,6 +138,34 @@ export class DeterministicStorageProvider implements StorageProvider {
     if (next && next !== "READY") return { outcome: next };
     this.objects.delete(input.objectKey);
     return { outcome: "READY" };
+  }
+
+  async writeObject(input: SafeObjectReference & {
+    bytes: Uint8Array;
+    checksumSha256: string;
+    contentType: string;
+  }): Promise<WriteObjectResult> {
+    this.assertReference(input);
+    if (this.objects.has(input.objectKey)) return { outcome: "PERMANENT_FAILURE" };
+    const checksumSha256 = sha256Hex(input.bytes);
+    if (checksumSha256 !== input.checksumSha256 || input.contentType !== "image/webp") {
+      return { outcome: "PERMANENT_FAILURE" };
+    }
+    this.putObject({
+      bytes: input.bytes,
+      contentType: input.contentType,
+      objectKey: input.objectKey,
+      reportedChecksumSha256: checksumSha256,
+    });
+    const object = this.objects.get(input.objectKey)!;
+    return {
+      checksumSha256,
+      contentType: object.contentType,
+      objectVersion: object.objectVersion,
+      outcome: "READY",
+      sizeBytes: object.bytes.byteLength,
+      writeOnce: true,
+    };
   }
 
   private assertReference(input: SafeObjectReference) {

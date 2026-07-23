@@ -4,9 +4,11 @@ import test from "node:test";
 
 import { Prisma } from "@prisma/client";
 
+import { platformJobHash } from "../../../features/platform-jobs/domain/canonical";
 import { setPlatformJobCursorSigningSecretForTests } from "../../../features/platform-jobs/domain/cursor-signing";
 import { PlatformJobDomainError } from "../../../features/platform-jobs/domain/errors";
 import { platformHealthPayload } from "../../../features/platform-jobs/domain/registry";
+import { setPlatformJobHandlerForTests } from "../../../features/platform-jobs/services/handlers";
 import { setPlatformJobAuthorizationTestHook, type PlatformJobAdminContext } from "../../../features/platform-jobs/services/admin-context";
 import { claimPlatformJobs, completePlatformJob, enqueuePlatformJob, failPlatformJob, heartbeatPlatformJob, recoverExpiredPlatformJobLeases, startPlatformJob } from "../../../features/platform-jobs/services/jobs";
 import { cancelPlatformJob, requeuePlatformJob, triggerPlatformJob } from "../../../features/platform-jobs/services/mutations";
@@ -51,6 +53,7 @@ test.before(async () => {
 test.afterEach(async () => {
   setPlatformJobAuthorizationTestHook(undefined);
   setPlatformWorkerTestHook(undefined);
+  setPlatformJobHandlerForTests("STORAGE_MAINTENANCE_DISCOVERY");
   await prisma.adminAccess.updateMany({ where: { id: fixture.adminAccessId }, data: { permissions: ["PLATFORM_JOBS_VIEW", "PLATFORM_JOBS_MANAGE"], status: "ACTIVE" } });
   await cleanupPlatformRows();
 });
@@ -65,14 +68,14 @@ test.after(async () => {
   await prisma.$disconnect();
 });
 
-test("migration chain is healthy at 44/44 and Gate 6A creates no rows", async () => {
+test("migration chain is healthy at 47/47 and the additive Gate 6B migrations create no platform rows", async () => {
   const migrationRows = await prisma.$queryRaw<Array<{ applied: bigint; failed: bigint; total: bigint }>>(Prisma.sql`
     SELECT COUNT(*) FILTER (WHERE "finished_at" IS NOT NULL AND "rolled_back_at" IS NULL) AS applied,
            COUNT(*) FILTER (WHERE "finished_at" IS NULL AND "rolled_back_at" IS NULL) AS failed,
            COUNT(*) AS total
     FROM "_prisma_migrations"
   `);
-  assert.deepEqual(migrationRows[0], { applied: BigInt(44), failed: BigInt(0), total: BigInt(44) });
+  assert.deepEqual(migrationRows[0], { applied: BigInt(47), failed: BigInt(0), total: BigInt(47) });
   assert.equal(await prisma.platformJob.count(), 0);
   assert.equal(await prisma.platformJobSchedule.count(), 0);
   assert.equal(await prisma.platformJobAttempt.count(), 0);
@@ -255,6 +258,319 @@ test("bounded worker executes only the inert registered handler and replays its 
   assert.equal(mutation.operationLeaseToken, null);
   assert.equal(mutation.operationLeaseExpiresAt, null);
   assert.match(mutation.operationWorkerId ?? "", /^operation:[a-f0-9]{64}$/u);
+});
+
+test("Migration 47 rejects every nullable worker-operation bypass through direct SQL", async () => {
+  const leaseToken = randomUUID();
+  const operationWorkerId = `operation:${platformJobHash(randomUUID())}`;
+  const operation = await prisma.platformJobMutation.create({
+    data: {
+      action: "WORKER_BATCH",
+      actorAdminUserId: fixture.userId,
+      actorPersonId: fixture.personId,
+      idempotencyKey: randomUUID(),
+      operationBatchSize: 1,
+      operationFencingToken: BigInt(1),
+      operationLeaseExpiresAt: new Date(Date.now() + 60_000),
+      operationLeaseToken: leaseToken,
+      operationWorkerId,
+      requestHash: platformJobHash({ action: "WORKER_BATCH", batchSize: 1 }),
+      result: { state: "PROCESSING" },
+    },
+  });
+  const rejectsOperation = (statement: ReturnType<typeof Prisma.sql>) =>
+    assert.rejects(prisma.$executeRaw(statement), /PlatformJobMutation_operation_check/u);
+
+  await rejectsOperation(Prisma.sql`
+    UPDATE "PlatformJobMutation" SET "operationBatchSize" = NULL WHERE "id" = ${operation.id}::uuid
+  `);
+  await rejectsOperation(Prisma.sql`
+    UPDATE "PlatformJobMutation" SET "operationWorkerId" = NULL WHERE "id" = ${operation.id}::uuid
+  `);
+  await rejectsOperation(Prisma.sql`
+    UPDATE "PlatformJobMutation" SET "operationWorkerId" = 'operation:invalid' WHERE "id" = ${operation.id}::uuid
+  `);
+  await rejectsOperation(Prisma.sql`
+    UPDATE "PlatformJobMutation" SET "operationFencingToken" = NULL WHERE "id" = ${operation.id}::uuid
+  `);
+  await rejectsOperation(Prisma.sql`
+    UPDATE "PlatformJobMutation" SET "operationFencingToken" = 0 WHERE "id" = ${operation.id}::uuid
+  `);
+  await rejectsOperation(Prisma.sql`
+    UPDATE "PlatformJobMutation" SET "result" = '{}'::jsonb WHERE "id" = ${operation.id}::uuid
+  `);
+  await rejectsOperation(Prisma.sql`
+    UPDATE "PlatformJobMutation" SET "result" = '{"state":7}'::jsonb WHERE "id" = ${operation.id}::uuid
+  `);
+  await rejectsOperation(Prisma.sql`
+    UPDATE "PlatformJobMutation" SET "result" = '{"state":"INVALID"}'::jsonb WHERE "id" = ${operation.id}::uuid
+  `);
+  await rejectsOperation(Prisma.sql`
+    UPDATE "PlatformJobMutation" SET "operationLeaseToken" = NULL WHERE "id" = ${operation.id}::uuid
+  `);
+  await rejectsOperation(Prisma.sql`
+    UPDATE "PlatformJobMutation"
+    SET "operationCompletedAt" = clock_timestamp(), "result" = '{"state":"COMPLETE"}'::jsonb
+    WHERE "id" = ${operation.id}::uuid
+  `);
+
+  await prisma.$executeRaw(Prisma.sql`
+    UPDATE "PlatformJobMutation"
+    SET "operationCompletedAt" = clock_timestamp(),
+        "operationLeaseToken" = NULL,
+        "operationLeaseExpiresAt" = NULL,
+        "result" = '{"state":"COMPLETE"}'::jsonb
+    WHERE "id" = ${operation.id}::uuid
+  `);
+  await rejectsOperation(Prisma.sql`
+    UPDATE "PlatformJobMutation"
+    SET "operationLeaseToken" = ${randomUUID()}::uuid
+    WHERE "id" = ${operation.id}::uuid
+  `);
+
+  const nonWorker = await prisma.platformJobMutation.create({
+    data: {
+      action: "SCHEDULER_TICK",
+      actorAdminUserId: fixture.userId,
+      actorPersonId: fixture.personId,
+      idempotencyKey: randomUUID(),
+      requestHash: platformJobHash({ action: "SCHEDULER_TICK" }),
+      result: { jobsCreated: 0, schedulesProcessed: 0 },
+    },
+  });
+  await rejectsOperation(Prisma.sql`
+    UPDATE "PlatformJobMutation" SET "operationBatchSize" = 1 WHERE "id" = ${nonWorker.id}::uuid
+  `);
+  await rejectsOperation(Prisma.sql`
+    UPDATE "PlatformJobMutation" SET "operationWorkerId" = ${operationWorkerId} WHERE "id" = ${nonWorker.id}::uuid
+  `);
+  await rejectsOperation(Prisma.sql`
+    UPDATE "PlatformJobMutation" SET "operationLeaseToken" = ${randomUUID()}::uuid WHERE "id" = ${nonWorker.id}::uuid
+  `);
+  await rejectsOperation(Prisma.sql`
+    UPDATE "PlatformJobMutation" SET "operationFencingToken" = 1 WHERE "id" = ${nonWorker.id}::uuid
+  `);
+  await rejectsOperation(Prisma.sql`
+    UPDATE "PlatformJobMutation" SET "operationLeaseExpiresAt" = clock_timestamp() WHERE "id" = ${nonWorker.id}::uuid
+  `);
+  await rejectsOperation(Prisma.sql`
+    UPDATE "PlatformJobMutation" SET "operationCompletedAt" = clock_timestamp() WHERE "id" = ${nonWorker.id}::uuid
+  `);
+});
+
+test("worker selection is permission-filtered while Gate 6A health remains platform-only", async () => {
+  const health = await createJob();
+  const storage = await createGate6bJob();
+  setPlatformJobHandlerForTests("STORAGE_MAINTENANCE_DISCOVERY", async () => ({
+    metadata: {
+      enqueued: 0,
+      kind: "STORAGE_MAINTENANCE_DISCOVERED",
+      scanned: 0,
+      skipped: 0,
+    },
+    outcome: "SUCCEEDED",
+  }));
+  const platformOnly = await runPlatformWorkerBatch(context, {
+    batchSize: 2,
+    idempotencyKey: randomUUID(),
+  });
+  assert.deepEqual(
+    { claimed: "claimed" in platformOnly ? platformOnly.claimed : -1, succeeded: "succeeded" in platformOnly ? platformOnly.succeeded : -1 },
+    { claimed: 1, succeeded: 1 },
+  );
+  assert.equal((await prisma.platformJob.findUniqueOrThrow({ where: { id: health.id } })).status, "SUCCEEDED");
+  assert.deepEqual(
+    await prisma.platformJob.findUniqueOrThrow({
+      where: { id: storage.id },
+      select: { attemptCount: true, status: true },
+    }),
+    { attemptCount: 0, status: "AVAILABLE" },
+  );
+  await grantJointWorkerPermissions();
+  const authorized = await runPlatformWorkerBatch(context, {
+    batchSize: 1,
+    idempotencyKey: randomUUID(),
+  });
+  assert.deepEqual(
+    { claimed: "claimed" in authorized ? authorized.claimed : -1, succeeded: "succeeded" in authorized ? authorized.succeeded : -1 },
+    { claimed: 1, succeeded: 1 },
+  );
+  assert.equal((await prisma.platformJob.findUniqueOrThrow({ where: { id: storage.id } })).status, "SUCCEEDED");
+});
+
+test("storage-only actors cannot start a worker and revocation after enqueue prevents Gate 6B claim", async () => {
+  const storage = await createGate6bJob();
+  await prisma.adminAccess.update({
+    where: { id: fixture.adminAccessId },
+    data: { permissions: ["STORAGE_RECORDS_VIEW", "STORAGE_RECORDS_MANAGE"] },
+  });
+  await assert.rejects(
+    runPlatformWorkerBatch(context, { batchSize: 1, idempotencyKey: randomUUID() }),
+    code("FORBIDDEN"),
+  );
+  await prisma.adminAccess.update({
+    where: { id: fixture.adminAccessId },
+    data: { permissions: ["PLATFORM_JOBS_VIEW", "PLATFORM_JOBS_MANAGE"] },
+  });
+  const platformOnly = await runPlatformWorkerBatch(context, {
+    batchSize: 1,
+    idempotencyKey: randomUUID(),
+  });
+  assert.equal("claimed" in platformOnly ? platformOnly.claimed : -1, 0);
+  assert.deepEqual(
+    await prisma.platformJob.findUniqueOrThrow({
+      where: { id: storage.id },
+      select: { attemptCount: true, status: true },
+    }),
+    { attemptCount: 0, status: "AVAILABLE" },
+  );
+});
+
+test("revocation after claim but before handler start prevents Gate 6B execution", async () => {
+  await grantJointWorkerPermissions();
+  const storage = await createGate6bJob();
+  let revoked = false;
+  setPlatformWorkerTestHook(async ({ phase }) => {
+    if (!revoked && phase === "AFTER_JOB_CLAIM_BEFORE_HANDLER") {
+      revoked = true;
+      await prisma.adminAccess.update({
+        where: { id: fixture.adminAccessId },
+        data: { permissions: ["PLATFORM_JOBS_VIEW", "PLATFORM_JOBS_MANAGE", "STORAGE_RECORDS_VIEW"] },
+      });
+    }
+  });
+  await assert.rejects(
+    runPlatformWorkerBatch(context, { batchSize: 1, idempotencyKey: randomUUID() }),
+    code("FORBIDDEN"),
+  );
+  assert.deepEqual(
+    await prisma.platformJob.findUniqueOrThrow({
+      where: { id: storage.id },
+      select: { attemptCount: true, status: true },
+    }),
+    { attemptCount: 1, status: "CLAIMED" },
+  );
+});
+
+test("Gate 6B schedule state, scheduler emission, and requeue require joint authority", async () => {
+  const now = new Date();
+  const created = await runPlatformJobSerializable((transaction) => createPlatformJobSchedule(transaction, {
+    cadenceSeconds: 60,
+    catchupLimit: 1,
+    createdByAdminUserId: fixture.userId,
+    createdByPersonId: fixture.personId,
+    jobType: "STORAGE_MAINTENANCE_DISCOVERY",
+    nextRunAt: new Date(now.getTime() - 60_000),
+    payload: { batchSize: 1 },
+    payloadVersion: 1,
+    scheduleKey: "STORAGE_MAINTENANCE_DISCOVERY",
+  }));
+  await assert.rejects(setPlatformJobScheduleEnabled(context, {
+    enabled: true,
+    expectedVersion: created.schedule.version,
+    idempotencyKey: randomUUID(),
+    scheduleId: created.schedule.id,
+  }), code("FORBIDDEN"));
+  await grantJointWorkerPermissions();
+  const enabled = await setPlatformJobScheduleEnabled(context, {
+    enabled: true,
+    expectedVersion: created.schedule.version,
+    idempotencyKey: randomUUID(),
+    scheduleId: created.schedule.id,
+  });
+  if (enabled.replay) throw new Error("Fresh Gate 6B schedule enable unexpectedly replayed.");
+  assert.equal(enabled.enabled, true);
+  await prisma.adminAccess.update({
+    where: { id: fixture.adminAccessId },
+    data: { permissions: ["PLATFORM_JOBS_VIEW", "PLATFORM_JOBS_MANAGE"] },
+  });
+  const tick = await runPlatformSchedulerTick(context, {
+    batchSize: 1,
+    idempotencyKey: randomUUID(),
+    now,
+  });
+  if (tick.replay) throw new Error("Fresh unauthorized Gate 6B scheduler tick unexpectedly replayed.");
+  assert.deepEqual(
+    { jobsCreated: tick.jobsCreated, schedulesProcessed: tick.schedulesProcessed },
+    { jobsCreated: 0, schedulesProcessed: 0 },
+  );
+
+  const failed = await createGate6bJob();
+  await prisma.platformJob.update({
+    where: { id: failed.id },
+    data: { failedAt: now, lastErrorCode: "PERMANENT_FAILURE", status: "FAILED" },
+  });
+  const stored = await prisma.platformJob.findUniqueOrThrow({ where: { id: failed.id } });
+  await assert.rejects(requeuePlatformJob(context, {
+    expectedVersion: stored.version,
+    idempotencyKey: randomUUID(),
+    jobId: stored.id,
+  }), code("FORBIDDEN"));
+});
+
+test("different authorized scheduler actors process one Gate 6B occurrence exactly once", async (t) => {
+  await grantJointWorkerPermissions();
+  const secondUserId = `gate6b.scheduler.${randomUUID()}`;
+  const secondUser = await prisma.user.create({
+    data: { email: `${secondUserId}@rezno.invalid`, id: secondUserId, name: "Gate 6B Scheduler" },
+  });
+  const secondPerson = await prisma.person.create({
+    data: { authUserId: secondUser.id, firstName: "Gate6B", isOnboarded: true, status: "ACTIVE" },
+  });
+  const secondAccess = await prisma.adminAccess.create({
+    data: {
+      permissions: [
+        "PLATFORM_JOBS_VIEW",
+        "PLATFORM_JOBS_MANAGE",
+        "STORAGE_RECORDS_VIEW",
+        "STORAGE_RECORDS_MANAGE",
+      ],
+      userId: secondUser.id,
+    },
+  });
+  const secondContext: PlatformJobAdminContext = {
+    adminAccessId: secondAccess.id,
+    personId: secondPerson.id,
+    source: "database",
+    userId: secondUser.id,
+  };
+  const scheduleCleanup: { id?: string } = {};
+  t.after(async () => {
+    const scheduleId = scheduleCleanup.id;
+    if (scheduleId) {
+      await prisma.platformJobMutation.deleteMany({ where: { scheduleId } });
+      await prisma.platformJobAttempt.deleteMany({ where: { job: { scheduleId } } });
+      await prisma.platformJob.deleteMany({ where: { scheduleId } });
+      await prisma.platformJobSchedule.deleteMany({ where: { id: scheduleId } });
+    }
+    await prisma.platformJobMutation.deleteMany({ where: { actorAdminUserId: secondUser.id } });
+    await prisma.adminAccess.deleteMany({ where: { id: secondAccess.id } });
+    await prisma.person.deleteMany({ where: { id: secondPerson.id } });
+    await prisma.user.deleteMany({ where: { id: secondUser.id } });
+  });
+  const now = new Date();
+  const created = await runPlatformJobSerializable((transaction) => createPlatformJobSchedule(transaction, {
+    cadenceSeconds: 300,
+    catchupLimit: 1,
+    createdByAdminUserId: fixture.userId,
+    createdByPersonId: fixture.personId,
+    enabled: true,
+    jobType: "STORAGE_MAINTENANCE_DISCOVERY",
+    nextRunAt: new Date(now.getTime() - 1_000),
+    payload: { batchSize: 1 },
+    payloadVersion: 1,
+    scheduleKey: "STORAGE_MAINTENANCE_DISCOVERY",
+  }));
+  const scheduleId = created.schedule.id;
+  scheduleCleanup.id = scheduleId;
+  const results = await Promise.all([
+    runPlatformSchedulerTick(context, { batchSize: 1, idempotencyKey: randomUUID(), now }),
+    runPlatformSchedulerTick(secondContext, { batchSize: 1, idempotencyKey: randomUUID(), now }),
+  ]);
+  assert.equal(results.reduce((sum, result) => sum + ("jobsCreated" in result ? result.jobsCreated : 0), 0), 1);
+  assert.equal(results.reduce((sum, result) => sum + ("schedulesProcessed" in result ? result.schedulesProcessed : 0), 0), 1);
+  assert.equal(await prisma.platformJob.count({ where: { scheduleId } }), 1);
+  assert.equal(await prisma.platformJobMutation.count({ where: { action: "SCHEDULER_TICK" } }), 2);
 });
 
 test("worker operation resumes a crash before claim with one concurrent owner", async () => {
@@ -497,7 +813,7 @@ test("database constraints reject forged scope, excessive priority, and oversize
   assert.deepEqual(unchanged.payload, platformHealthPayload());
 });
 
-test("claim and recovery indexes plus all Gate 6A foreign keys exist", async () => {
+test("claim and recovery indexes plus all Gate 6A and Gate 6B foreign keys exist", async () => {
   const indexes = await prisma.$queryRaw<Array<{ indexname: string }>>(Prisma.sql`
     SELECT indexname FROM pg_indexes
     WHERE schemaname = 'public' AND tablename IN ('PlatformJob', 'PlatformJobSchedule', 'PlatformJobAttempt', 'PlatformJobMutation')
@@ -512,14 +828,30 @@ test("claim and recovery indexes plus all Gate 6A foreign keys exist", async () 
     "PlatformJobMutation_action_operationLeaseExpiresAt_id_idx",
     "PlatformJobAttempt_workerId_createdAt_id_idx",
   ]) assert.equal(names.has(name), true, name);
-  const foreignKeys = await prisma.$queryRaw<Array<{ count: bigint }>>(Prisma.sql`
-    SELECT COUNT(*) AS count FROM pg_constraint
+  const foreignKeys = await prisma.$queryRaw<Array<{ name: string }>>(Prisma.sql`
+    SELECT conname AS name FROM pg_constraint
     WHERE contype = 'f' AND conrelid IN (
       '"PlatformJob"'::regclass, '"PlatformJobAttempt"'::regclass,
       '"PlatformJobSchedule"'::regclass, '"PlatformJobMutation"'::regclass
     )
+    ORDER BY conname
   `);
-  assert.equal(foreignKeys[0].count, BigInt(13));
+  assert.deepEqual(foreignKeys.map((row) => row.name), [
+    "PlatformJobAttempt_jobId_fkey",
+    "PlatformJobMutation_actorAdminUserId_fkey",
+    "PlatformJobMutation_actorPersonId_fkey",
+    "PlatformJobMutation_jobId_fkey",
+    "PlatformJobMutation_scheduleId_fkey",
+    "PlatformJobSchedule_createdByAdminUserId_fkey",
+    "PlatformJobSchedule_createdByPersonId_fkey",
+    "PlatformJobSchedule_organizationId_fkey",
+    "PlatformJob_createdByAdminUserId_fkey",
+    "PlatformJob_createdByPersonId_fkey",
+    "PlatformJob_organizationId_fkey",
+    "PlatformJob_parentJobId_fkey",
+    "PlatformJob_requeueRootJobId_fkey",
+    "PlatformJob_scheduleId_fkey",
+  ]);
 });
 
 async function workerMutation(idempotencyKey: string) {
@@ -577,6 +909,33 @@ async function createJob(input: { availableAt?: Date; deduplicationKey?: string;
     payloadVersion: 1,
     source: "ADMIN_MANUAL",
   }))).job;
+}
+
+async function createGate6bJob() {
+  return (await runPlatformJobSerializable((transaction) => enqueuePlatformJob(transaction, {
+    availableAt: new Date(Date.now() - 1_000),
+    createdByAdminUserId: fixture.userId,
+    createdByPersonId: fixture.personId,
+    deduplicationKey: `integration:gate6b:${randomUUID()}`,
+    jobType: "STORAGE_MAINTENANCE_DISCOVERY",
+    payload: { batchSize: 1 },
+    payloadVersion: 1,
+    source: "ADMIN_MANUAL",
+  }))).job;
+}
+
+async function grantJointWorkerPermissions() {
+  await prisma.adminAccess.update({
+    where: { id: fixture.adminAccessId },
+    data: {
+      permissions: [
+        "PLATFORM_JOBS_VIEW",
+        "PLATFORM_JOBS_MANAGE",
+        "STORAGE_RECORDS_VIEW",
+        "STORAGE_RECORDS_MANAGE",
+      ],
+    },
+  });
 }
 
 async function createFailedJob() {
