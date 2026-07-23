@@ -3,7 +3,7 @@ import type { PrismaClient } from "@prisma/client";
 export const MEDIA_GATE5B_CONFIRMATION = "REZNO_MEDIA_GATE5B_STAGING_ONLY";
 const STORAGE_MEDIA_GATE6B_CONFIRMATION = "REZNO_STAGE6_GATE6B_STAGING_ONLY";
 const GATE5B_MIGRATIONS = BigInt(42);
-const GATE6B_SUCCESSOR_MIGRATIONS = BigInt(46);
+const GATE6B_SUCCESSOR_MIGRATIONS = BigInt(47);
 
 type SafetyClient = Pick<PrismaClient, "$queryRaw">;
 
@@ -51,6 +51,6 @@ export async function assertMediaGate5bStaging(
   }
   return {
     database: "rezno_staging" as const,
-    migrations: gate6bSuccessor ? "46/46" as const : "42/42" as const,
+    migrations: gate6bSuccessor ? "47/47" as const : "42/42" as const,
   };
 }

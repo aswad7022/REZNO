@@ -6,7 +6,7 @@ import {
 } from "../../lib/db/postgres-transport";
 
 export const STORAGE_MEDIA_GATE6B_CONFIRMATION = "REZNO_STAGE6_GATE6B_STAGING_ONLY";
-const EXPECTED_MIGRATIONS = BigInt(46);
+const EXPECTED_MIGRATIONS = BigInt(47);
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "::1", "localhost"]);
 
 type SafetyClient = Pick<PrismaClient, "$queryRaw">;
@@ -68,7 +68,7 @@ export async function assertStorageMediaGate6bStaging(
     || migrations.applied !== EXPECTED_MIGRATIONS
     || migrations.failed !== BigInt(0)
     || migrations.rolledBack !== BigInt(0)
-  ) throw new Error("Gate 6B fixture requires an exact healthy 46/46 migration state.");
+  ) throw new Error("Gate 6B fixture requires an exact healthy 47/47 migration state.");
 
   return {
     backendPgStatSsl: localUnencrypted ? connection.encrypted : transportEvidence!.backendPgStatSsl,
@@ -76,7 +76,7 @@ export async function assertStorageMediaGate6bStaging(
     database: "rezno_staging" as const,
     encrypted: localUnencrypted ? connection.encrypted : transportEvidence!.encrypted,
     hostnameVerified: localUnencrypted ? false : transportEvidence!.hostnameVerified,
-    migrations: "46/46" as const,
+    migrations: "47/47" as const,
     prismaUsedAttestedPhysicalClient: localUnencrypted
       ? false
       : transportEvidence!.prismaUsedAttestedPhysicalClient,

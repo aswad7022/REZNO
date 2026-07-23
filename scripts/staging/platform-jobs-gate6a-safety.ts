@@ -5,7 +5,7 @@ import { assertGate6aTransportEvidence, type Gate6aTransportEvidence } from "../
 export const PLATFORM_JOBS_GATE6A_CONFIRMATION = "REZNO_STAGE6_GATE6A_STAGING_ONLY";
 const STORAGE_MEDIA_GATE6B_CONFIRMATION = "REZNO_STAGE6_GATE6B_STAGING_ONLY";
 const GATE6A_MIGRATIONS = BigInt(44);
-const GATE6B_SUCCESSOR_MIGRATIONS = BigInt(46);
+const GATE6B_SUCCESSOR_MIGRATIONS = BigInt(47);
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "::1", "localhost"]);
 
 type SafetyClient = Pick<PrismaClient, "$queryRaw">;
@@ -77,7 +77,7 @@ export async function assertPlatformJobsGate6aStaging(
     database: "rezno_staging" as const,
     encrypted: localUnencrypted ? connection.encrypted : transportEvidence!.encrypted,
     hostnameVerified: localUnencrypted ? false : transportEvidence!.hostnameVerified,
-    migrations: gate6bSuccessor ? "46/46" as const : "44/44" as const,
+    migrations: gate6bSuccessor ? "47/47" as const : "44/44" as const,
     prismaUsedAttestedPhysicalClient: localUnencrypted
       ? false
       : transportEvidence!.prismaUsedAttestedPhysicalClient,
