@@ -39,6 +39,11 @@ import {
   isStoredAssetRescanEligible,
 } from "../../../features/storage-automation/domain/policy";
 import { setStorageAutomationErrorTestHook } from "../../../features/storage-automation/services/handlers";
+import { COMMUNICATIONS_PAYMENT_GATE6C_CONFIRMATION } from "../../../scripts/staging/communications-payment-gate6c-safety";
+import {
+  assertStorageMediaGate6bStaging,
+  STORAGE_MEDIA_GATE6B_CONFIRMATION,
+} from "../../../scripts/staging/storage-media-gate6b-safety";
 
 const assetId = "10000000-0000-4000-8000-000000000001";
 const sessionId = "10000000-0000-4000-8000-000000000002";
@@ -106,13 +111,18 @@ test("Gate 6B payload and result schemas are closed, reference-only, and bounded
   );
 });
 
-test("the schedule registry preserves Gate 6A and admits only the four Gate 6B discovery mappings disabled by default", async () => {
-  assert.deepEqual(PLATFORM_JOB_DISCOVERY_TYPES, [
+test("the schedule registry preserves Gate 6A and the four Gate 6B discovery mappings disabled by default", async () => {
+  const gate6bDiscoveryTypes = [
     "STORAGE_MAINTENANCE_DISCOVERY",
     "STORAGE_RESCAN_DISCOVERY",
     "MEDIA_RENDITION_DISCOVERY",
     "MEDIA_RENDITION_CLEANUP_DISCOVERY",
-  ]);
+  ] as const;
+  assert.deepEqual(
+    PLATFORM_JOB_DISCOVERY_TYPES.filter((jobType) =>
+      gate6bDiscoveryTypes.includes(jobType as (typeof gate6bDiscoveryTypes)[number])),
+    gate6bDiscoveryTypes,
+  );
   const created: Array<Record<string, unknown>> = [];
   const transaction = {
     platformJobSchedule: {
@@ -137,7 +147,7 @@ test("the schedule registry preserves Gate 6A and admits only the four Gate 6B d
     payload: { probe: "DURABLE_FOUNDATION", version: 1 },
     scheduleKey: "PLATFORM_HEALTH_PROBE",
   });
-  for (const jobType of PLATFORM_JOB_DISCOVERY_TYPES) {
+  for (const jobType of gate6bDiscoveryTypes) {
     await createPlatformJobSchedule(transaction, {
       ...common,
       jobType,
@@ -156,6 +166,33 @@ test("the schedule registry preserves Gate 6A and admits only the four Gate 6B d
     }),
     domainCode("VALIDATION_ERROR"),
   );
+});
+
+test("Gate 6B staging safety admits 48/48 only under the exact Gate 6C successor confirmation", async () => {
+  const rows = [
+    [{ database: "rezno_staging", encrypted: false, user: "postgres" }],
+    [{
+      applied: BigInt(48),
+      failed: BigInt(0),
+      rolledBack: BigInt(0),
+      total: BigInt(48),
+    }],
+  ];
+  const result = await assertStorageMediaGate6bStaging(
+    { $queryRaw: async () => rows.shift() } as never,
+    {
+      DATABASE_URL:
+        "postgresql://postgres:local-only@127.0.0.1:55448/rezno_staging?sslmode=disable",
+      NODE_ENV: "test",
+      REZNO_ENV: "staging",
+      REZNO_STAGE6_GATE6B_ALLOW_LOCAL_UNENCRYPTED: "true",
+      REZNO_STAGE6_GATE6B_CONFIRM: STORAGE_MEDIA_GATE6B_CONFIRMATION,
+      REZNO_STAGE6_GATE6C_CONFIRM:
+        COMMUNICATIONS_PAYMENT_GATE6C_CONFIRMATION,
+      REZNO_STAGE6_GATE6C_SUCCESSOR: "true",
+    },
+  );
+  assert.equal(result.migrations, "48/48");
 });
 
 test("cleanup, rescan, and rendition eligibility policies fail closed", () => {

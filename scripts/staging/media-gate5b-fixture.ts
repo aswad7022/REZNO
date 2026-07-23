@@ -70,6 +70,12 @@ export const mediaGate5bFixtureIds = {
 export async function cleanupMediaGate5bFixture(prisma: PrismaClient) {
   return {
     adminAuditLogs: (await prisma.adminAuditLog.deleteMany({ where: { adminUserId: { in: userIds } } })).count,
+    outboundAttempts: (await prisma.outboundDeliveryAttempt.deleteMany({
+      where: { delivery: { personId: { in: personIds } } },
+    })).count,
+    outboundDeliveries: (await prisma.outboundDelivery.deleteMany({
+      where: { personId: { in: personIds } },
+    })).count,
     mediaMutations: (await prisma.mediaMutation.deleteMany({ where: { actorPersonId: { in: personIds } } })).count,
     mediaBindings: (await prisma.mediaBinding.deleteMany({
       where: { containerId: { in: Object.values(containerIds) } },

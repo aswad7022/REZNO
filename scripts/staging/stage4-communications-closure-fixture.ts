@@ -727,14 +727,57 @@ export async function stage4ClosureFingerprint() {
   };
 }
 
+let stage4ClosureCleanupPhase = "NOT_RUNNING";
+
+export function currentStage4ClosureCleanupPhase() {
+  return stage4ClosureCleanupPhase;
+}
+
 export async function cleanupStage4ClosureFixture() {
   return prisma.$transaction(async (transaction) => {
     const deleted: Record<string, number> = {};
-    deleted.attempts = (await transaction.outboundDeliveryAttempt.deleteMany({ where: { id: { in: attemptIds() } } })).count;
-    deleted.deliveries = (await transaction.outboundDelivery.deleteMany({ where: { id: { in: deliveryIds() } } })).count;
-    deleted.mutations = (await transaction.communicationCampaignMutation.deleteMany({ where: { id: { in: campaignMutationIds() } } })).count;
-    deleted.audits = (await transaction.adminAuditLog.deleteMany({ where: { id: deterministicUuid("admin-audit:campaign") } })).count;
+    stage4ClosureCleanupPhase = "OUTBOUND_ATTEMPTS";
+    deleted.attempts = (await transaction.outboundDeliveryAttempt.deleteMany({
+      where: {
+        OR: [
+          { id: { in: attemptIds() } },
+          { deliveryId: { in: deliveryIds() } },
+          { delivery: { campaignId: { in: campaignIds() } } },
+          { delivery: { personId: { in: personIds() } } },
+        ],
+      },
+    })).count;
+    stage4ClosureCleanupPhase = "OUTBOUND_DELIVERIES";
+    deleted.deliveries = (await transaction.outboundDelivery.deleteMany({
+      where: {
+        OR: [
+          { campaignId: { in: campaignIds() } },
+          { personId: { in: personIds() } },
+        ],
+      },
+    })).count;
+    stage4ClosureCleanupPhase = "OUTBOUND_MUTATIONS";
+    deleted.mutations = (await transaction.communicationCampaignMutation.deleteMany({
+      where: {
+        OR: [
+          { id: { in: campaignMutationIds() } },
+          { campaignId: { in: campaignIds() } },
+        ],
+      },
+    })).count;
+    stage4ClosureCleanupPhase = "OUTBOUND_AUDITS";
+    deleted.audits = (await transaction.adminAuditLog.deleteMany({
+      where: {
+        adminUserId: { in: userIds() },
+        OR: [
+          { id: deterministicUuid("admin-audit:campaign") },
+          { targetId: { in: campaignIds() } },
+        ],
+      },
+    })).count;
+    stage4ClosureCleanupPhase = "OUTBOUND_CAMPAIGNS";
     deleted.campaigns = (await transaction.communicationCampaign.deleteMany({ where: { id: { in: campaignIds() } } })).count;
+    stage4ClosureCleanupPhase = "NOTIFICATIONS";
     deleted.interactions = (await transaction.notificationInteraction.deleteMany({ where: { personId: { in: personIds() } } })).count;
     deleted.notificationStates = (await transaction.notificationRecipientState.deleteMany({ where: { notificationId: { in: notificationIds() } } })).count;
     deleted.inboxStates = (await transaction.notificationInboxState.deleteMany({ where: { personId: { in: personIds() } } })).count;
@@ -742,21 +785,29 @@ export async function cleanupStage4ClosureFixture() {
     deleted.outboundPreferenceMutations = (await transaction.outboundPreferenceMutation.deleteMany({ where: { personId: { in: personIds() } } })).count;
     deleted.outboundPreferences = (await transaction.outboundPreference.deleteMany({ where: { personId: { in: personIds() } } })).count;
     deleted.notificationPreferences = (await transaction.notificationPreference.deleteMany({ where: { personId: { in: personIds() } } })).count;
+    stage4ClosureCleanupPhase = "CONVERSATIONS";
     deleted.readStates = (await transaction.conversationReadState.deleteMany({ where: { conversationId: { in: conversationIds() } } })).count;
     deleted.messages = (await transaction.message.deleteMany({ where: { id: { in: messageIds() } } })).count;
     deleted.conversations = (await transaction.conversation.deleteMany({ where: { id: { in: conversationIds() } } })).count;
+    stage4ClosureCleanupPhase = "BOOKINGS";
     deleted.restaurantDetails = (await transaction.restaurantReservationDetails.deleteMany({ where: { bookingId: stage4ClosureIds.restaurantBooking } })).count;
     deleted.tables = (await transaction.restaurantTable.deleteMany({ where: { id: stage4ClosureIds.table } })).count;
     deleted.bookings = (await transaction.booking.deleteMany({ where: { id: { in: [stage4ClosureIds.booking, stage4ClosureIds.restaurantBooking] } } })).count;
+    stage4ClosureCleanupPhase = "AUTHORITY";
     deleted.adminAccess = (await transaction.adminAccess.deleteMany({ where: { userId: { in: userIds() } } })).count;
     deleted.members = (await transaction.organizationMember.deleteMany({ where: { id: { in: memberIds() } } })).count;
     deleted.roles = (await transaction.role.deleteMany({ where: { id: { in: roleIds() } } })).count;
+    stage4ClosureCleanupPhase = "ORGANIZATION_BRANCHES";
     deleted.branches = (await transaction.branch.deleteMany({ where: { id: stage4ClosureIds.branch } })).count;
+    stage4ClosureCleanupPhase = "ORGANIZATION_ROWS";
     deleted.organizations = (await transaction.organization.deleteMany({ where: { id: { in: [stage4ClosureIds.organization, stage4ClosureIds.foreignOrganization] } } })).count;
+    stage4ClosureCleanupPhase = "ORGANIZATION_PEOPLE";
     deleted.people = (await transaction.person.deleteMany({ where: { id: { in: personIds() } } })).count;
+    stage4ClosureCleanupPhase = "ORGANIZATION_USERS";
     deleted.users = (await transaction.user.deleteMany({ where: { id: { in: userIds() } } })).count;
+    stage4ClosureCleanupPhase = "COMPLETE";
     return { deleted, fixture: STAGE4_CLOSURE_FIXTURE };
-  });
+  }, { timeout: 30_000 });
 }
 
 const fixtureLocalizedContent = {

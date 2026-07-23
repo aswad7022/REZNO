@@ -15,6 +15,7 @@ import {
 } from "./media-gate5b-fixture";
 import {
   cleanupPaymentsGate5cFixture,
+  inspectPaymentsGate5cSuccessorEvidence,
   materializePaymentsGate5cEvidence,
   paymentsGate5cFixtureIds,
   seedPaymentsGate5cFixture,
@@ -39,7 +40,11 @@ export async function stage5ClosureFingerprint(prisma: PrismaClient) {
   const [managedStorage, media, payments] = await Promise.all([
     managedStorageFingerprint(prisma),
     mediaGate5bFingerprint(prisma),
-    materializePaymentsGate5cEvidence(prisma),
+    process.env.REZNO_STAGE6_GATE6C_SUCCESSOR === "true"
+      && process.env.REZNO_STAGE6_GATE6C_CONFIRM
+        === "REZNO_STAGE6_GATE6C_STAGING_ONLY"
+      ? inspectPaymentsGate5cSuccessorEvidence(prisma)
+      : materializePaymentsGate5cEvidence(prisma),
   ]);
   return combinedEvidence(managedStorage, media, payments.fingerprint);
 }

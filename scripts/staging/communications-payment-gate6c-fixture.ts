@@ -99,10 +99,13 @@ const stage4cPersonIds = [
 export async function seedCommunicationsPaymentGate6cFixture(
   prisma: PrismaClient,
 ) {
+  communicationsPaymentGate6cSeedPhase = "CLEANUP";
   await cleanupCommunicationsPaymentGate6cFixture(prisma);
+  communicationsPaymentGate6cSeedPhase = "PAYMENT_FIXTURE";
   const paymentEvidence = await seedPaymentsGate5cFixture(prisma);
   const ids = communicationsPaymentGate6cFixtureIds;
   const paymentIds = paymentsGate5cFixtureIds;
+  communicationsPaymentGate6cSeedPhase = "AUTHORITATIVE_LOOKUP";
   const adminAccess = await prisma.adminAccess.findUniqueOrThrow({
     where: { userId: ids.adminUserId },
     select: { id: true },
@@ -134,6 +137,7 @@ export async function seedCommunicationsPaymentGate6cFixture(
     scanned: 0,
   } as const;
 
+  communicationsPaymentGate6cSeedPhase = "GATE6C_ROWS";
   await prisma.$transaction(async (transaction) => {
     await transaction.adminAccess.update({
       where: { id: adminAccess.id },
@@ -237,6 +241,9 @@ export async function seedCommunicationsPaymentGate6cFixture(
     await transaction.$executeRaw(
       Prisma.sql`SET CONSTRAINTS "FinancialJournal_balance_trigger" IMMEDIATE`,
     );
+    // Keep the accepted Gate 5C settlement sentinels outside the current
+    // closed-day window used by Gate 6C statement generation. Successor
+    // smokes inspect those sentinels read-only after this deliberate shift.
     await transaction.settlementBatch.update({
       where: { id: paymentIds.settlementBatchIds[0] },
       data: {
@@ -338,13 +345,21 @@ export async function seedCommunicationsPaymentGate6cFixture(
     timeout: 30_000,
   });
 
+  communicationsPaymentGate6cSeedPhase = "SETTLEMENT_ROLLBACK_EVIDENCE";
   const settlementEvidence =
     await materializeGate6cSettlementDraftEvidence(prisma);
+  communicationsPaymentGate6cSeedPhase = "FINGERPRINT";
   return {
     fixture: await communicationsPaymentGate6cFixtureFingerprint(prisma),
     paymentEvidence,
     settlementEvidence,
   };
+}
+
+let communicationsPaymentGate6cSeedPhase = "NOT_RUNNING";
+
+export function currentCommunicationsPaymentGate6cSeedPhase() {
+  return communicationsPaymentGate6cSeedPhase;
 }
 
 export async function communicationsPaymentGate6cFixtureFingerprint(

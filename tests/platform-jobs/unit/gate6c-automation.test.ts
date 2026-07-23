@@ -9,7 +9,10 @@ import {
   requiredPlatformSchedulePermissions,
 } from "../../../features/platform-jobs/domain/authority";
 import {
+  platformJobHandlerTimeoutMs,
   PLATFORM_JOB_DISCOVERY_TYPES,
+  PLATFORM_JOB_HANDLER_TIMEOUT_OVERRIDES_MS,
+  PLATFORM_JOB_LIMITS,
   STAGE_6_ARCHITECTURE,
 } from "../../../features/platform-jobs/domain/contracts";
 import { PlatformJobDomainError } from "../../../features/platform-jobs/domain/errors";
@@ -43,6 +46,34 @@ test("Gate 6C locks status, joint authority, and schedule ownership", () => {
   ]);
   assert.equal(PLATFORM_JOB_DISCOVERY_TYPES.includes("PAYMENT_RETRY_DISCOVERY"), true);
   assert.equal(PLATFORM_JOB_DISCOVERY_TYPES.includes("PAYMENT_RECONCILIATION" as never), false);
+  assert.equal(
+    platformJobHandlerTimeoutMs("COMMUNICATION_CAMPAIGN_DISPATCH"),
+    15_000,
+  );
+  assert.equal(
+    platformJobHandlerTimeoutMs("PAYMENT_REFUND_RETRY"),
+    15_000,
+  );
+  assert.equal(
+    platformJobHandlerTimeoutMs("COMMUNICATION_CAMPAIGN_DISCOVERY"),
+    PLATFORM_JOB_LIMITS.executionTimeoutMs,
+  );
+  assert.deepEqual(
+    Object.keys(PLATFORM_JOB_HANDLER_TIMEOUT_OVERRIDES_MS).sort(),
+    [
+      "COMMUNICATION_CAMPAIGN_DISPATCH",
+      "COMMUNICATION_DELIVERY_DISPATCH",
+      "PAYMENT_ATTEMPT_RETRY",
+      "PAYMENT_PROVIDER_EVENT_PROCESS",
+      "PAYMENT_RECONCILIATION",
+      "PAYMENT_REFUND_RETRY",
+      "SETTLEMENT_STATEMENT_GENERATE",
+    ],
+  );
+  assert.ok(
+    platformJobHandlerTimeoutMs("COMMUNICATION_CAMPAIGN_DISPATCH")
+      < PLATFORM_JOB_LIMITS.minLeaseSeconds * 1_000,
+  );
 });
 
 test("Gate 6C payloads contain strict references and reject copied authority", () => {
@@ -171,4 +202,65 @@ test("Migration 48 is additive, actorless only for exact provider events, and cr
   assert.doesNotMatch(source, /\bINSERT\s+INTO\b/iu);
   assert.doesNotMatch(source, /\bUPDATE\s+"(?:Communication|Payment|Settlement|PlatformJob)/u);
   assert.doesNotMatch(source, /\bDELETE\s+FROM\b/iu);
+});
+
+test("Gate 6C successor fixtures remain read-only or exact-ID cleanup safe", async () => {
+  const [
+    stage4cSmoke,
+    gate5cFixture,
+    gate5cSmoke,
+    gate5dSmoke,
+    gate6bFixture,
+  ] = await Promise.all([
+    readFile(
+      new URL(
+        "../../../scripts/staging/smoke-outbound-communications-stage4c.ts",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "../../../scripts/staging/payments-gate5c-fixture.ts",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "../../../scripts/staging/smoke-payments-gate5c.ts",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "../../../scripts/staging/smoke-stage5-closure.ts",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "../../../scripts/staging/storage-media-gate6b-fixture.ts",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  ]);
+  assert.match(
+    stage4cSmoke,
+    /REZNO_STAGE6_GATE6C_CONFIRM === "REZNO_STAGE6_GATE6C_STAGING_ONLY"/u,
+  );
+  assert.match(
+    gate5cFixture,
+    /inspectPaymentsGate5cSuccessorEvidence/u,
+  );
+  assert.match(gate5cSmoke, /readOnlySuccessorInspection/u);
+  assert.match(gate5dSmoke, /readOnlySuccessorInspection/u);
+  assert.match(gate6bFixture, /successorUtcDay/u);
+  assert.doesNotMatch(
+    gate6bFixture,
+    /gate6cSuccessor\s*\?\s*new Date\("2026-07-22T14:00:00/u,
+  );
 });

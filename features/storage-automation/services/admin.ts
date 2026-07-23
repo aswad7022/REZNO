@@ -6,7 +6,6 @@ import { MEDIA_RENDITION_PROFILES } from "@/features/media/domain/rendition-regi
 import { platformJobHash } from "@/features/platform-jobs/domain/canonical";
 import { requiredPlatformJobPermissions } from "@/features/platform-jobs/domain/authority";
 import {
-  PLATFORM_JOB_DISCOVERY_TYPES,
   STAGE_6_ARCHITECTURE,
 } from "@/features/platform-jobs/domain/contracts";
 import { platformJobError } from "@/features/platform-jobs/domain/errors";
@@ -21,6 +20,13 @@ import {
   assertStorageAdminCurrent,
   type StorageAdminActor,
 } from "@/features/storage/services/actor";
+
+export const STORAGE_MEDIA_AUTOMATION_DISCOVERY_TYPES = [
+  "STORAGE_MAINTENANCE_DISCOVERY",
+  "STORAGE_RESCAN_DISCOVERY",
+  "MEDIA_RENDITION_DISCOVERY",
+  "MEDIA_RENDITION_CLEANUP_DISCOVERY",
+] as const satisfies readonly PlatformJobType[];
 
 export async function storageAutomationStatus(
   context: PlatformJobAdminContext,
@@ -43,7 +49,7 @@ export async function storageAutomationStatus(
         "MEDIA_RENDITION_CLEANUP_DISCOVERY",
         "MEDIA_RENDITION_DELETE",
       ],
-      scheduleKeys: [...PLATFORM_JOB_DISCOVERY_TYPES],
+      scheduleKeys: [...STORAGE_MEDIA_AUTOMATION_DISCOVERY_TYPES],
       renditionProfiles: Object.keys(MEDIA_RENDITION_PROFILES),
       provider: configuredStorageProvider().kind,
       scanner: "SCANNER_NOT_CONFIGURED",
@@ -58,10 +64,10 @@ export async function triggerStorageAutomationDiscovery(
   input: {
     batchSize: number;
     idempotencyKey: string;
-    jobType: (typeof PLATFORM_JOB_DISCOVERY_TYPES)[number];
+    jobType: (typeof STORAGE_MEDIA_AUTOMATION_DISCOVERY_TYPES)[number];
   },
 ) {
-  if (!PLATFORM_JOB_DISCOVERY_TYPES.includes(input.jobType)) {
+  if (!STORAGE_MEDIA_AUTOMATION_DISCOVERY_TYPES.includes(input.jobType)) {
     platformJobError("VALIDATION_ERROR", "The storage-automation discovery type is not allow-listed.");
   }
   return enqueueManualAutomation(context, storageActor, {

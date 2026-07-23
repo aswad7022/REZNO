@@ -335,6 +335,43 @@ export async function materializePaymentsGate5cEvidence(prisma: PrismaClient) {
   throw new Error("Gate 5C rollback-only evidence transaction unexpectedly committed.");
 }
 
+export async function inspectPaymentsGate5cSuccessorEvidence(
+  prisma: PrismaClient,
+) {
+  const [balances, journalCount, postingCount, settlementCount, lineCount] =
+    await Promise.all([
+      prisma.$queryRaw<Array<{
+        credit: Prisma.Decimal;
+        debit: Prisma.Decimal;
+      }>>(Prisma.sql`
+        SELECT
+          COALESCE(SUM("amount") FILTER (WHERE "side" = 'DEBIT'), 0)::numeric(18,3) AS debit,
+          COALESCE(SUM("amount") FILTER (WHERE "side" = 'CREDIT'), 0)::numeric(18,3) AS credit
+        FROM "FinancialPosting"
+        WHERE "journalId" IN (${Prisma.join(journalIds.map((journalId) => Prisma.sql`${journalId}::uuid`))})
+      `),
+      prisma.financialJournal.count({ where: { id: { in: journalIds } } }),
+      prisma.financialPosting.count({ where: { id: { in: postingIds } } }),
+      prisma.settlementBatch.count({
+        where: { id: { in: settlementBatchIds }, status: "DRAFT" },
+      }),
+      prisma.settlementLine.count({ where: { id: { in: settlementLineIds } } }),
+    ]);
+  return {
+    evidence: {
+      balanced:
+        balances[0]?.credit.equals(balances[0]?.debit) ?? false,
+      baseSettlementSentinels: settlementCount,
+      journalCount,
+      meaning: "LEDGER_STATEMENT_NOT_BANK_PAYOUT" as const,
+      postingCount,
+      readOnlySuccessorInspection: true as const,
+      settlementLineCount: lineCount,
+    },
+    fingerprint: await paymentsGate5cFingerprint(prisma),
+  };
+}
+
 type FingerprintClient = Pick<Prisma.TransactionClient, "paymentIntent" | "paymentAttempt" | "paymentProviderEvent" | "paymentRefund" | "financialJournal" | "financialPosting" | "settlementBatch" | "settlementLine" | "organizationMember" | "adminAccess">;
 
 async function paymentsGate5cFingerprint(prisma: FingerprintClient) {

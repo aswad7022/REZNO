@@ -31,6 +31,7 @@ import {
   type Gate6aTransportEvidence,
 } from "../../../lib/db/postgres-transport";
 import { assertPlatformJobsGate6aStaging, PLATFORM_JOBS_GATE6A_CONFIRMATION } from "../../../scripts/staging/platform-jobs-gate6a-safety";
+import { COMMUNICATIONS_PAYMENT_GATE6C_CONFIRMATION } from "../../../scripts/staging/communications-payment-gate6c-safety";
 import { STORAGE_MEDIA_GATE6B_CONFIRMATION } from "../../../scripts/staging/storage-media-gate6b-safety";
 
 const secret = "gate6a-cursor-secret-with-sufficient-entropy-2026-07-21";
@@ -345,6 +346,39 @@ test("Gate 6A staging safety accepts only exact direct Neon verification or exac
       tlsProtocol: "TLSv1.3",
       transport: "TCP_POSTGRESQL_TLS",
       transportConfigurationSha256: successorEvidence.transportConfigurationSha256,
+    },
+  );
+  const gate6cEnvironment = {
+    ...successorEnvironment,
+    REZNO_STAGE6_GATE6C_CONFIRM:
+      COMMUNICATIONS_PAYMENT_GATE6C_CONFIRMATION,
+    REZNO_STAGE6_GATE6C_SUCCESSOR: "true",
+  };
+  const gate6cEvidence = {
+    ...validTransportEvidence(gate6cEnvironment),
+    migrationApplied: 48,
+    migrationTotal: 48,
+  };
+  assert.deepEqual(
+    await assertPlatformJobsGate6aStaging(
+      safetyClient(undefined, { applied: BigInt(48), total: BigInt(48) }),
+      gate6cEnvironment,
+      gate6cEvidence,
+    ),
+    {
+      backendPgStatSsl: true,
+      clientTlsVerified: true,
+      database: "rezno_staging",
+      encrypted: true,
+      hostnameVerified: true,
+      migrations: "48/48",
+      prismaUsedAttestedPhysicalClient: true,
+      role: "neondb_owner",
+      rolledBack: 0,
+      tlsProtocol: "TLSv1.3",
+      transport: "TCP_POSTGRESQL_TLS",
+      transportConfigurationSha256:
+        gate6cEvidence.transportConfigurationSha256,
     },
   );
 });

@@ -14,13 +14,21 @@ import { getBusinessPayment, getAdminPayment, listAdminPayments, listBusinessPay
 import { listAdminSettlements } from "../../features/payments/services/settlements";
 import { prisma } from "../../lib/db/prisma";
 import {
+  inspectPaymentsGate5cSuccessorEvidence,
   materializePaymentsGate5cEvidence,
   PAYMENTS_GATE5C_MARKER,
   paymentsGate5cFixtureIds,
 } from "./payments-gate5c-fixture";
 import { assertPaymentsGate5cStaging } from "./payments-gate5c-safety";
 
+let smokePhase = "BOOT";
+
 async function main() {
+  const gate6cSuccessor =
+    process.env.REZNO_STAGE6_GATE6C_SUCCESSOR === "true"
+    && process.env.REZNO_STAGE6_GATE6C_CONFIRM
+      === "REZNO_STAGE6_GATE6C_STAGING_ONLY";
+  smokePhase = "SAFETY";
   const safety = await assertPaymentsGate5cStaging(prisma);
   const ids = paymentsGate5cFixtureIds;
   assert.equal(paymentProvider().kind, "NOT_CONFIGURED");
@@ -55,8 +63,10 @@ async function main() {
   assert.equal((await getAdminPayment(admin, ids.intentIds[3]!)).id, ids.intentIds[3]);
   await assert.rejects(getAdminPayment(revokedAdmin, ids.intentIds[3]!), denied);
 
+  smokePhase = "LIFECYCLE_MATRIX";
   const lifecycleMatrix = await assertFixtureLifecycleMatrix();
 
+  smokePhase = "PAGINATION_AND_AUTHORIZATION";
   const customerPage = await listCustomerPayments(customerA, { limit: 1 });
   const ownerPage = await listBusinessPayments(owner, { limit: 1 });
   const managerPage = await listBusinessPayments(manager, { limit: 1 });
@@ -78,6 +88,7 @@ async function main() {
   assert.equal(journals.items[0]?.balanced, true);
   assert.equal(settlements.items[0]?.meaning, "LEDGER_STATEMENT_NOT_BANK_PAYOUT");
 
+  smokePhase = "RECONCILIATION";
   const reconciliation = await runPaymentReconciliation(admin, {
     idempotencyKey: ids.mutationIds[0]!,
     limit: 1,
@@ -87,6 +98,7 @@ async function main() {
   assert.equal(reconciliation.items[0]?.classification, "NOT_CONFIGURED");
   assert.equal(reconciliation.items[0]?.providerStatus, "NOT_CONFIGURED");
 
+  smokePhase = "DETERMINISTIC_PROVIDER";
   const provider = new DeterministicPaymentProvider("gate5c-staging-operator-secret", () => new Date("2026-07-20T15:00:00.000Z"));
   const scenarios = ["IMMEDIATE_CAPTURE", "REQUIRES_ACTION", "AUTHORIZE", "TRANSIENT_FAILURE", "PERMANENT_FAILURE"] as const;
   const outcomes: string[] = [];
@@ -124,18 +136,33 @@ async function main() {
   assert.equal((await provider.verifyAndParseWebhook({ ...signed, signature: "0".repeat(64), receivedAt: signedAt })).outcome, "INVALID_SIGNATURE");
   const boundedWebhook = await assertBoundedWebhookIngestion();
 
-  const financial = await materializePaymentsGate5cEvidence(prisma);
-  assert.deepEqual(financial.evidence, {
-    balanced: true,
-    finalizedSettlement: true,
-    journalCount: 7,
-    journalImmutable: true,
-    meaning: "LEDGER_STATEMENT_NOT_BANK_PAYOUT",
-    overRefundRejected: true,
-    postingImmutable: true,
-    settlementDoubleInclusionRejected: true,
-    settlementImmutable: true,
-  });
+  smokePhase = "FINANCIAL_EVIDENCE";
+  const financial = gate6cSuccessor
+    ? await inspectPaymentsGate5cSuccessorEvidence(prisma)
+    : await materializePaymentsGate5cEvidence(prisma);
+  if (gate6cSuccessor) {
+    assert.deepEqual(financial.evidence, {
+      balanced: true,
+      baseSettlementSentinels: 2,
+      journalCount: 7,
+      meaning: "LEDGER_STATEMENT_NOT_BANK_PAYOUT",
+      postingCount: 14,
+      readOnlySuccessorInspection: true,
+      settlementLineCount: 0,
+    });
+  } else {
+    assert.deepEqual(financial.evidence, {
+      balanced: true,
+      finalizedSettlement: true,
+      journalCount: 7,
+      journalImmutable: true,
+      meaning: "LEDGER_STATEMENT_NOT_BANK_PAYOUT",
+      overRefundRejected: true,
+      postingImmutable: true,
+      settlementDoubleInclusionRejected: true,
+      settlementImmutable: true,
+    });
+  }
 
   const leaked = JSON.stringify({ adminPage, capabilities, customerPage, financial, journals, lifecycleMatrix, ownerPage, reconciliation, refunds, settlements });
   assert.doesNotMatch(leaked, /postgresql:\/\/|DATABASE_URL|BETTER_AUTH_SECRET|webhookSecret|authorization|cardNumber|\bcvv\b|\bpan\b|provider access token/i);
@@ -147,6 +174,7 @@ async function main() {
   });
   assert.equal(duplicatedNotifications.length, 0);
 
+  smokePhase = "OUTPUT";
   console.log(JSON.stringify({
     ...safety,
     boundedWebhook,
@@ -340,4 +368,9 @@ function invalidCursor(error: unknown) {
   return error instanceof PaymentDomainError && error.code === "INVALID_CURSOR";
 }
 
-main().finally(() => prisma.$disconnect());
+main()
+  .catch(() => {
+    process.exitCode = 1;
+    console.error(`Gate 5C staging smoke failed closed at ${smokePhase}.`);
+  })
+  .finally(() => prisma.$disconnect());

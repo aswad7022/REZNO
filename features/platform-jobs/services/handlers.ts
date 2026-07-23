@@ -2,7 +2,9 @@ import "server-only";
 
 import type { PlatformJobErrorCode, PlatformJobType } from "@prisma/client";
 
-import { PLATFORM_JOB_LIMITS } from "@/features/platform-jobs/domain/contracts";
+import {
+  platformJobHandlerTimeoutMs,
+} from "@/features/platform-jobs/domain/contracts";
 import { parsePlatformJobPayload } from "@/features/platform-jobs/domain/registry";
 import { runStorageMediaAutomationHandler } from "@/features/storage-automation/services/handlers";
 import { runCommunicationsPaymentAutomationHandler } from "@/features/communications-payment-automation/services/handlers";
@@ -108,7 +110,7 @@ export async function executePlatformJobHandler(input: {
     timer = setTimeout(() => {
       controller.abort();
       resolve({ errorCode: "HANDLER_TIMEOUT", outcome: "FAILED", retryable: true });
-    }, PLATFORM_JOB_LIMITS.executionTimeoutMs);
+    }, platformJobHandlerTimeoutMs(input.jobType));
   });
   try {
     const execution = Promise.resolve(handler(payload, {
