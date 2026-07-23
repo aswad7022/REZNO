@@ -253,3 +253,10 @@ automatically reversed, and no operator edits financial or communication truth.
 Gate 6C remains ACTIVE until complete local validation, rehearsals, security
 review, staging evidence, exact-head CI/Vercel, independent review, and merge.
 Its pull request remains Draft. Gate 6D must not start here.
+
+Authenticated staging completed the required 47/47→48/48 migration, identical
+two-seed fixture fingerprint, 47-check Gate 6C smoke, all six successor
+smokes, exact cleanup with a zero second run, unchanged foreign sentinels, and
+restoration of the original non-fixture database fingerprint. This evidence
+does not close the gate: exact-head local validation, CI/Vercel, Draft PR
+review, and independent acceptance remain required.

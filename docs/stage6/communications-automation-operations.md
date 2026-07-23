@@ -35,6 +35,13 @@ service owns recipient snapshot semantics, the 5,000-recipient ceiling, the
 one canonical in-app Notification, and delivery construction. The job contains
 no audience copy or endpoint data.
 
+Gate 6C exact dispatch, provider-event, payment-retry, reconciliation, and
+settlement handlers have a closed 15-second bound because they combine
+multiple authority-guarded PostgreSQL phases and, where applicable, provider
+work. Discovery handlers and every Gate 6A/Gate 6B handler retain the
+five-second default. The override remains below the minimum 30-second job
+lease, and timeout aborts the execution guard before publication.
+
 ## Delivery discovery and dispatch
 
 Delivery discovery first releases expired Stage 4C claims through the accepted

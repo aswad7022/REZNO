@@ -32,6 +32,7 @@ not create a service principal.
 | duplicate capture | locked totals, full-capture policy, unique journal source |
 | over-refund/race | locked reserved balance and stable refund identity |
 | retry amplification | bounded scan, five retries, backoff, terminal failures |
+| exact handler timeout | closed Gate 6C 15-second bound below the 30-second lease; discovery remains at five seconds and abort guards block publication |
 | posted-ledger mutation | PostgreSQL immutable journal/posting triggers |
 | reconciliation correction | classification-only; no state mutation |
 | settlement duplication | one DRAFT per Organization/currency/period |
@@ -71,3 +72,14 @@ Metrics, alerts, incident automation, service principal, automatic scheduler,
 always-on worker, receipts, and runtime activation remain Gate 6D. Email,
 SMS, push, payment, and bank providers remain `NOT_CONFIGURED`; scheduler and
 worker remain `NOT_CONNECTED`.
+
+## Staging credential response
+
+The 2026-07-23 staging run treated one operator-output connection-string
+exposure as an actual credential incident. The exact `rezno-staging` role was
+rotated immediately, the prior credential was proved invalid with PostgreSQL
+`28P01`, and only the confirmed staging Vercel Production and Preview
+consumers were updated and redeployed. The replacement credential passed
+direct non-pooler TLS 1.3, certificate, hostname, role, database, and Prisma
+physical-client attestation. Repository, history, build, export, and temporary
+artifact scans must show zero value matches before the Draft PR is published.
