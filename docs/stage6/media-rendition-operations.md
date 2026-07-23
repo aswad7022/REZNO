@@ -21,12 +21,24 @@ profile. Its fingerprint also binds source checksum and provider object
 version. The output key is generated server-side from that identity and is
 write-once.
 
-Migration 46 makes the persisted claim lifecycle exact. `PROCESSING` requires
+Migration 47 makes the persisted claim lifecycle fully NULL-safe. `PROCESSING` requires
 all of job ID, lease token, positive fencing token, and expiry.
 `DELETE_PENDING` may be idle with no claim or own the same complete claim.
 `PENDING`, `READY`, `FAILED`, `SUPERSEDED`, and `DELETED` must contain no claim
-field. Deployment fails before replacing the constraint when any claimless,
-partial/invalid, or illegal-state row exists; it never invents a claimant.
+field. A rendition output is either complete or empty: provider object version
+is optional only for a complete provider result, while MIME, size, checksum,
+both dimensions, and ready time are mandatory; an empty result requires every
+output field to be NULL. Width and height are either both absent or a positive
+pair inside the exact profile box. Only deletion states may carry deletion
+timestamps. Deployment fails before replacing a constraint when any
+partial/invalid or illegal-state row exists; it never invents a claimant or
+repairs unknown data.
+
+Authenticated staging applied Migration 47 once from healthy 46/46 after all
+claim/output/profile/deletion violation counts were zero. It finished healthy
+47/47 with the repository checksum, made the second deploy a no-op, passed the
+166-check Gate 6B smoke, and returned rendition rows to zero after exact
+cleanup while preserving the whole-database non-fixture fingerprint.
 
 ## Generation and publication
 

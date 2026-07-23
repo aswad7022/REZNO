@@ -177,9 +177,16 @@ Migration 46 tightens `MediaRendition` so `PROCESSING` always owns one complete
 positive-fencing claim, `DELETE_PENDING` is either idle or completely claimed,
 and all other states are claim-free. It first fails closed on claimless,
 partial/invalid, or illegal-state claims and never fabricates ownership.
-Neither migration creates jobs, schedules, renditions, assets, sessions,
-bindings, orders, actors, Organizations, or provider state. Migrations 1–45
-are immutable after Migration 46.
+
+Migration 47 closes PostgreSQL `CHECK` UNKNOWN semantics across the adjacent
+Gate 6A worker-operation and Gate 6B rescan/rendition lifecycle constraints.
+It preflights sanitized violation counts, then replaces only the six vulnerable
+constraints with explicit truth tables. A complete rendition output requires
+MIME, size, checksum, both dimensions, and ready time; provider object version
+remains optional under the provider contract. Empty output requires every
+output field, including provider version, to be NULL. None of Migrations
+45–47 creates jobs, schedules, renditions, assets, sessions, bindings, orders,
+actors, Organizations, or provider state. Migrations 1–46 are immutable.
 
 ## Staging, rollback, and recovery
 
@@ -196,6 +203,17 @@ ran twice and preserved foreign sentinels and the original database
 fingerprint. Operational detail is in
 `storage-automation-operations.md`, `media-rendition-operations.md`,
 `gate6b-security.md`, and `gate6b-test-plan.md`.
+
+Migration 47 closure resumed from authenticated healthy 46/46 without another
+credential rotation. The direct non-pooler client-side TLS/physical-Pool
+attestation and 15-count zero-violation preflight preceded the only canonical
+schema write. Migration 47 reached healthy 47/47 with checksum
+`9596d3e94b852e5e8a794c9fc47f30decf67ad50e890ced7d5bc366704ee8b7d`,
+and the second deploy was a no-op. The expanded Gate 6B smoke passed 166
+checks; Gate 5A/5B/6A successors passed 75/50/59; cleanup removed 70 rows then
+zero; all protected domain counters returned to zero; and the non-fixture
+fingerprint remained exactly
+`51f91a54f3d34335477ad613342c374803a26d6b401271973f7cffa89613d2d2`.
 
 Application rollback disconnects invocation and deploys the previous code while
 retaining the additive schema and all job/domain evidence. Migrations and enum
@@ -214,13 +232,14 @@ Draft.
 
 ## Current evidence
 
-Local validation passed Gate 6A 22 unit and 27 PostgreSQL checks; Gate 6B 7
-unit, 21 PostgreSQL, and 6 built-server HTTP checks; and complete totals of 435
-unit, 397 PostgreSQL, and 120 HTTP/RSC/API tests, for 952 regressions. ESLint,
+Final local validation passed Gate 6A 22 unit and 28 PostgreSQL checks; Gate 6B
+7 unit, 21 PostgreSQL, and 6 built-server HTTP checks; and complete totals of
+435 unit, 398 PostgreSQL, and 120 HTTP/RSC/API tests, for 953 regressions. ESLint,
 root and Mobile TypeScript, Prisma format/validate/generate, Next 16.2.11
 production build, Expo dependency validation, Expo Doctor 20/20, and both
-Hermes exports passed. Fresh A/B 1→46 and populated 45→46 rehearsals passed
-without data drift and made the second deploy a no-op.
+Hermes exports passed. Fresh A/B 1→47 and populated 46→47 rehearsals passed
+without data drift and made the second deploy a no-op. Migrations 1–46 remained
+byte-identical.
 
 Authenticated staging rotated only the verified `rezno-staging` role, rejected
 the old credential at authentication, redeployed the Production and Preview
@@ -235,6 +254,14 @@ the expanded smoke passed 101 checks; Gate 5A/5B/6A successors passed
 75/50/59; cleanup removed 70 rows then zero; and the non-fixture fingerprint
 remained
 `51f91a54f3d34335477ad613342c374803a26d6b401271973f7cffa89613d2d2`.
+
+Migration 47 then passed an authenticated zero-write 46/46 preflight with all
+15 violation counts zero, applied once with checksum
+`9596d3e94b852e5e8a794c9fc47f30decf67ad50e890ced7d5bc366704ee8b7d`,
+and finished healthy 47/47. The second deploy was a no-op; the expanded smoke
+passed 166 checks; Gate 5A/5B/6A again passed 75/50/59; cleanup removed 70 then
+zero; all protected domain counters were zero; and the same non-fixture
+fingerprint was preserved.
 PR-level closure additionally requires exact-head Actions, both Vercel checks,
 zero unresolved review threads, and independent review. Gate 6B is not accepted
 until the PR is merged.

@@ -78,19 +78,21 @@ dead-letter evidence.
 
 ## Deployment, rollback, and staging
 
-Migrations 45 and 46 are additive and create no jobs, schedules, sessions,
-assets, renditions, bindings, actors, or provider state. Migration 46 only
-replaces the rendition claim constraint after a zero-violation preflight. An
-application rollback keeps the schema and operational evidence: disconnect
-invocation, deploy the prior application, retain both migrations, and prepare
-a forward fix. Do not drop the new columns/table, weaken the claim constraint,
-or reverse enum values in an incident.
+Migrations 45, 46, and 47 are additive and create no jobs, schedules, sessions,
+assets, renditions, bindings, actors, or provider state. Migration 47 replaces
+only six proven vulnerable Gate 6A/Gate 6B constraints after a fail-closed
+zero-violation preflight. It makes rescan claims exactly all-present or
+all-NULL, closes worker-operation tuples, and makes rendition claim, output,
+profile, and deletion lifecycles explicit. An application rollback keeps the
+schema and operational evidence: disconnect invocation, deploy the prior
+application, retain all migrations, and prepare a forward fix. Do not drop the
+new columns/table, weaken a truth table, or reverse enum values in an incident.
 
 Staging uses exact database `rezno_staging`, the authenticated direct
 non-pooler Neon endpoint, `sslmode=verify-full`, expected host/role
 confirmations, and the Gate 6A client-side TLS/physical-Pool attestation. The
 Gate 6B scripts additionally require exact confirmation
-`REZNO_STAGE6_GATE6B_STAGING_ONLY` and healthy 46/46:
+`REZNO_STAGE6_GATE6B_STAGING_ONLY` and healthy 47/47:
 
 1. `npm run seed:staging:storage-media-gate6b` twice;
 2. `npm run smoke:staging:storage-media-gate6b`;
@@ -100,7 +102,7 @@ Gate 6B scripts additionally require exact confirmation
 Both seeds must share one fixture fingerprint. The smoke must preserve the
 non-fixture fingerprint and pre-existing foreign Person/Organization sentinel
 hashes. The second cleanup must remove zero, the final non-fixture fingerprint
-must equal the pre-migration value, and migrations must remain healthy 46/46.
+must equal the pre-migration value, and migrations must remain healthy 47/47.
 
 The authenticated 2026-07-22 run satisfied this runbook: healthy 44/44→45/45,
 Migration 45 checksum `bf1ca0d7…14389`, second deploy no-op, seed fingerprint
@@ -124,8 +126,18 @@ Gate 5A/5B/6A successors passed 75/50/59; cleanup removed 70 rows then zero;
 and final fixture counters were all zero.
 
 Gate 5B and Gate 6A historical staging guards retain their exact 42/42 and
-44/44 modes. They accept 46/46 only when the exact Gate 6B confirmation marker
-is also present; arbitrary forward migration counts still fail closed.
+44/44 modes. Their Gate 6B successor modes accept exact 47/47 only when the
+exact Gate 6B confirmation marker is also present; arbitrary forward migration
+counts still fail closed. The expanded Gate 6B smoke runs 166 checks, including
+every required NULL-field rejection and every legal truth-table branch.
+
+The authenticated Migration 47 run started at healthy 46/46 with all 15
+sanitized violation counts zero. Canonical deploy reached healthy 47/47 with
+checksum
+`9596d3e94b852e5e8a794c9fc47f30decf67ad50e890ced7d5bc366704ee8b7d`;
+its second deploy was a no-op. The 166/75/50/59 Gate 6B/5A/5B/6A smokes passed,
+cleanup removed 70 rows then zero, and the preflight non-fixture fingerprint
+was unchanged after closure.
 
 Communication/payment automation remains Gate 6C. Automatic runtime,
 distributed coordination, alerts, incidents, and Stage 6 closure remain Gate
