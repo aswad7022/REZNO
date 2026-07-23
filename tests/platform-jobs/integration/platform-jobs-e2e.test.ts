@@ -4,6 +4,7 @@ import test from "node:test";
 
 import { Prisma } from "@prisma/client";
 
+import { platformJobHash } from "../../../features/platform-jobs/domain/canonical";
 import { setPlatformJobCursorSigningSecretForTests } from "../../../features/platform-jobs/domain/cursor-signing";
 import { PlatformJobDomainError } from "../../../features/platform-jobs/domain/errors";
 import { platformHealthPayload } from "../../../features/platform-jobs/domain/registry";
@@ -67,14 +68,14 @@ test.after(async () => {
   await prisma.$disconnect();
 });
 
-test("migration chain is healthy at 46/46 and the additive Gate 6B migrations create no platform rows", async () => {
+test("migration chain is healthy at 47/47 and the additive Gate 6B migrations create no platform rows", async () => {
   const migrationRows = await prisma.$queryRaw<Array<{ applied: bigint; failed: bigint; total: bigint }>>(Prisma.sql`
     SELECT COUNT(*) FILTER (WHERE "finished_at" IS NOT NULL AND "rolled_back_at" IS NULL) AS applied,
            COUNT(*) FILTER (WHERE "finished_at" IS NULL AND "rolled_back_at" IS NULL) AS failed,
            COUNT(*) AS total
     FROM "_prisma_migrations"
   `);
-  assert.deepEqual(migrationRows[0], { applied: BigInt(46), failed: BigInt(0), total: BigInt(46) });
+  assert.deepEqual(migrationRows[0], { applied: BigInt(47), failed: BigInt(0), total: BigInt(47) });
   assert.equal(await prisma.platformJob.count(), 0);
   assert.equal(await prisma.platformJobSchedule.count(), 0);
   assert.equal(await prisma.platformJobAttempt.count(), 0);
@@ -257,6 +258,104 @@ test("bounded worker executes only the inert registered handler and replays its 
   assert.equal(mutation.operationLeaseToken, null);
   assert.equal(mutation.operationLeaseExpiresAt, null);
   assert.match(mutation.operationWorkerId ?? "", /^operation:[a-f0-9]{64}$/u);
+});
+
+test("Migration 47 rejects every nullable worker-operation bypass through direct SQL", async () => {
+  const leaseToken = randomUUID();
+  const operationWorkerId = `operation:${platformJobHash(randomUUID())}`;
+  const operation = await prisma.platformJobMutation.create({
+    data: {
+      action: "WORKER_BATCH",
+      actorAdminUserId: fixture.userId,
+      actorPersonId: fixture.personId,
+      idempotencyKey: randomUUID(),
+      operationBatchSize: 1,
+      operationFencingToken: BigInt(1),
+      operationLeaseExpiresAt: new Date(Date.now() + 60_000),
+      operationLeaseToken: leaseToken,
+      operationWorkerId,
+      requestHash: platformJobHash({ action: "WORKER_BATCH", batchSize: 1 }),
+      result: { state: "PROCESSING" },
+    },
+  });
+  const rejectsOperation = (statement: ReturnType<typeof Prisma.sql>) =>
+    assert.rejects(prisma.$executeRaw(statement), /PlatformJobMutation_operation_check/u);
+
+  await rejectsOperation(Prisma.sql`
+    UPDATE "PlatformJobMutation" SET "operationBatchSize" = NULL WHERE "id" = ${operation.id}::uuid
+  `);
+  await rejectsOperation(Prisma.sql`
+    UPDATE "PlatformJobMutation" SET "operationWorkerId" = NULL WHERE "id" = ${operation.id}::uuid
+  `);
+  await rejectsOperation(Prisma.sql`
+    UPDATE "PlatformJobMutation" SET "operationWorkerId" = 'operation:invalid' WHERE "id" = ${operation.id}::uuid
+  `);
+  await rejectsOperation(Prisma.sql`
+    UPDATE "PlatformJobMutation" SET "operationFencingToken" = NULL WHERE "id" = ${operation.id}::uuid
+  `);
+  await rejectsOperation(Prisma.sql`
+    UPDATE "PlatformJobMutation" SET "operationFencingToken" = 0 WHERE "id" = ${operation.id}::uuid
+  `);
+  await rejectsOperation(Prisma.sql`
+    UPDATE "PlatformJobMutation" SET "result" = '{}'::jsonb WHERE "id" = ${operation.id}::uuid
+  `);
+  await rejectsOperation(Prisma.sql`
+    UPDATE "PlatformJobMutation" SET "result" = '{"state":7}'::jsonb WHERE "id" = ${operation.id}::uuid
+  `);
+  await rejectsOperation(Prisma.sql`
+    UPDATE "PlatformJobMutation" SET "result" = '{"state":"INVALID"}'::jsonb WHERE "id" = ${operation.id}::uuid
+  `);
+  await rejectsOperation(Prisma.sql`
+    UPDATE "PlatformJobMutation" SET "operationLeaseToken" = NULL WHERE "id" = ${operation.id}::uuid
+  `);
+  await rejectsOperation(Prisma.sql`
+    UPDATE "PlatformJobMutation"
+    SET "operationCompletedAt" = clock_timestamp(), "result" = '{"state":"COMPLETE"}'::jsonb
+    WHERE "id" = ${operation.id}::uuid
+  `);
+
+  await prisma.$executeRaw(Prisma.sql`
+    UPDATE "PlatformJobMutation"
+    SET "operationCompletedAt" = clock_timestamp(),
+        "operationLeaseToken" = NULL,
+        "operationLeaseExpiresAt" = NULL,
+        "result" = '{"state":"COMPLETE"}'::jsonb
+    WHERE "id" = ${operation.id}::uuid
+  `);
+  await rejectsOperation(Prisma.sql`
+    UPDATE "PlatformJobMutation"
+    SET "operationLeaseToken" = ${randomUUID()}::uuid
+    WHERE "id" = ${operation.id}::uuid
+  `);
+
+  const nonWorker = await prisma.platformJobMutation.create({
+    data: {
+      action: "SCHEDULER_TICK",
+      actorAdminUserId: fixture.userId,
+      actorPersonId: fixture.personId,
+      idempotencyKey: randomUUID(),
+      requestHash: platformJobHash({ action: "SCHEDULER_TICK" }),
+      result: { jobsCreated: 0, schedulesProcessed: 0 },
+    },
+  });
+  await rejectsOperation(Prisma.sql`
+    UPDATE "PlatformJobMutation" SET "operationBatchSize" = 1 WHERE "id" = ${nonWorker.id}::uuid
+  `);
+  await rejectsOperation(Prisma.sql`
+    UPDATE "PlatformJobMutation" SET "operationWorkerId" = ${operationWorkerId} WHERE "id" = ${nonWorker.id}::uuid
+  `);
+  await rejectsOperation(Prisma.sql`
+    UPDATE "PlatformJobMutation" SET "operationLeaseToken" = ${randomUUID()}::uuid WHERE "id" = ${nonWorker.id}::uuid
+  `);
+  await rejectsOperation(Prisma.sql`
+    UPDATE "PlatformJobMutation" SET "operationFencingToken" = 1 WHERE "id" = ${nonWorker.id}::uuid
+  `);
+  await rejectsOperation(Prisma.sql`
+    UPDATE "PlatformJobMutation" SET "operationLeaseExpiresAt" = clock_timestamp() WHERE "id" = ${nonWorker.id}::uuid
+  `);
+  await rejectsOperation(Prisma.sql`
+    UPDATE "PlatformJobMutation" SET "operationCompletedAt" = clock_timestamp() WHERE "id" = ${nonWorker.id}::uuid
+  `);
 });
 
 test("worker selection is permission-filtered while Gate 6A health remains platform-only", async () => {

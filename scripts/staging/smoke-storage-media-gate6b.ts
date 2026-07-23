@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 
-import { Prisma, type PlatformJobType } from "@prisma/client";
+import { Prisma, type PlatformJobType, type StoredAsset } from "@prisma/client";
 import sharp from "sharp";
 
 import {
@@ -187,57 +187,8 @@ async function main() {
   assert.equal(disabledSchedule.enabled, false);
   checks += 5;
 
-  smokePhase = "RENDITION_CLAIM_MATRIX";
-  await resetFixtureJobs();
-  await prisma.mediaRendition.deleteMany({ where: { sourceAssetId: { in: Object.values(ids.assets) } } });
-  const claimOwner = await prepareRunningJob("MEDIA_RENDITION_GENERATE", {
-    assetId: ids.assets.renditionSource,
-    expectedVersion: 1,
-    profile: "AVATAR_256_WEBP",
-  });
-  const claimSource = await prisma.storedAsset.findUniqueOrThrow({ where: { id: ids.assets.renditionSource } });
-  const claimFingerprint = mediaRenditionSourceFingerprint({
-    profile: "AVATAR_256_WEBP",
-    sourceAssetId: claimSource.id,
-    sourceAssetVersion: claimSource.version,
-    sourceChecksumSha256: claimSource.checksumSha256,
-    sourceProviderObjectVersion: claimSource.providerObjectVersion,
-  });
-  const pendingRendition = await prisma.mediaRendition.create({
-    data: {
-      objectKey: generateMediaRenditionObjectKey(claimSource.id, claimFingerprint),
-      profile: "AVATAR_256_WEBP",
-      provider: claimSource.provider,
-      sourceAssetId: claimSource.id,
-      sourceAssetVersion: claimSource.version,
-      sourceChecksumSha256: claimSource.checksumSha256,
-      sourceFingerprint: claimFingerprint,
-      sourceProviderObjectVersion: claimSource.providerObjectVersion,
-      state: "PENDING",
-    },
-  });
-  await assert.rejects(prisma.$executeRaw(Prisma.sql`
-    UPDATE "MediaRendition" SET "state" = 'PROCESSING' WHERE "id" = ${pendingRendition.id}::uuid
-  `), /MediaRendition_claim_check/u);
-  await assert.rejects(prisma.$executeRaw(Prisma.sql`
-    UPDATE "MediaRendition"
-    SET "state" = 'PROCESSING', "claimJobId" = ${claimOwner.claim.id}::uuid
-    WHERE "id" = ${pendingRendition.id}::uuid
-  `), /MediaRendition_claim_check/u);
-  await prisma.$executeRaw(Prisma.sql`
-    UPDATE "MediaRendition"
-    SET "state" = 'PROCESSING', "claimJobId" = ${claimOwner.claim.id}::uuid,
-        "claimLeaseToken" = ${claimOwner.claim.leaseToken}::uuid,
-        "claimFencingToken" = ${claimOwner.claim.fencingToken},
-        "claimExpiresAt" = ${claimOwner.claim.leaseExpiresAt}
-    WHERE "id" = ${pendingRendition.id}::uuid
-  `);
-  const validClaim = await prisma.mediaRendition.findUniqueOrThrow({ where: { id: pendingRendition.id } });
-  assert.equal(validClaim.state, "PROCESSING");
-  assert.equal(validClaim.claimJobId, claimOwner.claim.id);
-  checks += 4;
-  await prisma.mediaRendition.delete({ where: { id: pendingRendition.id } });
-  await resetFixtureJobs();
+  smokePhase = "POSTGRESQL_TRUTH_TABLES";
+  checks += await assertPostgresTruthTables();
 
   smokePhase = "CROSS_ADMIN_DOMAIN_DEDUPE";
   const secondUserId = `${STORAGE_MEDIA_GATE6B_MARKER}-dedupe-${randomUUID()}`;
@@ -644,6 +595,362 @@ async function populateProvider(provider: DeterministicStorageProvider) {
       objectKey: session.objectKey,
     });
   }
+}
+
+async function assertPostgresTruthTables() {
+  let checks = 0;
+  const rejects = async (statement: ReturnType<typeof Prisma.sql>, constraint: RegExp) => {
+    await assert.rejects(prisma.$executeRaw(statement), constraint);
+    checks += 1;
+  };
+
+  await resetFixtureJobs();
+  try {
+    const claimOwner = await prepareRunningJob("MEDIA_RENDITION_GENERATE", {
+      assetId: ids.assets.explicitReady,
+      expectedVersion: 2,
+      profile: "CARD_640_WEBP",
+    });
+    const source = await prisma.storedAsset.findUniqueOrThrow({ where: { id: ids.assets.explicitReady } });
+    const pending = await createTruthTableRendition(source, "CARD_640_WEBP");
+    const emptyDelete = await createTruthTableRendition(source, "HERO_1600_WEBP");
+    const claim = claimOwner.claim;
+    const claimConstraint = /MediaRendition_claim_check/u;
+
+    await rejects(Prisma.sql`
+      UPDATE "MediaRendition" SET "state" = 'PROCESSING' WHERE "id" = ${pending.id}::uuid
+    `, claimConstraint);
+    for (const missing of ["job", "lease", "fence", "expiry"] as const) {
+      await rejects(Prisma.sql`
+        UPDATE "MediaRendition"
+        SET "state" = 'PROCESSING',
+            "claimJobId" = ${missing === "job" ? null : claim.id}::uuid,
+            "claimLeaseToken" = ${missing === "lease" ? null : claim.leaseToken}::uuid,
+            "claimFencingToken" = ${missing === "fence" ? null : claim.fencingToken},
+            "claimExpiresAt" = ${missing === "expiry" ? null : claim.leaseExpiresAt}
+        WHERE "id" = ${pending.id}::uuid
+      `, claimConstraint);
+    }
+    await rejects(Prisma.sql`
+      UPDATE "MediaRendition"
+      SET "state" = 'PROCESSING', "claimJobId" = ${claim.id}::uuid,
+          "claimLeaseToken" = ${claim.leaseToken}::uuid, "claimFencingToken" = 0,
+          "claimExpiresAt" = ${claim.leaseExpiresAt}
+      WHERE "id" = ${pending.id}::uuid
+    `, claimConstraint);
+    await prisma.$executeRaw(Prisma.sql`
+      UPDATE "MediaRendition"
+      SET "state" = 'PROCESSING', "claimJobId" = ${claim.id}::uuid,
+          "claimLeaseToken" = ${claim.leaseToken}::uuid,
+          "claimFencingToken" = ${claim.fencingToken}, "claimExpiresAt" = ${claim.leaseExpiresAt}
+      WHERE "id" = ${pending.id}::uuid
+    `);
+    assert.deepEqual(
+      await prisma.mediaRendition.findUniqueOrThrow({
+        where: { id: pending.id },
+        select: { claimJobId: true, state: true },
+      }),
+      { claimJobId: claim.id, state: "PROCESSING" },
+    );
+    checks += 1;
+    await prisma.$executeRaw(Prisma.sql`
+      UPDATE "MediaRendition"
+      SET "state" = 'PENDING', "claimJobId" = NULL, "claimLeaseToken" = NULL,
+          "claimFencingToken" = NULL, "claimExpiresAt" = NULL
+      WHERE "id" = ${pending.id}::uuid
+    `);
+
+    const deleteRequestedAt = new Date();
+    await prisma.mediaRendition.update({
+      where: { id: emptyDelete.id },
+      data: { deleteRequestedAt, state: "DELETE_PENDING" },
+    });
+    assert.equal(
+      (await prisma.mediaRendition.findUniqueOrThrow({ where: { id: emptyDelete.id } })).state,
+      "DELETE_PENDING",
+    );
+    checks += 1;
+    await rejects(Prisma.sql`
+      UPDATE "MediaRendition" SET "claimJobId" = ${claim.id}::uuid
+      WHERE "id" = ${emptyDelete.id}::uuid
+    `, claimConstraint);
+    await rejects(Prisma.sql`
+      UPDATE "MediaRendition"
+      SET "claimJobId" = ${claim.id}::uuid, "claimLeaseToken" = ${claim.leaseToken}::uuid,
+          "claimFencingToken" = NULL, "claimExpiresAt" = ${claim.leaseExpiresAt}
+      WHERE "id" = ${emptyDelete.id}::uuid
+    `, claimConstraint);
+    await prisma.$executeRaw(Prisma.sql`
+      UPDATE "MediaRendition"
+      SET "claimJobId" = ${claim.id}::uuid, "claimLeaseToken" = ${claim.leaseToken}::uuid,
+          "claimFencingToken" = ${claim.fencingToken}, "claimExpiresAt" = ${claim.leaseExpiresAt}
+      WHERE "id" = ${emptyDelete.id}::uuid
+    `);
+    await prisma.$executeRaw(Prisma.sql`
+      UPDATE "MediaRendition"
+      SET "claimJobId" = NULL, "claimLeaseToken" = NULL,
+          "claimFencingToken" = NULL, "claimExpiresAt" = NULL
+      WHERE "id" = ${emptyDelete.id}::uuid
+    `);
+    checks += 2;
+
+    await prisma.mediaRendition.update({
+      where: { id: emptyDelete.id },
+      data: { deletedAt: deleteRequestedAt, state: "DELETED" },
+    });
+    for (const renditionId of [
+      pending.id,
+      ids.renditions.ready,
+      ids.renditions.failed,
+      ids.renditions.stale,
+      emptyDelete.id,
+    ]) {
+      await rejects(Prisma.sql`
+        UPDATE "MediaRendition"
+        SET "claimJobId" = ${claim.id}::uuid, "claimLeaseToken" = ${claim.leaseToken}::uuid,
+            "claimFencingToken" = ${claim.fencingToken}, "claimExpiresAt" = ${claim.leaseExpiresAt}
+        WHERE "id" = ${renditionId}::uuid
+      `, claimConstraint);
+    }
+
+    const rescanConstraint = /StoredAsset_rescan_claim_check/u;
+    for (const missing of ["job", "lease", "fence", "expiry"] as const) {
+      await rejects(Prisma.sql`
+        UPDATE "StoredAsset"
+        SET "rescanClaimJobId" = ${missing === "job" ? null : claim.id}::uuid,
+            "rescanClaimLeaseToken" = ${missing === "lease" ? null : claim.leaseToken}::uuid,
+            "rescanClaimFencingToken" = ${missing === "fence" ? null : claim.fencingToken},
+            "rescanClaimExpiresAt" = ${missing === "expiry" ? null : claim.leaseExpiresAt}
+        WHERE "id" = ${source.id}::uuid
+      `, rescanConstraint);
+    }
+    await rejects(Prisma.sql`
+      UPDATE "StoredAsset"
+      SET "rescanClaimJobId" = ${claim.id}::uuid,
+          "rescanClaimLeaseToken" = ${claim.leaseToken}::uuid,
+          "rescanClaimFencingToken" = 0,
+          "rescanClaimExpiresAt" = ${claim.leaseExpiresAt}
+      WHERE "id" = ${source.id}::uuid
+    `, rescanConstraint);
+    await prisma.$executeRaw(Prisma.sql`
+      UPDATE "StoredAsset"
+      SET "rescanClaimJobId" = ${claim.id}::uuid,
+          "rescanClaimLeaseToken" = ${claim.leaseToken}::uuid,
+          "rescanClaimFencingToken" = ${claim.fencingToken},
+          "rescanClaimExpiresAt" = ${claim.leaseExpiresAt}
+      WHERE "id" = ${source.id}::uuid
+    `);
+    await prisma.$executeRaw(Prisma.sql`
+      UPDATE "StoredAsset"
+      SET "rescanClaimJobId" = NULL, "rescanClaimLeaseToken" = NULL,
+          "rescanClaimFencingToken" = NULL, "rescanClaimExpiresAt" = NULL
+      WHERE "id" = ${source.id}::uuid
+    `);
+    assert.deepEqual(
+      await prisma.storedAsset.findUniqueOrThrow({
+        where: { id: source.id },
+        select: {
+          rescanClaimExpiresAt: true,
+          rescanClaimFencingToken: true,
+          rescanClaimJobId: true,
+          rescanClaimLeaseToken: true,
+        },
+      }),
+      {
+        rescanClaimExpiresAt: null,
+        rescanClaimFencingToken: null,
+        rescanClaimJobId: null,
+        rescanClaimLeaseToken: null,
+      },
+    );
+    checks += 2;
+
+    const requiredOutputFields = [
+      "mimeType",
+      "sizeBytes",
+      "checksumSha256",
+      "width",
+      "height",
+      "readyAt",
+    ] as const;
+    for (const renditionId of [ids.renditions.ready, ids.renditions.stale]) {
+      for (const field of requiredOutputFields) {
+        await rejects(Prisma.sql`
+          UPDATE "MediaRendition" SET ${Prisma.raw(`"${field}"`)} = NULL
+          WHERE "id" = ${renditionId}::uuid
+        `, /MediaRendition_(output|profile_bounds)_check/u);
+      }
+    }
+    await prisma.$executeRaw(Prisma.sql`
+      UPDATE "MediaRendition" SET "providerObjectVersion" = NULL
+      WHERE "id" = ${ids.renditions.ready}::uuid
+    `);
+    assert.equal(
+      (await prisma.mediaRendition.findUniqueOrThrow({ where: { id: ids.renditions.ready } }))
+        .providerObjectVersion,
+      null,
+    );
+    checks += 1;
+    await rejects(Prisma.sql`
+      UPDATE "MediaRendition" SET "width" = 257 WHERE "id" = ${ids.renditions.ready}::uuid
+    `, /MediaRendition_profile_bounds_check/u);
+    await rejects(Prisma.sql`
+      UPDATE "MediaRendition" SET "width" = 0 WHERE "id" = ${ids.renditions.ready}::uuid
+    `, /MediaRendition_(output|profile_bounds)_check/u);
+    await rejects(Prisma.sql`
+      UPDATE "MediaRendition" SET "mimeType" = NULL
+      WHERE "id" = ${ids.renditions.deletePending}::uuid
+    `, /MediaRendition_output_check/u);
+    await rejects(Prisma.sql`
+      UPDATE "MediaRendition" SET "mimeType" = 'image/webp'
+      WHERE "id" = ${emptyDelete.id}::uuid
+    `, /MediaRendition_output_check/u);
+    await rejects(Prisma.sql`
+      UPDATE "MediaRendition" SET "mimeType" = 'image/webp'
+      WHERE "id" = ${pending.id}::uuid
+    `, /MediaRendition_output_check/u);
+    await rejects(Prisma.sql`
+      UPDATE "MediaRendition" SET "mimeType" = 'image/webp'
+      WHERE "id" = ${ids.renditions.failed}::uuid
+    `, /MediaRendition_output_check/u);
+
+    await prisma.$executeRaw(Prisma.sql`
+      UPDATE "MediaRendition"
+      SET "state" = 'DELETE_PENDING', "deleteRequestedAt" = ${deleteRequestedAt}
+      WHERE "id" = ${ids.renditions.ready}::uuid
+    `);
+    await prisma.$executeRaw(Prisma.sql`
+      UPDATE "MediaRendition"
+      SET "state" = 'READY', "deleteRequestedAt" = NULL
+      WHERE "id" = ${ids.renditions.ready}::uuid
+    `);
+    checks += 1;
+
+    for (const renditionId of [
+      pending.id,
+      ids.renditions.ready,
+      ids.renditions.failed,
+      ids.renditions.stale,
+    ]) {
+      await rejects(Prisma.sql`
+        UPDATE "MediaRendition" SET "deleteRequestedAt" = ${deleteRequestedAt}
+        WHERE "id" = ${renditionId}::uuid
+      `, /MediaRendition_delete_check/u);
+    }
+    await prisma.$executeRaw(Prisma.sql`
+      UPDATE "MediaRendition"
+      SET "state" = 'PROCESSING', "claimJobId" = ${claim.id}::uuid,
+          "claimLeaseToken" = ${claim.leaseToken}::uuid,
+          "claimFencingToken" = ${claim.fencingToken}, "claimExpiresAt" = ${claim.leaseExpiresAt}
+      WHERE "id" = ${pending.id}::uuid
+    `);
+    await rejects(Prisma.sql`
+      UPDATE "MediaRendition" SET "deleteRequestedAt" = ${deleteRequestedAt}
+      WHERE "id" = ${pending.id}::uuid
+    `, /MediaRendition_delete_check/u);
+
+    const operationConstraint = /PlatformJobMutation_operation_check/u;
+    const operationId = claimOwner.operation.mutationId;
+    const workerId = claimOwner.operation.workerId;
+    const operationRejects = [
+      Prisma.sql`UPDATE "PlatformJobMutation" SET "operationBatchSize" = NULL WHERE "id" = ${operationId}::uuid`,
+      Prisma.sql`UPDATE "PlatformJobMutation" SET "operationWorkerId" = NULL WHERE "id" = ${operationId}::uuid`,
+      Prisma.sql`UPDATE "PlatformJobMutation" SET "operationWorkerId" = 'operation:invalid' WHERE "id" = ${operationId}::uuid`,
+      Prisma.sql`UPDATE "PlatformJobMutation" SET "operationFencingToken" = NULL WHERE "id" = ${operationId}::uuid`,
+      Prisma.sql`UPDATE "PlatformJobMutation" SET "operationFencingToken" = 0 WHERE "id" = ${operationId}::uuid`,
+      Prisma.sql`UPDATE "PlatformJobMutation" SET "result" = '{}'::jsonb WHERE "id" = ${operationId}::uuid`,
+      Prisma.sql`UPDATE "PlatformJobMutation" SET "result" = '{"state":7}'::jsonb WHERE "id" = ${operationId}::uuid`,
+      Prisma.sql`UPDATE "PlatformJobMutation" SET "result" = '{"state":"INVALID"}'::jsonb WHERE "id" = ${operationId}::uuid`,
+      Prisma.sql`UPDATE "PlatformJobMutation" SET "operationLeaseToken" = NULL WHERE "id" = ${operationId}::uuid`,
+      Prisma.sql`UPDATE "PlatformJobMutation" SET "operationLeaseExpiresAt" = NULL WHERE "id" = ${operationId}::uuid`,
+      Prisma.sql`
+        UPDATE "PlatformJobMutation"
+        SET "operationCompletedAt" = clock_timestamp(), "result" = '{"state":"COMPLETE"}'::jsonb
+        WHERE "id" = ${operationId}::uuid
+      `,
+    ];
+    for (const statement of operationRejects) {
+      await rejects(statement, operationConstraint);
+    }
+    assert.deepEqual(
+      await prisma.platformJobMutation.findUniqueOrThrow({
+        where: { id: operationId },
+        select: { operationCompletedAt: true, result: true },
+      }),
+      { operationCompletedAt: null, result: { state: "PROCESSING" } },
+    );
+    checks += 1;
+    await prisma.$executeRaw(Prisma.sql`
+      UPDATE "PlatformJobMutation"
+      SET "operationCompletedAt" = clock_timestamp(),
+          "operationLeaseToken" = NULL,
+          "operationLeaseExpiresAt" = NULL,
+          "result" = '{"state":"COMPLETE"}'::jsonb
+      WHERE "id" = ${operationId}::uuid
+    `);
+    assert.equal(
+      (await prisma.platformJobMutation.findUniqueOrThrow({ where: { id: operationId } }))
+        .operationCompletedAt instanceof Date,
+      true,
+    );
+    checks += 1;
+    await rejects(Prisma.sql`
+      UPDATE "PlatformJobMutation" SET "operationLeaseToken" = ${randomUUID()}::uuid
+      WHERE "id" = ${operationId}::uuid
+    `, operationConstraint);
+
+    const nonWorker = await prisma.platformJobMutation.create({
+      data: {
+        action: "SCHEDULER_TICK",
+        actorAdminUserId: ids.adminUserId,
+        actorPersonId: ids.adminPersonId,
+        idempotencyKey: randomUUID(),
+        requestHash: platformJobHash({ action: "SCHEDULER_TICK" }),
+        result: { jobsCreated: 0, schedulesProcessed: 0 },
+      },
+    });
+    const nonWorkerRejects = [
+      Prisma.sql`UPDATE "PlatformJobMutation" SET "operationBatchSize" = 1 WHERE "id" = ${nonWorker.id}::uuid`,
+      Prisma.sql`UPDATE "PlatformJobMutation" SET "operationWorkerId" = ${workerId} WHERE "id" = ${nonWorker.id}::uuid`,
+      Prisma.sql`UPDATE "PlatformJobMutation" SET "operationLeaseToken" = ${randomUUID()}::uuid WHERE "id" = ${nonWorker.id}::uuid`,
+      Prisma.sql`UPDATE "PlatformJobMutation" SET "operationFencingToken" = 1 WHERE "id" = ${nonWorker.id}::uuid`,
+      Prisma.sql`UPDATE "PlatformJobMutation" SET "operationLeaseExpiresAt" = clock_timestamp() WHERE "id" = ${nonWorker.id}::uuid`,
+      Prisma.sql`UPDATE "PlatformJobMutation" SET "operationCompletedAt" = clock_timestamp() WHERE "id" = ${nonWorker.id}::uuid`,
+    ];
+    for (const statement of nonWorkerRejects) {
+      await rejects(statement, operationConstraint);
+    }
+
+    return checks;
+  } finally {
+    await seedStorageMediaGate6bFixture(prisma);
+  }
+}
+
+async function createTruthTableRendition(
+  source: StoredAsset,
+  profile: "CARD_640_WEBP" | "HERO_1600_WEBP",
+) {
+  const fingerprint = mediaRenditionSourceFingerprint({
+    profile,
+    sourceAssetId: source.id,
+    sourceAssetVersion: source.version,
+    sourceChecksumSha256: source.checksumSha256,
+    sourceProviderObjectVersion: source.providerObjectVersion,
+  });
+  return prisma.mediaRendition.create({
+    data: {
+      objectKey: generateMediaRenditionObjectKey(source.id, fingerprint),
+      profile,
+      provider: source.provider,
+      sourceAssetId: source.id,
+      sourceAssetVersion: source.version,
+      sourceChecksumSha256: source.checksumSha256,
+      sourceFingerprint: fingerprint,
+      sourceProviderObjectVersion: source.providerObjectVersion,
+      state: "PENDING",
+    },
+  });
 }
 
 async function resetFixtureJobs() {

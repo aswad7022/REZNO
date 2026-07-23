@@ -70,7 +70,7 @@ test("Gate 6B storage and media automation is durable, fenced, and exact", { con
     await prisma.$disconnect();
   });
 
-  await t.test("Migrations 45-46 are healthy, schema-only, indexed, and constrained", async () => {
+  await t.test("Migrations 45-47 are healthy, schema-only, indexed, and constrained", async () => {
     const [migration] = await prisma.$queryRaw<Array<{
       applied: bigint;
       failed: bigint;
@@ -84,7 +84,7 @@ test("Gate 6B storage and media automation is durable, fenced, and exact", { con
       FROM "_prisma_migrations"
     `);
     assert.deepEqual(migration, {
-      applied: BigInt(46), failed: BigInt(0), rolledBack: BigInt(0), total: BigInt(46),
+      applied: BigInt(47), failed: BigInt(0), rolledBack: BigInt(0), total: BigInt(47),
     });
     assert.equal(await prisma.platformJob.count(), 0);
     assert.equal(await prisma.platformJobSchedule.count(), 0);
@@ -180,7 +180,7 @@ test("Gate 6B storage and media automation is durable, fenced, and exact", { con
     },
   });
 
-  await t.test("Migration 46 enforces the exact rendition claim-state matrix", async () => {
+  await t.test("Migration 47 enforces exact nullable constraint truth tables", async () => {
     await resetAutomationRows();
     const assets = await Promise.all(Array.from({ length: 5 }, () =>
       createAsset(fixture.actors.customer, "CUSTOMER_AVATAR", sourceBytes, provider, "READY")));
@@ -196,6 +196,27 @@ test("Gate 6B storage and media automation is durable, fenced, and exact", { con
     await assert.rejects(prisma.$executeRaw(Prisma.sql`
       UPDATE "MediaRendition"
       SET "state" = 'PROCESSING', "claimJobId" = ${claim.id}::uuid
+      WHERE "id" = ${pending.id}::uuid
+    `), /MediaRendition_claim_check/u);
+    await assert.rejects(prisma.$executeRaw(Prisma.sql`
+      UPDATE "MediaRendition"
+      SET "state" = 'PROCESSING', "claimJobId" = NULL,
+          "claimLeaseToken" = ${claim.leaseToken}::uuid,
+          "claimFencingToken" = ${claim.fencingToken}, "claimExpiresAt" = ${claim.leaseExpiresAt}
+      WHERE "id" = ${pending.id}::uuid
+    `), /MediaRendition_claim_check/u);
+    await assert.rejects(prisma.$executeRaw(Prisma.sql`
+      UPDATE "MediaRendition"
+      SET "state" = 'PROCESSING', "claimJobId" = ${claim.id}::uuid,
+          "claimLeaseToken" = NULL,
+          "claimFencingToken" = ${claim.fencingToken}, "claimExpiresAt" = ${claim.leaseExpiresAt}
+      WHERE "id" = ${pending.id}::uuid
+    `), /MediaRendition_claim_check/u);
+    await assert.rejects(prisma.$executeRaw(Prisma.sql`
+      UPDATE "MediaRendition"
+      SET "state" = 'PROCESSING', "claimJobId" = ${claim.id}::uuid,
+          "claimLeaseToken" = ${claim.leaseToken}::uuid,
+          "claimFencingToken" = NULL, "claimExpiresAt" = ${claim.leaseExpiresAt}
       WHERE "id" = ${pending.id}::uuid
     `), /MediaRendition_claim_check/u);
     await assert.rejects(prisma.$executeRaw(Prisma.sql`
@@ -257,6 +278,12 @@ test("Gate 6B storage and media automation is durable, fenced, and exact", { con
     await assert.rejects(prisma.$executeRaw(Prisma.sql`
       UPDATE "MediaRendition" SET "claimJobId" = ${claim.id}::uuid WHERE "id" = ${idleDelete.id}::uuid
     `), /MediaRendition_claim_check/u);
+    await assert.rejects(prisma.$executeRaw(Prisma.sql`
+      UPDATE "MediaRendition"
+      SET "claimJobId" = ${claim.id}::uuid, "claimLeaseToken" = ${claim.leaseToken}::uuid,
+          "claimFencingToken" = NULL, "claimExpiresAt" = ${claim.leaseExpiresAt}
+      WHERE "id" = ${idleDelete.id}::uuid
+    `), /MediaRendition_claim_check/u);
     await prisma.$executeRaw(Prisma.sql`
       UPDATE "MediaRendition"
       SET "claimJobId" = ${claim.id}::uuid, "claimLeaseToken" = ${claim.leaseToken}::uuid,
@@ -270,6 +297,108 @@ test("Gate 6B storage and media automation is durable, fenced, and exact", { con
       WHERE "id" = ${idleDelete.id}::uuid
     `);
     assert.equal((await prisma.mediaRendition.findUniqueOrThrow({ where: { id: idleDelete.id } })).state, "DELETE_PENDING");
+
+    for (const missing of ["job", "lease", "fence", "expiry"] as const) {
+      await assert.rejects(prisma.$executeRaw(Prisma.sql`
+        UPDATE "StoredAsset"
+        SET "rescanClaimJobId" = ${missing === "job" ? null : claim.id}::uuid,
+            "rescanClaimLeaseToken" = ${missing === "lease" ? null : claim.leaseToken}::uuid,
+            "rescanClaimFencingToken" = ${missing === "fence" ? null : claim.fencingToken},
+            "rescanClaimExpiresAt" = ${missing === "expiry" ? null : claim.leaseExpiresAt}
+        WHERE "id" = ${assets[0]!.id}::uuid
+      `), /StoredAsset_rescan_claim_check/u);
+    }
+    await assert.rejects(prisma.$executeRaw(Prisma.sql`
+      UPDATE "StoredAsset"
+      SET "rescanClaimJobId" = ${claim.id}::uuid,
+          "rescanClaimLeaseToken" = ${claim.leaseToken}::uuid,
+          "rescanClaimFencingToken" = 0,
+          "rescanClaimExpiresAt" = ${claim.leaseExpiresAt}
+      WHERE "id" = ${assets[0]!.id}::uuid
+    `), /StoredAsset_rescan_claim_check/u);
+    await prisma.$executeRaw(Prisma.sql`
+      UPDATE "StoredAsset"
+      SET "rescanClaimJobId" = ${claim.id}::uuid,
+          "rescanClaimLeaseToken" = ${claim.leaseToken}::uuid,
+          "rescanClaimFencingToken" = ${claim.fencingToken},
+          "rescanClaimExpiresAt" = ${claim.leaseExpiresAt}
+      WHERE "id" = ${assets[0]!.id}::uuid
+    `);
+    await prisma.$executeRaw(Prisma.sql`
+      UPDATE "StoredAsset"
+      SET "rescanClaimJobId" = NULL, "rescanClaimLeaseToken" = NULL,
+          "rescanClaimFencingToken" = NULL, "rescanClaimExpiresAt" = NULL
+      WHERE "id" = ${assets[0]!.id}::uuid
+    `);
+
+    const requiredOutputFields = [
+      "mimeType",
+      "sizeBytes",
+      "checksumSha256",
+      "width",
+      "height",
+      "readyAt",
+    ] as const;
+    for (const rendition of [ready, superseded]) {
+      for (const field of requiredOutputFields) {
+        await assertMediaRenditionNullRejected(rendition.id, field, /MediaRendition_(output|profile_bounds)_check/u);
+      }
+    }
+    await prisma.$executeRaw(Prisma.sql`
+      UPDATE "MediaRendition" SET "providerObjectVersion" = NULL WHERE "id" = ${ready.id}::uuid
+    `);
+    await assert.rejects(prisma.$executeRaw(Prisma.sql`
+      UPDATE "MediaRendition" SET "width" = 257 WHERE "id" = ${ready.id}::uuid
+    `), /MediaRendition_profile_bounds_check/u);
+    await assert.rejects(prisma.$executeRaw(Prisma.sql`
+      UPDATE "MediaRendition" SET "width" = 0 WHERE "id" = ${ready.id}::uuid
+    `), /MediaRendition_(output|profile_bounds)_check/u);
+    await assert.rejects(prisma.$executeRaw(Prisma.sql`
+      UPDATE "MediaRendition" SET "providerObjectVersion" = 'partial' WHERE "id" = ${idleDelete.id}::uuid
+    `), /MediaRendition_output_check/u);
+    await assert.rejects(prisma.$executeRaw(Prisma.sql`
+      UPDATE "MediaRendition" SET "mimeType" = 'image/webp' WHERE "id" = ${deleted.id}::uuid
+    `), /MediaRendition_output_check/u);
+    await assert.rejects(prisma.$executeRaw(Prisma.sql`
+      UPDATE "MediaRendition" SET "mimeType" = 'image/webp' WHERE "id" = ${pending.id}::uuid
+    `), /MediaRendition_output_check/u);
+    await assert.rejects(prisma.$executeRaw(Prisma.sql`
+      UPDATE "MediaRendition" SET "mimeType" = 'image/webp' WHERE "id" = ${failed.id}::uuid
+    `), /MediaRendition_output_check/u);
+
+    await prisma.$executeRaw(Prisma.sql`
+      UPDATE "MediaRendition"
+      SET "state" = 'DELETE_PENDING', "deleteRequestedAt" = ${deleteRequestedAt}
+      WHERE "id" = ${ready.id}::uuid
+    `);
+    await prisma.$executeRaw(Prisma.sql`
+      UPDATE "MediaRendition"
+      SET "state" = 'READY', "deleteRequestedAt" = NULL
+      WHERE "id" = ${ready.id}::uuid
+    `);
+    assert.equal((await prisma.mediaRendition.findUniqueOrThrow({ where: { id: idleDelete.id } })).state, "DELETE_PENDING");
+
+    for (const id of [pending.id, ready.id, failed.id, superseded.id]) {
+      await assert.rejects(prisma.$executeRaw(Prisma.sql`
+        UPDATE "MediaRendition" SET "deleteRequestedAt" = ${deleteRequestedAt} WHERE "id" = ${id}::uuid
+      `), /MediaRendition_delete_check/u);
+    }
+    await prisma.$executeRaw(Prisma.sql`
+      UPDATE "MediaRendition"
+      SET "state" = 'PROCESSING', "claimJobId" = ${claim.id}::uuid,
+          "claimLeaseToken" = ${claim.leaseToken}::uuid,
+          "claimFencingToken" = ${claim.fencingToken}, "claimExpiresAt" = ${claim.leaseExpiresAt}
+      WHERE "id" = ${pending.id}::uuid
+    `);
+    await assert.rejects(prisma.$executeRaw(Prisma.sql`
+      UPDATE "MediaRendition" SET "deleteRequestedAt" = ${deleteRequestedAt} WHERE "id" = ${pending.id}::uuid
+    `), /MediaRendition_delete_check/u);
+    await prisma.$executeRaw(Prisma.sql`
+      UPDATE "MediaRendition"
+      SET "state" = 'PENDING', "claimJobId" = NULL, "claimLeaseToken" = NULL,
+          "claimFencingToken" = NULL, "claimExpiresAt" = NULL
+      WHERE "id" = ${pending.id}::uuid
+    `);
   });
 
   await t.test("Admin status and discovery are permission-revalidated and idempotent without auto-activation", async () => {
@@ -1368,6 +1497,18 @@ async function createReadyRendition(
       width: 256,
     },
   });
+}
+
+async function assertMediaRenditionNullRejected(
+  id: string,
+  field: "mimeType" | "sizeBytes" | "checksumSha256" | "width" | "height" | "readyAt",
+  constraint: RegExp,
+) {
+  await assert.rejects(prisma.$executeRaw(Prisma.sql`
+    UPDATE "MediaRendition"
+    SET ${Prisma.raw(`"${field}"`)} = NULL
+    WHERE "id" = ${id}::uuid
+  `), constraint);
 }
 
 async function prepareRunningJobs(

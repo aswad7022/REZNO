@@ -289,7 +289,7 @@ test("provider absence is explicit and the deterministic adapter cannot be activ
   }
 });
 
-test("Gate 6B error retry classification is finite and Migrations 45-46 are schema-only", async () => {
+test("Gate 6B error retry classification is finite and Migrations 45-47 are schema-only", async () => {
   for (const jobType of [
     "STORAGE_MAINTENANCE_DISCOVERY",
     "STORAGE_ORPHAN_CLEANUP",
@@ -306,7 +306,7 @@ test("Gate 6B error retry classification is finite and Migrations 45-46 are sche
     assert.equal(isRetryablePlatformJobError(jobType, "PERMANENT_FAILURE"), false);
     assert.equal(isRetryablePlatformJobError(jobType, "PROVIDER_RAW_SECRET"), false);
   }
-  const [migration45, migration46] = await Promise.all([
+  const [migration45, migration46, migration47] = await Promise.all([
     readFile(new URL(
       "../../../prisma/migrations/20260722150000_storage_media_automation/migration.sql",
       import.meta.url,
@@ -315,9 +315,14 @@ test("Gate 6B error retry classification is finite and Migrations 45-46 are sche
       "../../../prisma/migrations/20260723120000_media_rendition_claim_integrity/migration.sql",
       import.meta.url,
     ), "utf8"),
+    readFile(new URL(
+      "../../../prisma/migrations/20260723150000_gate6a_gate6b_constraint_truth_tables/migration.sql",
+      import.meta.url,
+    ), "utf8"),
   ]);
   assert.doesNotMatch(migration45, /\bINSERT\s+INTO\b|\bUPDATE\s+"?[A-Z][A-Za-z]+"?\s+SET\b|\bDELETE\s+FROM\b/iu);
   assert.doesNotMatch(migration46, /\bINSERT\s+INTO\b|\bUPDATE\s+"?[A-Z][A-Za-z]+"?\s+SET\b|\bDELETE\s+FROM\b/iu);
+  assert.doesNotMatch(migration47, /\bINSERT\s+INTO\b|\bUPDATE\s+"?[A-Z][A-Za-z]+"?\s+SET\b|\bDELETE\s+FROM\b/iu);
   assert.match(migration45, /MediaRendition_sourceAssetId_sourceAssetVersion_profile_key/u);
   assert.match(migration45, /MediaRendition_failure_check/u);
   assert.match(migration45, /StoredAsset_rescan_claim_check/u);
@@ -327,6 +332,12 @@ test("Gate 6B error retry classification is finite and Migrations 45-46 are sche
   assert.match(migration46, /illegal_state_claim_count/u);
   assert.match(migration46, /"state" = 'PROCESSING'[\s\S]*"claimJobId" IS NOT NULL/u);
   assert.match(migration46, /"state" = 'DELETE_PENDING'[\s\S]*"claimJobId" IS NULL/u);
+  assert.match(migration47, /"operationFencingToken" IS NOT NULL/u);
+  assert.match(migration47, /"rescanClaimFencingToken" IS NOT NULL/u);
+  assert.match(migration47, /"claimFencingToken" IS NOT NULL/u);
+  assert.match(migration47, /"mimeType" IS NOT NULL/u);
+  assert.match(migration47, /"width" IS NULL AND "height" IS NULL/u);
+  assert.match(migration47, /"deleteRequestedAt" IS NULL[\s\S]*"deletedAt" IS NULL/u);
 });
 
 function domainCode(expected: string) {

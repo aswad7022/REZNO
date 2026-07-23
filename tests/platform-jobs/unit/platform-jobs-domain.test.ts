@@ -225,7 +225,7 @@ test("health handler succeeds with bounded metadata and converts raw exceptions 
   setPlatformJobHandlerForTests("PLATFORM_HEALTH_PROBE");
 });
 
-test("production-only guards and additive migrations 43-46 are explicit in source", async () => {
+test("production-only guards and additive migrations 43-47 are explicit in source", async () => {
   const [cursorSource, handlerSource, workerSource, migrations] = await Promise.all([
     readFile(new URL("../../../features/platform-jobs/domain/cursor-signing.ts", import.meta.url), "utf8"),
     readFile(new URL("../../../features/platform-jobs/services/handlers.ts", import.meta.url), "utf8"),
@@ -236,11 +236,12 @@ test("production-only guards and additive migrations 43-46 are explicit in sourc
   assert.match(handlerSource, /NODE_ENV === "production"/);
   assert.match(workerSource, /NODE_ENV === "production"/);
   const names = migrations.filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort();
-  assert.equal(names.length, 46);
-  assert.equal(names.at(-4), "20260721160000_platform_jobs_foundation");
-  assert.equal(names.at(-3), "20260722090000_platform_worker_operation_recovery");
-  assert.equal(names.at(-2), "20260722150000_storage_media_automation");
-  assert.equal(names.at(-1), "20260723120000_media_rendition_claim_integrity");
+  assert.equal(names.length, 47);
+  assert.equal(names.at(-5), "20260721160000_platform_jobs_foundation");
+  assert.equal(names.at(-4), "20260722090000_platform_worker_operation_recovery");
+  assert.equal(names.at(-3), "20260722150000_storage_media_automation");
+  assert.equal(names.at(-2), "20260723120000_media_rendition_claim_integrity");
+  assert.equal(names.at(-1), "20260723150000_gate6a_gate6b_constraint_truth_tables");
 });
 
 test("production runtime refuses cursor-secret and handler test overrides", () => {
@@ -303,7 +304,7 @@ test("Gate 6A staging safety accepts only exact direct Neon verification or exac
   };
   assert.deepEqual(
     await assertPlatformJobsGate6aStaging(
-      safetyClient(undefined, { applied: BigInt(46), total: BigInt(46) }),
+      safetyClient(undefined, { applied: BigInt(47), total: BigInt(47) }),
       successorEnvironment,
       successorEvidence,
     ),
@@ -313,7 +314,7 @@ test("Gate 6A staging safety accepts only exact direct Neon verification or exac
       database: "rezno_staging",
       encrypted: true,
       hostnameVerified: true,
-      migrations: "46/46",
+      migrations: "47/47",
       prismaUsedAttestedPhysicalClient: true,
       role: "neondb_owner",
       rolledBack: 0,

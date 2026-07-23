@@ -170,7 +170,7 @@ test("Gate 5B staging fixture fails closed outside exact staging and accepts onl
   await assert.rejects(assertMediaGate5bStaging(client("rezno_production"), exactEnvironment), /exact rezno_staging/u);
   await assert.rejects(assertMediaGate5bStaging(client("rezno_staging", BigInt(41), BigInt(41)), exactEnvironment), /42\/42/u);
   await assert.rejects(
-    assertMediaGate5bStaging(client("rezno_staging", BigInt(46), BigInt(46)), exactEnvironment),
+    assertMediaGate5bStaging(client("rezno_staging", BigInt(47), BigInt(47)), exactEnvironment),
     /42\/42/u,
   );
   assert.deepEqual(await assertMediaGate5bStaging(client("rezno_staging"), exactEnvironment), {
@@ -179,7 +179,7 @@ test("Gate 5B staging fixture fails closed outside exact staging and accepts onl
   });
   assert.deepEqual(
     await assertMediaGate5bStaging(
-      client("rezno_staging", BigInt(46), BigInt(46)),
+      client("rezno_staging", BigInt(47), BigInt(47)),
       {
         ...exactEnvironment,
         REZNO_STAGE6_GATE6B_CONFIRM: STORAGE_MEDIA_GATE6B_CONFIRMATION,
@@ -187,7 +187,7 @@ test("Gate 5B staging fixture fails closed outside exact staging and accepts onl
     ),
     {
       database: "rezno_staging",
-      migrations: "46/46",
+      migrations: "47/47",
     },
   );
 });
