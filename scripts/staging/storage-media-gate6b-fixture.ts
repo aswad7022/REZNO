@@ -375,15 +375,15 @@ export async function cleanupStorageMediaGate6bFixture(prisma: PrismaClient) {
         rescanClaimLeaseToken: null,
       },
     });
-    await transaction.mediaRendition.updateMany({
-      where: { sourceAssetId: { in: fixtureAssets } },
-      data: {
-        claimExpiresAt: null,
-        claimFencingToken: null,
-        claimJobId: null,
-        claimLeaseToken: null,
-      },
-    });
+    await transaction.$executeRaw(Prisma.sql`
+      UPDATE "MediaRendition"
+      SET "state" = CASE WHEN "state" = 'PROCESSING' THEN 'PENDING'::"MediaRenditionState" ELSE "state" END,
+          "claimExpiresAt" = NULL,
+          "claimFencingToken" = NULL,
+          "claimJobId" = NULL,
+          "claimLeaseToken" = NULL
+      WHERE "sourceAssetId" IN (${Prisma.join(fixtureAssets.map((id) => Prisma.sql`${id}::uuid`))})
+    `);
     const mutations = await transaction.platformJobMutation.deleteMany({ where: { actorAdminUserId: ids.adminUserId } });
     const attempts = await transaction.platformJobAttempt.deleteMany({ where: { job: { createdByAdminUserId: ids.adminUserId } } });
     const childJobs = await transaction.platformJob.deleteMany({ where: { createdByAdminUserId: ids.adminUserId, parentJobId: { not: null } } });

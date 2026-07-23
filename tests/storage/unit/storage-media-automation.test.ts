@@ -289,7 +289,7 @@ test("provider absence is explicit and the deterministic adapter cannot be activ
   }
 });
 
-test("Gate 6B error retry classification is finite and Migration 45 is schema-only", async () => {
+test("Gate 6B error retry classification is finite and Migrations 45-46 are schema-only", async () => {
   for (const jobType of [
     "STORAGE_MAINTENANCE_DISCOVERY",
     "STORAGE_ORPHAN_CLEANUP",
@@ -306,15 +306,27 @@ test("Gate 6B error retry classification is finite and Migration 45 is schema-on
     assert.equal(isRetryablePlatformJobError(jobType, "PERMANENT_FAILURE"), false);
     assert.equal(isRetryablePlatformJobError(jobType, "PROVIDER_RAW_SECRET"), false);
   }
-  const migration = await readFile(new URL(
-    "../../../prisma/migrations/20260722150000_storage_media_automation/migration.sql",
-    import.meta.url,
-  ), "utf8");
-  assert.doesNotMatch(migration, /\bINSERT\s+INTO\b|\bUPDATE\s+"?[A-Z][A-Za-z]+"?\s+SET\b|\bDELETE\s+FROM\b/iu);
-  assert.match(migration, /MediaRendition_sourceAssetId_sourceAssetVersion_profile_key/u);
-  assert.match(migration, /MediaRendition_failure_check/u);
-  assert.match(migration, /StoredAsset_rescan_claim_check/u);
-  assert.match(migration, /PlatformJob_source_check/u);
+  const [migration45, migration46] = await Promise.all([
+    readFile(new URL(
+      "../../../prisma/migrations/20260722150000_storage_media_automation/migration.sql",
+      import.meta.url,
+    ), "utf8"),
+    readFile(new URL(
+      "../../../prisma/migrations/20260723120000_media_rendition_claim_integrity/migration.sql",
+      import.meta.url,
+    ), "utf8"),
+  ]);
+  assert.doesNotMatch(migration45, /\bINSERT\s+INTO\b|\bUPDATE\s+"?[A-Z][A-Za-z]+"?\s+SET\b|\bDELETE\s+FROM\b/iu);
+  assert.doesNotMatch(migration46, /\bINSERT\s+INTO\b|\bUPDATE\s+"?[A-Z][A-Za-z]+"?\s+SET\b|\bDELETE\s+FROM\b/iu);
+  assert.match(migration45, /MediaRendition_sourceAssetId_sourceAssetVersion_profile_key/u);
+  assert.match(migration45, /MediaRendition_failure_check/u);
+  assert.match(migration45, /StoredAsset_rescan_claim_check/u);
+  assert.match(migration45, /PlatformJob_source_check/u);
+  assert.match(migration46, /claimless_processing_count/u);
+  assert.match(migration46, /partial_or_invalid_claim_count/u);
+  assert.match(migration46, /illegal_state_claim_count/u);
+  assert.match(migration46, /"state" = 'PROCESSING'[\s\S]*"claimJobId" IS NOT NULL/u);
+  assert.match(migration46, /"state" = 'DELETE_PENDING'[\s\S]*"claimJobId" IS NULL/u);
 });
 
 function domainCode(expected: string) {

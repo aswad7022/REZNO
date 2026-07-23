@@ -1,23 +1,32 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 
-import type { PlatformJobType } from "@prisma/client";
+import { Prisma, type PlatformJobType } from "@prisma/client";
 import sharp from "sharp";
 
+import {
+  generateMediaRenditionObjectKey,
+  mediaRenditionSourceFingerprint,
+} from "../../features/media/domain/rendition-registry";
 import { createPrivateAvatarDownloadTarget } from "../../features/media/services/delivery";
+import { platformJobHash } from "../../features/platform-jobs/domain/canonical";
 import { STAGE_6_ARCHITECTURE } from "../../features/platform-jobs/domain/contracts";
 import { PlatformJobDomainError } from "../../features/platform-jobs/domain/errors";
+import { platformHealthPayload } from "../../features/platform-jobs/domain/registry";
 import { executePlatformJobHandler } from "../../features/platform-jobs/services/handlers";
 import {
-  claimPlatformJobs,
+  claimPlatformJobsInTransaction,
   completePlatformJob,
+  enqueueDomainDiscoveryPlatformJob,
   enqueuePlatformJob,
   failPlatformJob,
   startPlatformJob,
   type ClaimedPlatformJob,
 } from "../../features/platform-jobs/services/jobs";
-import { runPlatformSchedulerTick } from "../../features/platform-jobs/services/schedules";
+import type { PlatformJobOperationAuthority } from "../../features/platform-jobs/services/operation-lease";
+import { runPlatformSchedulerTick, setPlatformJobScheduleEnabled } from "../../features/platform-jobs/services/schedules";
 import { runPlatformJobSerializable } from "../../features/platform-jobs/services/transaction";
+import { runPlatformWorkerBatch } from "../../features/platform-jobs/services/worker";
 import { DeterministicStorageProvider } from "../../features/storage/providers/deterministic";
 import { configuredStorageProvider, setStorageProviderForTests } from "../../features/storage/providers/registry";
 import { setStorageMalwareScannerForTests } from "../../features/storage/services/storage-mutations";
@@ -38,7 +47,11 @@ import {
 } from "./storage-media-gate6b-fixture";
 import { assertStorageMediaGate6bStaging } from "./storage-media-gate6b-safety";
 
-type RunningJob = { claim: ClaimedPlatformJob; workerId: string };
+type RunningJob = {
+  claim: ClaimedPlatformJob;
+  operation: PlatformJobOperationAuthority;
+  workerId: string;
+};
 let smokePhase = "BOOT";
 let smokeDiagnostic: unknown = null;
 
@@ -96,6 +109,279 @@ async function main() {
   assert.equal(JSON.stringify(status).includes("objectKey"), false);
   assert.equal(JSON.stringify(status).includes("signed"), false);
   checks += 7;
+
+  smokePhase = "EXECUTION_AUTHORITY";
+  await resetFixtureJobs();
+  const originalPermissions = (await prisma.adminAccess.findUniqueOrThrow({
+    where: { id: ids.adminAccessId },
+    select: { permissions: true },
+  })).permissions;
+  const healthJob = await enqueueSmokeJob("PLATFORM_HEALTH_PROBE", platformHealthPayload());
+  const filteredGate6bJob = await enqueueSmokeJob("STORAGE_MAINTENANCE_DISCOVERY", { batchSize: 1 });
+  await setFixturePermissions(["PLATFORM_JOBS_VIEW", "PLATFORM_JOBS_MANAGE"]);
+  const mixed = await runPlatformWorkerBatch(context, { batchSize: 2, idempotencyKey: randomUUID() });
+  assert.equal(mixed.state, "COMPLETE");
+  if (mixed.state !== "COMPLETE") throw new Error("The mixed worker did not complete.");
+  assert.equal(mixed.claimed, 1);
+  assert.equal(mixed.succeeded, 1);
+  assert.equal((await prisma.platformJob.findUniqueOrThrow({ where: { id: healthJob.id } })).status, "SUCCEEDED");
+  assert.deepEqual(
+    await prisma.platformJob.findUniqueOrThrow({
+      where: { id: filteredGate6bJob.id },
+      select: { attemptCount: true, status: true },
+    }),
+    { attemptCount: 0, status: "AVAILABLE" },
+  );
+  assert.doesNotMatch(JSON.stringify(mixed), /actor|person|permission|operation|lease|fencing|workerId/iu);
+  await setFixturePermissions(originalPermissions);
+  const authorizedClaim = await claimExistingJob(filteredGate6bJob.id);
+  assert.equal(authorizedClaim.claim.id, filteredGate6bJob.id);
+  assert.equal(authorizedClaim.claim.jobType, "STORAGE_MAINTENANCE_DISCOVERY");
+  await resetFixtureJobs();
+  await enqueueSmokeJob("PLATFORM_HEALTH_PROBE", platformHealthPayload());
+  await setFixturePermissions(["STORAGE_RECORDS_VIEW", "STORAGE_RECORDS_MANAGE"]);
+  await assert.rejects(
+    runPlatformWorkerBatch(context, { batchSize: 1, idempotencyKey: randomUUID() }),
+    (error: unknown) => error instanceof PlatformJobDomainError && error.code === "FORBIDDEN",
+  );
+  await setFixturePermissions(originalPermissions);
+  checks += 10;
+
+  smokePhase = "SCHEDULE_AUTHORITY";
+  await resetFixtureJobs();
+  const schedule = await prisma.platformJobSchedule.findFirstOrThrow({
+    where: { createdByAdminUserId: ids.adminUserId, scheduleKey: "STORAGE_MAINTENANCE_DISCOVERY" },
+  });
+  await setFixturePermissions(["PLATFORM_JOBS_VIEW", "PLATFORM_JOBS_MANAGE"]);
+  await assert.rejects(setPlatformJobScheduleEnabled(context, {
+    enabled: true,
+    expectedVersion: schedule.version,
+    idempotencyKey: randomUUID(),
+    scheduleId: schedule.id,
+  }), (error: unknown) => error instanceof PlatformJobDomainError && error.code === "FORBIDDEN");
+  await setFixturePermissions(originalPermissions);
+  const enabledSchedule = await setPlatformJobScheduleEnabled(context, {
+    enabled: true,
+    expectedVersion: schedule.version,
+    idempotencyKey: randomUUID(),
+    scheduleId: schedule.id,
+  });
+  if (enabledSchedule.replay) throw new Error("Fresh staging schedule enable unexpectedly replayed.");
+  await setFixturePermissions(["PLATFORM_JOBS_VIEW", "PLATFORM_JOBS_MANAGE"]);
+  const filteredTick = await runPlatformSchedulerTick(context, {
+    batchSize: 1,
+    idempotencyKey: randomUUID(),
+    now: new Date("2026-07-24T00:00:00Z"),
+  });
+  if (filteredTick.replay) throw new Error("Fresh staging scheduler tick unexpectedly replayed.");
+  assert.equal(filteredTick.jobsCreated, 0);
+  assert.equal(filteredTick.schedulesProcessed, 0);
+  await setFixturePermissions(originalPermissions);
+  const disabledSchedule = await setPlatformJobScheduleEnabled(context, {
+    enabled: false,
+    expectedVersion: enabledSchedule.version,
+    idempotencyKey: randomUUID(),
+    scheduleId: schedule.id,
+  });
+  if (disabledSchedule.replay) throw new Error("Fresh staging schedule disable unexpectedly replayed.");
+  assert.equal(disabledSchedule.enabled, false);
+  checks += 5;
+
+  smokePhase = "RENDITION_CLAIM_MATRIX";
+  await resetFixtureJobs();
+  await prisma.mediaRendition.deleteMany({ where: { sourceAssetId: { in: Object.values(ids.assets) } } });
+  const claimOwner = await prepareRunningJob("MEDIA_RENDITION_GENERATE", {
+    assetId: ids.assets.renditionSource,
+    expectedVersion: 1,
+    profile: "AVATAR_256_WEBP",
+  });
+  const claimSource = await prisma.storedAsset.findUniqueOrThrow({ where: { id: ids.assets.renditionSource } });
+  const claimFingerprint = mediaRenditionSourceFingerprint({
+    profile: "AVATAR_256_WEBP",
+    sourceAssetId: claimSource.id,
+    sourceAssetVersion: claimSource.version,
+    sourceChecksumSha256: claimSource.checksumSha256,
+    sourceProviderObjectVersion: claimSource.providerObjectVersion,
+  });
+  const pendingRendition = await prisma.mediaRendition.create({
+    data: {
+      objectKey: generateMediaRenditionObjectKey(claimSource.id, claimFingerprint),
+      profile: "AVATAR_256_WEBP",
+      provider: claimSource.provider,
+      sourceAssetId: claimSource.id,
+      sourceAssetVersion: claimSource.version,
+      sourceChecksumSha256: claimSource.checksumSha256,
+      sourceFingerprint: claimFingerprint,
+      sourceProviderObjectVersion: claimSource.providerObjectVersion,
+      state: "PENDING",
+    },
+  });
+  await assert.rejects(prisma.$executeRaw(Prisma.sql`
+    UPDATE "MediaRendition" SET "state" = 'PROCESSING' WHERE "id" = ${pendingRendition.id}::uuid
+  `), /MediaRendition_claim_check/u);
+  await assert.rejects(prisma.$executeRaw(Prisma.sql`
+    UPDATE "MediaRendition"
+    SET "state" = 'PROCESSING', "claimJobId" = ${claimOwner.claim.id}::uuid
+    WHERE "id" = ${pendingRendition.id}::uuid
+  `), /MediaRendition_claim_check/u);
+  await prisma.$executeRaw(Prisma.sql`
+    UPDATE "MediaRendition"
+    SET "state" = 'PROCESSING', "claimJobId" = ${claimOwner.claim.id}::uuid,
+        "claimLeaseToken" = ${claimOwner.claim.leaseToken}::uuid,
+        "claimFencingToken" = ${claimOwner.claim.fencingToken},
+        "claimExpiresAt" = ${claimOwner.claim.leaseExpiresAt}
+    WHERE "id" = ${pendingRendition.id}::uuid
+  `);
+  const validClaim = await prisma.mediaRendition.findUniqueOrThrow({ where: { id: pendingRendition.id } });
+  assert.equal(validClaim.state, "PROCESSING");
+  assert.equal(validClaim.claimJobId, claimOwner.claim.id);
+  checks += 4;
+  await prisma.mediaRendition.delete({ where: { id: pendingRendition.id } });
+  await resetFixtureJobs();
+
+  smokePhase = "CROSS_ADMIN_DOMAIN_DEDUPE";
+  const secondUserId = `${STORAGE_MEDIA_GATE6B_MARKER}-dedupe-${randomUUID()}`;
+  const secondUser = await prisma.user.create({
+    data: { email: `${secondUserId}@rezno.invalid`, id: secondUserId, name: "Gate 6B Dedupe" },
+  });
+  const secondPerson = await prisma.person.create({
+    data: { authUserId: secondUser.id, firstName: "Gate6B", isOnboarded: true, status: "ACTIVE" },
+  });
+  const secondAccess = await prisma.adminAccess.create({
+    data: { permissions: originalPermissions, userId: secondUser.id },
+  });
+  const crossAdminJobIds: string[] = [];
+  try {
+    smokeDiagnostic = { crossAdminStep: "PARENTS" };
+    const [firstParent, secondParent] = await Promise.all([
+      enqueueSmokeJob("STORAGE_MAINTENANCE_DISCOVERY", { batchSize: 1 }),
+      enqueueSmokeJobForActor(secondUser.id, secondPerson.id, "STORAGE_MAINTENANCE_DISCOVERY", { batchSize: 1 }),
+    ]);
+    crossAdminJobIds.push(firstParent.id, secondParent.id);
+    const availableAt = new Date("2026-07-22T12:00:00.123Z");
+    const cases = [
+      { jobType: "STORAGE_ORPHAN_CLEANUP" as const, payload: { expectedVersion: 1, uploadSessionId: randomUUID() } },
+      { jobType: "STORAGE_ASSET_DELETE_RETRY" as const, payload: { assetId: randomUUID(), expectedVersion: 1 } },
+      { jobType: "STORAGE_ASSET_RESCAN" as const, payload: { assetId: randomUUID(), expectedVersion: 1 } },
+      { jobType: "MEDIA_RENDITION_GENERATE" as const, payload: { assetId: randomUUID(), expectedVersion: 1, profile: "CARD_640_WEBP" } },
+    ];
+    for (const [index, item] of cases.entries()) {
+      smokeDiagnostic = { crossAdminStep: "CHILD", index, jobType: item.jobType };
+      const deduplicationKey = `staging:gate6b:cross-admin:${index}:${randomUUID()}`;
+      const [first, second] = await Promise.all([
+        runPlatformJobSerializable((transaction) => enqueueDomainDiscoveryPlatformJob(transaction, {
+          availableAt,
+          createdByAdminUserId: ids.adminUserId,
+          createdByPersonId: ids.adminPersonId,
+          deduplicationKey,
+          jobType: item.jobType,
+          parentJobId: firstParent.id,
+          payload: item.payload,
+          payloadVersion: 1,
+        })),
+        runPlatformJobSerializable((transaction) => enqueueDomainDiscoveryPlatformJob(transaction, {
+          availableAt,
+          createdByAdminUserId: secondUser.id,
+          createdByPersonId: secondPerson.id,
+          deduplicationKey,
+          jobType: item.jobType,
+          parentJobId: secondParent.id,
+          payload: item.payload,
+          payloadVersion: 1,
+        })),
+      ]);
+      assert.equal(Number(first.replay) + Number(second.replay), 1);
+      assert.equal(first.job.id, second.job.id);
+      crossAdminJobIds.push(first.job.id);
+      checks += 2;
+    }
+  } finally {
+    await prisma.platformJob.deleteMany({ where: { id: { in: crossAdminJobIds } } });
+    await prisma.adminAccess.deleteMany({ where: { id: secondAccess.id } });
+    await prisma.person.deleteMany({ where: { id: secondPerson.id } });
+    await prisma.user.deleteMany({ where: { id: secondUser.id } });
+  }
+  smokeDiagnostic = { crossAdminStep: "RESEED" };
+  await seedStorageMediaGate6bFixture(prisma);
+
+  smokePhase = "REVOCATION_DURING_PROVIDER_DELETE";
+  await resetFixtureJobs();
+  setStorageProviderForTests(proxyProvider(provider, async () => {
+    await setFixturePermissions(["STORAGE_RECORDS_VIEW", "PLATFORM_JOBS_VIEW", "PLATFORM_JOBS_MANAGE"]);
+    return { outcome: "READY" as const };
+  }));
+  const deleteTarget = await prisma.storedAsset.findUniqueOrThrow({ where: { id: ids.assets.deletePending } });
+  const revokedDelete = await prepareRunningJob("STORAGE_ASSET_DELETE_RETRY", {
+    assetId: deleteTarget.id,
+    expectedVersion: deleteTarget.version,
+  });
+  const revokedDeleteOutcome = await runHandler(revokedDelete);
+  assert.deepEqual(revokedDeleteOutcome, { errorCode: "PERMANENT_FAILURE", outcome: "FAILED", retryable: false });
+  const retainedDelete = await prisma.storedAsset.findUniqueOrThrow({ where: { id: deleteTarget.id } });
+  assert.equal(retainedDelete.state, "DELETE_PENDING");
+  assert.equal(retainedDelete.deletedAt, null);
+  await setFixturePermissions(originalPermissions);
+  setStorageProviderForTests(provider);
+  await prisma.storedAsset.update({
+    where: { id: deleteTarget.id },
+    data: { providerCleanupClaimId: null, providerCleanupClaimedAt: null },
+  });
+  await resetFixtureJobs();
+  checks += 3;
+
+  smokePhase = "REVOCATION_DURING_PROVIDER_RESCAN";
+  const revocationProvider = proxyProvider(provider);
+  setStorageProviderForTests({
+    ...revocationProvider,
+    getObjectForInspection: async (input) => {
+      const result = await provider.getObjectForInspection(input);
+      await setFixturePermissions(["STORAGE_RECORDS_VIEW", "PLATFORM_JOBS_VIEW", "PLATFORM_JOBS_MANAGE"]);
+      return result;
+    },
+  });
+  const rescanTarget = await prisma.storedAsset.findUniqueOrThrow({ where: { id: ids.assets.quarantined } });
+  const revokedRescan = await prepareRunningJob("STORAGE_ASSET_RESCAN", {
+    assetId: rescanTarget.id,
+    expectedVersion: rescanTarget.version,
+  });
+  const revokedRescanOutcome = await runHandler(revokedRescan);
+  assert.deepEqual(revokedRescanOutcome, { errorCode: "PERMANENT_FAILURE", outcome: "FAILED", retryable: false });
+  const retainedRescan = await prisma.storedAsset.findUniqueOrThrow({ where: { id: rescanTarget.id } });
+  assert.equal(retainedRescan.state, "QUARANTINED");
+  assert.equal(retainedRescan.lastRescannedAt, null);
+  await setFixturePermissions(originalPermissions);
+  setStorageProviderForTests(provider);
+  await resetFixtureJobs();
+  checks += 3;
+
+  smokePhase = "REVOCATION_DURING_RENDITION_WRITE";
+  await prisma.mediaRendition.deleteMany({ where: { sourceAssetId: ids.assets.renditionSource } });
+  setStorageProviderForTests({
+    ...proxyProvider(provider),
+    writeObject: async (input) => {
+      const result = await provider.writeObject(input);
+      await setFixturePermissions(["STORAGE_RECORDS_VIEW", "PLATFORM_JOBS_VIEW", "PLATFORM_JOBS_MANAGE"]);
+      return result;
+    },
+  });
+  const renditionTarget = await prisma.storedAsset.findUniqueOrThrow({ where: { id: ids.assets.renditionSource } });
+  const revokedWrite = await prepareRunningJob("MEDIA_RENDITION_GENERATE", {
+    assetId: renditionTarget.id,
+    expectedVersion: renditionTarget.version,
+    profile: "AVATAR_256_WEBP",
+  });
+  const revokedWriteOutcome = await runHandler(revokedWrite);
+  smokeDiagnostic = { revokedWriteOutcome };
+  assert.deepEqual(revokedWriteOutcome, { errorCode: "PERMANENT_FAILURE", outcome: "FAILED", retryable: false });
+  const retainedWrite = await prisma.mediaRendition.findFirstOrThrow({ where: { sourceAssetId: renditionTarget.id } });
+  assert.equal(retainedWrite.state, "PROCESSING");
+  assert.equal(retainedWrite.readyAt, null);
+  assert.equal(retainedWrite.claimJobId, revokedWrite.claim.id);
+  await setFixturePermissions(originalPermissions);
+  setStorageProviderForTests(provider);
+  await prisma.mediaRendition.deleteMany({ where: { sourceAssetId: renditionTarget.id } });
+  await resetFixtureJobs();
+  checks += 4;
 
   await resetFixtureJobs();
   smokePhase = "MAINTENANCE_DISCOVERY";
@@ -370,15 +656,15 @@ async function resetFixtureJobs() {
       rescanClaimLeaseToken: null,
     },
   });
-  await prisma.mediaRendition.updateMany({
-    where: { sourceAssetId: { in: Object.values(ids.assets) } },
-    data: {
-      claimExpiresAt: null,
-      claimFencingToken: null,
-      claimJobId: null,
-      claimLeaseToken: null,
-    },
-  });
+  await prisma.$executeRaw(Prisma.sql`
+    UPDATE "MediaRendition"
+    SET "state" = CASE WHEN "state" = 'PROCESSING' THEN 'PENDING'::"MediaRenditionState" ELSE "state" END,
+        "claimExpiresAt" = NULL,
+        "claimFencingToken" = NULL,
+        "claimJobId" = NULL,
+        "claimLeaseToken" = NULL
+    WHERE "sourceAssetId" IN (${Prisma.join(Object.values(ids.assets).map((id) => Prisma.sql`${id}::uuid`))})
+  `);
   await prisma.platformJobMutation.deleteMany({ where: { actorAdminUserId: ids.adminUserId } });
   await prisma.platformJobAttempt.deleteMany({ where: { job: { createdByAdminUserId: ids.adminUserId } } });
   await prisma.platformJob.deleteMany({ where: { createdByAdminUserId: ids.adminUserId, parentJobId: { not: null } } });
@@ -416,6 +702,37 @@ async function prepareRunningJob(jobType: PlatformJobType, payload: unknown) {
   return claimExistingJob(jobId);
 }
 
+async function enqueueSmokeJob(jobType: PlatformJobType, payload: unknown) {
+  return enqueueSmokeJobForActor(ids.adminUserId, ids.adminPersonId, jobType, payload);
+}
+
+async function enqueueSmokeJobForActor(
+  userId: string,
+  personId: string,
+  jobType: PlatformJobType,
+  payload: unknown,
+) {
+  return (await runPlatformJobSerializable((transaction) => enqueuePlatformJob(transaction, {
+    availableAt: new Date("2000-01-01T00:00:00Z"),
+    createdByAdminUserId: userId,
+    createdByPersonId: personId,
+    deduplicationKey: `staging:${STORAGE_MEDIA_GATE6B_MARKER}:${jobType.toLowerCase()}:${randomUUID()}`,
+    jobType,
+    maxAttempts: 2,
+    payload,
+    payloadVersion: 1,
+    priority: 9,
+    source: "ADMIN_MANUAL",
+  }))).job;
+}
+
+async function setFixturePermissions(permissions: string[]) {
+  await prisma.adminAccess.update({
+    where: { id: ids.adminAccessId },
+    data: { permissions },
+  });
+}
+
 async function claimExistingJob(jobId: string) {
   await prisma.platformJob.updateMany({
     where: {
@@ -426,16 +743,48 @@ async function claimExistingJob(jobId: string) {
     data: { availableAt: new Date("2100-01-01T00:00:00Z") },
   });
   await prisma.platformJob.update({ where: { id: jobId }, data: { availableAt: new Date("2000-01-01T00:00:00Z") } });
-  const workerId = `staging:gate6b:${randomUUID()}`;
-  const [claim] = await claimPlatformJobs({ batchSize: 1, workerId });
+  const operation = await runPlatformJobSerializable(async (transaction) => {
+    const idempotencyKey = randomUUID();
+    const workerId = `operation:${platformJobHash(idempotencyKey)}`;
+    const leaseToken = randomUUID();
+    const mutation = await transaction.platformJobMutation.create({
+      data: {
+        action: "WORKER_BATCH",
+        actorAdminUserId: ids.adminUserId,
+        actorPersonId: ids.adminPersonId,
+        idempotencyKey,
+        operationBatchSize: 1,
+        operationFencingToken: BigInt(1),
+        operationLeaseExpiresAt: new Date(Date.now() + 5 * 60_000),
+        operationLeaseToken: leaseToken,
+        operationWorkerId: workerId,
+        requestHash: platformJobHash({ action: "WORKER_BATCH", batchSize: 1 }),
+        result: { state: "PROCESSING" },
+      },
+    });
+    const authority: PlatformJobOperationAuthority = {
+      fencingToken: BigInt(1),
+      leaseToken,
+      mutationId: mutation.id,
+      workerId,
+    };
+    const [claim] = await claimPlatformJobsInTransaction(transaction, {
+      batchSize: 1,
+      operation: authority,
+      workerId,
+    });
+    return { authority, claim };
+  });
+  const { authority, claim } = operation;
   assert.equal(claim?.id, jobId);
   await startPlatformJob({
     fencingToken: claim!.fencingToken,
     jobId: claim!.id,
     leaseToken: claim!.leaseToken,
-    workerId,
+    operation: authority,
+    workerId: authority.workerId,
   });
-  return { claim: claim!, workerId };
+  return { claim: claim!, operation: authority, workerId: authority.workerId };
 }
 
 function runHandler(job: RunningJob) {
@@ -444,6 +793,7 @@ function runHandler(job: RunningJob) {
     jobId: job.claim.id,
     jobType: job.claim.jobType,
     leaseToken: job.claim.leaseToken,
+    operation: job.operation,
     payload: job.claim.payload,
     payloadVersion: job.claim.payloadVersion,
   });
@@ -455,6 +805,7 @@ async function settleHandler(job: RunningJob, outcome: Awaited<ReturnType<typeof
       fencingToken: job.claim.fencingToken,
       jobId: job.claim.id,
       leaseToken: job.claim.leaseToken,
+      operation: job.operation,
       result: outcome.metadata,
       workerId: job.workerId,
     });
@@ -464,6 +815,7 @@ async function settleHandler(job: RunningJob, outcome: Awaited<ReturnType<typeof
     fencingToken: job.claim.fencingToken,
     jobId: job.claim.id,
     leaseToken: job.claim.leaseToken,
+    operation: job.operation,
     retryable: outcome.retryable,
     workerId: job.workerId,
   });
@@ -486,9 +838,15 @@ function proxyProvider(
 
 const keepAlive = setInterval(() => undefined, 1_000);
 main()
-  .catch(() => {
+  .catch((error: unknown) => {
     process.exitCode = 1;
-    console.error(`Gate 6B staging smoke failed closed at ${smokePhase}: ${JSON.stringify(smokeDiagnostic)}.`);
+    const safeError = error && typeof error === "object"
+      ? {
+          code: "code" in error && typeof error.code === "string" ? error.code : null,
+          name: "name" in error && typeof error.name === "string" ? error.name : "Error",
+        }
+      : { code: null, name: "Error" };
+    console.error(`Gate 6B staging smoke failed closed at ${smokePhase}: ${JSON.stringify({ diagnostic: smokeDiagnostic, error: safeError })}.`);
   })
   .finally(async () => {
     setStorageMalwareScannerForTests(undefined);

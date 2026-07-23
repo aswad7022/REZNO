@@ -5,6 +5,12 @@ import { Socket } from "node:net";
 import test from "node:test";
 
 import { readBoundedPlatformJobJson, parsePlatformJobListQuery, parsePlatformJobTrigger } from "../../../features/platform-jobs/api/validation";
+import {
+  authorizedPlatformJobTypes,
+  authorizedPlatformScheduleKeys,
+  requiredPlatformJobPermissions,
+  requiredPlatformSchedulePermissions,
+} from "../../../features/platform-jobs/domain/authority";
 import { platformJobCanonicalJson, platformJobHash, serializedUtf8Bytes } from "../../../features/platform-jobs/domain/canonical";
 import { PLATFORM_JOB_ALLOWED_TYPES, PLATFORM_JOB_LIMITS, STAGE_6_ARCHITECTURE } from "../../../features/platform-jobs/domain/contracts";
 import { decodePlatformJobCursor, encodePlatformJobCursor, platformJobCursorBinding } from "../../../features/platform-jobs/domain/cursor";
@@ -25,6 +31,7 @@ import {
   type Gate6aTransportEvidence,
 } from "../../../lib/db/postgres-transport";
 import { assertPlatformJobsGate6aStaging, PLATFORM_JOBS_GATE6A_CONFIRMATION } from "../../../scripts/staging/platform-jobs-gate6a-safety";
+import { STORAGE_MEDIA_GATE6B_CONFIRMATION } from "../../../scripts/staging/storage-media-gate6b-safety";
 
 const secret = "gate6a-cursor-secret-with-sufficient-entropy-2026-07-21";
 const ts = (microseconds: string) => `2026-07-21T12:00:00.${microseconds}Z`;
@@ -71,6 +78,28 @@ test("Gate 6B extends the accepted Gate 6A registry with only the closed storage
   assert.equal(PLATFORM_JOB_LIMITS.maxAttempts, 10);
   assert.equal(PLATFORM_JOB_LIMITS.maxScheduleCatchup, 10);
   assert.equal(PLATFORM_JOB_LIMITS.maxRequeues, 3);
+});
+
+test("execution authority registries keep health platform-only and require joint Gate 6B management", () => {
+  assert.deepEqual(requiredPlatformJobPermissions("PLATFORM_HEALTH_PROBE"), ["PLATFORM_JOBS_MANAGE"]);
+  assert.deepEqual(requiredPlatformJobPermissions("MEDIA_RENDITION_GENERATE"), [
+    "PLATFORM_JOBS_MANAGE",
+    "STORAGE_RECORDS_MANAGE",
+  ]);
+  assert.deepEqual(requiredPlatformSchedulePermissions("STORAGE_RESCAN_DISCOVERY"), [
+    "PLATFORM_JOBS_MANAGE",
+    "STORAGE_RECORDS_MANAGE",
+  ]);
+  assert.deepEqual(authorizedPlatformJobTypes(["PLATFORM_JOBS_MANAGE"]), ["PLATFORM_HEALTH_PROBE"]);
+  assert.deepEqual(authorizedPlatformScheduleKeys(["PLATFORM_JOBS_MANAGE"]), ["PLATFORM_HEALTH_PROBE"]);
+  assert.equal(authorizedPlatformJobTypes([
+    "PLATFORM_JOBS_MANAGE",
+    "STORAGE_RECORDS_MANAGE",
+  ]).length, 10);
+  assert.equal(authorizedPlatformScheduleKeys([
+    "PLATFORM_JOBS_MANAGE",
+    "STORAGE_RECORDS_MANAGE",
+  ]).length, 5);
 });
 
 test("canonical JSON and hashes ignore object key order but preserve changed values", () => {
@@ -196,7 +225,7 @@ test("health handler succeeds with bounded metadata and converts raw exceptions 
   setPlatformJobHandlerForTests("PLATFORM_HEALTH_PROBE");
 });
 
-test("production-only guards and additive migrations 43-45 are explicit in source", async () => {
+test("production-only guards and additive migrations 43-46 are explicit in source", async () => {
   const [cursorSource, handlerSource, workerSource, migrations] = await Promise.all([
     readFile(new URL("../../../features/platform-jobs/domain/cursor-signing.ts", import.meta.url), "utf8"),
     readFile(new URL("../../../features/platform-jobs/services/handlers.ts", import.meta.url), "utf8"),
@@ -207,10 +236,11 @@ test("production-only guards and additive migrations 43-45 are explicit in sourc
   assert.match(handlerSource, /NODE_ENV === "production"/);
   assert.match(workerSource, /NODE_ENV === "production"/);
   const names = migrations.filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort();
-  assert.equal(names.length, 45);
-  assert.equal(names.at(-3), "20260721160000_platform_jobs_foundation");
-  assert.equal(names.at(-2), "20260722090000_platform_worker_operation_recovery");
-  assert.equal(names.at(-1), "20260722150000_storage_media_automation");
+  assert.equal(names.length, 46);
+  assert.equal(names.at(-4), "20260721160000_platform_jobs_foundation");
+  assert.equal(names.at(-3), "20260722090000_platform_worker_operation_recovery");
+  assert.equal(names.at(-2), "20260722150000_storage_media_automation");
+  assert.equal(names.at(-1), "20260723120000_media_rendition_claim_integrity");
 });
 
 test("production runtime refuses cursor-secret and handler test overrides", () => {
@@ -262,6 +292,36 @@ test("Gate 6A staging safety accepts only exact direct Neon verification or exac
     transport: "LOCAL_TEST_TCP",
     transportConfigurationSha256: null,
   });
+  const successorEnvironment = {
+    ...direct,
+    REZNO_STAGE6_GATE6B_CONFIRM: STORAGE_MEDIA_GATE6B_CONFIRMATION,
+  };
+  const successorEvidence = {
+    ...validTransportEvidence(successorEnvironment),
+    migrationApplied: 46,
+    migrationTotal: 46,
+  };
+  assert.deepEqual(
+    await assertPlatformJobsGate6aStaging(
+      safetyClient(undefined, { applied: BigInt(46), total: BigInt(46) }),
+      successorEnvironment,
+      successorEvidence,
+    ),
+    {
+      backendPgStatSsl: true,
+      clientTlsVerified: true,
+      database: "rezno_staging",
+      encrypted: true,
+      hostnameVerified: true,
+      migrations: "46/46",
+      prismaUsedAttestedPhysicalClient: true,
+      role: "neondb_owner",
+      rolledBack: 0,
+      tlsProtocol: "TLSv1.3",
+      transport: "TCP_POSTGRESQL_TLS",
+      transportConfigurationSha256: successorEvidence.transportConfigurationSha256,
+    },
+  );
 });
 
 test("Gate 6A accepts valid client TLS proof whether backend pg_stat_ssl is true or false", async () => {

@@ -13,15 +13,19 @@ import sharp from "sharp";
 import { attachMedia, detachMedia } from "../../../features/media/services/media-lifecycle";
 import { createPublicMediaDownloadTarget } from "../../../features/media/services/delivery";
 import { executePlatformJobHandler } from "../../../features/platform-jobs/services/handlers";
+import { platformJobHash } from "../../../features/platform-jobs/domain/canonical";
+import { PlatformJobDomainError } from "../../../features/platform-jobs/domain/errors";
 import {
-  claimPlatformJobs,
+  claimPlatformJobsInTransaction,
   completePlatformJob,
+  enqueueDomainDiscoveryPlatformJob,
   enqueuePlatformJob,
   failPlatformJob,
   startPlatformJob,
   type ClaimedPlatformJob,
 } from "../../../features/platform-jobs/services/jobs";
 import type { PlatformJobAdminContext } from "../../../features/platform-jobs/services/admin-context";
+import type { PlatformJobOperationAuthority } from "../../../features/platform-jobs/services/operation-lease";
 import { runPlatformJobSerializable } from "../../../features/platform-jobs/services/transaction";
 import {
   generateMediaRenditionObjectKey,
@@ -50,7 +54,11 @@ import {
   resetStorageTestDatabase,
 } from "../helpers/storage-fixture";
 
-type RunningJob = { claim: ClaimedPlatformJob; workerId: string };
+type RunningJob = {
+  claim: ClaimedPlatformJob;
+  operation: PlatformJobOperationAuthority;
+  workerId: string;
+};
 
 test("Gate 6B storage and media automation is durable, fenced, and exact", { concurrency: false }, async (t) => {
   await resetStorageTestDatabase();
@@ -62,7 +70,7 @@ test("Gate 6B storage and media automation is durable, fenced, and exact", { con
     await prisma.$disconnect();
   });
 
-  await t.test("Migration 45 is healthy, schema-only, indexed, and constrained", async () => {
+  await t.test("Migrations 45-46 are healthy, schema-only, indexed, and constrained", async () => {
     const [migration] = await prisma.$queryRaw<Array<{
       applied: bigint;
       failed: bigint;
@@ -76,7 +84,7 @@ test("Gate 6B storage and media automation is durable, fenced, and exact", { con
       FROM "_prisma_migrations"
     `);
     assert.deepEqual(migration, {
-      applied: BigInt(45), failed: BigInt(0), rolledBack: BigInt(0), total: BigInt(45),
+      applied: BigInt(46), failed: BigInt(0), rolledBack: BigInt(0), total: BigInt(46),
     });
     assert.equal(await prisma.platformJob.count(), 0);
     assert.equal(await prisma.platformJobSchedule.count(), 0);
@@ -136,11 +144,133 @@ test("Gate 6B storage and media automation is durable, fenced, and exact", { con
     source: "database",
     userId: fixture.actors.admin.userId,
   };
+  await prisma.adminAccess.update({
+    where: { id: fixture.viewAdminAccess.id },
+    data: {
+      permissions: [
+        "STORAGE_RECORDS_VIEW",
+        "STORAGE_RECORDS_MANAGE",
+        "PLATFORM_JOBS_VIEW",
+        "PLATFORM_JOBS_MANAGE",
+      ],
+    },
+  });
+  const secondContext: PlatformJobAdminContext = {
+    adminAccessId: fixture.viewAdminAccess.id,
+    personId: fixture.actors.viewAdmin.personId,
+    source: "database",
+    userId: fixture.actors.viewAdmin.userId,
+  };
   const provider = new DeterministicStorageProvider();
   setStorageProviderForTests(provider);
   const sourceBytes = await sharp({
     create: { background: "#2457a6", channels: 3, height: 500, width: 1_000 },
   }).png().toBuffer();
+  const setExecutionStoragePermission = (enabled: boolean) => prisma.adminAccess.update({
+    where: { id: fixture.adminAccess.id },
+    data: {
+      permissions: enabled
+        ? [
+            "STORAGE_RECORDS_VIEW",
+            "STORAGE_RECORDS_MANAGE",
+            "PLATFORM_JOBS_VIEW",
+            "PLATFORM_JOBS_MANAGE",
+          ]
+        : ["STORAGE_RECORDS_VIEW", "PLATFORM_JOBS_VIEW", "PLATFORM_JOBS_MANAGE"],
+    },
+  });
+
+  await t.test("Migration 46 enforces the exact rendition claim-state matrix", async () => {
+    await resetAutomationRows();
+    const assets = await Promise.all(Array.from({ length: 5 }, () =>
+      createAsset(fixture.actors.customer, "CUSTOMER_AVATAR", sourceBytes, provider, "READY")));
+    const [running] = await prepareRunningJobs(context, [{
+      jobType: "MEDIA_RENDITION_GENERATE",
+      payload: { assetId: assets[0]!.id, expectedVersion: assets[0]!.version, profile: "AVATAR_256_WEBP" },
+    }]);
+    const claim = running.claim;
+    const pending = await createPendingRendition(assets[0]!, "AVATAR_256_WEBP", provider);
+    await assert.rejects(prisma.$executeRaw(Prisma.sql`
+      UPDATE "MediaRendition" SET "state" = 'PROCESSING' WHERE "id" = ${pending.id}::uuid
+    `), /MediaRendition_claim_check/u);
+    await assert.rejects(prisma.$executeRaw(Prisma.sql`
+      UPDATE "MediaRendition"
+      SET "state" = 'PROCESSING', "claimJobId" = ${claim.id}::uuid
+      WHERE "id" = ${pending.id}::uuid
+    `), /MediaRendition_claim_check/u);
+    await assert.rejects(prisma.$executeRaw(Prisma.sql`
+      UPDATE "MediaRendition"
+      SET "state" = 'PROCESSING', "claimJobId" = ${claim.id}::uuid,
+          "claimLeaseToken" = ${claim.leaseToken}::uuid, "claimFencingToken" = 0,
+          "claimExpiresAt" = ${claim.leaseExpiresAt}
+      WHERE "id" = ${pending.id}::uuid
+    `), /MediaRendition_claim_check/u);
+    await assert.rejects(prisma.$executeRaw(Prisma.sql`
+      UPDATE "MediaRendition"
+      SET "state" = 'PROCESSING', "claimJobId" = ${claim.id}::uuid,
+          "claimLeaseToken" = ${claim.leaseToken}::uuid,
+          "claimFencingToken" = ${claim.fencingToken}, "claimExpiresAt" = NULL
+      WHERE "id" = ${pending.id}::uuid
+    `), /MediaRendition_claim_check/u);
+    await prisma.$executeRaw(Prisma.sql`
+      UPDATE "MediaRendition"
+      SET "state" = 'PROCESSING', "claimJobId" = ${claim.id}::uuid,
+          "claimLeaseToken" = ${claim.leaseToken}::uuid,
+          "claimFencingToken" = ${claim.fencingToken}, "claimExpiresAt" = ${claim.leaseExpiresAt}
+      WHERE "id" = ${pending.id}::uuid
+    `);
+    await prisma.$executeRaw(Prisma.sql`
+      UPDATE "MediaRendition"
+      SET "state" = 'PENDING', "claimJobId" = NULL, "claimLeaseToken" = NULL,
+          "claimFencingToken" = NULL, "claimExpiresAt" = NULL
+      WHERE "id" = ${pending.id}::uuid
+    `);
+
+    const ready = await createReadyRendition(assets[1]!, "AVATAR_256_WEBP", provider, sourceBytes);
+    const failed = await createPendingRendition(assets[2]!, "AVATAR_256_WEBP", provider);
+    await prisma.mediaRendition.update({
+      where: { id: failed.id },
+      data: { failureCode: "SAFE_FAILURE", state: "FAILED" },
+    });
+    const superseded = await createReadyRendition(assets[3]!, "AVATAR_256_WEBP", provider, sourceBytes);
+    await prisma.mediaRendition.update({ where: { id: superseded.id }, data: { state: "SUPERSEDED" } });
+    const deleted = await createPendingRendition(assets[4]!, "AVATAR_256_WEBP", provider);
+    const deleteRequestedAt = new Date();
+    await prisma.mediaRendition.update({
+      where: { id: deleted.id },
+      data: { deleteRequestedAt, deletedAt: deleteRequestedAt, state: "DELETED" },
+    });
+    for (const id of [pending.id, ready.id, failed.id, superseded.id, deleted.id]) {
+      await assert.rejects(prisma.$executeRaw(Prisma.sql`
+        UPDATE "MediaRendition"
+        SET "claimJobId" = ${claim.id}::uuid, "claimLeaseToken" = ${claim.leaseToken}::uuid,
+            "claimFencingToken" = ${claim.fencingToken}, "claimExpiresAt" = ${claim.leaseExpiresAt}
+        WHERE "id" = ${id}::uuid
+      `), /MediaRendition_claim_check/u);
+    }
+
+    const idleDelete = await createPendingRendition(assets[0]!, "CARD_640_WEBP", provider);
+    await prisma.mediaRendition.update({
+      where: { id: idleDelete.id },
+      data: { deleteRequestedAt, state: "DELETE_PENDING" },
+    });
+    await assert.rejects(prisma.$executeRaw(Prisma.sql`
+      UPDATE "MediaRendition" SET "claimJobId" = ${claim.id}::uuid WHERE "id" = ${idleDelete.id}::uuid
+    `), /MediaRendition_claim_check/u);
+    await prisma.$executeRaw(Prisma.sql`
+      UPDATE "MediaRendition"
+      SET "claimJobId" = ${claim.id}::uuid, "claimLeaseToken" = ${claim.leaseToken}::uuid,
+          "claimFencingToken" = ${claim.fencingToken}, "claimExpiresAt" = ${claim.leaseExpiresAt}
+      WHERE "id" = ${idleDelete.id}::uuid
+    `);
+    await prisma.$executeRaw(Prisma.sql`
+      UPDATE "MediaRendition"
+      SET "claimJobId" = NULL, "claimLeaseToken" = NULL,
+          "claimFencingToken" = NULL, "claimExpiresAt" = NULL
+      WHERE "id" = ${idleDelete.id}::uuid
+    `);
+    assert.equal((await prisma.mediaRendition.findUniqueOrThrow({ where: { id: idleDelete.id } })).state, "DELETE_PENDING");
+  });
 
   await t.test("Admin status and discovery are permission-revalidated and idempotent without auto-activation", async () => {
     await resetAutomationRows();
@@ -200,6 +330,156 @@ test("Gate 6B storage and media automation is durable, fenced, and exact", { con
     assert.equal(children.every((job) => job.source === "DOMAIN_DISCOVERY" && Boolean(job.parentJobId)), true);
   });
 
+  await t.test("canonical domain children dedupe atomically across Admin actors and retain first provenance", async () => {
+    await resetAutomationRows();
+    const availableAt = new Date("2026-07-22T12:00:00.123Z");
+    const [firstParent, secondParent] = await Promise.all([
+      createDiscoveryParent(context, "first-parent"),
+      createDiscoveryParent(secondContext, "second-parent"),
+    ]);
+    const cases: Array<{
+      jobType: Exclude<PlatformJobType, "PLATFORM_HEALTH_PROBE">;
+      key: string;
+      payload: Record<string, unknown>;
+    }> = [
+      {
+        jobType: "STORAGE_ORPHAN_CLEANUP",
+        key: `gate6b:orphan:${randomUUID()}:v1`,
+        payload: { expectedVersion: 1, uploadSessionId: randomUUID() },
+      },
+      {
+        jobType: "STORAGE_ASSET_DELETE_RETRY",
+        key: `gate6b:asset-delete:${randomUUID()}:v1`,
+        payload: { assetId: randomUUID(), expectedVersion: 1 },
+      },
+      {
+        jobType: "STORAGE_ASSET_RESCAN",
+        key: `gate6b:rescan:${randomUUID()}:v1`,
+        payload: { assetId: randomUUID(), expectedVersion: 1 },
+      },
+      {
+        jobType: "MEDIA_RENDITION_GENERATE",
+        key: `gate6b:rendition:${randomUUID()}:v1:CARD_640_WEBP`,
+        payload: { assetId: randomUUID(), expectedVersion: 1, profile: "CARD_640_WEBP" },
+      },
+    ];
+    for (const item of cases) {
+      const create = (
+        actor: PlatformJobAdminContext,
+        parentJobId: string,
+      ) => runPlatformJobSerializable((transaction) => enqueueDomainDiscoveryPlatformJob(transaction, {
+        availableAt,
+        createdByAdminUserId: actor.userId,
+        createdByPersonId: actor.personId,
+        deduplicationKey: item.key,
+        jobType: item.jobType,
+        parentJobId,
+        payload: item.payload,
+        payloadVersion: 1,
+      }));
+      const [left, right] = await Promise.all([
+        create(context, firstParent.id),
+        create(secondContext, secondParent.id),
+      ]);
+      assert.equal(Number(left.replay) + Number(right.replay), 1);
+      assert.equal(left.job.id, right.job.id);
+      const winner = left.replay
+        ? { actor: secondContext, parentJobId: secondParent.id }
+        : { actor: context, parentJobId: firstParent.id };
+      const stored = await prisma.platformJob.findUniqueOrThrow({ where: { id: left.job.id } });
+      assert.equal(stored.createdByAdminUserId, winner.actor.userId);
+      assert.equal(stored.createdByPersonId, winner.actor.personId);
+      assert.equal(stored.parentJobId, winner.parentJobId);
+      assert.equal(stored.payloadHash, platformJobHash(item.payload));
+      assert.equal(await prisma.platformJob.count({ where: { deduplicationKey: item.key } }), 1);
+    }
+
+    const original = cases[0]!;
+    const exactReplay = await runPlatformJobSerializable((transaction) => enqueueDomainDiscoveryPlatformJob(transaction, {
+      availableAt,
+      createdByAdminUserId: secondContext.userId,
+      createdByPersonId: secondContext.personId,
+      deduplicationKey: original.key,
+      jobType: original.jobType,
+      parentJobId: secondParent.id,
+      payload: original.payload,
+      payloadVersion: 1,
+    }));
+    assert.equal(exactReplay.replay, true);
+    for (const changed of [
+      { jobType: original.jobType, payload: { ...original.payload, expectedVersion: 2 } },
+      { jobType: "STORAGE_ASSET_DELETE_RETRY" as const, payload: { assetId: randomUUID(), expectedVersion: 1 } },
+    ]) {
+      await assert.rejects(runPlatformJobSerializable((transaction) => enqueueDomainDiscoveryPlatformJob(transaction, {
+        availableAt,
+        createdByAdminUserId: secondContext.userId,
+        createdByPersonId: secondContext.personId,
+        deduplicationKey: original.key,
+        jobType: changed.jobType,
+        parentJobId: secondParent.id,
+        payload: changed.payload,
+        payloadVersion: 1,
+      })), platformCode("IDEMPOTENCY_CONFLICT"));
+    }
+
+    const manualKey = `gate6b:manual-actor-bound:${randomUUID()}`;
+    const manualPayload = { assetId: randomUUID(), expectedVersion: 1 };
+    await runPlatformJobSerializable((transaction) => enqueuePlatformJob(transaction, {
+      availableAt,
+      createdByAdminUserId: context.userId,
+      createdByPersonId: context.personId,
+      deduplicationKey: manualKey,
+      jobType: "STORAGE_ASSET_RESCAN",
+      payload: manualPayload,
+      payloadVersion: 1,
+      source: "ADMIN_MANUAL",
+    }));
+    await assert.rejects(runPlatformJobSerializable((transaction) => enqueuePlatformJob(transaction, {
+      availableAt,
+      createdByAdminUserId: secondContext.userId,
+      createdByPersonId: secondContext.personId,
+      deduplicationKey: manualKey,
+      jobType: "STORAGE_ASSET_RESCAN",
+      payload: manualPayload,
+      payloadVersion: 1,
+      source: "ADMIN_MANUAL",
+    })), platformCode("IDEMPOTENCY_CONFLICT"));
+  });
+
+  await t.test("domain idempotency conflicts are permanent and never become HANDLER_EXCEPTION retries", async () => {
+    await resetAutomationRows();
+    const orphan = await createExpiredOrphan(fixture.actors.customer, provider, sourceBytes, -1_000);
+    const [discovery] = await prepareRunningJobs(context, [{
+      jobType: "STORAGE_MAINTENANCE_DISCOVERY",
+      payload: { batchSize: 10 },
+    }]);
+    const rawErrors: unknown[] = [];
+    setStorageAutomationErrorTestHook((error) => rawErrors.push(error));
+    await runPlatformJobSerializable((transaction) => enqueueDomainDiscoveryPlatformJob(transaction, {
+      availableAt: new Date(orphan.expiresAt.getTime() + STORAGE_ORPHAN_RETENTION_MS),
+      createdByAdminUserId: context.userId,
+      createdByPersonId: context.personId,
+      deduplicationKey: `gate6b:orphan:${orphan.id}:v${orphan.version}`,
+      jobType: "STORAGE_ORPHAN_CLEANUP",
+      parentJobId: discovery.claim.id,
+      payload: { expectedVersion: orphan.version + 1, uploadSessionId: orphan.id },
+      payloadVersion: 1,
+    }));
+    const outcome = await runHandler(discovery);
+    assert.deepEqual(outcome, { errorCode: "PERMANENT_FAILURE", outcome: "FAILED", retryable: false });
+    assert.equal(rawErrors.length, 1);
+    assert.equal(rawErrors[0] instanceof PlatformJobDomainError, true);
+    await settleHandler(discovery, outcome);
+    const stored = await prisma.platformJob.findUniqueOrThrow({ where: { id: discovery.claim.id } });
+    assert.equal(stored.status, "FAILED");
+    assert.equal(stored.lastErrorCode, "PERMANENT_FAILURE");
+    assert.equal(stored.attemptCount, 1);
+    assert.equal(await prisma.platformJobAttempt.count({
+      where: { errorCode: "HANDLER_EXCEPTION", jobId: discovery.claim.id },
+    }), 0);
+    setStorageAutomationErrorTestHook(undefined);
+  });
+
   await t.test("an exact orphan claim has one provider winner and NOT_FOUND is terminal success", async () => {
     await resetAutomationRows();
     const orphan = await createExpiredOrphan(fixture.actors.customer, provider, sourceBytes, -1_000);
@@ -253,7 +533,7 @@ test("Gate 6B storage and media automation is durable, fenced, and exact", { con
     assert.equal(provider.hasObject(asset.objectKey), true);
     assert.equal(stored.providerCleanupClaimId, null);
     await prisma.platformJob.update({ where: { id: running.claim.id }, data: { availableAt: new Date(Date.now() - 1_000) } });
-    [running] = await claimAndStart(1);
+    [running] = await claimAndStart(1, context);
     const second = await runHandler(running);
     assert.equal(second.outcome, "SUCCEEDED");
     await settleHandler(running, second);
@@ -323,7 +603,7 @@ test("Gate 6B storage and media automation is durable, fenced, and exact", { con
       idempotencyKey: randomUUID(),
     });
     assert.equal(requested.replay, false);
-    const [running] = await claimAndStart(1);
+    const [running] = await claimAndStart(1, context);
     const outcomes = await Promise.all([runHandler(running), runHandler(running)]);
     assert.equal(
       outcomes.filter((outcome) => outcome.outcome === "SUCCEEDED").length >= 1,
@@ -375,6 +655,329 @@ test("Gate 6B storage and media automation is durable, fenced, and exact", { con
     setStorageProviderForTests(provider);
   });
 
+  await t.test("revocation during provider HEAD or read prevents rescan outcome and binding detach", async () => {
+    for (const phase of ["HEAD", "READ"] as const) {
+      await resetAutomationRows();
+      await setExecutionStoragePermission(true);
+      setStorageProviderForTests(provider);
+      const asset = await createAsset(fixture.actors.customer, "CUSTOMER_AVATAR", sourceBytes, provider, "READY");
+      const container = await attachMedia(fixture.actors.customer, {
+        assetId: asset.id,
+        expectedVersion: 0,
+        idempotencyKey: randomUUID(),
+        slot: "CUSTOMER_AVATAR",
+        target: { kind: "CUSTOMER_PROFILE" },
+      });
+      const binding = container.bindings.find((item) => item.media?.assetId === asset.id)!;
+      setStorageMalwareScannerForTests({ inspect: async () => "MALWARE_DETECTED" });
+      let revoked = false;
+      setStorageProviderForTests(wrapProvider(provider, {
+        getObjectForInspection: async (input) => {
+          const result = await provider.getObjectForInspection(input);
+          if (phase === "READ" && !revoked) {
+            revoked = true;
+            await setExecutionStoragePermission(false);
+          }
+          return result;
+        },
+        headObject: async (input) => {
+          const result = await provider.headObject(input);
+          if (phase === "HEAD" && !revoked) {
+            revoked = true;
+            await setExecutionStoragePermission(false);
+          }
+          return result;
+        },
+      }));
+      const [running] = await prepareRunningJobs(context, [{
+        jobType: "STORAGE_ASSET_RESCAN",
+        payload: { assetId: asset.id, expectedVersion: asset.version },
+      }]);
+      const outcome = await runHandler(running);
+      assert.deepEqual(outcome, { errorCode: "PERMANENT_FAILURE", outcome: "FAILED", retryable: false });
+      const [stored, storedBinding] = await Promise.all([
+        prisma.storedAsset.findUniqueOrThrow({ where: { id: asset.id } }),
+        prisma.mediaBinding.findUniqueOrThrow({ where: { id: binding.id } }),
+      ]);
+      assert.equal(stored.state, "READY");
+      assert.equal(stored.lastRescannedAt, null);
+      assert.equal(stored.rescanClaimJobId, running.claim.id);
+      assert.equal(stored.rescanClaimLeaseToken, running.claim.leaseToken);
+      assert.equal(storedBinding.state, "ACTIVE");
+      await setExecutionStoragePermission(true);
+      setStorageMalwareScannerForTests(undefined);
+      setStorageProviderForTests(provider);
+    }
+  });
+
+  await t.test("revocation during rendition write prevents publication and leaves a complete expiring claim", async () => {
+    await resetAutomationRows();
+    await setExecutionStoragePermission(true);
+    setStorageProviderForTests(provider);
+    const asset = await createAsset(fixture.actors.owner, "BUSINESS_COVER", sourceBytes, provider, "READY");
+    await attachMedia(fixture.actors.owner, {
+      assetId: asset.id,
+      expectedVersion: 0,
+      idempotencyKey: randomUUID(),
+      slot: "BUSINESS_COVER",
+      target: { kind: "BUSINESS_PROFILE" },
+    });
+    let revoked = false;
+    setStorageProviderForTests(wrapProvider(provider, {
+      writeObject: async (input) => {
+        const result = await provider.writeObject(input);
+        if (!revoked) {
+          revoked = true;
+          await setExecutionStoragePermission(false);
+        }
+        return result;
+      },
+    }));
+    const [running] = await prepareRunningJobs(context, [{
+      jobType: "MEDIA_RENDITION_GENERATE",
+      payload: { assetId: asset.id, expectedVersion: asset.version, profile: "HERO_1600_WEBP" },
+    }]);
+    const outcome = await runHandler(running);
+    assert.deepEqual(outcome, { errorCode: "PERMANENT_FAILURE", outcome: "FAILED", retryable: false });
+    const rendition = await prisma.mediaRendition.findFirstOrThrow({ where: { sourceAssetId: asset.id } });
+    assert.equal(rendition.state, "PROCESSING");
+    assert.equal(rendition.claimJobId, running.claim.id);
+    assert.equal(rendition.claimLeaseToken, running.claim.leaseToken);
+    assert.equal(rendition.claimFencingToken, running.claim.fencingToken);
+    assert.equal(rendition.claimExpiresAt instanceof Date, true);
+    assert.equal(rendition.readyAt, null);
+    assert.equal(provider.hasObject(rendition.objectKey), true);
+    await setExecutionStoragePermission(true);
+    setStorageProviderForTests(provider);
+  });
+
+  await t.test("rendition claims recover only after expiry and stale fencing cannot publish", async () => {
+    await resetAutomationRows();
+    await setExecutionStoragePermission(true);
+    setStorageProviderForTests(provider);
+    const recoverableAsset = await createAsset(fixture.actors.owner, "BUSINESS_COVER", sourceBytes, provider, "READY");
+    await attachMedia(fixture.actors.owner, {
+      assetId: recoverableAsset.id,
+      expectedVersion: 0,
+      idempotencyKey: randomUUID(),
+      slot: "BUSINESS_COVER",
+      target: { kind: "BUSINESS_PROFILE" },
+    });
+    const [expiredOwner] = await prepareRunningJobs(context, [{
+      jobType: "MEDIA_RENDITION_GENERATE",
+      payload: { assetId: recoverableAsset.id, expectedVersion: recoverableAsset.version, profile: "HERO_1600_WEBP" },
+    }]);
+    const expired = await createPendingRendition(recoverableAsset, "HERO_1600_WEBP", provider);
+    await prisma.mediaRendition.update({
+      where: { id: expired.id },
+      data: {
+        claimExpiresAt: new Date("2000-01-01T00:00:00.000Z"),
+        claimFencingToken: expiredOwner.claim.fencingToken,
+        claimJobId: expiredOwner.claim.id,
+        claimLeaseToken: expiredOwner.claim.leaseToken,
+        state: "PROCESSING",
+      },
+    });
+    const [recovery] = await prepareRunningJobs(context, [{
+      jobType: "MEDIA_RENDITION_GENERATE",
+      payload: { assetId: recoverableAsset.id, expectedVersion: recoverableAsset.version, profile: "HERO_1600_WEBP" },
+    }]);
+    assert.equal((await runHandler(recovery)).outcome, "SUCCEEDED");
+    const recovered = await prisma.mediaRendition.findUniqueOrThrow({ where: { id: expired.id } });
+    assert.equal(recovered.state, "READY");
+    assert.equal(recovered.claimJobId, null);
+    assert.equal(recovered.claimLeaseToken, null);
+
+    await resetAutomationRows();
+    setStorageProviderForTests(provider);
+    const busyAsset = await createAsset(fixture.actors.owner, "BUSINESS_COVER", sourceBytes, provider, "READY");
+    await attachMedia(fixture.actors.owner, {
+      assetId: busyAsset.id,
+      expectedVersion: 0,
+      idempotencyKey: randomUUID(),
+      slot: "BUSINESS_COVER",
+      target: { kind: "BUSINESS_PROFILE" },
+    });
+    const [busyOwner] = await prepareRunningJobs(context, [{
+      jobType: "MEDIA_RENDITION_GENERATE",
+      payload: { assetId: busyAsset.id, expectedVersion: busyAsset.version, profile: "HERO_1600_WEBP" },
+    }]);
+    const busy = await createPendingRendition(busyAsset, "HERO_1600_WEBP", provider);
+    await prisma.mediaRendition.update({
+      where: { id: busy.id },
+      data: {
+        claimExpiresAt: new Date(Date.now() + 60_000),
+        claimFencingToken: busyOwner.claim.fencingToken,
+        claimJobId: busyOwner.claim.id,
+        claimLeaseToken: busyOwner.claim.leaseToken,
+        state: "PROCESSING",
+      },
+    });
+    const [contender] = await prepareRunningJobs(context, [{
+      jobType: "MEDIA_RENDITION_GENERATE",
+      payload: { assetId: busyAsset.id, expectedVersion: busyAsset.version, profile: "HERO_1600_WEBP" },
+    }]);
+    assert.deepEqual(await runHandler(contender), {
+      errorCode: "TRANSIENT_FAILURE",
+      outcome: "FAILED",
+      retryable: true,
+    });
+    assert.deepEqual(
+      await prisma.mediaRendition.findUniqueOrThrow({
+        where: { id: busy.id },
+        select: { claimFencingToken: true, claimJobId: true, claimLeaseToken: true, state: true },
+      }),
+      {
+        claimFencingToken: busyOwner.claim.fencingToken,
+        claimJobId: busyOwner.claim.id,
+        claimLeaseToken: busyOwner.claim.leaseToken,
+        state: "PROCESSING",
+      },
+    );
+
+    await resetAutomationRows();
+    setStorageProviderForTests(provider);
+    const fencedAsset = await createAsset(fixture.actors.owner, "BUSINESS_COVER", sourceBytes, provider, "READY");
+    await attachMedia(fixture.actors.owner, {
+      assetId: fencedAsset.id,
+      expectedVersion: 0,
+      idempotencyKey: randomUUID(),
+      slot: "BUSINESS_COVER",
+      target: { kind: "BUSINESS_PROFILE" },
+    });
+    const entered = deferred<void>();
+    const gate = deferred<void>();
+    setStorageProviderForTests(wrapProvider(provider, {
+      writeObject: async (input) => {
+        entered.resolve();
+        await gate.promise;
+        return provider.writeObject(input);
+      },
+    }));
+    const [fencedJob] = await prepareRunningJobs(context, [{
+      jobType: "MEDIA_RENDITION_GENERATE",
+      payload: { assetId: fencedAsset.id, expectedVersion: fencedAsset.version, profile: "HERO_1600_WEBP" },
+    }]);
+    const pending = runHandler(fencedJob);
+    await entered.promise;
+    const claimed = await prisma.mediaRendition.findFirstOrThrow({ where: { sourceAssetId: fencedAsset.id } });
+    assert.equal(claimed.state, "PROCESSING");
+    assert.equal(claimed.claimJobId, fencedJob.claim.id);
+    assert.equal(claimed.claimLeaseToken, fencedJob.claim.leaseToken);
+    assert.equal(claimed.claimFencingToken, fencedJob.claim.fencingToken);
+    assert.equal(claimed.claimExpiresAt instanceof Date, true);
+    await prisma.mediaRendition.update({
+      where: { id: claimed.id },
+      data: { claimFencingToken: { increment: BigInt(1) } },
+    });
+    gate.resolve();
+    assert.deepEqual(await pending, { errorCode: "PERMANENT_FAILURE", outcome: "FAILED", retryable: false });
+    const fenced = await prisma.mediaRendition.findUniqueOrThrow({ where: { id: claimed.id } });
+    assert.equal(fenced.state, "PROCESSING");
+    assert.equal(fenced.readyAt, null);
+    assert.equal(fenced.claimFencingToken, fencedJob.claim.fencingToken + BigInt(1));
+
+    await resetAutomationRows();
+    setStorageProviderForTests(provider);
+    const retryAsset = await createAsset(fixture.actors.owner, "BUSINESS_COVER", sourceBytes, provider, "READY");
+    await attachMedia(fixture.actors.owner, {
+      assetId: retryAsset.id,
+      expectedVersion: 0,
+      idempotencyKey: randomUUID(),
+      slot: "BUSINESS_COVER",
+      target: { kind: "BUSINESS_PROFILE" },
+    });
+    setStorageProviderForTests(wrapProvider(provider, {
+      writeObject: async () => ({ outcome: "TRANSIENT_FAILURE" }),
+    }));
+    const [retryJob] = await prepareRunningJobs(context, [{
+      jobType: "MEDIA_RENDITION_GENERATE",
+      payload: { assetId: retryAsset.id, expectedVersion: retryAsset.version, profile: "HERO_1600_WEBP" },
+    }]);
+    assert.deepEqual(await runHandler(retryJob), {
+      errorCode: "TRANSIENT_FAILURE",
+      outcome: "FAILED",
+      retryable: true,
+    });
+    const retryable = await prisma.mediaRendition.findFirstOrThrow({ where: { sourceAssetId: retryAsset.id } });
+    assert.equal(retryable.state, "PENDING");
+    assert.equal(retryable.claimJobId, null);
+    assert.equal(retryable.claimLeaseToken, null);
+    assert.equal(retryable.claimFencingToken, null);
+    assert.equal(retryable.claimExpiresAt, null);
+    setStorageProviderForTests(provider);
+  });
+
+  await t.test("revocation during provider deletes prevents asset and rendition deletion confirmation", async () => {
+    await resetAutomationRows();
+    await setExecutionStoragePermission(true);
+    setStorageProviderForTests(provider);
+    const asset = await createAsset(fixture.actors.customer, "CUSTOMER_AVATAR", sourceBytes, provider, "DELETE_PENDING");
+    let revoked = false;
+    setStorageProviderForTests(wrapProvider(provider, {
+      deleteObject: async (input) => {
+        const result = await provider.deleteObject(input);
+        if (!revoked) {
+          revoked = true;
+          await setExecutionStoragePermission(false);
+        }
+        return result;
+      },
+    }));
+    const [assetDelete] = await prepareRunningJobs(context, [{
+      jobType: "STORAGE_ASSET_DELETE_RETRY",
+      payload: { assetId: asset.id, expectedVersion: asset.version },
+    }]);
+    assert.deepEqual(await runHandler(assetDelete), {
+      errorCode: "PERMANENT_FAILURE",
+      outcome: "FAILED",
+      retryable: false,
+    });
+    const retained = await prisma.storedAsset.findUniqueOrThrow({ where: { id: asset.id } });
+    assert.equal(retained.state, "DELETE_PENDING");
+    assert.equal(retained.deletedAt, null);
+    assert.equal(retained.providerCleanupClaimId, assetDelete.claim.leaseToken);
+    assert.equal(provider.hasObject(asset.objectKey), false);
+
+    await resetAutomationRows();
+    await setExecutionStoragePermission(true);
+    setStorageProviderForTests(provider);
+    const source = await createAsset(fixture.actors.owner, "BUSINESS_LOGO", sourceBytes, provider, "READY");
+    const rendition = await createReadyRendition(source, "CARD_640_WEBP", provider, sourceBytes);
+    const superseded = await prisma.mediaRendition.update({
+      where: { id: rendition.id },
+      data: { state: "SUPERSEDED" },
+    });
+    revoked = false;
+    setStorageProviderForTests(wrapProvider(provider, {
+      deleteObject: async (input) => {
+        const result = await provider.deleteObject(input);
+        if (!revoked) {
+          revoked = true;
+          await setExecutionStoragePermission(false);
+        }
+        return result;
+      },
+    }));
+    const [renditionDelete] = await prepareRunningJobs(context, [{
+      jobType: "MEDIA_RENDITION_DELETE",
+      payload: { expectedVersion: superseded.version, renditionId: superseded.id },
+    }]);
+    assert.deepEqual(await runHandler(renditionDelete), {
+      errorCode: "PERMANENT_FAILURE",
+      outcome: "FAILED",
+      retryable: false,
+    });
+    const retainedRendition = await prisma.mediaRendition.findUniqueOrThrow({ where: { id: superseded.id } });
+    assert.equal(retainedRendition.state, "DELETE_PENDING");
+    assert.equal(retainedRendition.deletedAt, null);
+    assert.equal(retainedRendition.claimJobId, renditionDelete.claim.id);
+    assert.equal(retainedRendition.claimLeaseToken, renditionDelete.claim.leaseToken);
+    assert.equal(provider.hasObject(retainedRendition.objectKey), false);
+    await setExecutionStoragePermission(true);
+    setStorageProviderForTests(provider);
+  });
+
   await t.test("concurrent rendition discovery creates one child and one bounded READY rendition", async () => {
     await resetAutomationRows();
     const rawErrors: string[] = [];
@@ -397,7 +1000,7 @@ test("Gate 6B storage and media automation is durable, fenced, and exact", { con
     await Promise.all(discovery.map((job, index) => settleHandler(job, results[index]!)));
     const children = await prisma.platformJob.findMany({ where: { jobType: "MEDIA_RENDITION_GENERATE" } });
     assert.equal(children.length, 1);
-    const [generation] = await claimAndStart(1);
+    const [generation] = await claimAndStart(1, context);
     const generated = await runHandler(generation);
     assert.equal(generated.outcome, "SUCCEEDED", JSON.stringify({ generated, rawErrors }));
     await settleHandler(generation, generated);
@@ -518,7 +1121,7 @@ test("Gate 6B storage and media automation is durable, fenced, and exact", { con
     const discovery = await runHandler(cleanup);
     assert.equal(discovery.outcome, "SUCCEEDED");
     await settleHandler(cleanup, discovery);
-    const [deletion] = await claimAndStart(1);
+    const [deletion] = await claimAndStart(1, context);
     const deleted = await runHandler(deletion);
     assert.equal(deleted.outcome, "SUCCEEDED");
     await settleHandler(deletion, deleted);
@@ -695,6 +1298,33 @@ async function createExpiredOrphan(
   });
 }
 
+async function createPendingRendition(
+  asset: Awaited<ReturnType<typeof createAsset>>,
+  profile: "AVATAR_256_WEBP" | "CARD_640_WEBP" | "HERO_1600_WEBP",
+  provider: DeterministicStorageProvider,
+) {
+  const sourceFingerprint = mediaRenditionSourceFingerprint({
+    profile,
+    sourceAssetId: asset.id,
+    sourceAssetVersion: asset.version,
+    sourceChecksumSha256: asset.checksumSha256,
+    sourceProviderObjectVersion: asset.providerObjectVersion,
+  });
+  return prisma.mediaRendition.create({
+    data: {
+      objectKey: generateMediaRenditionObjectKey(asset.id, sourceFingerprint),
+      profile,
+      provider: provider.kind,
+      sourceAssetId: asset.id,
+      sourceAssetVersion: asset.version,
+      sourceChecksumSha256: asset.checksumSha256,
+      sourceFingerprint,
+      sourceProviderObjectVersion: asset.providerObjectVersion,
+      state: "PENDING",
+    },
+  });
+}
+
 async function createReadyRendition(
   asset: Awaited<ReturnType<typeof createAsset>>,
   profile: "AVATAR_256_WEBP" | "CARD_640_WEBP" | "HERO_1600_WEBP",
@@ -756,20 +1386,65 @@ async function prepareRunningJobs(
       source: "ADMIN_MANUAL",
     }));
   }
-  return claimAndStart(inputs.length);
+  return claimAndStart(inputs.length, context);
 }
 
-async function claimAndStart(batchSize: number) {
-  const workerId = `worker:gate6b:${randomUUID()}`;
-  const claims = await claimPlatformJobs({ batchSize, workerId });
+async function createDiscoveryParent(context: PlatformJobAdminContext, label: string) {
+  return (await runPlatformJobSerializable((transaction) => enqueuePlatformJob(transaction, {
+    availableAt: new Date(Date.now() + 60_000),
+    createdByAdminUserId: context.userId,
+    createdByPersonId: context.personId,
+    deduplicationKey: `gate6b:integration-parent:${label}:${randomUUID()}`,
+    jobType: "STORAGE_MAINTENANCE_DISCOVERY",
+    payload: { batchSize: 1 },
+    payloadVersion: 1,
+    source: "ADMIN_MANUAL",
+  }))).job;
+}
+
+async function claimAndStart(batchSize: number, context: PlatformJobAdminContext) {
+  const operation = await runPlatformJobSerializable(async (transaction) => {
+    const idempotencyKey = randomUUID();
+    const workerId = `operation:${platformJobHash(idempotencyKey)}`;
+    const leaseToken = randomUUID();
+    const mutation = await transaction.platformJobMutation.create({
+      data: {
+        action: "WORKER_BATCH",
+        actorAdminUserId: context.userId,
+        actorPersonId: context.personId,
+        idempotencyKey,
+        operationBatchSize: batchSize,
+        operationFencingToken: BigInt(1),
+        operationLeaseExpiresAt: new Date(Date.now() + 5 * 60_000),
+        operationLeaseToken: leaseToken,
+        operationWorkerId: workerId,
+        requestHash: platformJobHash({ action: "WORKER_BATCH", batchSize }),
+        result: { state: "PROCESSING" },
+      },
+    });
+    const authority: PlatformJobOperationAuthority = {
+      fencingToken: BigInt(1),
+      leaseToken,
+      mutationId: mutation.id,
+      workerId,
+    };
+    const claims = await claimPlatformJobsInTransaction(transaction, {
+      batchSize,
+      operation: authority,
+      workerId,
+    });
+    return { authority, claims };
+  });
+  const { authority, claims } = operation;
   assert.equal(claims.length, batchSize);
   await Promise.all(claims.map((claim) => startPlatformJob({
     fencingToken: claim.fencingToken,
     jobId: claim.id,
     leaseToken: claim.leaseToken,
-    workerId,
+    operation: authority,
+    workerId: authority.workerId,
   })));
-  return claims.map((claim) => ({ claim, workerId }));
+  return claims.map((claim) => ({ claim, operation: authority, workerId: authority.workerId }));
 }
 
 function runHandler(job: RunningJob) {
@@ -778,6 +1453,7 @@ function runHandler(job: RunningJob) {
     jobId: job.claim.id,
     jobType: job.claim.jobType,
     leaseToken: job.claim.leaseToken,
+    operation: job.operation,
     payload: job.claim.payload,
     payloadVersion: job.claim.payloadVersion,
   });
@@ -789,6 +1465,7 @@ async function settleHandler(job: RunningJob, outcome: Awaited<ReturnType<typeof
       fencingToken: job.claim.fencingToken,
       jobId: job.claim.id,
       leaseToken: job.claim.leaseToken,
+      operation: job.operation,
       result: outcome.metadata,
       workerId: job.workerId,
     });
@@ -798,6 +1475,7 @@ async function settleHandler(job: RunningJob, outcome: Awaited<ReturnType<typeof
     fencingToken: job.claim.fencingToken,
     jobId: job.claim.id,
     leaseToken: job.claim.leaseToken,
+    operation: job.operation,
     retryable: outcome.retryable,
     workerId: job.workerId,
   });
@@ -856,4 +1534,8 @@ function deferred<T>() {
   let resolve!: (value: T | PromiseLike<T>) => void;
   const promise = new Promise<T>((next) => { resolve = next; });
   return { promise, resolve };
+}
+
+function platformCode(expected: string) {
+  return (error: unknown) => error instanceof PlatformJobDomainError && error.code === expected;
 }

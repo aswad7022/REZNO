@@ -27,6 +27,7 @@ import {
   MEDIA_GATE5B_CONFIRMATION,
   assertMediaGate5bStaging,
 } from "../../../scripts/staging/media-gate5b-safety";
+import { STORAGE_MEDIA_GATE6B_CONFIRMATION } from "../../../scripts/staging/storage-media-gate6b-safety";
 
 const translate = (key: string) => key;
 
@@ -149,7 +150,7 @@ test("Customer Mobile resolves only trusted managed media paths against its API 
   });
 });
 
-test("Gate 5B staging fixture fails closed outside exact staging and the current Stage 5 42/42", async () => {
+test("Gate 5B staging fixture fails closed outside exact staging and accepts only its exact or Gate 6B successor state", async () => {
   const exactEnvironment = {
     NODE_ENV: "test",
     REZNO_ENV: "staging",
@@ -168,10 +169,27 @@ test("Gate 5B staging fixture fails closed outside exact staging and the current
   }), /exact staging environment/u);
   await assert.rejects(assertMediaGate5bStaging(client("rezno_production"), exactEnvironment), /exact rezno_staging/u);
   await assert.rejects(assertMediaGate5bStaging(client("rezno_staging", BigInt(41), BigInt(41)), exactEnvironment), /42\/42/u);
+  await assert.rejects(
+    assertMediaGate5bStaging(client("rezno_staging", BigInt(46), BigInt(46)), exactEnvironment),
+    /42\/42/u,
+  );
   assert.deepEqual(await assertMediaGate5bStaging(client("rezno_staging"), exactEnvironment), {
     database: "rezno_staging",
     migrations: "42/42",
   });
+  assert.deepEqual(
+    await assertMediaGate5bStaging(
+      client("rezno_staging", BigInt(46), BigInt(46)),
+      {
+        ...exactEnvironment,
+        REZNO_STAGE6_GATE6B_CONFIRM: STORAGE_MEDIA_GATE6B_CONFIRMATION,
+      },
+    ),
+    {
+      database: "rezno_staging",
+      migrations: "46/46",
+    },
+  );
 });
 
 function mediaCode(code: string) {

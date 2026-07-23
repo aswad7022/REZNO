@@ -141,7 +141,7 @@ test("Stage 6 preserves Gate 5D through the Gate 6A foundation and Gate 6B addit
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
     .sort();
-  assert.equal(migrations.length, 45);
+  assert.equal(migrations.length, 46);
   assert.equal(
     migrations.includes("20260720140000_payments_financial_integrity_foundation"),
     true,
@@ -162,7 +162,11 @@ test("Stage 6 preserves Gate 5D through the Gate 6A foundation and Gate 6B addit
     migrations.includes("20260722150000_storage_media_automation"),
     true,
   );
-  assert.equal(migrations.filter((name) => name > "20260721130000_payment_financial_integrity_closure").length, 3);
+  assert.equal(
+    migrations.includes("20260723120000_media_rendition_claim_integrity"),
+    true,
+  );
+  assert.equal(migrations.filter((name) => name > "20260721130000_payment_financial_integrity_closure").length, 4);
 });
 
 test("provider registries reject production test-provider activation", async () => {

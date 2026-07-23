@@ -3,7 +3,9 @@ import type { PrismaClient } from "@prisma/client";
 import { assertGate6aTransportEvidence, type Gate6aTransportEvidence } from "../../lib/db/postgres-transport";
 
 export const PLATFORM_JOBS_GATE6A_CONFIRMATION = "REZNO_STAGE6_GATE6A_STAGING_ONLY";
-const EXPECTED_MIGRATIONS = BigInt(44);
+const STORAGE_MEDIA_GATE6B_CONFIRMATION = "REZNO_STAGE6_GATE6B_STAGING_ONLY";
+const GATE6A_MIGRATIONS = BigInt(44);
+const GATE6B_SUCCESSOR_MIGRATIONS = BigInt(46);
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "::1", "localhost"]);
 
 type SafetyClient = Pick<PrismaClient, "$queryRaw">;
@@ -20,9 +22,15 @@ export async function assertPlatformJobsGate6aStaging(
   ) throw new Error("Gate 6A fixture requires the exact non-production staging environment and confirmation marker.");
 
   const target = parseDatabaseTarget(environment.DATABASE_URL);
+  const gate6bSuccessor =
+    environment.REZNO_STAGE6_GATE6B_CONFIRM === STORAGE_MEDIA_GATE6B_CONFIRMATION;
   const localOverrideRequested = isExactLocalTestTarget(environment, target);
   if (!localOverrideRequested) {
-    assertGate6aTransportEvidence(transportEvidence, environment);
+    assertGate6aTransportEvidence(
+      transportEvidence,
+      environment,
+      gate6bSuccessor ? { requireHealthy44: false } : undefined,
+    );
   }
   const [connection] = await prisma.$queryRaw<Array<{ database: string; encrypted: boolean; user: string }>>`
     SELECT current_database() AS database,
@@ -49,12 +57,19 @@ export async function assertPlatformJobsGate6aStaging(
            count(*) FILTER (WHERE rolled_back_at IS NOT NULL)::bigint AS "rolledBack"
     FROM "_prisma_migrations"
   `;
+  const expectedMigrations = gate6bSuccessor
+    ? GATE6B_SUCCESSOR_MIGRATIONS
+    : GATE6A_MIGRATIONS;
   if (
-    migrations?.total !== EXPECTED_MIGRATIONS
-    || migrations.applied !== EXPECTED_MIGRATIONS
+    migrations?.total !== expectedMigrations
+    || migrations.applied !== expectedMigrations
     || migrations.failed !== BigInt(0)
     || migrations.rolledBack !== BigInt(0)
-  ) throw new Error("Gate 6A fixture requires an exact healthy 44/44 migration state.");
+  ) {
+    throw new Error(
+      `Gate 6A fixture requires an exact healthy ${expectedMigrations}/${expectedMigrations} migration state.`,
+    );
+  }
 
   return {
     backendPgStatSsl: localUnencrypted ? connection.encrypted : transportEvidence!.backendPgStatSsl,
@@ -62,7 +77,7 @@ export async function assertPlatformJobsGate6aStaging(
     database: "rezno_staging" as const,
     encrypted: localUnencrypted ? connection.encrypted : transportEvidence!.encrypted,
     hostnameVerified: localUnencrypted ? false : transportEvidence!.hostnameVerified,
-    migrations: "44/44" as const,
+    migrations: gate6bSuccessor ? "46/46" as const : "44/44" as const,
     prismaUsedAttestedPhysicalClient: localUnencrypted
       ? false
       : transportEvidence!.prismaUsedAttestedPhysicalClient,
