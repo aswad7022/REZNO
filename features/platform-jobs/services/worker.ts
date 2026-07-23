@@ -133,6 +133,7 @@ export async function runPlatformWorkerBatch(
       jobId: job.id,
       jobType: job.jobType,
       leaseToken: job.leaseToken,
+      operation: prepared.authority,
       payload: job.payload,
       payloadVersion: job.payloadVersion,
     });

@@ -15,11 +15,14 @@ import {
   mediaRenditionSourceFingerprint,
 } from "@/features/media/domain/rendition-registry";
 import { renderMediaRendition } from "@/features/media/services/rendition-processor";
+import { requiredPlatformJobPermissions } from "@/features/platform-jobs/domain/authority";
+import { PlatformJobDomainError, platformJobError } from "@/features/platform-jobs/domain/errors";
 import type {
   PlatformJobHandlerContext,
   PlatformJobHandlerResult,
 } from "@/features/platform-jobs/services/handlers";
-import { enqueuePlatformJob } from "@/features/platform-jobs/services/jobs";
+import { enqueueDomainDiscoveryPlatformJob } from "@/features/platform-jobs/services/jobs";
+import { assertPlatformJobOperationAuthorized } from "@/features/platform-jobs/services/operation-lease";
 import {
   STORAGE_INSPECTION_POLICY_VERSION,
   STORAGE_ORPHAN_RETENTION_MS,
@@ -89,6 +92,9 @@ export async function runStorageMediaAutomationHandler(
     automationErrorTestHook?.(error);
     if (error instanceof AutomationFailure) {
       return { errorCode: error.errorCode, outcome: "FAILED", retryable: error.retryable };
+    }
+    if (error instanceof PlatformJobDomainError) {
+      return { errorCode: "PERMANENT_FAILURE", outcome: "FAILED", retryable: false };
     }
     return { errorCode: "HANDLER_EXCEPTION", outcome: "FAILED", retryable: true };
   }
@@ -422,7 +428,7 @@ async function cleanupOrphanSession(payload: ExactSessionPayload, context: JobCo
       return exact("STORAGE_ORPHAN_CLEANED", outcome.outcome === "NOT_FOUND" ? "ABSENT" : "COMPLETED", "EXPIRED");
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   } catch (error) {
-    await releaseSessionCleanupClaim(session.id, payload.expectedVersion, context.leaseToken);
+    await releaseSessionCleanupClaim(session.id, payload.expectedVersion, context).catch(() => undefined);
     throw error;
   }
 }
@@ -477,7 +483,7 @@ async function retryDeletePendingAsset(payload: ExactAssetPayload, context: JobC
       return exact("STORAGE_ASSET_DELETE_RETRIED", outcome.outcome === "NOT_FOUND" ? "ABSENT" : "COMPLETED", "DELETED");
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   } catch (error) {
-    await releaseAssetCleanupClaim(asset.id, payload.expectedVersion, context.leaseToken);
+    await releaseAssetCleanupClaim(asset.id, payload.expectedVersion, context).catch(() => undefined);
     throw error;
   }
 }
@@ -532,7 +538,7 @@ async function rescanStoredAsset(payload: ExactAssetPayload, context: JobContext
       state,
     });
   } catch (error) {
-    await releaseRescanClaim(asset.id, payload.expectedVersion, context);
+    await releaseRescanClaim(asset.id, payload.expectedVersion, context).catch(() => undefined);
     throw error;
   }
 }
@@ -696,7 +702,12 @@ async function generateMediaRendition(payload: RenditionGeneratePayload, context
     return publication.result;
   } catch (error) {
     const failure = error instanceof AutomationFailure ? error : null;
-    await failRenditionClaim(rendition.id, context, failure?.safeCode ?? "HANDLER_EXCEPTION", failure?.retryable ?? true);
+    await failRenditionClaim(
+      rendition.id,
+      context,
+      failure?.safeCode ?? "HANDLER_EXCEPTION",
+      failure?.retryable ?? true,
+    ).catch(() => undefined);
     throw error;
   }
 }
@@ -766,7 +777,7 @@ async function deleteMediaRendition(payload: RenditionDeletePayload, context: Jo
       return exact("MEDIA_RENDITION_DELETED", outcome.outcome === "NOT_FOUND" ? "ABSENT" : "COMPLETED", "DELETED");
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   } catch (error) {
-    await releaseRenditionDeleteClaim(rendition.id, rendition.version, context);
+    await releaseRenditionDeleteClaim(rendition.id, rendition.version, context).catch(() => undefined);
     throw error;
   }
 }
@@ -830,8 +841,7 @@ async function applyRescanOutcome(
   },
 ) {
   return prisma.$transaction(async (transaction) => {
-    const { job, now } = await assertJobLease(transaction, context);
-    if (!job.createdByPersonId) automationFailure("PERMANENT_FAILURE", false, "MISSING_JOB_ACTOR");
+    const { actor, now } = await assertJobLease(transaction, context);
     await transaction.$queryRaw(Prisma.sql`SELECT "id" FROM "StoredAsset" WHERE "id" = ${asset.id}::uuid FOR UPDATE`);
     const current = await transaction.storedAsset.findUnique({ where: { id: asset.id } });
     if (!current
@@ -882,7 +892,7 @@ async function applyRescanOutcome(
           where: { id: binding.id, state: "ACTIVE", version: binding.version },
           data: {
             detachedAt: now,
-            detachedByPersonId: job.createdByPersonId,
+            detachedByPersonId: actor.personId,
             state: "DETACHED",
             version: { increment: 1 },
           },
@@ -901,8 +911,7 @@ async function applyRescanOutcome(
 
 async function rejectUnsafeReadyAsset(asset: StoredAsset, context: JobContext, failureCode: string) {
   await prisma.$transaction(async (transaction) => {
-    const { job, now } = await assertJobLease(transaction, context);
-    if (!job.createdByPersonId) automationFailure("PERMANENT_FAILURE", false, "MISSING_JOB_ACTOR");
+    const { actor, now } = await assertJobLease(transaction, context);
     await transaction.$queryRaw(Prisma.sql`SELECT "id" FROM "StoredAsset" WHERE "id" = ${asset.id}::uuid FOR UPDATE`);
     const current = await transaction.storedAsset.findUnique({ where: { id: asset.id } });
     if (!current || current.state !== "READY" || current.version !== asset.version) return;
@@ -921,7 +930,7 @@ async function rejectUnsafeReadyAsset(asset: StoredAsset, context: JobContext, f
         where: { id: binding.id, state: "ACTIVE", version: binding.version },
         data: {
           detachedAt: now,
-          detachedByPersonId: job.createdByPersonId,
+          detachedByPersonId: actor.personId,
           state: "DETACHED",
           version: { increment: 1 },
         },
@@ -1008,7 +1017,7 @@ async function enqueueChild(
   if (!parent.createdByAdminUserId || !parent.createdByPersonId) {
     automationFailure("PERMANENT_FAILURE", false, "DISCOVERY_ACTOR_MISSING");
   }
-  const created = await enqueuePlatformJob(transaction, {
+  const created = await enqueueDomainDiscoveryPlatformJob(transaction, {
     availableAt: input.availableAt,
     createdByAdminUserId: parent.createdByAdminUserId,
     createdByPersonId: parent.createdByPersonId,
@@ -1018,7 +1027,6 @@ async function enqueueChild(
     parentJobId,
     payload: input.payload,
     payloadVersion: 1,
-    source: "DOMAIN_DISCOVERY",
   });
   return !created.replay;
 }
@@ -1026,6 +1034,15 @@ async function enqueueChild(
 async function assertJobLease(transaction: Prisma.TransactionClient, context: JobContext) {
   assertSignal(context);
   const now = await databaseNow(transaction);
+  if (!context.operation) {
+    platformJobError("FORBIDDEN", "Gate 6B handler execution requires worker-operation authority.");
+  }
+  const actor = await assertPlatformJobOperationAuthorized(
+    transaction,
+    context.operation,
+    now,
+    requiredPlatformJobPermissions(context.jobType),
+  );
   const job = await transaction.platformJob.findFirst({
     where: {
       fencingToken: context.fencingToken,
@@ -1033,6 +1050,7 @@ async function assertJobLease(transaction: Prisma.TransactionClient, context: Jo
       leaseExpiresAt: { gt: now },
       leaseToken: context.leaseToken,
       status: "RUNNING",
+      jobType: context.jobType,
     },
     select: {
       createdByAdminUserId: true,
@@ -1042,7 +1060,7 @@ async function assertJobLease(transaction: Prisma.TransactionClient, context: Jo
     },
   });
   if (!job?.leaseExpiresAt) automationFailure("PERMANENT_FAILURE", false, "STALE_JOB_LEASE");
-  return { job, now };
+  return { actor, job, now };
 }
 
 function providerFor(kind: StorageProviderKind) {
@@ -1147,63 +1165,78 @@ function assertRescanClaimAvailable(asset: StoredAsset, now: Date) {
   }
 }
 
-async function releaseSessionCleanupClaim(id: string, version: number, leaseToken: string) {
-  await prisma.uploadSession.updateMany({
-    where: { id, providerCleanupClaimId: leaseToken, state: "EXPIRED", version },
-    data: { providerCleanupClaimId: null, providerCleanupClaimedAt: null },
+async function releaseSessionCleanupClaim(id: string, version: number, context: JobContext) {
+  await prisma.$transaction(async (transaction) => {
+    await assertJobLease(transaction, context);
+    await transaction.uploadSession.updateMany({
+      where: { id, providerCleanupClaimId: context.leaseToken, state: "EXPIRED", version },
+      data: { providerCleanupClaimId: null, providerCleanupClaimedAt: null },
+    });
   });
 }
 
-async function releaseAssetCleanupClaim(id: string, version: number, leaseToken: string) {
-  await prisma.storedAsset.updateMany({
-    where: { id, providerCleanupClaimId: leaseToken, state: "DELETE_PENDING", version },
-    data: { providerCleanupClaimId: null, providerCleanupClaimedAt: null },
+async function releaseAssetCleanupClaim(id: string, version: number, context: JobContext) {
+  await prisma.$transaction(async (transaction) => {
+    await assertJobLease(transaction, context);
+    await transaction.storedAsset.updateMany({
+      where: { id, providerCleanupClaimId: context.leaseToken, state: "DELETE_PENDING", version },
+      data: { providerCleanupClaimId: null, providerCleanupClaimedAt: null },
+    });
   });
 }
 
 async function releaseRescanClaim(id: string, version: number, context: JobContext) {
-  await prisma.storedAsset.updateMany({
-    where: { id, rescanClaimJobId: context.jobId, rescanClaimLeaseToken: context.leaseToken, version },
-    data: {
-      rescanClaimExpiresAt: null,
-      rescanClaimFencingToken: null,
-      rescanClaimJobId: null,
-      rescanClaimLeaseToken: null,
-    },
+  await prisma.$transaction(async (transaction) => {
+    await assertJobLease(transaction, context);
+    await transaction.storedAsset.updateMany({
+      where: { id, rescanClaimJobId: context.jobId, rescanClaimLeaseToken: context.leaseToken, version },
+      data: {
+        rescanClaimExpiresAt: null,
+        rescanClaimFencingToken: null,
+        rescanClaimJobId: null,
+        rescanClaimLeaseToken: null,
+      },
+    });
   });
 }
 
 async function failRenditionClaim(id: string, context: JobContext, failureCode: string, retryable: boolean) {
-  await prisma.mediaRendition.updateMany({
-    where: { claimFencingToken: context.fencingToken, claimJobId: context.jobId, claimLeaseToken: context.leaseToken, id },
-    data: {
-      claimExpiresAt: null,
-      claimFencingToken: null,
-      claimJobId: null,
-      claimLeaseToken: null,
-      failureCode: retryable ? null : failureCode.slice(0, 80),
-      state: retryable ? "PENDING" : "FAILED",
-      version: { increment: 1 },
-    },
+  await prisma.$transaction(async (transaction) => {
+    await assertJobLease(transaction, context);
+    await transaction.mediaRendition.updateMany({
+      where: { claimFencingToken: context.fencingToken, claimJobId: context.jobId, claimLeaseToken: context.leaseToken, id },
+      data: {
+        claimExpiresAt: null,
+        claimFencingToken: null,
+        claimJobId: null,
+        claimLeaseToken: null,
+        failureCode: retryable ? null : failureCode.slice(0, 80),
+        state: retryable ? "PENDING" : "FAILED",
+        version: { increment: 1 },
+      },
+    });
   });
 }
 
 async function releaseRenditionDeleteClaim(id: string, version: number, context: JobContext) {
-  await prisma.mediaRendition.updateMany({
-    where: {
-      claimFencingToken: context.fencingToken,
-      claimJobId: context.jobId,
-      claimLeaseToken: context.leaseToken,
-      id,
-      state: "DELETE_PENDING",
-      version,
-    },
-    data: {
-      claimExpiresAt: null,
-      claimFencingToken: null,
-      claimJobId: null,
-      claimLeaseToken: null,
-    },
+  await prisma.$transaction(async (transaction) => {
+    await assertJobLease(transaction, context);
+    await transaction.mediaRendition.updateMany({
+      where: {
+        claimFencingToken: context.fencingToken,
+        claimJobId: context.jobId,
+        claimLeaseToken: context.leaseToken,
+        id,
+        state: "DELETE_PENDING",
+        version,
+      },
+      data: {
+        claimExpiresAt: null,
+        claimFencingToken: null,
+        claimJobId: null,
+        claimLeaseToken: null,
+      },
+    });
   });
 }
 

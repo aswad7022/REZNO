@@ -3,6 +3,10 @@ import "server-only";
 import { PlatformJobScheduleKey, PlatformJobType, Prisma } from "@prisma/client";
 
 import { platformJobHash } from "@/features/platform-jobs/domain/canonical";
+import {
+  authorizedPlatformScheduleKeys,
+  requiredPlatformSchedulePermissions,
+} from "@/features/platform-jobs/domain/authority";
 import { PLATFORM_JOB_LIMITS } from "@/features/platform-jobs/domain/contracts";
 import { platformJobError } from "@/features/platform-jobs/domain/errors";
 import { calculatePlatformScheduleTick } from "@/features/platform-jobs/domain/schedule";
@@ -97,6 +101,14 @@ export async function setPlatformJobScheduleEnabled(
   const requestHash = platformJobHash({ action, expectedVersion: input.expectedVersion, scheduleId: input.scheduleId });
   return runPlatformJobSerializable(async (transaction) => {
     const current = await assertPlatformJobAdminCurrent(transaction, context, "PLATFORM_JOBS_MANAGE");
+    await lockPlatformJobSchedule(transaction, input.scheduleId);
+    const schedule = await transaction.platformJobSchedule.findUnique({ where: { id: input.scheduleId } });
+    if (!schedule) platformJobError("NOT_FOUND", "The platform-job schedule was not found.");
+    await assertPlatformJobAdminCurrent(
+      transaction,
+      current,
+      requiredPlatformSchedulePermissions(schedule.scheduleKey),
+    );
     const existing = await transaction.platformJobMutation.findUnique({
       where: { actorAdminUserId_idempotencyKey: { actorAdminUserId: current.userId, idempotencyKey: input.idempotencyKey } },
     });
@@ -106,9 +118,6 @@ export async function setPlatformJobScheduleEnabled(
       }
       return { ...(safeResult(existing.result)), replay: true as const };
     }
-    await lockPlatformJobSchedule(transaction, input.scheduleId);
-    const schedule = await transaction.platformJobSchedule.findUnique({ where: { id: input.scheduleId } });
-    if (!schedule) platformJobError("NOT_FOUND", "The platform-job schedule was not found.");
     if (schedule.version !== input.expectedVersion) platformJobError("CONFLICT", "The platform-job schedule version changed.");
     if (schedule.enabled === input.enabled) platformJobError("CONFLICT", "The platform-job schedule already has the requested state.");
     const updated = await transaction.platformJobSchedule.update({
@@ -152,10 +161,15 @@ export async function runPlatformSchedulerTick(
       }
       return { ...safeResult(existing.result), replay: true as const };
     }
+    const authorizedScheduleKeys = authorizedPlatformScheduleKeys(current.permissions);
+    const authorizedScheduleKeysSql = Prisma.join(
+      authorizedScheduleKeys.map((scheduleKey) => Prisma.sql`${scheduleKey}::"PlatformJobScheduleKey"`),
+    );
     const due = await transaction.$queryRaw<Array<{ id: string }>>(Prisma.sql`
       SELECT schedule."id"
       FROM "PlatformJobSchedule" AS schedule
       WHERE schedule."enabled" = TRUE
+        AND schedule."scheduleKey" IN (${authorizedScheduleKeysSql})
         AND schedule."nextRunAt" <= ${now}
       ORDER BY schedule."nextRunAt", schedule."id"
       FOR UPDATE SKIP LOCKED

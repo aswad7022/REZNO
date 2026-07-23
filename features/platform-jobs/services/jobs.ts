@@ -9,6 +9,10 @@ import {
 } from "@prisma/client";
 
 import { platformJobHash } from "@/features/platform-jobs/domain/canonical";
+import {
+  authorizedPlatformJobTypes,
+  requiredPlatformJobPermissions,
+} from "@/features/platform-jobs/domain/authority";
 import { PLATFORM_JOB_LIMITS } from "@/features/platform-jobs/domain/contracts";
 import { platformJobError } from "@/features/platform-jobs/domain/errors";
 import {
@@ -21,7 +25,7 @@ import { parsePlatformJobPayload, parsePlatformJobResult, isRetryablePlatformJob
 import { prisma } from "@/lib/db/prisma";
 import { runPlatformJobSerializable } from "@/features/platform-jobs/services/transaction";
 import {
-  assertPlatformJobOperationOwned,
+  assertPlatformJobOperationAuthorized,
   platformJobDatabaseNow,
   type PlatformJobOperationAuthority,
 } from "@/features/platform-jobs/services/operation-lease";
@@ -62,15 +66,7 @@ export async function enqueuePlatformJob(
   const payloadHash = platformJobHash(payload);
   const maxAttempts = input.maxAttempts ?? 5;
   const priority = input.priority ?? 5;
-  if (!Number.isInteger(priority) || priority < 0 || priority > 9) {
-    platformJobError("VALIDATION_ERROR", "The platform-job priority is invalid.");
-  }
-  if (!Number.isInteger(maxAttempts) || maxAttempts < 1 || maxAttempts > PLATFORM_JOB_LIMITS.maxAttempts) {
-    platformJobError("VALIDATION_ERROR", "The maximum job attempts value is invalid.");
-  }
-  if (!/^[A-Za-z0-9][A-Za-z0-9._:~-]{0,159}$/.test(input.deduplicationKey)) {
-    platformJobError("VALIDATION_ERROR", "The server-generated deduplication key is invalid.");
-  }
+  assertPlatformJobCreationBounds(input.deduplicationKey, priority, maxAttempts);
   if ((input.source === "SCHEDULE") !== Boolean(input.scheduleId)
     || (input.source === "DOMAIN_DISCOVERY") !== Boolean(input.parentJobId)
     || (input.source !== "DOMAIN_DISCOVERY" && Boolean(input.parentJobId))) {
@@ -128,6 +124,76 @@ export async function enqueuePlatformJob(
   return { job, replay: false as const };
 }
 
+export async function enqueueDomainDiscoveryPlatformJob(
+  transaction: Prisma.TransactionClient,
+  input: {
+    availableAt: Date;
+    createdByAdminUserId: string;
+    createdByPersonId: string;
+    deduplicationKey: string;
+    jobType: Exclude<PlatformJobType, "PLATFORM_HEALTH_PROBE">;
+    maxAttempts?: number;
+    organizationId?: string | null;
+    parentJobId: string;
+    payload: unknown;
+    payloadVersion: number;
+    priority?: number;
+  },
+) {
+  const payload = parsePlatformJobPayload(input.jobType, input.payloadVersion, input.payload);
+  const payloadHash = platformJobHash(payload);
+  const maxAttempts = input.maxAttempts ?? 5;
+  const priority = input.priority ?? 5;
+  assertPlatformJobCreationBounds(input.deduplicationKey, priority, maxAttempts);
+  const scopeKey = input.organizationId ? `organization:${input.organizationId}` : "platform";
+  const canonicalLock = `platform-domain-child:${scopeKey}:${input.deduplicationKey}`;
+  await transaction.$queryRaw(
+    Prisma.sql`SELECT CAST(pg_advisory_xact_lock(hashtextextended(${canonicalLock}, 0)) AS text) AS locked`,
+  );
+  const existing = await transaction.platformJob.findFirst({
+    where: { deduplicationKey: input.deduplicationKey, scopeKey },
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+  });
+  if (existing) {
+    const exact = existing.jobType === input.jobType
+      && existing.payloadHash === payloadHash
+      && existing.payloadVersion === input.payloadVersion
+      && existing.source === "DOMAIN_DISCOVERY"
+      && existing.scheduleId === null
+      && existing.priority === priority
+      && existing.maxAttempts === maxAttempts
+      && existing.availableAt.getTime() === input.availableAt.getTime()
+      && existing.requeueRootJobId === null
+      && existing.requeueSequence === 0;
+    if (!exact) {
+      platformJobError("IDEMPOTENCY_CONFLICT", "The canonical domain-child identity was reused with different input.");
+    }
+    return { job: existing, replay: true as const };
+  }
+  const now = new Date();
+  const status: PlatformJobStatus = input.availableAt.getTime() > now.getTime() ? "SCHEDULED" : "AVAILABLE";
+  const job = await transaction.platformJob.create({
+    data: {
+      availableAt: input.availableAt,
+      createdByAdminUserId: input.createdByAdminUserId,
+      createdByPersonId: input.createdByPersonId,
+      deduplicationKey: input.deduplicationKey,
+      jobType: input.jobType,
+      maxAttempts,
+      organizationId: input.organizationId ?? null,
+      parentJobId: input.parentJobId,
+      payload: payload as Prisma.InputJsonValue,
+      payloadHash,
+      payloadVersion: input.payloadVersion,
+      priority,
+      scopeKey,
+      source: "DOMAIN_DISCOVERY",
+      status,
+    },
+  });
+  return { job, replay: false as const };
+}
+
 export async function claimPlatformJobs(input: {
   batchSize: number;
   leaseSeconds?: number;
@@ -157,13 +223,24 @@ export async function claimPlatformJobsInTransaction(
     platformJobError("VALIDATION_ERROR", "The worker batch is outside the accepted bound.");
   }
   const now = input.now ?? new Date();
-  if (input.operation) await assertPlatformJobOperationOwned(transaction, input.operation, now);
+  const eligibleJobTypes = input.operation
+    ? authorizedPlatformJobTypes((await assertPlatformJobOperationAuthorized(
+        transaction,
+        input.operation,
+        now,
+        ["PLATFORM_JOBS_MANAGE"],
+      )).permissions)
+    : ["PLATFORM_HEALTH_PROBE" as const];
+  const eligibleJobTypesSql = Prisma.join(
+    eligibleJobTypes.map((jobType) => Prisma.sql`${jobType}::"PlatformJobType"`),
+  );
   const leaseExpiresAt = platformLeaseExpiry(now, input.leaseSeconds ?? PLATFORM_JOB_LIMITS.defaultLeaseSeconds);
   return transaction.$queryRaw<ClaimedPlatformJob[]>(Prisma.sql`
     WITH candidates AS (
       SELECT job."id"
       FROM "PlatformJob" AS job
       WHERE job."status" IN ('SCHEDULED', 'AVAILABLE', 'RETRY_WAIT')
+        AND job."jobType" IN (${eligibleJobTypesSql})
         AND job."availableAt" <= ${now}
         AND job."attemptCount" < job."maxAttempts"
       ORDER BY job."priority" DESC, job."availableAt" ASC, job."id" ASC
@@ -223,9 +300,17 @@ export async function startPlatformJob(input: {
 }) {
   const now = input.now ?? new Date();
   return runPlatformJobSerializable(async (transaction) => {
-    if (input.operation) {
-      await assertPlatformJobOperationOwned(transaction, input.operation, await platformJobDatabaseNow(transaction));
-    }
+    const currentJob = await transaction.platformJob.findUnique({
+      where: { id: input.jobId },
+      select: { jobType: true },
+    });
+    if (!currentJob) platformJobError("STALE_LEASE", "The claimed job is unavailable.");
+    await assertJobExecutionAuthorized(
+      transaction,
+      input.operation,
+      currentJob.jobType,
+      await platformJobDatabaseNow(transaction),
+    );
     const updated = await transaction.platformJob.updateMany({
       where: {
         id: input.jobId,
@@ -303,14 +388,17 @@ export async function completePlatformJob(input: {
 }) {
   const now = input.now ?? new Date();
   return runPlatformJobSerializable(async (transaction) => {
-    if (input.operation) {
-      await assertPlatformJobOperationOwned(transaction, input.operation, await platformJobDatabaseNow(transaction));
-    }
     const attempt = await transaction.platformJobAttempt.findUnique({
       where: { jobId_leaseToken: { jobId: input.jobId, leaseToken: input.leaseToken } },
       include: { job: { select: { jobType: true } } },
     });
     if (!attempt) platformJobError("STALE_LEASE", "The completion attempt is unknown.");
+    await assertJobExecutionAuthorized(
+      transaction,
+      input.operation,
+      attempt.job.jobType,
+      await platformJobDatabaseNow(transaction),
+    );
     if (attempt.fencingToken !== input.fencingToken) platformJobError("STALE_LEASE", "The completion fencing generation is stale.");
     const result = parsePlatformJobResult(attempt.job.jobType, input.result);
     const resultHash = platformJobHash(result);
@@ -371,7 +459,12 @@ export async function failPlatformJob(input: {
   const now = input.now ?? new Date();
   return runPlatformJobSerializable(async (transaction) => {
     if (input.operation) {
-      await assertPlatformJobOperationOwned(transaction, input.operation, await platformJobDatabaseNow(transaction));
+      await assertPlatformJobOperationAuthorized(
+        transaction,
+        input.operation,
+        await platformJobDatabaseNow(transaction),
+        ["PLATFORM_JOBS_MANAGE"],
+      );
     }
     const attempt = await transaction.platformJobAttempt.findUnique({
       where: { jobId_leaseToken: { jobId: input.jobId, leaseToken: input.leaseToken } },
@@ -436,7 +529,14 @@ export async function recoverExpiredPlatformJobLeases(
   }
   return prisma.$transaction(async (transaction) => {
     const recoveryNow = scope?.operation ? await platformJobDatabaseNow(transaction) : now;
-    if (scope?.operation) await assertPlatformJobOperationOwned(transaction, scope.operation, recoveryNow);
+    if (scope?.operation) {
+      await assertPlatformJobOperationAuthorized(
+        transaction,
+        scope.operation,
+        recoveryNow,
+        ["PLATFORM_JOBS_MANAGE"],
+      );
+    }
     const expired = await transaction.$queryRaw<Array<{
       attemptCount: number;
       id: string;
@@ -485,4 +585,38 @@ export async function recoverExpiredPlatformJobLeases(
     }
     return { deadLettered, recovered: expired.length, retryWait };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted });
+}
+
+async function assertJobExecutionAuthorized(
+  transaction: Prisma.TransactionClient,
+  operation: PlatformJobOperationAuthority | undefined,
+  jobType: PlatformJobType,
+  now: Date,
+) {
+  if (!operation) {
+    if (jobType === "PLATFORM_HEALTH_PROBE") return;
+    platformJobError("FORBIDDEN", "Gate 6B jobs require a current worker-operation authority.");
+  }
+  await assertPlatformJobOperationAuthorized(
+    transaction,
+    operation,
+    now,
+    requiredPlatformJobPermissions(jobType),
+  );
+}
+
+function assertPlatformJobCreationBounds(
+  deduplicationKey: string,
+  priority: number,
+  maxAttempts: number,
+) {
+  if (!Number.isInteger(priority) || priority < 0 || priority > 9) {
+    platformJobError("VALIDATION_ERROR", "The platform-job priority is invalid.");
+  }
+  if (!Number.isInteger(maxAttempts) || maxAttempts < 1 || maxAttempts > PLATFORM_JOB_LIMITS.maxAttempts) {
+    platformJobError("VALIDATION_ERROR", "The maximum job attempts value is invalid.");
+  }
+  if (!/^[A-Za-z0-9][A-Za-z0-9._:~-]{0,159}$/.test(deduplicationKey)) {
+    platformJobError("VALIDATION_ERROR", "The server-generated deduplication key is invalid.");
+  }
 }

@@ -3,6 +3,7 @@ import "server-only";
 import { PlatformJobMutationAction, PlatformJobType, Prisma } from "@prisma/client";
 
 import { platformJobHash } from "@/features/platform-jobs/domain/canonical";
+import { requiredPlatformJobPermissions } from "@/features/platform-jobs/domain/authority";
 import { PLATFORM_JOB_LIMITS } from "@/features/platform-jobs/domain/contracts";
 import { platformJobError } from "@/features/platform-jobs/domain/errors";
 import { isPlatformJobCancellable, isPlatformJobRequeueable } from "@/features/platform-jobs/domain/lifecycle";
@@ -64,11 +65,12 @@ export async function cancelPlatformJob(
   const requestHash = platformJobHash({ action: "CANCEL", expectedVersion: input.expectedVersion, jobId: input.jobId });
   return runPlatformJobSerializable(async (transaction) => {
     const current = await assertPlatformJobAdminCurrent(transaction, context, "PLATFORM_JOBS_MANAGE");
-    const replay = await mutationReplay(transaction, current.userId, input.idempotencyKey, "CANCEL", requestHash);
-    if (replay) return { ...replay, replay: true as const };
     await lockPlatformJob(transaction, input.jobId);
     const job = await transaction.platformJob.findUnique({ where: { id: input.jobId } });
     if (!job) platformJobError("NOT_FOUND", "The platform job was not found.");
+    await assertPlatformJobAdminCurrent(transaction, current, requiredPlatformJobPermissions(job.jobType));
+    const replay = await mutationReplay(transaction, current.userId, input.idempotencyKey, "CANCEL", requestHash);
+    if (replay) return { ...replay, replay: true as const };
     if (job.version !== input.expectedVersion) platformJobError("CONFLICT", "The platform job version changed.");
     if (!isPlatformJobCancellable(job.status)) platformJobError("JOB_NOT_CANCELLABLE", "The platform job is no longer cancellable.");
     const now = new Date();
@@ -98,11 +100,12 @@ export async function requeuePlatformJob(
   const requestHash = platformJobHash({ action: "REQUEUE", expectedVersion: input.expectedVersion, jobId: input.jobId });
   return runPlatformJobSerializable(async (transaction) => {
     const current = await assertPlatformJobAdminCurrent(transaction, context, "PLATFORM_JOBS_MANAGE");
-    const replay = await mutationReplay(transaction, current.userId, input.idempotencyKey, "REQUEUE", requestHash);
-    if (replay) return { ...replay, replay: true as const };
     await lockPlatformJob(transaction, input.jobId);
     const failed = await transaction.platformJob.findUnique({ where: { id: input.jobId } });
     if (!failed) platformJobError("NOT_FOUND", "The platform job was not found.");
+    await assertPlatformJobAdminCurrent(transaction, current, requiredPlatformJobPermissions(failed.jobType));
+    const replay = await mutationReplay(transaction, current.userId, input.idempotencyKey, "REQUEUE", requestHash);
+    if (replay) return { ...replay, replay: true as const };
     if (failed.version !== input.expectedVersion) platformJobError("CONFLICT", "The platform job version changed.");
     if (!isPlatformJobRequeueable(failed.status)) platformJobError("JOB_NOT_REQUEUEABLE", "The platform job is not eligible for requeue.");
     const rootId = failed.requeueRootJobId ?? failed.id;

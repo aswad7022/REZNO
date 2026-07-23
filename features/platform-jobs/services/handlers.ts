@@ -5,11 +5,14 @@ import type { PlatformJobErrorCode, PlatformJobType } from "@prisma/client";
 import { PLATFORM_JOB_LIMITS } from "@/features/platform-jobs/domain/contracts";
 import { parsePlatformJobPayload } from "@/features/platform-jobs/domain/registry";
 import { runStorageMediaAutomationHandler } from "@/features/storage-automation/services/handlers";
+import type { PlatformJobOperationAuthority } from "@/features/platform-jobs/services/operation-lease";
 
 export type PlatformJobHandlerContext = {
   fencingToken: bigint;
   jobId: string;
+  jobType: PlatformJobType;
   leaseToken: string;
+  operation?: PlatformJobOperationAuthority;
   signal: AbortSignal;
 };
 
@@ -72,6 +75,7 @@ export async function executePlatformJobHandler(input: {
   jobId: string;
   jobType: PlatformJobType;
   leaseToken: string;
+  operation?: PlatformJobOperationAuthority;
   payload: unknown;
   payloadVersion: number;
 }) {
@@ -89,7 +93,9 @@ export async function executePlatformJobHandler(input: {
     const execution = Promise.resolve(handler(payload, {
       fencingToken: input.fencingToken,
       jobId: input.jobId,
+      jobType: input.jobType,
       leaseToken: input.leaseToken,
+      operation: input.operation,
       signal: controller.signal,
     })).catch((): PlatformJobHandlerResult => ({
       errorCode: "HANDLER_EXCEPTION",

@@ -4,6 +4,7 @@ import { Prisma, type PlatformJobType } from "@prisma/client";
 
 import { MEDIA_RENDITION_PROFILES } from "@/features/media/domain/rendition-registry";
 import { platformJobHash } from "@/features/platform-jobs/domain/canonical";
+import { requiredPlatformJobPermissions } from "@/features/platform-jobs/domain/authority";
 import {
   PLATFORM_JOB_DISCOVERY_TYPES,
   STAGE_6_ARCHITECTURE,
@@ -26,7 +27,7 @@ export async function storageAutomationStatus(
   storageActor: StorageAdminActor,
 ) {
   return runPlatformJobSerializable(async (transaction) => {
-    await assertCombinedAuthority(transaction, context, storageActor);
+    await assertCombinedAuthority(transaction, context, storageActor, "STORAGE_MAINTENANCE_DISCOVERY");
     return {
       type: "STORAGE_MEDIA_AUTOMATION_STATUS" as const,
       gate: "6B",
@@ -77,7 +78,7 @@ export async function requestStoredAssetRescan(
   input: { assetId: string; expectedVersion: number; idempotencyKey: string },
 ) {
   return runPlatformJobSerializable(async (transaction) => {
-    const current = await assertCombinedAuthority(transaction, context, storageActor);
+    const current = await assertCombinedAuthority(transaction, context, storageActor, "STORAGE_ASSET_RESCAN");
     const requestHash = platformJobHash({ action: "GATE6B_EXACT_RESCAN", ...input });
     const replay = await mutationReplay(transaction, current.userId, input.idempotencyKey, requestHash);
     if (replay) return { ...replay, replay: true as const };
@@ -128,7 +129,7 @@ async function enqueueManualAutomation(
   },
 ) {
   return runPlatformJobSerializable(async (transaction) => {
-    const current = await assertCombinedAuthority(transaction, context, storageActor);
+    const current = await assertCombinedAuthority(transaction, context, storageActor, input.jobType);
     const requestHash = platformJobHash(input.request);
     const replay = await mutationReplay(transaction, current.userId, input.idempotencyKey, requestHash);
     if (replay) return { ...replay, replay: true as const };
@@ -164,8 +165,13 @@ async function assertCombinedAuthority(
   transaction: Prisma.TransactionClient,
   context: PlatformJobAdminContext,
   storageActor: StorageAdminActor,
+  jobType: PlatformJobType,
 ) {
-  const current = await assertPlatformJobAdminCurrent(transaction, context, "PLATFORM_JOBS_MANAGE");
+  const current = await assertPlatformJobAdminCurrent(
+    transaction,
+    context,
+    requiredPlatformJobPermissions(jobType),
+  );
   await assertStorageAdminCurrent(transaction, storageActor, "STORAGE_RECORDS_MANAGE");
   return current;
 }

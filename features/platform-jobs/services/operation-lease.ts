@@ -1,6 +1,11 @@
 import { Prisma } from "@prisma/client";
 
+import type { AdminPermission } from "@/features/admin/config/permissions";
 import { platformJobError } from "@/features/platform-jobs/domain/errors";
+import {
+  assertPlatformJobAdminCurrent,
+  type PlatformJobAdminContext,
+} from "@/features/platform-jobs/services/admin-context";
 
 export type PlatformJobOperationAuthority = {
   fencingToken: bigint;
@@ -14,8 +19,14 @@ export async function assertPlatformJobOperationOwned(
   authority: PlatformJobOperationAuthority,
   now: Date,
 ) {
-  const operation = await transaction.$queryRaw<Array<{ id: string }>>(Prisma.sql`
-    SELECT mutation."id"
+  const operation = await transaction.$queryRaw<Array<{
+    actorAdminUserId: string;
+    actorPersonId: string;
+    id: string;
+  }>>(Prisma.sql`
+    SELECT mutation."id",
+           mutation."actorAdminUserId" AS "actorAdminUserId",
+           mutation."actorPersonId" AS "actorPersonId"
     FROM "PlatformJobMutation" AS mutation
     WHERE mutation."id" = ${authority.mutationId}::uuid
       AND mutation."action" = 'WORKER_BATCH'
@@ -29,6 +40,23 @@ export async function assertPlatformJobOperationOwned(
   if (operation.length !== 1) {
     platformJobError("STALE_LEASE", "The worker operation lease is stale or expired.");
   }
+  const owned = operation[0]!;
+  return {
+    adminAccessId: null,
+    personId: owned.actorPersonId,
+    source: "database",
+    userId: owned.actorAdminUserId,
+  } satisfies PlatformJobAdminContext;
+}
+
+export async function assertPlatformJobOperationAuthorized(
+  transaction: Prisma.TransactionClient,
+  authority: PlatformJobOperationAuthority,
+  now: Date,
+  permissions: readonly AdminPermission[],
+) {
+  const actor = await assertPlatformJobOperationOwned(transaction, authority, now);
+  return assertPlatformJobAdminCurrent(transaction, actor, permissions);
 }
 
 export async function platformJobDatabaseNow(transaction: Prisma.TransactionClient) {

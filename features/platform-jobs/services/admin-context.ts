@@ -14,6 +14,10 @@ export type PlatformJobAdminContext = {
   userId: string;
 };
 
+export type CurrentPlatformJobAdminContext = PlatformJobAdminContext & {
+  permissions: readonly AdminPermission[];
+};
+
 type AuthorizationTestHook = (context: PlatformJobAdminContext) => Promise<void> | void;
 let authorizationTestHook: AuthorizationTestHook | undefined;
 
@@ -36,8 +40,8 @@ export function setPlatformJobAuthorizationTestHook(hook: AuthorizationTestHook 
 export async function assertPlatformJobAdminCurrent(
   transaction: Prisma.TransactionClient,
   context: PlatformJobAdminContext,
-  permission: AdminPermission,
-) {
+  required: AdminPermission | readonly AdminPermission[],
+): Promise<CurrentPlatformJobAdminContext> {
   const identities = await transaction.$queryRaw<Array<{ email: string }>>(Prisma.sql`
     SELECT auth_user."email"
     FROM "Person" AS person
@@ -65,13 +69,16 @@ export async function assertPlatformJobAdminCurrent(
     ? null
     : await transaction.adminAccess.findUnique({ where: { userId: context.userId } });
   const grant = resolveAdminGrant({ databaseAccess, envSuperAdmin });
-  if (!resolvedAdminHasPermission(grant, permission)) {
-    platformJobError("FORBIDDEN", `Current Admin permission ${permission} is required.`);
+  const permissions = Array.isArray(required) ? required : [required];
+  const missing = permissions.find((permission) => !resolvedAdminHasPermission(grant, permission));
+  if (missing) {
+    platformJobError("FORBIDDEN", `Current Admin permission ${missing} is required.`);
   }
 
-  const current: PlatformJobAdminContext = {
+  const current: CurrentPlatformJobAdminContext = {
     ...context,
     adminAccessId: databaseAccess?.id ?? null,
+    permissions: grant?.permissions ?? [],
     source: envSuperAdmin ? "env" : "database",
   };
   await authorizationTestHook?.(current);
