@@ -234,6 +234,18 @@ fixture must run twice with one fingerprint; Gate 6C plus Stage 4C/4D, Gate
 5C/5D, and Gate 6A/6B successor smokes must pass; exact cleanup must run twice
 and preserve the non-fixture fingerprint.
 
+The composed fixture reuses Stage 4C and Gate 5C identities and domain rows,
+then adds only exact `6c…` campaign, delivery, event, refund, schedule, job,
+attempt, and mutation rows. Financial success evidence is rollback-only:
+posted journals and postings are intentionally immutable, so a cleanup-safe
+real-staging fixture must never create a successful artificial capture or
+refund and later attempt to erase it. Persistent staging execution therefore
+proves authenticated event replay/ignore behavior, transient retry behavior,
+reference stability, reconciliation non-mutation, and no-payout truth.
+Successful capture/refund posting and DRAFT settlement calculation are proven
+inside serializable rollback-only evidence plus the complete PostgreSQL suite.
+This is a preservation control, not a weaker financial assertion.
+
 Application rollback disconnects invocation and deploys the previous code while
 retaining additive schema and durable evidence. No migration or enum value is
 automatically reversed, and no operator edits financial or communication truth.
