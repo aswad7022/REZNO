@@ -26,8 +26,8 @@ export const STAGE_6_ARCHITECTURE = {
   title: "Stage 6 — Admin and Platform Operations",
   gates: {
     gate6A: "ACCEPTED",
-    gate6B: "ACTIVE",
-    gate6C: "UNSTARTED",
+    gate6B: "ACCEPTED",
+    gate6C: "ACTIVE",
     gate6D: "UNSTARTED",
   },
   runtime: {
