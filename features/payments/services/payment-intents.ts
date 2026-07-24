@@ -313,17 +313,28 @@ export async function submitCustomerPaymentIntent(
     const now = new Date();
     if (replay) {
       if (replay.status !== "PROCESSING" || (replay.claimExpiresAt && replay.claimExpiresAt > now)) {
-        return { attemptId: replay.id, claimOwner: null, replayed: true };
+        return {
+          attemptId: replay.id,
+          claimGeneration: null,
+          claimOwner: null,
+          replayed: true,
+        };
       }
-      await transaction.paymentAttempt.update({
+      const reclaimed = await transaction.paymentAttempt.update({
         where: { id: replay.id },
         data: {
           claimedBy: claimOwner,
           claimExpiresAt: new Date(now.getTime() + 60_000),
           startedAt: replay.startedAt ?? now,
+          version: { increment: 1 },
         },
       });
-      return { attemptId: replay.id, claimOwner, replayed: false };
+      return {
+        attemptId: replay.id,
+        claimGeneration: reclaimed.version,
+        claimOwner,
+        replayed: false,
+      };
     }
     if (intent.attempts.length >= MAX_ATTEMPTS_PER_INTENT) {
       paymentError("RATE_LIMITED", "Payment attempt limit was reached.");
@@ -345,7 +356,7 @@ export async function submitCustomerPaymentIntent(
         status: "CLAIMED",
       },
     });
-    await transaction.paymentAttempt.update({
+    const processingAttempt = await transaction.paymentAttempt.update({
       where: { id: attemptId },
       data: { startedAt: now, status: "PROCESSING", version: { increment: 1 } },
     });
@@ -356,7 +367,12 @@ export async function submitCustomerPaymentIntent(
         data: { status: "PROCESSING", version: { increment: 1 } },
       });
     }
-    return { attemptId, claimOwner, replayed: false };
+    return {
+      attemptId,
+      claimGeneration: processingAttempt.version,
+      claimOwner,
+      replayed: false,
+    };
   });
   if (claimed.replayed) {
     const intent = await prisma.paymentIntent.findUniqueOrThrow({
@@ -388,7 +404,13 @@ export async function submitCustomerPaymentIntent(
       result = { outcome: "TRANSIENT_FAILURE", safeCode: "PROVIDER_FAILURE" };
     }
   }
-  const applied = await applyProviderCreateResult(paymentIntentId, attempt.id, claimed.claimOwner!, result);
+  const applied = await applyProviderCreateResult(
+    paymentIntentId,
+    attempt.id,
+    claimed.claimOwner!,
+    claimed.claimGeneration!,
+    result,
+  );
   if (result.outcome === "NOT_CONFIGURED") {
     paymentError("PAYMENT_PROVIDER_NOT_CONFIGURED", "Online payment provider is not configured.");
   }
@@ -399,6 +421,7 @@ async function applyProviderCreateResult(
   paymentIntentId: string,
   attemptId: string,
   claimOwner: string,
+  claimGeneration: number,
   result: ProviderResult,
   executionGuard?: PaymentExecutionGuard,
 ) {
@@ -411,7 +434,11 @@ async function applyProviderCreateResult(
     });
     const attempt = await transaction.paymentAttempt.findUnique({ where: { id: attemptId } });
     if (!intent || !attempt) paymentError("NOT_FOUND", "Payment attempt was not found.");
-    if (attempt.status !== "PROCESSING" || attempt.claimedBy !== claimOwner) {
+    if (
+      attempt.status !== "PROCESSING"
+      || attempt.claimedBy !== claimOwner
+      || attempt.version !== claimGeneration
+    ) {
       return loadIntentDto(transaction, intent.id);
     }
     if (intent.status === "CAPTURED") {
@@ -573,7 +600,7 @@ export async function retryPaymentAttemptFromAutomation(
           state: attempt.status,
         };
       }
-      if (attempt.version !== input.expectedVersion + 1) {
+      if (attempt.version < input.expectedVersion + 1) {
         return { kind: "INELIGIBLE" as const, state: attempt.status };
       }
       const reclaimed = await transaction.paymentAttempt.update({
@@ -582,6 +609,7 @@ export async function retryPaymentAttemptFromAutomation(
           claimedBy: claimOwner,
           claimExpiresAt: new Date(now.getTime() + PAYMENT_OPERATION_CLAIM_MS),
           startedAt: attempt.startedAt ?? now,
+          version: { increment: 1 },
         },
         include: { paymentIntent: true },
       });
@@ -662,6 +690,7 @@ export async function retryPaymentAttemptFromAutomation(
     await recoverPaymentAttemptAfterInterruption(
       prepared.attempt.id,
       claimOwner,
+      prepared.attempt.version,
       "AUTHORITY_REVOKED",
     );
     throw error;
@@ -699,6 +728,7 @@ export async function retryPaymentAttemptFromAutomation(
       prepared.attempt.paymentIntentId,
       prepared.attempt.id,
       claimOwner,
+      prepared.attempt.version,
       result,
       input.executionGuard,
     );
@@ -706,6 +736,7 @@ export async function retryPaymentAttemptFromAutomation(
     await recoverPaymentAttemptAfterInterruption(
       prepared.attempt.id,
       claimOwner,
+      prepared.attempt.version,
       "PROVIDER_RESULT_UNAPPLIED",
     );
     throw error;
@@ -743,6 +774,7 @@ async function paymentDatabaseNow(transaction: Prisma.TransactionClient) {
 async function recoverPaymentAttemptAfterInterruption(
   attemptId: string,
   claimOwner: string,
+  claimGeneration: number,
   safeCode: string,
 ) {
   return runPaymentSerializable(async (transaction) => {
@@ -761,6 +793,7 @@ async function recoverPaymentAttemptAfterInterruption(
       !attempt
       || attempt.status !== "PROCESSING"
       || attempt.claimedBy !== claimOwner
+      || attempt.version !== claimGeneration
     ) return;
     const now = await paymentDatabaseNow(transaction);
     if (

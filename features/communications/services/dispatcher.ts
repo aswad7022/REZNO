@@ -415,7 +415,7 @@ export async function processExactDeliveryForAutomation(input: {
         };
       }
       const claimExpiresAt = new Date(now.getTime() + CLAIM_LEASE_MS);
-      await transaction.outboundDelivery.update({
+      const reclaimed = await transaction.outboundDelivery.update({
         where: { id: delivery.id },
         data: {
           claimedAt: now,
@@ -430,7 +430,11 @@ export async function processExactDeliveryForAutomation(input: {
           data: { claimOwner: input.claimOwner },
         });
       }
-      return { kind: "CLAIMED" as const, recovered: true };
+      return {
+        claimGeneration: reclaimed.version,
+        kind: "CLAIMED" as const,
+        recovered: true,
+      };
     }
     if (delivery.version !== input.expectedVersion) {
       return {
@@ -449,7 +453,7 @@ export async function processExactDeliveryForAutomation(input: {
         state: delivery.status,
       };
     }
-    await transaction.outboundDelivery.update({
+    const claimed = await transaction.outboundDelivery.update({
       where: { id: delivery.id },
       data: {
         claimedAt: now,
@@ -459,7 +463,11 @@ export async function processExactDeliveryForAutomation(input: {
         version: { increment: 1 },
       },
     });
-    return { kind: "CLAIMED" as const, recovered: false };
+    return {
+      claimGeneration: claimed.version,
+      kind: "CLAIMED" as const,
+      recovered: false,
+    };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
   if (prepared.kind === "ABSENT") {
@@ -486,11 +494,13 @@ export async function processExactDeliveryForAutomation(input: {
       input.claimOwner,
       new Date(),
       input.executionGuard,
+      prepared.claimGeneration,
     );
   } catch (error) {
     await recoverDeliveryAfterInterruption(
       input.deliveryId,
       input.claimOwner,
+      prepared.claimGeneration,
       "AUTHORITY_OR_PREPARATION_INTERRUPTED",
     );
     throw error;
@@ -518,6 +528,7 @@ export async function processExactDeliveryForAutomation(input: {
     await recoverDeliveryAfterInterruption(
       input.deliveryId,
       input.claimOwner,
+      providerPreparation.claimGeneration,
       "AUTHORITY_REVOKED",
     );
     throw error;
@@ -545,6 +556,7 @@ export async function processExactDeliveryForAutomation(input: {
   try {
     state = await finalizeProviderAttempt({
       attemptId: providerPreparation.attemptId,
+      claimGeneration: providerPreparation.claimGeneration,
       claimOwner: input.claimOwner,
       deliveryId: input.deliveryId,
       executionGuard: input.executionGuard,
@@ -555,6 +567,7 @@ export async function processExactDeliveryForAutomation(input: {
     await recoverDeliveryAfterInterruption(
       input.deliveryId,
       input.claimOwner,
+      providerPreparation.claimGeneration,
       "PROVIDER_RESULT_UNAPPLIED",
     );
     throw error;
@@ -616,7 +629,12 @@ export async function processClaimedDeliveries(
 ): Promise<DispatchResultDto> {
   const result = emptyDispatchResult();
   for (const deliveryId of deliveryIds) {
-    const prepared = await prepareProviderMessage(deliveryId, claimOwner, now, executionGuard);
+    const prepared = await prepareProviderMessage(
+      deliveryId,
+      claimOwner,
+      now,
+      executionGuard,
+    );
     if (!prepared) {
       result.suppressed += 1;
       continue;
@@ -636,6 +654,7 @@ export async function processClaimedDeliveries(
     }
     const status = await finalizeProviderAttempt({
       attemptId: prepared.attemptId,
+      claimGeneration: prepared.claimGeneration,
       claimOwner,
       deliveryId,
       now: new Date(),
@@ -834,7 +853,12 @@ async function prepareProviderMessage(
   claimOwner: string,
   now: Date,
   executionGuard?: CommunicationExecutionGuard,
-): Promise<{ attemptId: string; message: SafeProviderMessage } | null> {
+  expectedClaimGeneration?: number,
+): Promise<{
+  attemptId: string;
+  claimGeneration: number;
+  message: SafeProviderMessage;
+} | null> {
   return prisma.$transaction(async (transaction) => {
     await executionGuard?.(transaction);
     const rows = await transaction.$queryRaw<Array<{ id: string }>>(Prisma.sql`
@@ -848,7 +872,23 @@ async function prepareProviderMessage(
       where: { id: deliveryId },
       include: { campaign: true },
     });
-    if (!delivery || delivery.status !== "CLAIMED" || delivery.claimOwner !== claimOwner) return null;
+    if (
+      !delivery
+      || delivery.status !== "CLAIMED"
+      || delivery.claimOwner !== claimOwner
+      || (
+        expectedClaimGeneration !== undefined
+        && delivery.version !== expectedClaimGeneration
+      )
+    ) {
+      if (expectedClaimGeneration !== undefined) {
+        throw new CommunicationOperationRetryableError(
+          1,
+          "CLAIM_GENERATION_CHANGED",
+        );
+      }
+      return null;
+    }
     if (delivery.campaign.status === "CANCELLED") {
       await suppressClaimedDelivery(transaction, delivery, "CAMPAIGN_CANCELLED", now, "CANCELLED");
       return null;
@@ -912,13 +952,19 @@ async function prepareProviderMessage(
           sanitizedMetadata: { providerIdempotencyScope: "delivery" },
         },
       });
-      await transaction.outboundDelivery.update({
+      const advancedDelivery = await transaction.outboundDelivery.update({
         where: { id: delivery.id },
         data: { attemptCount: attemptNumber, version: { increment: 1 } },
       });
+      return {
+        attemptId: attempt.id,
+        claimGeneration: advancedDelivery.version,
+        message: providerMessage(delivery, endpoint.endpoint),
+      };
     }
     return {
       attemptId: attempt.id,
+      claimGeneration: delivery.version,
       message: providerMessage(delivery, endpoint.endpoint),
     };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
@@ -926,6 +972,7 @@ async function prepareProviderMessage(
 
 async function finalizeProviderAttempt(input: {
   attemptId: string;
+  claimGeneration: number;
   claimOwner: string;
   deliveryId: string;
   now: Date;
@@ -942,8 +989,19 @@ async function finalizeProviderAttempt(input: {
     `);
     const delivery = await transaction.outboundDelivery.findUnique({ where: { id: input.deliveryId } });
     const attempt = await transaction.outboundDeliveryAttempt.findUnique({ where: { id: input.attemptId } });
-    if (!delivery || !attempt || attempt.finishedAt || delivery.claimOwner !== input.claimOwner) {
-      communicationError("STALE_VERSION", "Delivery claim ownership changed.");
+    if (!delivery || !attempt) {
+      communicationError("NOT_FOUND", "Delivery attempt was not found.");
+    }
+    if (
+      attempt.finishedAt
+      || attempt.claimOwner !== input.claimOwner
+      || delivery.claimOwner !== input.claimOwner
+      || delivery.version !== input.claimGeneration
+    ) {
+      throw new CommunicationOperationRetryableError(
+        1,
+        "CLAIM_GENERATION_CHANGED",
+      );
     }
     const accepted = input.providerResult.outcome === "ACCEPTED";
     const transient = input.providerResult.outcome === "TRANSIENT_FAILURE" && input.providerResult.retryable;
@@ -1049,6 +1107,7 @@ async function suppressClaimedDelivery(
 async function recoverDeliveryAfterInterruption(
   deliveryId: string,
   claimOwner: string,
+  claimGeneration: number,
   safeCode: string,
 ) {
   return prisma.$transaction(async (transaction) => {
@@ -1061,6 +1120,7 @@ async function recoverDeliveryAfterInterruption(
       !delivery
       || delivery.status !== "CLAIMED"
       || delivery.claimOwner !== claimOwner
+      || delivery.version !== claimGeneration
     ) return;
     const now = await communicationDatabaseNow(transaction);
     const cancelled = delivery.campaign.status === "CANCELLED";

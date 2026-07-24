@@ -1390,6 +1390,446 @@ test("Gate 6C exact OutboundDelivery jobs reuse attempts and converge after inte
   assert.equal(finalizedRevokedAttempt.outcome, "TRANSIENT_FAILURE");
 });
 
+test("Gate 6C PaymentAttempt claim generations fence stale exact-job cleanup", { concurrency: false }, async (t) => {
+  const fixture = await createPaymentFixture("gate6c-attempt-generation");
+  const provider = new DeterministicPaymentProvider(
+    "gate6c-attempt-generation-secret-with-safe-entropy",
+  );
+  const originalCreate = provider.createPayment.bind(provider);
+  let failNextCreate = false;
+  provider.createPayment = async (input) => {
+    if (failNextCreate) {
+      failNextCreate = false;
+      return {
+        outcome: "TRANSIENT_FAILURE",
+        safeCode: "TEMPORARY_UNAVAILABLE",
+      };
+    }
+    return originalCreate(input);
+  };
+  setPaymentProviderForTests(provider);
+  t.after(async () => {
+    setPaymentAttemptRetryTestHook(undefined);
+    setPaymentProviderForTests(null);
+    await resetStorageTestDatabase();
+    await prisma.$disconnect();
+  });
+
+  for (const pausePhase of [
+    "AFTER_CLAIM_BEFORE_PROVIDER",
+    "AFTER_PROVIDER_BEFORE_APPLY",
+  ] as const) {
+    const subject = await failedPaymentAttempt(
+      fixture,
+      provider,
+      () => {
+        failNextCreate = true;
+      },
+    );
+    const jobId = randomUUID();
+    const firstPaused = deferred();
+    const releaseFirst = deferred();
+    const secondPaused = deferred();
+    const releaseSecond = deferred();
+    let matchingHookCalls = 0;
+    setPaymentAttemptRetryTestHook(async ({ phase }) => {
+      if (phase !== pausePhase) return;
+      matchingHookCalls += 1;
+      if (matchingHookCalls === 1) {
+        firstPaused.resolve();
+        await releaseFirst.promise;
+      } else if (matchingHookCalls === 2) {
+        secondPaused.resolve();
+        await releaseSecond.promise;
+      }
+    });
+    let firstGuardCalls = 0;
+    const staleGuardCall =
+      pausePhase === "AFTER_CLAIM_BEFORE_PROVIDER" ? 2 : 3;
+    const staleFirstGuard: PaymentExecutionGuard = async () => {
+      firstGuardCalls += 1;
+      if (firstGuardCalls >= staleGuardCall) {
+        throw new Error("stale payment-attempt execution");
+      }
+    };
+    const firstRejected = assert.rejects(
+      retryPaymentAttemptFromAutomation(fixture.adminContext, {
+        attemptId: subject.attempt.id,
+        executionGuard: staleFirstGuard,
+        expectedVersion: subject.attempt.version,
+        jobId,
+      }),
+      /stale payment-attempt execution/,
+    );
+    await firstPaused.promise;
+    const firstGeneration = (
+      await prisma.paymentAttempt.findUniqueOrThrow({
+        where: { id: subject.attempt.id },
+      })
+    ).version;
+    await prisma.paymentAttempt.update({
+      where: { id: subject.attempt.id },
+      data: { claimExpiresAt: new Date(Date.now() - 1_000) },
+    });
+    const secondExecution = retryPaymentAttemptFromAutomation(
+      fixture.adminContext,
+      {
+        attemptId: subject.attempt.id,
+        executionGuard: noPaymentGuard,
+        expectedVersion: subject.attempt.version,
+        jobId,
+      },
+    );
+    await secondPaused.promise;
+    const secondClaim = await prisma.paymentAttempt.findUniqueOrThrow({
+      where: { id: subject.attempt.id },
+    });
+    assert.ok(secondClaim.version > firstGeneration);
+    assert.equal(secondClaim.status, "PROCESSING");
+    releaseFirst.resolve();
+    await firstRejected;
+    const afterStaleRecovery = await prisma.paymentAttempt.findUniqueOrThrow({
+      where: { id: subject.attempt.id },
+    });
+    assert.equal(afterStaleRecovery.version, secondClaim.version);
+    assert.equal(afterStaleRecovery.status, "PROCESSING");
+    assert.equal(afterStaleRecovery.claimedBy, `platform-job:${jobId}`);
+    releaseSecond.resolve();
+    await secondExecution;
+    assert.equal(
+      (
+        await prisma.paymentAttempt.findUniqueOrThrow({
+          where: { id: subject.attempt.id },
+        })
+      ).status,
+      "CAPTURED",
+    );
+    assert.equal(
+      await prisma.financialJournal.count({
+        where: {
+          paymentIntentId: subject.intent.id,
+          sourceType: "CAPTURE",
+        },
+      }),
+      1,
+    );
+    setPaymentAttemptRetryTestHook(undefined);
+  }
+});
+
+test("Gate 6C PaymentRefund claim generations fence stale cleanup and preserve manual replay", { concurrency: false }, async (t) => {
+  const fixture = await createPaymentFixture("gate6c-refund-generation");
+  const provider = new DeterministicPaymentProvider(
+    "gate6c-refund-generation-secret-with-safe-entropy",
+  );
+  const originalRefund = provider.refundPayment.bind(provider);
+  let failNextRefund = false;
+  provider.refundPayment = async (input) => {
+    if (failNextRefund) {
+      failNextRefund = false;
+      return {
+        outcome: "TRANSIENT_FAILURE",
+        safeCode: "TEMPORARY_UNAVAILABLE",
+      };
+    }
+    return originalRefund(input);
+  };
+  setPaymentProviderForTests(provider);
+  t.after(async () => {
+    setRefundRetryTestHook(undefined);
+    setPaymentProviderForTests(null);
+    await resetStorageTestDatabase();
+    await prisma.$disconnect();
+  });
+
+  for (const pausePhase of [
+    "AFTER_CLAIM_BEFORE_PROVIDER",
+    "AFTER_PROVIDER_BEFORE_APPLY",
+  ] as const) {
+    const payment = await capturedIntent(fixture, "19000.000");
+    failNextRefund = true;
+    await requestBusinessRefund(fixture.ownerReference, {
+      amount: "3000.000",
+      expectedVersion: payment.version,
+      idempotencyKey: randomUUID(),
+      paymentIntentId: payment.id,
+      reasonCode: "CUSTOMER_REQUEST",
+    });
+    const refund = await prisma.paymentRefund.findFirstOrThrow({
+      where: { paymentIntentId: payment.id },
+    });
+    await prisma.paymentRefund.update({
+      where: { id: refund.id },
+      data: { nextRetryAt: new Date(Date.now() - 1_000) },
+    });
+    const jobId = randomUUID();
+    const claimOwner = `platform-job:${jobId}`;
+    const firstPaused = deferred();
+    const releaseFirst = deferred();
+    const secondPaused = deferred();
+    const releaseSecond = deferred();
+    let matchingHookCalls = 0;
+    setRefundRetryTestHook(async ({ phase }) => {
+      if (phase !== pausePhase) return;
+      matchingHookCalls += 1;
+      if (matchingHookCalls === 1) {
+        firstPaused.resolve();
+        await releaseFirst.promise;
+      } else if (matchingHookCalls === 2) {
+        secondPaused.resolve();
+        await releaseSecond.promise;
+      }
+    });
+    let firstGuardCalls = 0;
+    const staleGuardCall =
+      pausePhase === "AFTER_CLAIM_BEFORE_PROVIDER" ? 2 : 3;
+    const staleFirstGuard: PaymentExecutionGuard = async () => {
+      firstGuardCalls += 1;
+      if (firstGuardCalls >= staleGuardCall) {
+        throw new Error("stale refund execution");
+      }
+    };
+    const automation = { claimOwner, requireRetryable: true as const };
+    const firstRejected = assert.rejects(
+      retryAdminRefund(
+        fixture.adminContext,
+        refund.id,
+        { expectedVersion: refund.version, idempotencyKey: jobId },
+        staleFirstGuard,
+        automation,
+      ),
+      /stale refund execution/,
+    );
+    await firstPaused.promise;
+    const firstGeneration = (
+      await prisma.paymentRefund.findUniqueOrThrow({
+        where: { id: refund.id },
+      })
+    ).version;
+    await prisma.paymentRefund.update({
+      where: { id: refund.id },
+      data: { claimExpiresAt: new Date(Date.now() - 1_000) },
+    });
+    const secondExecution = retryAdminRefund(
+      fixture.adminContext,
+      refund.id,
+      { expectedVersion: refund.version, idempotencyKey: jobId },
+      noPaymentGuard,
+      automation,
+    );
+    await secondPaused.promise;
+    const secondClaim = await prisma.paymentRefund.findUniqueOrThrow({
+      where: { id: refund.id },
+    });
+    assert.ok(secondClaim.version > firstGeneration);
+    assert.equal(secondClaim.status, "PROCESSING");
+    releaseFirst.resolve();
+    await firstRejected;
+    const afterStaleRecovery = await prisma.paymentRefund.findUniqueOrThrow({
+      where: { id: refund.id },
+    });
+    assert.equal(afterStaleRecovery.version, secondClaim.version);
+    assert.equal(afterStaleRecovery.status, "PROCESSING");
+    assert.equal(afterStaleRecovery.claimedBy, claimOwner);
+    assert.equal(
+      (
+        await prisma.paymentMutation.findUniqueOrThrow({
+          where: {
+            actorKey_idempotencyKey: {
+              actorKey: `admin:${fixture.adminContext.userId}`,
+              idempotencyKey: jobId,
+            },
+          },
+        })
+      ).status,
+      "PROCESSING",
+    );
+    releaseSecond.resolve();
+    await secondExecution;
+    assert.equal(
+      (
+        await prisma.paymentRefund.findUniqueOrThrow({
+          where: { id: refund.id },
+        })
+      ).status,
+      "SUCCEEDED",
+    );
+    assert.equal(
+      await prisma.financialJournal.count({
+        where: { paymentRefundId: refund.id, sourceType: "REFUND" },
+      }),
+      1,
+    );
+    setRefundRetryTestHook(undefined);
+  }
+
+  const manualPayment = await capturedIntent(fixture, "20000.000");
+  failNextRefund = true;
+  await requestBusinessRefund(fixture.ownerReference, {
+    amount: "4000.000",
+    expectedVersion: manualPayment.version,
+    idempotencyKey: randomUUID(),
+    paymentIntentId: manualPayment.id,
+    reasonCode: "CUSTOMER_REQUEST",
+  });
+  const manualRefund = await prisma.paymentRefund.findFirstOrThrow({
+    where: { paymentIntentId: manualPayment.id },
+  });
+  await prisma.paymentRefund.update({
+    where: { id: manualRefund.id },
+    data: { nextRetryAt: new Date(Date.now() - 1_000) },
+  });
+  const manualKey = randomUUID();
+  setRefundRetryTestHook(({ phase }) => {
+    if (phase === "AFTER_CLAIM_BEFORE_PROVIDER") {
+      throw new Error("manual refund interruption");
+    }
+  });
+  await assert.rejects(
+    retryAdminRefund(fixture.adminContext, manualRefund.id, {
+      expectedVersion: manualRefund.version,
+      idempotencyKey: manualKey,
+    }),
+    /manual refund interruption/,
+  );
+  const liveReplay = await retryAdminRefund(
+    fixture.adminContext,
+    manualRefund.id,
+    {
+      expectedVersion: manualRefund.version,
+      idempotencyKey: manualKey,
+    },
+  );
+  assert.equal(liveReplay.id, manualPayment.id);
+  await prisma.paymentRefund.update({
+    where: { id: manualRefund.id },
+    data: { claimExpiresAt: new Date(Date.now() - 1_000) },
+  });
+  setRefundRetryTestHook(undefined);
+  await retryAdminRefund(fixture.adminContext, manualRefund.id, {
+    expectedVersion: manualRefund.version,
+    idempotencyKey: manualKey,
+  });
+  assert.equal(
+    (
+      await prisma.paymentRefund.findUniqueOrThrow({
+        where: { id: manualRefund.id },
+      })
+    ).status,
+    "SUCCEEDED",
+  );
+});
+
+test("Gate 6C OutboundDelivery claim generations fence stale exact-job cleanup", { concurrency: false }, async (t) => {
+  await resetCommunicationTestDatabase();
+  const fixture = await createCommunicationFixture("gate6c-delivery-generation");
+  setCommunicationTestProviderFactory(
+    (channel) => new DeterministicSinkProvider(channel),
+  );
+  t.after(async () => {
+    setDeliveryAutomationTestHook(undefined);
+    setCommunicationTestProviderFactory(undefined);
+    await resetCommunicationTestDatabase();
+    await prisma.$disconnect();
+  });
+
+  for (const pausePhase of [
+    "AFTER_CLAIM_BEFORE_ATTEMPT",
+    "AFTER_PROVIDER_BEFORE_FINALIZE",
+  ] as const) {
+    const delivery = await pendingDelivery(fixture);
+    const jobId = randomUUID();
+    const claimOwner = `platform-job:${jobId}`;
+    const firstPaused = deferred();
+    const releaseFirst = deferred();
+    const secondPaused = deferred();
+    const releaseSecond = deferred();
+    let matchingHookCalls = 0;
+    setDeliveryAutomationTestHook(async ({ phase }) => {
+      if (phase !== pausePhase) return;
+      matchingHookCalls += 1;
+      if (matchingHookCalls === 1) {
+        firstPaused.resolve();
+        await releaseFirst.promise;
+      } else if (matchingHookCalls === 2) {
+        secondPaused.resolve();
+        await releaseSecond.promise;
+      }
+    });
+    let firstGuardCalls = 0;
+    const staleGuardCall =
+      pausePhase === "AFTER_CLAIM_BEFORE_ATTEMPT" ? 2 : 4;
+    const staleFirstGuard = async () => {
+      firstGuardCalls += 1;
+      if (firstGuardCalls >= staleGuardCall) {
+        throw new Error("stale delivery execution");
+      }
+    };
+    const firstRejected = assert.rejects(
+      processExactDeliveryForAutomation({
+        claimOwner,
+        deliveryId: delivery.id,
+        executionGuard: staleFirstGuard,
+        expectedVersion: delivery.version,
+      }),
+      /stale delivery execution/,
+    );
+    await firstPaused.promise;
+    const firstGeneration = (
+      await prisma.outboundDelivery.findUniqueOrThrow({
+        where: { id: delivery.id },
+      })
+    ).version;
+    await expireDeliveryClaim(delivery.id);
+    const secondExecution = processExactDeliveryForAutomation({
+      claimOwner,
+      deliveryId: delivery.id,
+      executionGuard: async () => undefined,
+      expectedVersion: delivery.version,
+    });
+    await secondPaused.promise;
+    const secondClaim = await prisma.outboundDelivery.findUniqueOrThrow({
+      where: { id: delivery.id },
+    });
+    assert.ok(secondClaim.version > firstGeneration);
+    assert.equal(secondClaim.status, "CLAIMED");
+    releaseFirst.resolve();
+    await firstRejected;
+    const afterStaleRecovery =
+      await prisma.outboundDelivery.findUniqueOrThrow({
+        where: { id: delivery.id },
+      });
+    assert.equal(afterStaleRecovery.version, secondClaim.version);
+    assert.equal(afterStaleRecovery.status, "CLAIMED");
+    assert.equal(afterStaleRecovery.claimOwner, claimOwner);
+    if (pausePhase === "AFTER_PROVIDER_BEFORE_FINALIZE") {
+      assert.equal(
+        await prisma.outboundDeliveryAttempt.count({
+          where: { deliveryId: delivery.id, finishedAt: null },
+        }),
+        1,
+      );
+    }
+    releaseSecond.resolve();
+    assert.equal((await secondExecution).state, "ACCEPTED");
+    assert.equal(
+      (
+        await prisma.outboundDelivery.findUniqueOrThrow({
+          where: { id: delivery.id },
+        })
+      ).status,
+      "ACCEPTED",
+    );
+    assert.equal(
+      await prisma.outboundDeliveryAttempt.count({
+        where: { deliveryId: delivery.id },
+      }),
+      1,
+    );
+    setDeliveryAutomationTestHook(undefined);
+  }
+});
+
 async function capturedIntent(
   fixture: Awaited<ReturnType<typeof createPaymentFixture>>,
   total: string,
@@ -1482,4 +1922,12 @@ function retryablePaymentOperation(error: unknown) {
 
 function retryableCommunicationOperation(error: unknown) {
   return error instanceof CommunicationOperationRetryableError;
+}
+
+function deferred() {
+  let resolve!: () => void;
+  const promise = new Promise<void>((complete) => {
+    resolve = complete;
+  });
+  return { promise, resolve };
 }

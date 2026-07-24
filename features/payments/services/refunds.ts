@@ -183,13 +183,27 @@ async function requestRefund(
       if (replay.requestHash !== requestHash) paymentError("IDEMPOTENCY_CONFLICT", "Refund idempotency key was reused with changed input.");
       const now = new Date();
       if (replay.status !== "PROCESSING" || (replay.claimExpiresAt && replay.claimExpiresAt > now)) {
-        return { claimOwner: null, refundId: replay.id, replayed: true };
+        return {
+          claimGeneration: null,
+          claimOwner: null,
+          refundId: replay.id,
+          replayed: true,
+        };
       }
-      await transaction.paymentRefund.update({
+      const reclaimed = await transaction.paymentRefund.update({
         where: { id: replay.id },
-        data: { claimedBy: claimOwner, claimExpiresAt: new Date(now.getTime() + 60_000) },
+        data: {
+          claimedBy: claimOwner,
+          claimExpiresAt: new Date(now.getTime() + 60_000),
+          version: { increment: 1 },
+        },
       });
-      return { claimOwner, refundId: replay.id, replayed: false };
+      return {
+        claimGeneration: reclaimed.version,
+        claimOwner,
+        refundId: replay.id,
+        replayed: false,
+      };
     }
     if (intent.version !== input.expectedVersion) paymentError("STALE_VERSION", "Payment changed. Refresh and retry.");
     if (!["CAPTURED", "PARTIALLY_REFUNDED"].includes(intent.status) || !intent.providerReference) {
@@ -222,7 +236,7 @@ async function requestRefund(
       },
     });
     assertPaymentRefundTransition(refund.status, "PROCESSING");
-    await transaction.paymentRefund.update({
+    const processingRefund = await transaction.paymentRefund.update({
       where: { id: refund.id },
       data: { status: "PROCESSING", version: { increment: 1 } },
     });
@@ -256,7 +270,12 @@ async function requestRefund(
         },
       });
     }
-    return { claimOwner, refundId: refund.id, replayed: false };
+    return {
+      claimGeneration: processingRefund.version,
+      claimOwner,
+      refundId: refund.id,
+      replayed: false,
+    };
   });
   if (prepared.replayed) {
     return loadRefundIntent(prepared.refundId);
@@ -275,7 +294,12 @@ async function requestRefund(
   } catch {
     result = { outcome: "TRANSIENT_FAILURE", safeCode: "PROVIDER_FAILURE" };
   }
-  return applyRefundResult(refund.id, prepared.claimOwner!, result);
+  return applyRefundResult(
+    refund.id,
+    prepared.claimOwner!,
+    prepared.claimGeneration!,
+    result,
+  );
 }
 
 async function retryRefund(
@@ -353,7 +377,7 @@ async function retryRefund(
       }
       if (
         refund.status !== "PROCESSING"
-        || refund.version !== input.expectedVersion + 1
+        || refund.version < input.expectedVersion + 1
         || !refund.providerRequestReference
       ) {
         return { kind: "FAILED_MUTATION" as const, refund };
@@ -387,6 +411,7 @@ async function retryRefund(
         data: {
           claimedBy: claimOwner,
           claimExpiresAt: new Date(now.getTime() + REFUND_OPERATION_CLAIM_MS),
+          version: { increment: 1 },
         },
         include: { paymentIntent: true },
       });
@@ -517,6 +542,9 @@ async function retryRefund(
     );
   }
   if (prepared.kind === "RETRYABLE") {
+    if (!automation) {
+      return loadRefundIntent(refundId);
+    }
     throw new PaymentOperationRetryableError(
       prepared.retryAfterSeconds,
       prepared.refund.status,
@@ -533,6 +561,7 @@ async function retryRefund(
     } catch (error) {
       await recoverRefundAfterInterruption({
         actorKey: actor.actorKey,
+        claimGeneration: prepared.refund.version,
         claimOwner,
         idempotencyKey: input.idempotencyKey,
         refundId,
@@ -563,6 +592,7 @@ async function retryRefund(
     return await applyRefundResult(
       refundId,
       claimOwner,
+      prepared.refund.version,
       result,
       executionGuard,
       {
@@ -573,6 +603,7 @@ async function retryRefund(
   } catch (error) {
     await recoverRefundAfterInterruption({
       actorKey: actor.actorKey,
+      claimGeneration: prepared.refund.version,
       claimOwner,
       idempotencyKey: input.idempotencyKey,
       refundId,
@@ -585,6 +616,7 @@ async function retryRefund(
 async function applyRefundResult(
   refundId: string,
   claimOwner: string,
+  claimGeneration: number,
   result: Awaited<ReturnType<ReturnType<typeof configuredPaymentProvider>["refundPayment"]>>,
   executionGuard?: PaymentExecutionGuard,
   mutation?: {
@@ -617,7 +649,11 @@ async function applyRefundResult(
       }
       return loadIntentById(transaction, refund.paymentIntentId);
     }
-    if (refund.status !== "PROCESSING" || refund.claimedBy !== claimOwner) {
+    if (
+      refund.status !== "PROCESSING"
+      || refund.claimedBy !== claimOwner
+      || refund.version !== claimGeneration
+    ) {
       if (mutation && refund.status === "FAILED") {
         await failRefundMutation(
           transaction,
@@ -849,6 +885,7 @@ async function terminateCapacityRejectedRefund(
 
 async function recoverRefundAfterInterruption(input: {
   actorKey: string;
+  claimGeneration: number;
   claimOwner: string;
   idempotencyKey: string;
   refundId: string;
@@ -878,6 +915,7 @@ async function recoverRefundAfterInterruption(input: {
     if (
       refund.status !== "PROCESSING"
       || refund.claimedBy !== input.claimOwner
+      || refund.version !== input.claimGeneration
     ) return;
     const now = await refundDatabaseNow(transaction);
     assertPaymentRefundTransition(refund.status, "FAILED");
