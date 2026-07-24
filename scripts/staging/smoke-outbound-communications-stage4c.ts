@@ -373,25 +373,34 @@ async function main() {
   setCommunicationEndpointDiagnosticsTestHook((diagnostics) => {
     endpointDiagnostics.push(diagnostics);
   });
-  const audiencePreviews = await Promise.all([
-    previewCampaignAudience(fullContext, {
+  const audienceInputs = [
+    {
       audience: "CUSTOMERS", targetPersonId: null, targetOrganizationId: null,
       channels: ["IN_APP", "EMAIL", "SMS", "PUSH"], category: "ADMIN_ANNOUNCEMENT", mandatory: false,
-    }),
-    previewCampaignAudience(fullContext, {
+    },
+    {
       audience: "BUSINESS_OWNERS", targetPersonId: null, targetOrganizationId: null,
       channels: ["IN_APP"], category: "ADMIN_ANNOUNCEMENT", mandatory: false,
-    }),
-    previewCampaignAudience(fullContext, {
+    },
+    {
       audience: "RESTAURANTS", targetPersonId: null, targetOrganizationId: null,
       channels: ["IN_APP"], category: "ADMIN_ANNOUNCEMENT", mandatory: false,
-    }),
-    previewCampaignAudience(fullContext, {
+    },
+    {
       audience: "BUSINESS", targetPersonId: null, targetOrganizationId: ORGANIZATION_ID,
       channels: ["IN_APP"], category: "ADMIN_ANNOUNCEMENT", mandatory: false,
-    }),
-  ]);
-  setCommunicationEndpointDiagnosticsTestHook(undefined);
+    },
+  ] as const;
+  const audiencePreviews: Array<
+    Awaited<ReturnType<typeof previewCampaignAudience>>
+  > = [];
+  try {
+    for (const input of audienceInputs) {
+      audiencePreviews.push(await previewCampaignAudience(fullContext, input));
+    }
+  } finally {
+    setCommunicationEndpointDiagnosticsTestHook(undefined);
+  }
   assert.ok(audiencePreviews.every((preview) => preview.evaluated > 0 && !preview.tooLarge));
   const outboundPreviewDiagnostics = endpointDiagnostics.find((item) => item.selectedChannels.length === 3);
   assert.ok(outboundPreviewDiagnostics);

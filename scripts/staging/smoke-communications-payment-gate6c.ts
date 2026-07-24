@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 
+import { Client } from "pg";
+
 import {
   DeterministicSinkProvider,
   setCommunicationTestProviderFactory,
@@ -726,17 +728,54 @@ async function runDurabilityClosure(input: {
     });
     const uncertainAttemptJob = randomUUID();
     const attemptCallsBeforeUncertainty = input.attemptProviderReferences.length;
-    setPaymentAttemptRetryTestHook(({ phase }) => {
-      if (phase === "AFTER_PROVIDER_BEFORE_APPLY") {
-        throw new Error("Gate 6C staging attempt provider uncertainty.");
-      }
+    let injectedAttemptGeneration:
+      | Awaited<ReturnType<typeof injectClaimGeneration>>
+      | undefined;
+    setPaymentAttemptRetryTestHook(async ({ phase }) => {
+      if (phase !== "AFTER_PROVIDER_BEFORE_APPLY") return;
+      injectedAttemptGeneration = await injectClaimGeneration(
+        "PAYMENT_ATTEMPT",
+        currentAttempt.id,
+        `platform-job:${uncertainAttemptJob}`,
+      );
     });
-    await assert.rejects(retryPaymentAttemptFromAutomation(input.context, {
-      attemptId: currentAttempt.id,
-      executionGuard: noPaymentGuard,
-      expectedVersion: currentAttempt.version,
-      jobId: uncertainAttemptJob,
-    }));
+    let staleAttemptGuardCalls = 0;
+    await assert.rejects(
+      retryPaymentAttemptFromAutomation(input.context, {
+        attemptId: currentAttempt.id,
+        executionGuard: async () => {
+          staleAttemptGuardCalls += 1;
+          if (staleAttemptGuardCalls >= 3) {
+            throw new Error("Gate 6C staging stale attempt generation.");
+          }
+        },
+        expectedVersion: currentAttempt.version,
+        jobId: uncertainAttemptJob,
+      }),
+      /stale attempt generation/u,
+    );
+    assert.ok(injectedAttemptGeneration);
+    const secondAttemptClaim = await prisma.paymentAttempt.findUniqueOrThrow({
+      where: { id: currentAttempt.id },
+    });
+    assert.equal(
+      secondAttemptClaim.version,
+      injectedAttemptGeneration.currentGeneration,
+    );
+    assert.ok(
+      secondAttemptClaim.version
+        > injectedAttemptGeneration.previousGeneration,
+    );
+    assert.equal(secondAttemptClaim.status, "PROCESSING");
+    const afterStaleAttempt = await prisma.paymentAttempt.findUniqueOrThrow({
+      where: { id: currentAttempt.id },
+    });
+    assert.equal(afterStaleAttempt.version, secondAttemptClaim.version);
+    assert.equal(afterStaleAttempt.status, "PROCESSING");
+    assert.equal(
+      afterStaleAttempt.claimedBy,
+      `platform-job:${uncertainAttemptJob}`,
+    );
     await prisma.paymentAttempt.update({
       where: { id: currentAttempt.id },
       data: { claimExpiresAt: new Date(Date.now() - 1_000) },
@@ -757,7 +796,7 @@ async function runDurabilityClosure(input: {
       input.attemptProviderReferences.length - attemptCallsBeforeUncertainty,
       2,
     );
-    checks += 2;
+    checks += 7;
 
     phase = "DURABILITY_ATTEMPT_REVOCATION";
     currentAttempt = await prisma.paymentAttempt.update({
@@ -925,18 +964,68 @@ async function runDurabilityClosure(input: {
     const uncertainRefundJob = randomUUID();
     mutationKeys.push(uncertainRefundJob);
     const refundCallsBeforeUncertainty = input.refundProviderReferences.length;
-    setRefundRetryTestHook(({ phase }) => {
-      if (phase === "AFTER_PROVIDER_BEFORE_APPLY") {
-        throw new Error("Gate 6C staging refund provider uncertainty.");
-      }
+    let injectedRefundGeneration:
+      | Awaited<ReturnType<typeof injectClaimGeneration>>
+      | undefined;
+    setRefundRetryTestHook(async ({ phase }) => {
+      if (phase !== "AFTER_PROVIDER_BEFORE_APPLY") return;
+      injectedRefundGeneration = await injectClaimGeneration(
+        "PAYMENT_REFUND",
+        currentRefund.id,
+        `platform-job:${uncertainRefundJob}`,
+      );
     });
-    await assert.rejects(retryAdminRefund(input.context, currentRefund.id, {
-      expectedVersion: currentRefund.version,
-      idempotencyKey: uncertainRefundJob,
-    }, noPaymentGuard, {
-      claimOwner: `platform-job:${uncertainRefundJob}`,
-      requireRetryable: true,
-    }));
+    let staleRefundGuardCalls = 0;
+    await assert.rejects(
+      retryAdminRefund(input.context, currentRefund.id, {
+        expectedVersion: currentRefund.version,
+        idempotencyKey: uncertainRefundJob,
+      }, async () => {
+        staleRefundGuardCalls += 1;
+        if (staleRefundGuardCalls >= 3) {
+          throw new Error("Gate 6C staging stale refund generation.");
+        }
+      }, {
+        claimOwner: `platform-job:${uncertainRefundJob}`,
+        requireRetryable: true,
+      }),
+      /stale refund generation/u,
+    );
+    assert.ok(injectedRefundGeneration);
+    const secondRefundClaim = await prisma.paymentRefund.findUniqueOrThrow({
+      where: { id: currentRefund.id },
+    });
+    assert.equal(
+      secondRefundClaim.version,
+      injectedRefundGeneration.currentGeneration,
+    );
+    assert.ok(
+      secondRefundClaim.version
+        > injectedRefundGeneration.previousGeneration,
+    );
+    assert.equal(secondRefundClaim.status, "PROCESSING");
+    const afterStaleRefund = await prisma.paymentRefund.findUniqueOrThrow({
+      where: { id: currentRefund.id },
+    });
+    assert.equal(afterStaleRefund.version, secondRefundClaim.version);
+    assert.equal(afterStaleRefund.status, "PROCESSING");
+    assert.equal(
+      afterStaleRefund.claimedBy,
+      `platform-job:${uncertainRefundJob}`,
+    );
+    assert.equal(
+      (
+        await prisma.paymentMutation.findUniqueOrThrow({
+          where: {
+            actorKey_idempotencyKey: {
+              actorKey: `admin:${input.context.userId}`,
+              idempotencyKey: uncertainRefundJob,
+            },
+          },
+        })
+      ).status,
+      "PROCESSING",
+    );
     await prisma.paymentRefund.update({
       where: { id: currentRefund.id },
       data: { claimExpiresAt: new Date(Date.now() - 1_000) },
@@ -958,7 +1047,7 @@ async function runDurabilityClosure(input: {
       input.refundProviderReferences.length - refundCallsBeforeUncertainty,
       2,
     );
-    checks += 2;
+    checks += 8;
 
     phase = "DURABILITY_REFUND_REVOCATION_AFTER_CLAIM";
     currentRefund = await prisma.paymentRefund.update({
@@ -1106,18 +1195,56 @@ async function runDurabilityClosure(input: {
     phase = "DURABILITY_DELIVERY_PROVIDER";
     const deliveryCallsBeforeUncertainty = input.getDeliveryProviderCalls();
     const deliveryKeysBeforeUncertainty = input.deliveryProviderKeys.length;
-    setDeliveryAutomationTestHook(({ phase }) => {
-      if (phase === "AFTER_PROVIDER_BEFORE_FINALIZE") {
-        throw new Error("Gate 6C staging delivery provider uncertainty.");
-      }
-    });
     const uncertainDeliveryOwner = `platform-job:${randomUUID()}`;
-    await assert.rejects(processExactDeliveryForAutomation({
-      claimOwner: uncertainDeliveryOwner,
-      deliveryId: delivery.id,
-      executionGuard: noCommunicationGuard,
-      expectedVersion: delivery.version,
-    }));
+    let injectedDeliveryGeneration:
+      | Awaited<ReturnType<typeof injectClaimGeneration>>
+      | undefined;
+    setDeliveryAutomationTestHook(async ({ phase }) => {
+      if (phase !== "AFTER_PROVIDER_BEFORE_FINALIZE") return;
+      injectedDeliveryGeneration = await injectClaimGeneration(
+        "OUTBOUND_DELIVERY",
+        delivery.id,
+        uncertainDeliveryOwner,
+      );
+    });
+    let staleDeliveryGuardCalls = 0;
+    await assert.rejects(
+      processExactDeliveryForAutomation({
+        claimOwner: uncertainDeliveryOwner,
+        deliveryId: delivery.id,
+        executionGuard: async () => {
+          staleDeliveryGuardCalls += 1;
+          if (staleDeliveryGuardCalls >= 4) {
+            throw new Error("Gate 6C staging stale delivery generation.");
+          }
+        },
+        expectedVersion: delivery.version,
+      }),
+      /stale delivery generation/u,
+    );
+    assert.ok(injectedDeliveryGeneration);
+    const secondDeliveryClaim = await prisma.outboundDelivery.findUniqueOrThrow({
+      where: { id: delivery.id },
+    });
+    assert.equal(
+      secondDeliveryClaim.version,
+      injectedDeliveryGeneration.currentGeneration,
+    );
+    assert.ok(
+      secondDeliveryClaim.version
+        > injectedDeliveryGeneration.previousGeneration,
+    );
+    assert.equal(secondDeliveryClaim.status, "CLAIMED");
+    const afterStaleDelivery =
+      await prisma.outboundDelivery.findUniqueOrThrow({
+        where: { id: delivery.id },
+      });
+    assert.equal(afterStaleDelivery.version, secondDeliveryClaim.version);
+    assert.equal(afterStaleDelivery.status, "CLAIMED");
+    assert.equal(afterStaleDelivery.claimOwner, uncertainDeliveryOwner);
+    assert.equal(await prisma.outboundDeliveryAttempt.count({
+      where: { deliveryId: delivery.id, finishedAt: null },
+    }), 1);
     await prisma.outboundDelivery.update({
       where: { id: delivery.id },
       data: { claimExpiresAt: new Date(Date.now() - 1_000) },
@@ -1141,7 +1268,7 @@ async function runDurabilityClosure(input: {
     assert.equal(await prisma.outboundDeliveryAttempt.count({
       where: { deliveryId: delivery.id },
     }), 1);
-    checks += 3;
+    checks += 9;
     await restoreDelivery();
 
     phase = "DURABILITY_DELIVERY_REVOCATION";
@@ -1276,6 +1403,65 @@ async function runDurabilityClosure(input: {
 
 const noPaymentGuard: PaymentExecutionGuard = async () => undefined;
 const noCommunicationGuard = async () => undefined;
+
+async function injectClaimGeneration(
+  target: "OUTBOUND_DELIVERY" | "PAYMENT_ATTEMPT" | "PAYMENT_REFUND",
+  id: string,
+  claimOwner: string,
+) {
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) {
+    throw new Error("Gate 6C claim-generation injection requires DATABASE_URL.");
+  }
+  const client = new Client({ connectionString });
+  await client.connect();
+  try {
+    const result = target === "PAYMENT_ATTEMPT"
+      ? await client.query<{ version: number }>(
+          `UPDATE "PaymentAttempt"
+           SET "claimExpiresAt" = clock_timestamp() + interval '1 minute',
+               "version" = "version" + 1
+           WHERE "id" = $1::uuid
+             AND "status" = 'PROCESSING'
+             AND "claimedBy" = $2
+           RETURNING "version"`,
+          [id, claimOwner],
+        )
+      : target === "PAYMENT_REFUND"
+        ? await client.query<{ version: number }>(
+            `UPDATE "PaymentRefund"
+             SET "claimExpiresAt" = clock_timestamp() + interval '1 minute',
+                 "version" = "version" + 1
+             WHERE "id" = $1::uuid
+               AND "status" = 'PROCESSING'
+               AND "claimedBy" = $2
+             RETURNING "version"`,
+            [id, claimOwner],
+          )
+        : await client.query<{ version: number }>(
+            `UPDATE "OutboundDelivery"
+             SET "claimExpiresAt" = clock_timestamp() + interval '1 minute',
+                 "version" = "version" + 1
+             WHERE "id" = $1::uuid
+               AND "status" = 'CLAIMED'
+               AND "claimOwner" = $2
+             RETURNING "version"`,
+            [id, claimOwner],
+          );
+    const currentGeneration = result.rows[0]?.version;
+    if (result.rowCount !== 1 || currentGeneration === undefined) {
+      throw new Error(
+        "Gate 6C claim-generation injection did not bind one exact active claim.",
+      );
+    }
+    return {
+      currentGeneration,
+      previousGeneration: currentGeneration - 1,
+    };
+  } finally {
+    await client.end();
+  }
+}
 
 function retryablePaymentOperation(error: unknown) {
   return error instanceof PaymentOperationRetryableError;

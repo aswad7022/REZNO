@@ -32,7 +32,9 @@ export const stage5ClosureFixtureIds = {
 export async function seedStage5ClosureFixture(prisma: PrismaClient) {
   const managedStorage = await seedManagedStorageFixture(prisma);
   const media = await seedMediaGate5bFixture(prisma);
-  const payments = await seedPaymentsGate5cFixture(prisma);
+  const payments = gate6cSuccessor()
+    ? await inspectPaymentsGate5cSuccessorEvidence(prisma)
+    : await seedPaymentsGate5cFixture(prisma);
   return combinedEvidence(managedStorage, media, payments.fingerprint);
 }
 
@@ -40,9 +42,7 @@ export async function stage5ClosureFingerprint(prisma: PrismaClient) {
   const [managedStorage, media, payments] = await Promise.all([
     managedStorageFingerprint(prisma),
     mediaGate5bFingerprint(prisma),
-    process.env.REZNO_STAGE6_GATE6C_SUCCESSOR === "true"
-      && process.env.REZNO_STAGE6_GATE6C_CONFIRM
-        === "REZNO_STAGE6_GATE6C_STAGING_ONLY"
+    gate6cSuccessor()
       ? inspectPaymentsGate5cSuccessorEvidence(prisma)
       : materializePaymentsGate5cEvidence(prisma),
   ]);
@@ -79,4 +79,10 @@ function combinedEvidence(
       .update(JSON.stringify(components))
       .digest("hex"),
   };
+}
+
+function gate6cSuccessor() {
+  return process.env.REZNO_STAGE6_GATE6C_SUCCESSOR === "true"
+    && process.env.REZNO_STAGE6_GATE6C_CONFIRM
+      === "REZNO_STAGE6_GATE6C_STAGING_ONLY";
 }

@@ -160,3 +160,71 @@ test(
     );
   },
 );
+
+test(
+  "Gate 5D successor seed preserves Gate 6C provider-event references",
+  { concurrency: false },
+  async (t) => {
+    await cleanupStage5ClosureFixture(prisma);
+    await seedStage5ClosureFixture(prisma);
+    const intent = await prisma.paymentIntent.findUniqueOrThrow({
+      where: { id: ids.payments.intentIds[0] },
+      select: { id: true, provider: true, providerReference: true },
+    });
+    const providerEventId = randomUUID();
+    const previousSuccessor = process.env.REZNO_STAGE6_GATE6C_SUCCESSOR;
+    const previousConfirmation = process.env.REZNO_STAGE6_GATE6C_CONFIRM;
+    process.env.REZNO_STAGE6_GATE6C_SUCCESSOR = "true";
+    process.env.REZNO_STAGE6_GATE6C_CONFIRM =
+      "REZNO_STAGE6_GATE6C_STAGING_ONLY";
+    await prisma.paymentProviderEvent.create({
+      data: {
+        createdAt: new Date(),
+        id: providerEventId,
+        normalizedType: "AUTHORIZED",
+        occurredAt: new Date(),
+        payloadHash: "a".repeat(64),
+        paymentIntentId: intent.id,
+        processedAt: new Date(),
+        provider: intent.provider,
+        providerEventId: `gate5d-successor-${providerEventId}`,
+        providerReference: intent.providerReference,
+        status: "IGNORED",
+        updatedAt: new Date(),
+        verifiedAt: new Date(),
+      },
+    });
+
+    t.after(async () => {
+      if (previousSuccessor === undefined) {
+        delete process.env.REZNO_STAGE6_GATE6C_SUCCESSOR;
+      } else {
+        process.env.REZNO_STAGE6_GATE6C_SUCCESSOR = previousSuccessor;
+      }
+      if (previousConfirmation === undefined) {
+        delete process.env.REZNO_STAGE6_GATE6C_CONFIRM;
+      } else {
+        process.env.REZNO_STAGE6_GATE6C_CONFIRM = previousConfirmation;
+      }
+      await prisma.paymentProviderEvent.deleteMany({
+        where: { id: providerEventId },
+      });
+      await cleanupStage5ClosureFixture(prisma);
+      await prisma.$disconnect();
+    });
+
+    const evidence = await seedStage5ClosureFixture(prisma);
+    assert.equal(typeof evidence.fingerprint, "string");
+    assert.ok(
+      await prisma.paymentProviderEvent.findUnique({
+        where: { id: providerEventId },
+      }),
+    );
+    assert.equal(
+      await prisma.paymentIntent.count({
+        where: { id: { in: ids.payments.intentIds } },
+      }),
+      ids.payments.intentIds.length,
+    );
+  },
+);

@@ -1151,8 +1151,11 @@ main()
       ? {
           code: "code" in error && typeof error.code === "string" ? error.code : null,
           name: "name" in error && typeof error.name === "string" ? error.name : "Error",
+          source: "stack" in error && typeof error.stack === "string"
+            ? error.stack.match(/smoke-storage-media-gate6b\.ts:(\d+):(\d+)/u)?.[0] ?? null
+            : null,
         }
-      : { code: null, name: "Error" };
+      : { code: null, name: "Error", source: null };
     console.error(`Gate 6B staging smoke failed closed at ${smokePhase}: ${JSON.stringify({ diagnostic: smokeDiagnostic, error: safeError })}.`);
   })
   .finally(async () => {
