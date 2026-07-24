@@ -29,6 +29,11 @@ const gate6cSuccessor =
   process.env.REZNO_STAGE6_GATE6C_SUCCESSOR === "true"
   && process.env.REZNO_STAGE6_GATE6C_CONFIRM
     === "REZNO_STAGE6_GATE6C_STAGING_ONLY";
+const gate6dSuccessor =
+  process.env.REZNO_STAGE6_GATE6D_SUCCESSOR === "true"
+  && process.env.REZNO_STAGE6_GATE6D_CONFIRM
+    === "REZNO_STAGE6_GATE6D_STAGING_ONLY";
+const rollingRetentionSuccessor = gate6cSuccessor || gate6dSuccessor;
 const successorUtcDay = new Date();
 successorUtcDay.setUTCHours(0, 0, 0, 0);
 
@@ -326,6 +331,16 @@ export async function storageMediaGate6bFixtureFingerprint(prisma: PrismaClient)
 
 export async function storageMediaGate6bNonFixtureFingerprint(prisma: PrismaClient) {
   const ids = storageMediaGate6bFixtureIds;
+  const gate6dOperationTables = new Set([
+    "DistributedRateLimitBucket",
+    "PlatformAlert",
+    "PlatformAlertHistory",
+    "PlatformIncident",
+    "PlatformIncidentHistory",
+    "PlatformOperationMutation",
+    "PlatformRuntimeControl",
+    "PlatformRuntimeInvocation",
+  ]);
   const tables = await prisma.$queryRaw<Array<{ table: string }>>(Prisma.sql`
     SELECT tablename AS table
     FROM pg_tables
@@ -334,6 +349,7 @@ export async function storageMediaGate6bNonFixtureFingerprint(prisma: PrismaClie
   `);
   const components: Array<{ count: string; digest: string; table: string }> = [];
   for (const { table } of tables) {
+    if (gate6dOperationTables.has(table)) continue;
     if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(table)) throw new Error("Unexpected staging table identifier.");
     const quoted = `"${table.replaceAll('"', '""')}"`;
     const where = nonFixtureWhere(table, ids);
@@ -469,14 +485,14 @@ function sessionRows() {
     expired(
       ids.sessions.retainedOrphan,
       1,
-      gate6cSuccessor
+      rollingRetentionSuccessor
         ? successorUtcDay
         : new Date("2026-07-22T14:00:00.123456Z"),
     ),
     expired(
       ids.sessions.dueOrphan,
       2,
-      gate6cSuccessor
+      rollingRetentionSuccessor
         ? new Date(successorUtcDay.getTime() - 3 * 86_400_000)
         : new Date("2026-07-20T14:00:00.123456Z"),
     ),

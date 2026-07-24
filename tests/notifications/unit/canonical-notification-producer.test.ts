@@ -28,6 +28,9 @@ function event(input: Partial<CanonicalNotificationEvent> = {}): CanonicalNotifi
 function transactionCapture() {
   const rows: Array<Record<string, unknown>> = [];
   const transaction = {
+    $queryRaw: async () => [{
+      authoritativeNow: "2026-07-18T10:00:00.123456Z",
+    }],
     notificationPreference: { findMany: async () => [] },
     notification: { createMany: async ({ data }: { data: Array<Record<string, unknown>> }) => { rows.push(...data); return { count: data.length }; } },
   } as unknown as Prisma.TransactionClient;
@@ -53,6 +56,23 @@ test("direct and broadcast live events share one injected producer timestamp", a
   for (const row of rows) {
     assert.equal(row.createdAt, producedAt);
     assert.equal(row.occurredAt, producedAt);
+  }
+});
+
+test("live events without an injected time use one exact PostgreSQL transaction timestamp", async () => {
+  const { rows, transaction } = transactionCapture();
+  await createCanonicalNotifications(transaction, [
+    event(),
+    event({
+      audience: "ALL",
+      eventKey: "producer:ALL:database-time",
+      recipientPersonId: undefined,
+    }),
+  ]);
+  assert.equal(rows.length, 2);
+  for (const row of rows) {
+    assert.equal(row.createdAt, "2026-07-18T10:00:00.123456Z");
+    assert.equal(row.occurredAt, "2026-07-18T10:00:00.123456Z");
   }
 });
 

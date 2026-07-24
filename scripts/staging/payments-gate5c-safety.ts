@@ -8,9 +8,15 @@ export async function assertPaymentsGate5cStaging(
   prisma: SafetyClient,
   environment: NodeJS.ProcessEnv = process.env,
 ) {
-  const expectedMigrations = environment.REZNO_STAGE6_GATE6C_SUCCESSOR === "true"
-    ? BigInt(48)
-    : BigInt(42);
+  const gate6dSuccessor =
+    environment.REZNO_STAGE6_GATE6D_SUCCESSOR === "true"
+    && environment.REZNO_STAGE6_GATE6D_CONFIRM
+      === "REZNO_STAGE6_GATE6D_STAGING_ONLY";
+  const expectedMigrations = gate6dSuccessor
+    ? BigInt(49)
+    : environment.REZNO_STAGE6_GATE6C_SUCCESSOR === "true"
+      ? BigInt(48)
+      : BigInt(42);
   if (
     environment.NODE_ENV === "production" ||
     environment.REZNO_ENV !== "staging" ||

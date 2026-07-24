@@ -267,6 +267,7 @@ async function main() {
     expectedVersion: deleteTarget.version,
   });
   const revokedDeleteOutcome = await runHandler(revokedDelete);
+  smokeDiagnostic = { revokedDeleteOutcome };
   assert.deepEqual(revokedDeleteOutcome, { errorCode: "PERMANENT_FAILURE", outcome: "FAILED", retryable: false });
   const retainedDelete = await prisma.storedAsset.findUniqueOrThrow({ where: { id: deleteTarget.id } });
   assert.equal(retainedDelete.state, "DELETE_PENDING");

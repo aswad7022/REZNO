@@ -15,6 +15,7 @@ import {
   parseFavoriteTarget,
 } from "../../../features/commerce/api/validation";
 import {
+  commerceNotificationEventKey,
   commerceNotificationCopy,
   commerceNotificationTranslations,
   notificationLanguageCodeFromUiLocale,
@@ -25,9 +26,10 @@ import { decodePublicCursor, encodePublicCursor } from "../../../features/commer
 import { favoriteFingerprint } from "../../../features/commerce/domain/favorite";
 import {
   customerOrderFingerprint,
+} from "../../../features/commerce/domain/customer-order-query";
+import {
   type CustomerOrderRecord,
 } from "../../../features/commerce/services/customer-order-query-service";
-import { commerceNotificationEventKey } from "../../../features/commerce/services/commerce-notification-service";
 
 function jsonRequest(body: unknown) {
   return new Request("http://localhost/api/commerce/test", {

@@ -247,7 +247,7 @@ test("Stage 4B staging fixture is confirmation-gated, production-refusing, bound
   assert.match(actorService, /FOR SHARE OF access/);
   assert.match(actorService, /test hooks are unavailable in production/);
   assert.match(deliveryService, /Messaging rate-limit test hooks are unavailable in production/);
-  assert.match(deliveryService, /findReplayCandidate[\s\S]+if \(!existing\) enforceStartRate/);
+  assert.match(deliveryService, /findReplayCandidate[\s\S]+if \(!existing\) await enforceStartRate/);
   assert.doesNotMatch(queryService, /\bprisma\./);
   assert.match(queryService, /messagingSerializable/);
   assert.match(fixture, /ownership collision/);

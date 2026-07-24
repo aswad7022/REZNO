@@ -4,9 +4,12 @@ export const MEDIA_GATE5B_CONFIRMATION = "REZNO_MEDIA_GATE5B_STAGING_ONLY";
 const STORAGE_MEDIA_GATE6B_CONFIRMATION = "REZNO_STAGE6_GATE6B_STAGING_ONLY";
 const COMMUNICATIONS_PAYMENT_GATE6C_CONFIRMATION =
   "REZNO_STAGE6_GATE6C_STAGING_ONLY";
+const PLATFORM_OPERATIONS_GATE6D_CONFIRMATION =
+  "REZNO_STAGE6_GATE6D_STAGING_ONLY";
 const GATE5B_MIGRATIONS = BigInt(42);
 const GATE6B_SUCCESSOR_MIGRATIONS = BigInt(47);
 const GATE6C_SUCCESSOR_MIGRATIONS = BigInt(48);
+const GATE6D_SUCCESSOR_MIGRATIONS = BigInt(49);
 
 type SafetyClient = Pick<PrismaClient, "$queryRaw">;
 
@@ -46,8 +49,14 @@ export async function assertMediaGate5bStaging(
     environment.REZNO_STAGE6_GATE6C_SUCCESSOR === "true"
     && environment.REZNO_STAGE6_GATE6C_CONFIRM
       === COMMUNICATIONS_PAYMENT_GATE6C_CONFIRMATION;
-  const expectedMigrations = gate6cSuccessor
-    ? GATE6C_SUCCESSOR_MIGRATIONS
+  const gate6dSuccessor =
+    environment.REZNO_STAGE6_GATE6D_SUCCESSOR === "true"
+    && environment.REZNO_STAGE6_GATE6D_CONFIRM
+      === PLATFORM_OPERATIONS_GATE6D_CONFIRMATION;
+  const expectedMigrations = gate6dSuccessor
+    ? GATE6D_SUCCESSOR_MIGRATIONS
+    : gate6cSuccessor
+      ? GATE6C_SUCCESSOR_MIGRATIONS
     : gate6bSuccessor
       ? GATE6B_SUCCESSOR_MIGRATIONS
       : GATE5B_MIGRATIONS;
@@ -60,8 +69,10 @@ export async function assertMediaGate5bStaging(
   }
   return {
     database: "rezno_staging" as const,
-    migrations: gate6cSuccessor
-      ? "48/48" as const
+    migrations: gate6dSuccessor
+      ? "49/49" as const
+      : gate6cSuccessor
+        ? "48/48" as const
       : gate6bSuccessor
         ? "47/47" as const
         : "42/42" as const,

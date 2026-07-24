@@ -5,15 +5,14 @@ import {
   type Gate6aTransportEvidence,
 } from "../../lib/db/postgres-transport";
 
-export const COMMUNICATIONS_PAYMENT_GATE6C_CONFIRMATION =
-  "REZNO_STAGE6_GATE6C_STAGING_ONLY";
-const PLATFORM_OPERATIONS_GATE6D_CONFIRMATION =
+export const PLATFORM_OPERATIONS_GATE6D_CONFIRMATION =
   "REZNO_STAGE6_GATE6D_STAGING_ONLY";
+const EXPECTED_MIGRATIONS = BigInt(49);
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "::1", "localhost"]);
 
 type SafetyClient = Pick<PrismaClient, "$queryRaw">;
 
-export async function assertCommunicationsPaymentGate6cStaging(
+export async function assertPlatformOperationsGate6dStaging(
   prisma: SafetyClient,
   environment: NodeJS.ProcessEnv = process.env,
   transportEvidence?: Gate6aTransportEvidence,
@@ -21,18 +20,13 @@ export async function assertCommunicationsPaymentGate6cStaging(
   if (
     environment.NODE_ENV === "production"
     || environment.REZNO_ENV !== "staging"
-    || environment.REZNO_STAGE6_GATE6C_CONFIRM
-      !== COMMUNICATIONS_PAYMENT_GATE6C_CONFIRMATION
+    || environment.REZNO_STAGE6_GATE6D_CONFIRM
+      !== PLATFORM_OPERATIONS_GATE6D_CONFIRMATION
   ) {
     throw new Error(
-      "Gate 6C fixture requires the exact non-production staging environment and confirmation marker.",
+      "Gate 6D fixture requires the exact non-production staging environment and confirmation marker.",
     );
   }
-  const gate6dSuccessor =
-    environment.REZNO_STAGE6_GATE6D_SUCCESSOR === "true"
-    && environment.REZNO_STAGE6_GATE6D_CONFIRM
-      === PLATFORM_OPERATIONS_GATE6D_CONFIRMATION;
-  const expectedMigrations = gate6dSuccessor ? BigInt(49) : BigInt(48);
 
   const target = parseDatabaseTarget(environment.DATABASE_URL);
   const localOverrideRequested = isExactLocalTestTarget(environment, target);
@@ -56,15 +50,18 @@ export async function assertCommunicationsPaymentGate6cStaging(
   `;
   if (
     connection?.database !== "rezno_staging"
-    || /prod(?:uction)?|live/i.test(connection?.database ?? "")
+    || /prod(?:uction)?|live/iu.test(connection?.database ?? "")
   ) {
     throw new Error(
-      "Gate 6C fixture requires the exact non-production rezno_staging database.",
+      "Gate 6D fixture requires the exact non-production rezno_staging database.",
     );
   }
-  if (target.database !== connection.database || target.user !== connection.user) {
+  if (
+    target.database !== connection.database
+    || target.user !== connection.user
+  ) {
     throw new Error(
-      "Gate 6C DATABASE_URL does not match the authenticated staging database and role.",
+      "Gate 6D DATABASE_URL does not match the authenticated staging database and role.",
     );
   }
 
@@ -96,13 +93,13 @@ export async function assertCommunicationsPaymentGate6cStaging(
     FROM "_prisma_migrations"
   `;
   if (
-    migrations?.total !== expectedMigrations
-    || migrations.applied !== expectedMigrations
+    migrations?.total !== EXPECTED_MIGRATIONS
+    || migrations.applied !== EXPECTED_MIGRATIONS
     || migrations.failed !== BigInt(0)
     || migrations.rolledBack !== BigInt(0)
   ) {
     throw new Error(
-      `Gate 6C fixture requires an exact healthy ${expectedMigrations}/${expectedMigrations} migration state.`,
+      "Gate 6D fixture requires an exact healthy 49/49 migration state.",
     );
   }
 
@@ -120,7 +117,7 @@ export async function assertCommunicationsPaymentGate6cStaging(
     hostnameVerified: localUnencrypted
       ? false
       : transportEvidence!.hostnameVerified,
-    migrations: gate6dSuccessor ? "49/49" as const : "48/48" as const,
+    migrations: "49/49" as const,
     prismaUsedAttestedPhysicalClient: localUnencrypted
       ? false
       : transportEvidence!.prismaUsedAttestedPhysicalClient,
@@ -145,27 +142,29 @@ type DatabaseTarget = {
 };
 
 function parseDatabaseTarget(databaseUrl: string | undefined): DatabaseTarget {
-  if (!databaseUrl) throw new Error("Gate 6C staging requires DATABASE_URL.");
+  if (!databaseUrl) {
+    throw new Error("Gate 6D staging requires DATABASE_URL.");
+  }
   let parsed: URL;
   try {
     parsed = new URL(databaseUrl);
   } catch {
-    throw new Error("Gate 6C staging requires a parseable DATABASE_URL.");
+    throw new Error("Gate 6D staging requires a parseable DATABASE_URL.");
   }
   if (parsed.protocol !== "postgresql:" && parsed.protocol !== "postgres:") {
     throw new Error(
-      "Gate 6C staging requires a PostgreSQL DATABASE_URL protocol.",
+      "Gate 6D staging requires a PostgreSQL DATABASE_URL protocol.",
     );
   }
   if (parsed.pathname !== "/rezno_staging") {
     throw new Error(
-      "Gate 6C DATABASE_URL must use the exact rezno_staging path.",
+      "Gate 6D DATABASE_URL must use the exact rezno_staging path.",
     );
   }
   const sslmodes = parsed.searchParams.getAll("sslmode");
   if (sslmodes.length > 1) {
     throw new Error(
-      "Gate 6C DATABASE_URL must contain at most one sslmode value.",
+      "Gate 6D DATABASE_URL must contain at most one sslmode value.",
     );
   }
   let user: string;
@@ -173,12 +172,12 @@ function parseDatabaseTarget(databaseUrl: string | undefined): DatabaseTarget {
     user = decodeURIComponent(parsed.username);
   } catch {
     throw new Error(
-      "Gate 6C DATABASE_URL contains an invalid encoded username.",
+      "Gate 6D DATABASE_URL contains an invalid encoded username.",
     );
   }
   if (!user) {
     throw new Error(
-      "Gate 6C DATABASE_URL requires an explicit database username.",
+      "Gate 6D DATABASE_URL requires an explicit database username.",
     );
   }
   return {
@@ -196,7 +195,7 @@ function isExactLocalTestOverride(
   connection: { database: string; encrypted: boolean; user: string },
 ) {
   if (
-    environment.REZNO_STAGE6_GATE6C_ALLOW_LOCAL_UNENCRYPTED !== "true"
+    environment.REZNO_STAGE6_GATE6D_ALLOW_LOCAL_UNENCRYPTED !== "true"
   ) {
     return false;
   }
@@ -209,7 +208,7 @@ function isExactLocalTestOverride(
     || (target.sslmode !== null && target.sslmode !== "disable")
   ) {
     throw new Error(
-      "Gate 6C local-unencrypted override is restricted to the exact loopback test target.",
+      "Gate 6D local-unencrypted override is restricted to the exact loopback test target.",
     );
   }
   return true;
@@ -219,7 +218,7 @@ function isExactLocalTestTarget(
   environment: NodeJS.ProcessEnv,
   target: DatabaseTarget,
 ) {
-  return environment.REZNO_STAGE6_GATE6C_ALLOW_LOCAL_UNENCRYPTED === "true"
+  return environment.REZNO_STAGE6_GATE6D_ALLOW_LOCAL_UNENCRYPTED === "true"
     && environment.NODE_ENV === "test"
     && LOOPBACK_HOSTS.has(target.host)
     && target.database === "rezno_staging"
@@ -232,15 +231,15 @@ function assertExactRealStagingTarget(
   connection: { database: string; user: string },
 ) {
   const expectedHost = environment
-    .REZNO_STAGE6_GATE6C_EXPECTED_DATABASE_HOST
+    .REZNO_STAGE6_GATE6D_EXPECTED_DATABASE_HOST
     ?.trim()
     .toLowerCase();
   const expectedRole = environment
-    .REZNO_STAGE6_GATE6C_EXPECTED_DATABASE_ROLE
+    .REZNO_STAGE6_GATE6D_EXPECTED_DATABASE_ROLE
     ?.trim();
   if (!expectedHost || !expectedRole) {
     throw new Error(
-      "Gate 6C staging requires authenticated expected host and role confirmations.",
+      "Gate 6D staging requires authenticated expected host and role confirmations.",
     );
   }
   if (
@@ -249,20 +248,20 @@ function assertExactRealStagingTarget(
     || LOOPBACK_HOSTS.has(target.host)
   ) {
     throw new Error(
-      "Gate 6C staging requires the direct non-pooler Neon endpoint.",
+      "Gate 6D staging requires the direct non-pooler Neon endpoint.",
     );
   }
   if (target.sslmode !== "verify-full") {
-    throw new Error("Gate 6C staging requires sslmode=verify-full.");
+    throw new Error("Gate 6D staging requires sslmode=verify-full.");
   }
   if (expectedHost !== target.host) {
     throw new Error(
-      "Gate 6C DATABASE_URL host does not match authenticated Neon discovery.",
+      "Gate 6D DATABASE_URL host does not match authenticated Neon discovery.",
     );
   }
   if (expectedRole !== connection.user || expectedRole !== target.user) {
     throw new Error(
-      "Gate 6C database role does not match authenticated Neon discovery.",
+      "Gate 6D database role does not match authenticated Neon discovery.",
     );
   }
 }

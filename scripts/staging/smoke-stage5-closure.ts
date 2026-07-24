@@ -16,6 +16,15 @@ import { assertStage5ClosureStaging } from "./stage5-closure-safety";
 
 async function main() {
   const safety = await assertStage5ClosureStaging(prisma);
+  const gate6cSuccessor =
+    process.env.REZNO_STAGE6_GATE6C_SUCCESSOR === "true"
+    && process.env.REZNO_STAGE6_GATE6C_CONFIRM
+      === "REZNO_STAGE6_GATE6C_STAGING_ONLY";
+  const gate6dSuccessor =
+    process.env.REZNO_STAGE6_GATE6D_SUCCESSOR === "true"
+    && process.env.REZNO_STAGE6_GATE6D_CONFIRM
+      === "REZNO_STAGE6_GATE6D_STAGING_ONLY";
+  const automationSuccessor = gate6cSuccessor || gate6dSuccessor;
   const before = await stage5ClosureFingerprint(prisma);
   let checks = 0;
 
@@ -63,7 +72,11 @@ async function main() {
 
   assert.equal(storageAssets.length, ids.managedStorage.assetIds.length);
   assert.equal(mediaAssets.length, ids.media.assetIds.length);
-  assert.equal(paymentIntents.length, ids.payments.intentIds.length);
+  assert.equal(
+    paymentIntents.length,
+    ids.payments.intentIds.length,
+    "Gate 5D successor smoke requires the exact Gate 5C fixture to be seeded before read-only payment inspection.",
+  );
   assert.ok(activeBindings.length > 0);
   checks += 4;
 
@@ -88,11 +101,7 @@ async function main() {
     checks += 4;
   }
 
-  const gate6cSuccessor =
-    process.env.REZNO_STAGE6_GATE6C_SUCCESSOR === "true"
-    && process.env.REZNO_STAGE6_GATE6C_CONFIRM
-      === "REZNO_STAGE6_GATE6C_STAGING_ONLY";
-  if (gate6cSuccessor) {
+  if (automationSuccessor) {
     const paymentEvidence =
       await inspectPaymentsGate5cSuccessorEvidence(prisma);
     assert.equal(paymentEvidence.evidence.balanced, true);

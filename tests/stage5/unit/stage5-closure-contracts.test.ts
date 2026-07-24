@@ -133,7 +133,7 @@ test("payment handoffs preserve the official Stage 6, 7, 8, and AI ownership", (
   ]);
 });
 
-test("Stage 6 preserves Gate 5D through the additive Gate 6A, Gate 6B, and Gate 6C migrations", async () => {
+test("Stage 6 preserves Gate 5D through the additive Gate 6A through Gate 6D migrations", async () => {
   const migrations = (
     await readdir(new URL("../../../prisma/migrations/", import.meta.url), {
       withFileTypes: true,
@@ -142,7 +142,7 @@ test("Stage 6 preserves Gate 5D through the additive Gate 6A, Gate 6B, and Gate 
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
     .sort();
-  assert.equal(migrations.length, 48);
+  assert.equal(migrations.length, 49);
   assert.equal(
     migrations.includes("20260720140000_payments_financial_integrity_foundation"),
     true,
@@ -175,7 +175,34 @@ test("Stage 6 preserves Gate 5D through the additive Gate 6A, Gate 6B, and Gate 
     migrations.includes("20260723180000_communications_payment_automation"),
     true,
   );
-  assert.equal(migrations.filter((name) => name > "20260721130000_payment_financial_integrity_closure").length, 6);
+  assert.equal(
+    migrations.includes("20260724180000_platform_operations_closure"),
+    true,
+  );
+  assert.equal(migrations.filter((name) => name > "20260721130000_payment_financial_integrity_closure").length, 7);
+});
+
+test("Gate 5C staging fixture keeps its remote seed transaction bounded above the Prisma default", async () => {
+  const source = await readFile(
+    new URL(
+      "../../../scripts/staging/payments-gate5c-fixture.ts",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  const seedStart = source.indexOf(
+    "export async function seedPaymentsGate5cFixture",
+  );
+  const materializeStart = source.indexOf(
+    "export async function materializePaymentsGate5cEvidence",
+  );
+  assert.notEqual(seedStart, -1);
+  assert.equal(materializeStart > seedStart, true);
+  const seedSource = source.slice(seedStart, materializeStart);
+  assert.match(
+    seedSource,
+    /\{ isolationLevel: "Serializable", timeout: 30_000 \}\);/u,
+  );
 });
 
 test("provider registries reject production test-provider activation", async () => {

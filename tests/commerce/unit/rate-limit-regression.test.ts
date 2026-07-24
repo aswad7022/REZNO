@@ -37,7 +37,7 @@ test("direct peer identity wins when proxy trust is disabled", () => {
   );
 });
 
-test("missing peer uses a bounded fingerprint and never one global empty fallback bucket", () => {
+test("missing peer uses a bounded fingerprint and a stable fail-closed scoped fallback", () => {
   const first = getRateLimitIdentifierFromHeaders(new Headers({ "user-agent": "client-a" }), "fallback");
   const second = getRateLimitIdentifierFromHeaders(new Headers({ "user-agent": "client-b" }), "fallback");
   assert.match(first, /^fingerprint:/);
@@ -45,8 +45,12 @@ test("missing peer uses a bounded fingerprint and never one global empty fallbac
 
   const unidentifiedA = getRateLimitIdentifierFromHeaders(new Headers(), "fallback");
   const unidentifiedB = getRateLimitIdentifierFromHeaders(new Headers(), "fallback");
-  assert.match(unidentifiedA, /^ephemeral:/);
-  assert.notEqual(unidentifiedA, unidentifiedB);
+  assert.match(unidentifiedA, /^unidentified:/);
+  assert.equal(unidentifiedA, unidentifiedB);
+  assert.notEqual(
+    unidentifiedA,
+    getRateLimitIdentifierFromHeaders(new Headers(), "different-fallback"),
+  );
 });
 
 test("one explicitly configured trusted header accepts only one normalized valid IP", () => {
@@ -71,8 +75,30 @@ test("one explicitly configured trusted header accepts only one normalized valid
   assert.notEqual(forwarded, realIp);
   assert.equal(configuredTrustedProxyHeader("x-forwarded-for"), "x-forwarded-for");
   assert.equal(configuredTrustedProxyHeader("x-real-ip"), "x-real-ip");
-  assert.equal(configuredTrustedProxyHeader("true"), undefined);
-  assert.equal(configuredTrustedProxyHeader("X-Forwarded-For"), undefined);
+  assert.equal(
+    configuredTrustedProxyHeader("x-vercel-forwarded-for"),
+    "x-vercel-forwarded-for",
+  );
+  assert.equal(configuredTrustedProxyHeader(undefined, "1"), "x-vercel-forwarded-for");
+  assert.equal(configuredTrustedProxyHeader("true", "1"), undefined);
+  assert.equal(configuredTrustedProxyHeader("X-Forwarded-For", "1"), undefined);
+
+  const vercel = getRateLimitIdentifierFromHeaders(
+    new Headers({
+      "x-forwarded-for": "198.51.100.1",
+      "x-vercel-forwarded-for": "203.0.113.9",
+    }),
+    "fallback",
+    { trustedProxyHeader: configuredTrustedProxyHeader(undefined, "1") },
+  );
+  assert.equal(
+    vercel,
+    getRateLimitIdentifierFromHeaders(
+      new Headers({ "x-vercel-forwarded-for": "203.0.113.9" }),
+      "different-fallback",
+      { trustedProxyHeader: "x-vercel-forwarded-for" },
+    ),
+  );
 });
 
 test("malformed, chained, empty, and conflicting forwarding values cannot become trusted IPs", () => {
