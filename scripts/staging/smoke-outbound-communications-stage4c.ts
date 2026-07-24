@@ -42,6 +42,9 @@ let smokeCheckpoint = "bootstrap";
 
 async function main() {
   validateOutboundStage4cEnvironment(process.env);
+  const gate6cSuccessor = process.env.REZNO_STAGE6_GATE6C_SUCCESSOR === "true"
+    && process.env.REZNO_STAGE6_GATE6C_CONFIRM === "REZNO_STAGE6_GATE6C_STAGING_ONLY";
+  const expectedMigrations = gate6cSuccessor ? 48 : 38;
   smokeCheckpoint = "aggregate-queries";
   const [
     campaigns,
@@ -112,7 +115,7 @@ async function main() {
     `),
   ]);
 
-  assert.equal(Number(migrations[0]?.count), 38);
+  assert.equal(Number(migrations[0]?.count), expectedMigrations);
   assert.ok(broadcastMutation);
   const [broadcastDeliveries, campaignCount, inAppCampaigns, inAppNotifications, notConfigured, transient, permanent] = await Promise.all([
     prisma.outboundDelivery.count({ where: { campaignId: broadcastMutation.campaignId } }),
@@ -160,7 +163,10 @@ async function main() {
   assert.ok(suppressedByReason.PREFERENCE_DISABLED >= 1);
   smokeCheckpoint = "provider-outcome-assertions";
   assert.equal(notConfigured, 1);
-  assert.equal(transient, 1);
+  // Gate 6C deliberately consumes the one retryable Gate 4C fixture delivery.
+  // Its successor smoke therefore proves the retry left RETRY_SCHEDULED, while
+  // the original Gate 4C smoke continues to prove the pre-automation state.
+  assert.equal(transient, gate6cSuccessor ? 0 : 1);
   assert.equal(permanent, 1);
   assert.equal(inAppCampaigns, inAppNotifications);
   smokeCheckpoint = "audit-access-assertions";
@@ -367,25 +373,34 @@ async function main() {
   setCommunicationEndpointDiagnosticsTestHook((diagnostics) => {
     endpointDiagnostics.push(diagnostics);
   });
-  const audiencePreviews = await Promise.all([
-    previewCampaignAudience(fullContext, {
+  const audienceInputs = [
+    {
       audience: "CUSTOMERS", targetPersonId: null, targetOrganizationId: null,
       channels: ["IN_APP", "EMAIL", "SMS", "PUSH"], category: "ADMIN_ANNOUNCEMENT", mandatory: false,
-    }),
-    previewCampaignAudience(fullContext, {
+    },
+    {
       audience: "BUSINESS_OWNERS", targetPersonId: null, targetOrganizationId: null,
       channels: ["IN_APP"], category: "ADMIN_ANNOUNCEMENT", mandatory: false,
-    }),
-    previewCampaignAudience(fullContext, {
+    },
+    {
       audience: "RESTAURANTS", targetPersonId: null, targetOrganizationId: null,
       channels: ["IN_APP"], category: "ADMIN_ANNOUNCEMENT", mandatory: false,
-    }),
-    previewCampaignAudience(fullContext, {
+    },
+    {
       audience: "BUSINESS", targetPersonId: null, targetOrganizationId: ORGANIZATION_ID,
       channels: ["IN_APP"], category: "ADMIN_ANNOUNCEMENT", mandatory: false,
-    }),
-  ]);
-  setCommunicationEndpointDiagnosticsTestHook(undefined);
+    },
+  ] as const;
+  const audiencePreviews: Array<
+    Awaited<ReturnType<typeof previewCampaignAudience>>
+  > = [];
+  try {
+    for (const input of audienceInputs) {
+      audiencePreviews.push(await previewCampaignAudience(fullContext, input));
+    }
+  } finally {
+    setCommunicationEndpointDiagnosticsTestHook(undefined);
+  }
   assert.ok(audiencePreviews.every((preview) => preview.evaluated > 0 && !preview.tooLarge));
   const outboundPreviewDiagnostics = endpointDiagnostics.find((item) => item.selectedChannels.length === 3);
   assert.ok(outboundPreviewDiagnostics);
@@ -407,7 +422,7 @@ async function main() {
   smokeCheckpoint = "output-redaction";
   const output = {
     fixture: OUTBOUND_STAGE4C_FIXTURE,
-    migrations: 38,
+    migrations: expectedMigrations,
     campaignCount,
     broadcastDeliveries,
     statuses,
@@ -416,6 +431,7 @@ async function main() {
     suppressedByReason,
     providerNotConfigured: notConfigured,
     retryScheduled: transient,
+    gate6cProcessedRetry: gate6cSuccessor,
     sinkPermanentFailure: permanent,
     inAppExactOnce: inAppCampaigns,
     campaignPagesVerified: 2,

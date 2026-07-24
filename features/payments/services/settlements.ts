@@ -22,6 +22,7 @@ import { paymentDecimal, paymentMoneyString, paymentSignedMoneyString } from "@/
 import { notifySettlementFinalized } from "@/features/payments/services/payment-notifications";
 import { runPaymentSerializable } from "@/features/payments/services/transaction";
 import { getExactPostgresTime } from "@/lib/db/postgres-timestamp";
+import type { PaymentExecutionGuard } from "@/features/payments/services/provider-events";
 
 const MAX_SETTLEMENT_JOURNALS = 500;
 const MAX_PERIOD_MS = 366 * 24 * 60 * 60 * 1000;
@@ -43,10 +44,12 @@ export async function previewSettlement(
     periodEnd: Date;
     periodStart: Date;
   },
+  executionGuard?: PaymentExecutionGuard,
 ) {
   assertSettlementPeriod(input.periodStart, input.periodEnd);
   return runPaymentSerializable(async (transaction) => {
     await assertCommerceAdminCurrent(transaction, context, "SETTLEMENTS_MANAGE");
+    await executionGuard?.(transaction);
     const organization = await transaction.organization.findFirst({
       where: { deletedAt: null, id: input.organizationId },
       select: { id: true },
@@ -74,6 +77,17 @@ export async function previewSettlement(
       }
       return settlementBatchDto(replay);
     }
+    const canonicalDraft = await transaction.settlementBatch.findFirst({
+      where: {
+        currency: input.currency,
+        organizationId: input.organizationId,
+        periodEnd: input.periodEnd,
+        periodStart: input.periodStart,
+        status: "DRAFT",
+      },
+      include: settlementDtoInclude,
+    });
+    if (canonicalDraft) return settlementBatchDto(canonicalDraft);
     const candidates = await settlementCandidates(transaction, input);
     if (candidates.length > MAX_SETTLEMENT_JOURNALS) {
       paymentError("VALIDATION_ERROR", "Settlement period has too many Journals; choose a shorter period.");
@@ -112,6 +126,7 @@ export async function previewSettlement(
       },
       include: settlementDtoInclude,
     });
+    await executionGuard?.(transaction);
     await transaction.adminAuditLog.create({
       data: {
         action: "payments.settlement.preview",

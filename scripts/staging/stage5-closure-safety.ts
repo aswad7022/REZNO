@@ -1,6 +1,8 @@
 import type { PrismaClient } from "@prisma/client";
 
 export const STAGE5_CLOSURE_CONFIRMATION = "REZNO_STAGE5_GATE5D_STAGING_ONLY";
+const COMMUNICATIONS_PAYMENT_GATE6C_CONFIRMATION =
+  "REZNO_STAGE6_GATE6C_STAGING_ONLY";
 
 type SafetyClient = Pick<PrismaClient, "$queryRaw">;
 
@@ -8,6 +10,11 @@ export async function assertStage5ClosureStaging(
   prisma: SafetyClient,
   environment: NodeJS.ProcessEnv = process.env,
 ) {
+  const gate6cSuccessor =
+    environment.REZNO_STAGE6_GATE6C_SUCCESSOR === "true"
+    && environment.REZNO_STAGE6_GATE6C_CONFIRM
+      === COMMUNICATIONS_PAYMENT_GATE6C_CONFIRMATION;
+  const expectedMigrations = gate6cSuccessor ? BigInt(48) : BigInt(42);
   if (
     environment.NODE_ENV === "production" ||
     environment.REZNO_ENV !== "staging" ||
@@ -43,16 +50,18 @@ export async function assertStage5ClosureStaging(
     FROM "_prisma_migrations"
   `;
   if (
-    migrations?.total !== BigInt(42) ||
-    migrations.applied !== BigInt(42) ||
+    migrations?.total !== expectedMigrations ||
+    migrations.applied !== expectedMigrations ||
     migrations.failed !== BigInt(0) ||
     migrations.rolledBack !== BigInt(0)
   ) {
-    throw new Error("Gate 5D fixture requires an exact healthy 42/42 migration state.");
+    throw new Error(
+      `Gate 5D fixture requires an exact healthy ${expectedMigrations}/${expectedMigrations} migration state.`,
+    );
   }
   return {
     database: "rezno_staging" as const,
-    migrations: "42/42" as const,
+    migrations: gate6cSuccessor ? "48/48" as const : "42/42" as const,
     rolledBack: 0 as const,
   };
 }

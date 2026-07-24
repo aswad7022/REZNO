@@ -27,6 +27,7 @@ import {
   MEDIA_GATE5B_CONFIRMATION,
   assertMediaGate5bStaging,
 } from "../../../scripts/staging/media-gate5b-safety";
+import { COMMUNICATIONS_PAYMENT_GATE6C_CONFIRMATION } from "../../../scripts/staging/communications-payment-gate6c-safety";
 import { STORAGE_MEDIA_GATE6B_CONFIRMATION } from "../../../scripts/staging/storage-media-gate6b-safety";
 
 const translate = (key: string) => key;
@@ -150,7 +151,7 @@ test("Customer Mobile resolves only trusted managed media paths against its API 
   });
 });
 
-test("Gate 5B staging fixture fails closed outside exact staging and accepts only its exact or Gate 6B successor state", async () => {
+test("Gate 5B staging fixture fails closed outside exact staging and accepts only exact successor states", async () => {
   const exactEnvironment = {
     NODE_ENV: "test",
     REZNO_ENV: "staging",
@@ -188,6 +189,32 @@ test("Gate 5B staging fixture fails closed outside exact staging and accepts onl
     {
       database: "rezno_staging",
       migrations: "47/47",
+    },
+  );
+  await assert.rejects(
+    assertMediaGate5bStaging(
+      client("rezno_staging", BigInt(48), BigInt(48)),
+      {
+        ...exactEnvironment,
+        REZNO_STAGE6_GATE6C_CONFIRM: "wrong",
+        REZNO_STAGE6_GATE6C_SUCCESSOR: "true",
+      },
+    ),
+    /42\/42/u,
+  );
+  assert.deepEqual(
+    await assertMediaGate5bStaging(
+      client("rezno_staging", BigInt(48), BigInt(48)),
+      {
+        ...exactEnvironment,
+        REZNO_STAGE6_GATE6C_CONFIRM:
+          COMMUNICATIONS_PAYMENT_GATE6C_CONFIRMATION,
+        REZNO_STAGE6_GATE6C_SUCCESSOR: "true",
+      },
+    ),
+    {
+      database: "rezno_staging",
+      migrations: "48/48",
     },
   );
 });

@@ -1229,6 +1229,7 @@ model OutboundPreferenceMutation {
 
 model OutboundDelivery {
   id                  String                    @id @default(uuid()) @db.Uuid
+  version             Int                       @default(1)
   campaignId          String                    @db.Uuid
   personId            String                    @db.Uuid
   channel             CommunicationChannel
@@ -1879,6 +1880,7 @@ model PaymentIntent {
 
 model PaymentAttempt {
   id                       String               @id @default(uuid()) @db.Uuid
+  version                  Int                  @default(1)
   paymentIntentId          String               @db.Uuid
   attemptNumber            Int
   status                   PaymentAttemptStatus @default(CREATED)
@@ -1887,6 +1889,9 @@ model PaymentAttempt {
   providerPaymentReference String?              @db.VarChar(180)
   idempotencyKey           String               @db.Uuid
   safeProviderCode         String?              @db.VarChar(80)
+  retryable                Boolean?
+  nextRetryAt              DateTime?            @db.Timestamptz(6)
+  retryCount               Int                  @default(0)
   requiresAction           Boolean              @default(false)
   actionReference          String?              @db.VarChar(240)
   actionExpiresAt          DateTime?            @db.Timestamptz(6)
@@ -1903,24 +1908,29 @@ model PaymentAttempt {
   @@unique([provider, providerRequestReference])
   @@index([paymentIntentId, createdAt, id])
   @@index([status, claimExpiresAt])
+  @@index([status, retryable, nextRetryAt, id])
 }
 
 model PaymentProviderEvent {
-  id                String                     @id @default(uuid()) @db.Uuid
-  paymentIntentId   String?                    @db.Uuid
-  provider          PaymentProviderKind
-  providerEventId   String                     @db.VarChar(180)
-  providerReference String?                    @db.VarChar(180)
-  normalizedType    String                     @db.VarChar(80)
-  status            PaymentProviderEventStatus @default(RECEIVED)
-  payloadHash       String                     @db.VarChar(64)
-  safeProviderCode  String?                    @db.VarChar(80)
-  occurredAt        DateTime                   @db.Timestamptz(6)
-  verifiedAt        DateTime?                  @db.Timestamptz(6)
-  processedAt       DateTime?                  @db.Timestamptz(6)
-  createdAt         DateTime                   @default(now()) @db.Timestamptz(6)
-  updatedAt         DateTime                   @updatedAt @db.Timestamptz(6)
-  paymentIntent     PaymentIntent?             @relation(fields: [paymentIntentId], references: [id], onDelete: Restrict)
+  id                 String                     @id @default(uuid()) @db.Uuid
+  paymentIntentId    String?                    @db.Uuid
+  provider           PaymentProviderKind
+  providerEventId    String                     @db.VarChar(180)
+  providerReference  String?                    @db.VarChar(180)
+  normalizedType     String                     @db.VarChar(80)
+  normalizedAmount   Decimal?                   @db.Decimal(18, 3)
+  normalizedCurrency String?                    @db.VarChar(3)
+  status             PaymentProviderEventStatus @default(RECEIVED)
+  processingVersion  Int                        @default(1)
+  payloadHash        String                     @db.VarChar(64)
+  safeProviderCode   String?                    @db.VarChar(80)
+  occurredAt         DateTime                   @db.Timestamptz(6)
+  verifiedAt         DateTime?                  @db.Timestamptz(6)
+  processedAt        DateTime?                  @db.Timestamptz(6)
+  createdAt          DateTime                   @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime                   @updatedAt @db.Timestamptz(6)
+  paymentIntent      PaymentIntent?             @relation(fields: [paymentIntentId], references: [id], onDelete: Restrict)
+  platformJob        PlatformJob?
 
   @@unique([provider, providerEventId])
   @@index([provider, providerReference])
@@ -1929,34 +1939,40 @@ model PaymentProviderEvent {
 }
 
 model PaymentRefund {
-  id                   String              @id @default(uuid()) @db.Uuid
-  paymentIntentId      String              @db.Uuid
-  amount               Decimal             @db.Decimal(18, 3)
-  currency             String              @db.VarChar(3)
-  reasonCode           PaymentRefundReason
-  note                 String?             @db.VarChar(500)
-  requestedByActorType PaymentActorType
-  requestedByActorId   String              @db.VarChar(191)
-  providerReference    String?             @db.VarChar(180)
-  status               PaymentRefundStatus @default(REQUESTED)
-  idempotencyKey       String              @db.Uuid
-  requestHash          String              @db.VarChar(64)
-  safeProviderCode     String?             @db.VarChar(80)
-  claimedBy            String?             @db.VarChar(120)
-  claimExpiresAt       DateTime?           @db.Timestamptz(6)
-  version              Int                 @default(1)
-  createdAt            DateTime            @default(now()) @db.Timestamptz(6)
-  updatedAt            DateTime            @updatedAt @db.Timestamptz(6)
-  completedAt          DateTime?           @db.Timestamptz(6)
-  paymentIntent        PaymentIntent       @relation(fields: [paymentIntentId], references: [id], onDelete: Restrict)
-  journals             FinancialJournal[]
+  id                       String              @id @default(uuid()) @db.Uuid
+  paymentIntentId          String              @db.Uuid
+  amount                   Decimal             @db.Decimal(18, 3)
+  currency                 String              @db.VarChar(3)
+  reasonCode               PaymentRefundReason
+  note                     String?             @db.VarChar(500)
+  requestedByActorType     PaymentActorType
+  requestedByActorId       String              @db.VarChar(191)
+  providerReference        String?             @db.VarChar(180)
+  providerRequestReference String?             @db.VarChar(180)
+  status                   PaymentRefundStatus @default(REQUESTED)
+  idempotencyKey           String              @db.Uuid
+  requestHash              String              @db.VarChar(64)
+  safeProviderCode         String?             @db.VarChar(80)
+  retryable                Boolean?
+  nextRetryAt              DateTime?           @db.Timestamptz(6)
+  retryCount               Int                 @default(0)
+  claimedBy                String?             @db.VarChar(120)
+  claimExpiresAt           DateTime?           @db.Timestamptz(6)
+  version                  Int                 @default(1)
+  createdAt                DateTime            @default(now()) @db.Timestamptz(6)
+  updatedAt                DateTime            @updatedAt @db.Timestamptz(6)
+  completedAt              DateTime?           @db.Timestamptz(6)
+  paymentIntent            PaymentIntent       @relation(fields: [paymentIntentId], references: [id], onDelete: Restrict)
+  journals                 FinancialJournal[]
 
   @@unique([requestedByActorType, requestedByActorId, idempotencyKey])
   @@unique([providerReference])
+  @@unique([providerRequestReference])
   @@index([createdAt, id])
   @@index([paymentIntentId, createdAt, id])
   @@index([status, createdAt, id])
   @@index([status, claimExpiresAt])
+  @@index([status, retryable, nextRetryAt, id])
 }
 
 model FinancialAccount {
@@ -2067,6 +2083,7 @@ model SettlementBatch {
   @@index([createdAt, id])
   @@index([organizationId, createdAt, id])
   @@index([status, createdAt, id])
+  @@index([status, periodEnd, organizationId, id])
 }
 
 model SettlementLine {
@@ -2103,6 +2120,7 @@ model PlatformJob {
   createdByPersonId    String?               @db.Uuid
   scheduleId           String?               @db.Uuid
   parentJobId          String?               @db.Uuid
+  providerEventId      String?               @unique @db.Uuid
   deduplicationKey     String                @db.VarChar(160)
   priority             Int                   @default(5) @db.SmallInt
   availableAt          DateTime              @db.Timestamptz(6)
@@ -2133,6 +2151,7 @@ model PlatformJob {
   schedule             PlatformJobSchedule?  @relation(fields: [scheduleId], references: [id], onDelete: Restrict)
   parentJob            PlatformJob?          @relation("PlatformJobDiscoveryChildren", fields: [parentJobId], references: [id], onDelete: Restrict)
   childJobs            PlatformJob[]         @relation("PlatformJobDiscoveryChildren")
+  providerEvent        PaymentProviderEvent? @relation(fields: [providerEventId], references: [id], onDelete: Restrict)
   attempts             PlatformJobAttempt[]
   mutations            PlatformJobMutation[]
   assetRescanClaims    StoredAsset[]         @relation("StoredAssetRescanClaimJob")
@@ -2278,6 +2297,16 @@ enum PlatformJobType {
   MEDIA_RENDITION_GENERATE
   MEDIA_RENDITION_CLEANUP_DISCOVERY
   MEDIA_RENDITION_DELETE
+  COMMUNICATION_CAMPAIGN_DISCOVERY
+  COMMUNICATION_DELIVERY_DISCOVERY
+  COMMUNICATION_CAMPAIGN_DISPATCH
+  COMMUNICATION_DELIVERY_DISPATCH
+  PAYMENT_PROVIDER_EVENT_PROCESS
+  PAYMENT_RETRY_DISCOVERY
+  PAYMENT_ATTEMPT_RETRY
+  PAYMENT_REFUND_RETRY
+  PAYMENT_RECONCILIATION
+  SETTLEMENT_STATEMENT_GENERATE
 }
 
 enum PlatformJobStatus {
@@ -2296,6 +2325,7 @@ enum PlatformJobSource {
   ADMIN_MANUAL
   SCHEDULE
   DOMAIN_DISCOVERY
+  PROVIDER_EVENT
 }
 
 enum PlatformJobAttemptStatus {
@@ -2324,6 +2354,11 @@ enum PlatformJobScheduleKey {
   STORAGE_RESCAN_DISCOVERY
   MEDIA_RENDITION_DISCOVERY
   MEDIA_RENDITION_CLEANUP_DISCOVERY
+  COMMUNICATION_CAMPAIGN_DISCOVERY
+  COMMUNICATION_DELIVERY_DISCOVERY
+  PAYMENT_RETRY_DISCOVERY
+  PAYMENT_RECONCILIATION
+  SETTLEMENT_STATEMENT_GENERATE
 }
 
 enum PlatformJobMutationAction {

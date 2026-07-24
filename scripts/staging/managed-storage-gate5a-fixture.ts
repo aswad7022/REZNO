@@ -27,6 +27,12 @@ export const managedStorageFixtureIds = {
 export async function cleanupManagedStorageFixture(prisma: PrismaClient) {
   const counts = {
     adminAuditLogs: (await prisma.adminAuditLog.deleteMany({ where: { adminUserId: { in: users } } })).count,
+    outboundAttempts: (await prisma.outboundDeliveryAttempt.deleteMany({
+      where: { delivery: { personId: { in: personIds } } },
+    })).count,
+    outboundDeliveries: (await prisma.outboundDelivery.deleteMany({
+      where: { personId: { in: personIds } },
+    })).count,
     assets: (await prisma.storedAsset.deleteMany({ where: { id: { in: assetIds } } })).count,
     mutations: (await prisma.storageMutation.deleteMany({ where: { actorPersonId: { in: personIds } } })).count,
     sessions: (await prisma.uploadSession.deleteMany({ where: { id: { in: sessionIds } } })).count,

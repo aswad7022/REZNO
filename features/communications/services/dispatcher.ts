@@ -16,7 +16,10 @@ import {
   type DispatchResultDto,
   type OutboundChannel,
 } from "@/features/communications/domain/contracts";
-import { communicationError } from "@/features/communications/domain/errors";
+import {
+  CommunicationOperationRetryableError,
+  communicationError,
+} from "@/features/communications/domain/errors";
 import {
   campaignFinalStatus,
   communicationRequestHash,
@@ -59,6 +62,27 @@ import { prisma } from "@/lib/db/prisma";
 const CLAIM_LEASE_MS = 5 * 60_000;
 export const DELIVERY_INSERT_CHUNK_SIZE = 1_000;
 
+type DeliveryAutomationTestPhase =
+  | "AFTER_CLAIM_BEFORE_ATTEMPT"
+  | "AFTER_ATTEMPT_BEFORE_PROVIDER"
+  | "AFTER_PROVIDER_BEFORE_FINALIZE";
+
+type DeliveryAutomationTestHook = (event: {
+  deliveryId: string;
+  phase: DeliveryAutomationTestPhase;
+}) => Promise<void> | void;
+
+let deliveryAutomationTestHook: DeliveryAutomationTestHook | undefined;
+
+export function setDeliveryAutomationTestHook(
+  hook: DeliveryAutomationTestHook | undefined,
+) {
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("Delivery automation test hooks are unavailable in production.");
+  }
+  deliveryAutomationTestHook = hook;
+}
+
 export type SnapshotDiagnostics = {
   deliveryInsertChunkCount: number;
   deliveryRowCount: number;
@@ -70,6 +94,9 @@ export type SnapshotDiagnostics = {
 
 type SnapshotDiagnosticsTestHook = (diagnostics: SnapshotDiagnostics) => Promise<void> | void;
 let snapshotDiagnosticsTestHook: SnapshotDiagnosticsTestHook | undefined;
+export type CommunicationExecutionGuard = (
+  transaction: Prisma.TransactionClient,
+) => Promise<void>;
 
 export function setCommunicationSnapshotDiagnosticsTestHook(
   hook: SnapshotDiagnosticsTestHook | undefined,
@@ -84,6 +111,7 @@ export async function sendCampaignNow(
   context: CommunicationAdminContext,
   rawInput: unknown,
   now = new Date(),
+  executionGuard?: CommunicationExecutionGuard,
 ): Promise<CampaignSummaryDto> {
   const input = parseOrValidationError(sendCampaignSchema, rawInput);
   const requestHash = communicationRequestHash({
@@ -98,6 +126,7 @@ export async function sendCampaignNow(
       context,
       "NOTIFICATIONS_SEND",
     );
+    await executionGuard?.(transaction);
     await lockCampaignMutationKey(transaction, currentContext.userId, input.idempotencyKey);
     const replay = await mutationReplay(
       transaction,
@@ -123,6 +152,7 @@ export async function sendCampaignNow(
       idempotencyKey: input.idempotencyKey,
       now,
       requestHash,
+      executionGuard,
     });
   });
 }
@@ -273,6 +303,7 @@ export async function claimDueDeliveries(
           "claimedAt" = ${now},
           "claimOwner" = ${claimOwner},
           "claimExpiresAt" = ${claimExpiresAt},
+          "version" = delivery."version" + 1,
           "updatedAt" = ${now}
       FROM due
       WHERE delivery."id" = due."id"
@@ -282,8 +313,274 @@ export async function claimDueDeliveries(
   }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted });
 }
 
-export async function releaseExpiredClaims(now = new Date()): Promise<number> {
+export async function claimExactDeliveryForAutomation(input: {
+  claimOwner: string;
+  deliveryId: string;
+  executionGuard: CommunicationExecutionGuard;
+  expectedVersion: number;
+  now?: Date;
+}): Promise<boolean> {
+  const now = input.now ?? new Date();
+  const claimExpiresAt = new Date(now.getTime() + CLAIM_LEASE_MS);
   return prisma.$transaction(async (transaction) => {
+    await input.executionGuard(transaction);
+    const claimed = await transaction.$executeRaw(Prisma.sql`
+      UPDATE "OutboundDelivery" AS delivery
+      SET "status" = 'CLAIMED',
+          "claimedAt" = ${now},
+          "claimOwner" = ${input.claimOwner},
+          "claimExpiresAt" = ${claimExpiresAt},
+          "version" = delivery."version" + 1,
+          "updatedAt" = ${now}
+      FROM "CommunicationCampaign" AS campaign
+      WHERE delivery."id" = ${input.deliveryId}::uuid
+        AND delivery."version" = ${input.expectedVersion}
+        AND delivery."campaignId" = campaign."id"
+        AND delivery."status" IN ('PENDING', 'RETRY_SCHEDULED')
+        AND (delivery."nextAttemptAt" IS NULL OR delivery."nextAttemptAt" <= ${now})
+        AND campaign."status" = 'DISPATCHING'
+    `);
+    return claimed === 1;
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+}
+
+export async function processExactDeliveryForAutomation(input: {
+  claimOwner: string;
+  deliveryId: string;
+  executionGuard: CommunicationExecutionGuard;
+  expectedVersion: number;
+}) {
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9_.:-]{7,99}$/.test(input.claimOwner)) {
+    communicationError("VALIDATION_ERROR", "Delivery claim input is invalid.");
+  }
+  const prepared = await prisma.$transaction(async (transaction) => {
+    await input.executionGuard(transaction);
+    await lockOutboundDelivery(transaction, input.deliveryId);
+    const delivery = await transaction.outboundDelivery.findUnique({
+      where: { id: input.deliveryId },
+      include: {
+        attempts: {
+          where: { finishedAt: null },
+          orderBy: [{ attemptNumber: "asc" }, { id: "asc" }],
+          take: 2,
+        },
+        campaign: true,
+      },
+    });
+    if (!delivery) return { kind: "ABSENT" as const };
+    if (delivery.attempts.length > 1) {
+      communicationError(
+        "STALE_VERSION",
+        "Delivery has multiple unfinished provider attempts.",
+      );
+    }
+    if (terminalDeliveryStatus(delivery.status)) {
+      return {
+        kind: "TERMINAL" as const,
+        outcome: "SUPERSEDED" as const,
+        state: delivery.status,
+      };
+    }
+    const now = await communicationDatabaseNow(transaction);
+    if (delivery.campaign.status !== "DISPATCHING") {
+      await suppressClaimedDelivery(
+        transaction,
+        delivery,
+        delivery.campaign.status === "CANCELLED"
+          ? "CAMPAIGN_CANCELLED"
+          : "CAMPAIGN_NOT_DISPATCHING",
+        now,
+        "CANCELLED",
+      );
+      return {
+        kind: "TERMINAL" as const,
+        outcome: "COMPLETED" as const,
+        state: "CANCELLED" as const,
+      };
+    }
+    if (delivery.status === "CLAIMED") {
+      const ownUnfinishedAttempt = delivery.attempts.some(
+        (attempt) => attempt.claimOwner === input.claimOwner,
+      );
+      const ownClaim =
+        delivery.claimOwner === input.claimOwner || ownUnfinishedAttempt;
+      if (delivery.claimExpiresAt && delivery.claimExpiresAt > now) {
+        return {
+          kind: "RETRYABLE" as const,
+          retryAfterSeconds: boundedDeliveryClaimRetrySeconds(
+            now,
+            delivery.claimExpiresAt,
+          ),
+          state: ownClaim ? "CLAIMED_BY_EXACT_JOB" : "CLAIMED_BY_OTHER_JOB",
+        };
+      }
+      const claimExpiresAt = new Date(now.getTime() + CLAIM_LEASE_MS);
+      const reclaimed = await transaction.outboundDelivery.update({
+        where: { id: delivery.id },
+        data: {
+          claimedAt: now,
+          claimExpiresAt,
+          claimOwner: input.claimOwner,
+          version: { increment: 1 },
+        },
+      });
+      if (delivery.attempts[0]) {
+        await transaction.outboundDeliveryAttempt.update({
+          where: { id: delivery.attempts[0].id },
+          data: { claimOwner: input.claimOwner },
+        });
+      }
+      return {
+        claimGeneration: reclaimed.version,
+        kind: "CLAIMED" as const,
+        recovered: true,
+      };
+    }
+    if (delivery.version !== input.expectedVersion) {
+      return {
+        kind: "TERMINAL" as const,
+        outcome: "STALE" as const,
+        state: delivery.status,
+      };
+    }
+    if (
+      !["PENDING", "RETRY_SCHEDULED"].includes(delivery.status)
+      || (delivery.nextAttemptAt && delivery.nextAttemptAt > now)
+    ) {
+      return {
+        kind: "TERMINAL" as const,
+        outcome: "INELIGIBLE" as const,
+        state: delivery.status,
+      };
+    }
+    const claimed = await transaction.outboundDelivery.update({
+      where: { id: delivery.id },
+      data: {
+        claimedAt: now,
+        claimExpiresAt: new Date(now.getTime() + CLAIM_LEASE_MS),
+        claimOwner: input.claimOwner,
+        status: "CLAIMED",
+        version: { increment: 1 },
+      },
+    });
+    return {
+      claimGeneration: claimed.version,
+      kind: "CLAIMED" as const,
+      recovered: false,
+    };
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+
+  if (prepared.kind === "ABSENT") {
+    return { outcome: "ABSENT" as const, state: "ABSENT" as const };
+  }
+  if (prepared.kind === "TERMINAL") {
+    return { outcome: prepared.outcome, state: prepared.state };
+  }
+  if (prepared.kind === "RETRYABLE") {
+    throw new CommunicationOperationRetryableError(
+      prepared.retryAfterSeconds,
+      prepared.state,
+    );
+  }
+
+  await deliveryAutomationTestHook?.({
+    deliveryId: input.deliveryId,
+    phase: "AFTER_CLAIM_BEFORE_ATTEMPT",
+  });
+  let providerPreparation: Awaited<ReturnType<typeof prepareProviderMessage>>;
+  try {
+    providerPreparation = await prepareProviderMessage(
+      input.deliveryId,
+      input.claimOwner,
+      new Date(),
+      input.executionGuard,
+      prepared.claimGeneration,
+    );
+  } catch (error) {
+    await recoverDeliveryAfterInterruption(
+      input.deliveryId,
+      input.claimOwner,
+      prepared.claimGeneration,
+      "AUTHORITY_OR_PREPARATION_INTERRUPTED",
+    );
+    throw error;
+  }
+  if (!providerPreparation) {
+    const current = await prisma.outboundDelivery.findUnique({
+      where: { id: input.deliveryId },
+      select: { status: true },
+    });
+    return {
+      outcome: "COMPLETED" as const,
+      state: current?.status ?? "ABSENT",
+    };
+  }
+  await deliveryAutomationTestHook?.({
+    deliveryId: input.deliveryId,
+    phase: "AFTER_ATTEMPT_BEFORE_PROVIDER",
+  });
+  try {
+    await prisma.$transaction(
+      (transaction) => input.executionGuard(transaction),
+      { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted },
+    );
+  } catch (error) {
+    await recoverDeliveryAfterInterruption(
+      input.deliveryId,
+      input.claimOwner,
+      providerPreparation.claimGeneration,
+      "AUTHORITY_REVOKED",
+    );
+    throw error;
+  }
+  const provider = resolveOutboundProvider(providerPreparation.message.channel);
+  let providerResult: ProviderSendResult;
+  try {
+    providerResult = sanitizeProviderResult(
+      await provider.send(providerPreparation.message),
+    );
+  } catch {
+    providerResult = {
+      outcome: "TRANSIENT_FAILURE",
+      providerName: "provider-adapter",
+      providerMessageId: null,
+      retryable: true,
+      safeCode: "PROVIDER_EXCEPTION",
+    };
+  }
+  await deliveryAutomationTestHook?.({
+    deliveryId: input.deliveryId,
+    phase: "AFTER_PROVIDER_BEFORE_FINALIZE",
+  });
+  let state: "ACCEPTED" | "RETRY_SCHEDULED" | "PERMANENT_FAILURE";
+  try {
+    state = await finalizeProviderAttempt({
+      attemptId: providerPreparation.attemptId,
+      claimGeneration: providerPreparation.claimGeneration,
+      claimOwner: input.claimOwner,
+      deliveryId: input.deliveryId,
+      executionGuard: input.executionGuard,
+      now: new Date(),
+      providerResult,
+    });
+  } catch (error) {
+    await recoverDeliveryAfterInterruption(
+      input.deliveryId,
+      input.claimOwner,
+      providerPreparation.claimGeneration,
+      "PROVIDER_RESULT_UNAPPLIED",
+    );
+    throw error;
+  }
+  return { outcome: "COMPLETED" as const, state };
+}
+
+export async function releaseExpiredClaims(
+  now = new Date(),
+  executionGuard?: CommunicationExecutionGuard,
+): Promise<number> {
+  return prisma.$transaction(async (transaction) => {
+    await executionGuard?.(transaction);
     const expired = await transaction.outboundDelivery.findMany({
       where: { status: "CLAIMED", claimExpiresAt: { lt: now } },
       select: { id: true, attemptCount: true },
@@ -305,6 +602,7 @@ export async function releaseExpiredClaims(now = new Date()): Promise<number> {
           claimedAt: null,
           claimExpiresAt: null,
           lastProviderCode: "CLAIM_EXPIRED",
+          version: { increment: 1 },
         },
       });
       await transaction.outboundDeliveryAttempt.updateMany({
@@ -327,10 +625,16 @@ export async function processClaimedDeliveries(
   claimOwner: string,
   deliveryIds: string[],
   now = new Date(),
+  executionGuard?: CommunicationExecutionGuard,
 ): Promise<DispatchResultDto> {
   const result = emptyDispatchResult();
   for (const deliveryId of deliveryIds) {
-    const prepared = await prepareProviderMessage(deliveryId, claimOwner, now);
+    const prepared = await prepareProviderMessage(
+      deliveryId,
+      claimOwner,
+      now,
+      executionGuard,
+    );
     if (!prepared) {
       result.suppressed += 1;
       continue;
@@ -350,10 +654,12 @@ export async function processClaimedDeliveries(
     }
     const status = await finalizeProviderAttempt({
       attemptId: prepared.attemptId,
+      claimGeneration: prepared.claimGeneration,
       claimOwner,
       deliveryId,
       now: new Date(),
       providerResult,
+      executionGuard,
     });
     result.attemptsFinalized += 1;
     if (status === "ACCEPTED") result.providerAccepted += 1;
@@ -392,8 +698,10 @@ async function enqueueCampaign(
     idempotencyKey: string;
     now: Date;
     requestHash: string;
+    executionGuard?: CommunicationExecutionGuard;
   },
 ): Promise<CampaignSummaryDto> {
+  await input.executionGuard?.(transaction);
   const snapshotStartedAt = Date.now();
   const recipients = await assertAudienceWithinLimit(transaction, input.campaign);
   let inAppNotificationId: string | null = input.campaign.inAppNotificationId;
@@ -476,6 +784,7 @@ async function enqueueCampaign(
   });
   const counts = countersFromGroups(groups);
   const final = campaignFinalStatus(counts, Boolean(inAppNotificationId));
+  await input.executionGuard?.(transaction);
   const updated = await transaction.communicationCampaign.update({
     where: { id: input.campaign.id },
     data: {
@@ -543,8 +852,15 @@ async function prepareProviderMessage(
   deliveryId: string,
   claimOwner: string,
   now: Date,
-): Promise<{ attemptId: string; message: SafeProviderMessage } | null> {
+  executionGuard?: CommunicationExecutionGuard,
+  expectedClaimGeneration?: number,
+): Promise<{
+  attemptId: string;
+  claimGeneration: number;
+  message: SafeProviderMessage;
+} | null> {
   return prisma.$transaction(async (transaction) => {
+    await executionGuard?.(transaction);
     const rows = await transaction.$queryRaw<Array<{ id: string }>>(Prisma.sql`
       SELECT delivery."id"
       FROM "OutboundDelivery" AS delivery
@@ -556,7 +872,23 @@ async function prepareProviderMessage(
       where: { id: deliveryId },
       include: { campaign: true },
     });
-    if (!delivery || delivery.status !== "CLAIMED" || delivery.claimOwner !== claimOwner) return null;
+    if (
+      !delivery
+      || delivery.status !== "CLAIMED"
+      || delivery.claimOwner !== claimOwner
+      || (
+        expectedClaimGeneration !== undefined
+        && delivery.version !== expectedClaimGeneration
+      )
+    ) {
+      if (expectedClaimGeneration !== undefined) {
+        throw new CommunicationOperationRetryableError(
+          1,
+          "CLAIM_GENERATION_CHANGED",
+        );
+      }
+      return null;
+    }
     if (delivery.campaign.status === "CANCELLED") {
       await suppressClaimedDelivery(transaction, delivery, "CAMPAIGN_CANCELLED", now, "CANCELLED");
       return null;
@@ -580,26 +912,59 @@ async function prepareProviderMessage(
       await suppressClaimedDelivery(transaction, delivery, reason ?? "MISSING_ENDPOINT", now, "SUPPRESSED");
       return null;
     }
-    const attemptNumber = delivery.attemptCount + 1;
-    if (attemptNumber > 5) {
-      await suppressClaimedDelivery(transaction, delivery, "MAX_ATTEMPTS", now, "PERMANENT_FAILURE");
-      return null;
+    const unfinished = await transaction.outboundDeliveryAttempt.findMany({
+      where: { deliveryId: delivery.id, finishedAt: null },
+      orderBy: [{ attemptNumber: "asc" }, { id: "asc" }],
+      take: 2,
+    });
+    if (unfinished.length > 1) {
+      communicationError(
+        "STALE_VERSION",
+        "Delivery has multiple unfinished provider attempts.",
+      );
     }
-    const attempt = await transaction.outboundDeliveryAttempt.create({
-      data: {
-        deliveryId: delivery.id,
-        attemptNumber,
-        claimOwner,
-        startedAt: now,
-        sanitizedMetadata: { providerIdempotencyScope: "delivery" },
-      },
-    });
-    await transaction.outboundDelivery.update({
-      where: { id: delivery.id },
-      data: { attemptCount: attemptNumber },
-    });
+    let attempt = unfinished[0];
+    if (attempt) {
+      if (attempt.attemptNumber !== delivery.attemptCount) {
+        communicationError(
+          "STALE_VERSION",
+          "Delivery attempt fencing is inconsistent.",
+        );
+      }
+      if (attempt.claimOwner !== claimOwner) {
+        attempt = await transaction.outboundDeliveryAttempt.update({
+          where: { id: attempt.id },
+          data: { claimOwner },
+        });
+      }
+    } else {
+      const attemptNumber = delivery.attemptCount + 1;
+      if (attemptNumber > 5) {
+        await suppressClaimedDelivery(transaction, delivery, "MAX_ATTEMPTS", now, "PERMANENT_FAILURE");
+        return null;
+      }
+      attempt = await transaction.outboundDeliveryAttempt.create({
+        data: {
+          deliveryId: delivery.id,
+          attemptNumber,
+          claimOwner,
+          startedAt: now,
+          sanitizedMetadata: { providerIdempotencyScope: "delivery" },
+        },
+      });
+      const advancedDelivery = await transaction.outboundDelivery.update({
+        where: { id: delivery.id },
+        data: { attemptCount: attemptNumber, version: { increment: 1 } },
+      });
+      return {
+        attemptId: attempt.id,
+        claimGeneration: advancedDelivery.version,
+        message: providerMessage(delivery, endpoint.endpoint),
+      };
+    }
     return {
       attemptId: attempt.id,
+      claimGeneration: delivery.version,
       message: providerMessage(delivery, endpoint.endpoint),
     };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
@@ -607,12 +972,15 @@ async function prepareProviderMessage(
 
 async function finalizeProviderAttempt(input: {
   attemptId: string;
+  claimGeneration: number;
   claimOwner: string;
   deliveryId: string;
   now: Date;
   providerResult: Awaited<ReturnType<ReturnType<typeof resolveOutboundProvider>["send"]>>;
+  executionGuard?: CommunicationExecutionGuard;
 }): Promise<"ACCEPTED" | "RETRY_SCHEDULED" | "PERMANENT_FAILURE"> {
   return prisma.$transaction(async (transaction) => {
+    await input.executionGuard?.(transaction);
     await transaction.$queryRaw(Prisma.sql`
       SELECT delivery."id"
       FROM "OutboundDelivery" AS delivery
@@ -621,8 +989,19 @@ async function finalizeProviderAttempt(input: {
     `);
     const delivery = await transaction.outboundDelivery.findUnique({ where: { id: input.deliveryId } });
     const attempt = await transaction.outboundDeliveryAttempt.findUnique({ where: { id: input.attemptId } });
-    if (!delivery || !attempt || attempt.finishedAt || delivery.claimOwner !== input.claimOwner) {
-      communicationError("STALE_VERSION", "Delivery claim ownership changed.");
+    if (!delivery || !attempt) {
+      communicationError("NOT_FOUND", "Delivery attempt was not found.");
+    }
+    if (
+      attempt.finishedAt
+      || attempt.claimOwner !== input.claimOwner
+      || delivery.claimOwner !== input.claimOwner
+      || delivery.version !== input.claimGeneration
+    ) {
+      throw new CommunicationOperationRetryableError(
+        1,
+        "CLAIM_GENERATION_CHANGED",
+      );
     }
     const accepted = input.providerResult.outcome === "ACCEPTED";
     const transient = input.providerResult.outcome === "TRANSIENT_FAILURE" && input.providerResult.retryable;
@@ -659,6 +1038,7 @@ async function finalizeProviderAttempt(input: {
         providerName: input.providerResult.providerName,
         providerMessageId: input.providerResult.providerMessageId,
         lastProviderCode: input.providerResult.safeCode,
+        version: { increment: 1 },
       },
     });
     await finalizeCampaignState(transaction, delivery.campaignId, input.now);
@@ -694,6 +1074,20 @@ async function suppressClaimedDelivery(
   now: Date,
   status: "SUPPRESSED" | "CANCELLED" | "PERMANENT_FAILURE",
 ) {
+  await transaction.outboundDeliveryAttempt.updateMany({
+    where: {
+      deliveryId: delivery.id,
+      finishedAt: null,
+    },
+    data: {
+      finishedAt: now,
+      nextAttemptAt: null,
+      outcome: "PERMANENT_FAILURE",
+      retryable: false,
+      safeProviderCode: reason.slice(0, 80),
+      sanitizedMetadata: { classification: "DOMAIN_SUPPRESSED" },
+    },
+  });
   await transaction.outboundDelivery.update({
     where: { id: delivery.id },
     data: {
@@ -704,9 +1098,115 @@ async function suppressClaimedDelivery(
       claimedAt: null,
       claimExpiresAt: null,
       nextAttemptAt: null,
+      version: { increment: 1 },
     },
   });
   await finalizeCampaignState(transaction, delivery.campaignId, now);
+}
+
+async function recoverDeliveryAfterInterruption(
+  deliveryId: string,
+  claimOwner: string,
+  claimGeneration: number,
+  safeCode: string,
+) {
+  return prisma.$transaction(async (transaction) => {
+    await lockOutboundDelivery(transaction, deliveryId);
+    const delivery = await transaction.outboundDelivery.findUnique({
+      where: { id: deliveryId },
+      include: { campaign: { select: { status: true } } },
+    });
+    if (
+      !delivery
+      || delivery.status !== "CLAIMED"
+      || delivery.claimOwner !== claimOwner
+      || delivery.version !== claimGeneration
+    ) return;
+    const now = await communicationDatabaseNow(transaction);
+    const cancelled = delivery.campaign.status === "CANCELLED";
+    const delay = cancelled
+      ? null
+      : delivery.attemptCount > 0
+        ? retryDelayMilliseconds(delivery.attemptCount)
+        : 60_000;
+    const nextAttemptAt =
+      delay === null ? null : new Date(now.getTime() + delay);
+    const status = cancelled
+      ? "CANCELLED"
+      : delay === null
+        ? "PERMANENT_FAILURE"
+        : "RETRY_SCHEDULED";
+    await transaction.outboundDeliveryAttempt.updateMany({
+      where: { deliveryId, finishedAt: null },
+      data: {
+        finishedAt: now,
+        nextAttemptAt,
+        outcome: cancelled ? "PERMANENT_FAILURE" : "TRANSIENT_FAILURE",
+        retryable: status === "RETRY_SCHEDULED",
+        safeProviderCode: (
+          cancelled ? "CAMPAIGN_CANCELLED" : safeCode
+        ).slice(0, 80),
+        sanitizedMetadata: { classification: "AUTOMATION_INTERRUPTED" },
+      },
+    });
+    await transaction.outboundDelivery.update({
+      where: { id: delivery.id },
+      data: {
+        claimExpiresAt: null,
+        claimedAt: null,
+        claimOwner: null,
+        failedAt: status === "PERMANENT_FAILURE" ? now : null,
+        lastProviderCode: (
+          cancelled ? "CAMPAIGN_CANCELLED" : safeCode
+        ).slice(0, 80),
+        nextAttemptAt,
+        status,
+        version: { increment: 1 },
+      },
+    });
+    await finalizeCampaignState(transaction, delivery.campaignId, now);
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+}
+
+async function lockOutboundDelivery(
+  transaction: Prisma.TransactionClient,
+  deliveryId: string,
+) {
+  await transaction.$queryRaw(Prisma.sql`
+    SELECT delivery."id"
+    FROM "OutboundDelivery" AS delivery
+    WHERE delivery."id" = ${deliveryId}::uuid
+    FOR UPDATE OF delivery
+  `);
+}
+
+async function communicationDatabaseNow(transaction: Prisma.TransactionClient) {
+  const [clock] = await transaction.$queryRaw<Array<{ now: Date }>>(
+    Prisma.sql`SELECT clock_timestamp() AS now`,
+  );
+  if (!clock?.now) {
+    communicationError("STALE_VERSION", "Communication database time is unavailable.");
+  }
+  return clock.now;
+}
+
+function terminalDeliveryStatus(status: string) {
+  return [
+    "ACCEPTED",
+    "PERMANENT_FAILURE",
+    "SUPPRESSED",
+    "CANCELLED",
+  ].includes(status);
+}
+
+function boundedDeliveryClaimRetrySeconds(now: Date, expiresAt: Date) {
+  return Math.max(
+    1,
+    Math.min(
+      Math.ceil(CLAIM_LEASE_MS / 1_000),
+      Math.ceil((expiresAt.getTime() - now.getTime()) / 1_000),
+    ),
+  );
 }
 
 async function isRecipientCurrent(

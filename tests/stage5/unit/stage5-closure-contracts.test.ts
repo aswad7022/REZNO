@@ -29,6 +29,7 @@ import {
   assertStage5ClosureStaging,
   STAGE5_CLOSURE_CONFIRMATION,
 } from "../../../scripts/staging/stage5-closure-safety";
+import { COMMUNICATIONS_PAYMENT_GATE6C_CONFIRMATION } from "../../../scripts/staging/communications-payment-gate6c-safety";
 
 test("Gate 5D registry locks the accepted gates, provider truth, and later-stage boundaries", () => {
   assert.deepEqual(Object.values(STAGE_5_CLOSURE.gates), [
@@ -132,7 +133,7 @@ test("payment handoffs preserve the official Stage 6, 7, 8, and AI ownership", (
   ]);
 });
 
-test("Stage 6 preserves Gate 5D through the Gate 6A foundation and Gate 6B additive migration", async () => {
+test("Stage 6 preserves Gate 5D through the additive Gate 6A, Gate 6B, and Gate 6C migrations", async () => {
   const migrations = (
     await readdir(new URL("../../../prisma/migrations/", import.meta.url), {
       withFileTypes: true,
@@ -141,7 +142,7 @@ test("Stage 6 preserves Gate 5D through the Gate 6A foundation and Gate 6B addit
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
     .sort();
-  assert.equal(migrations.length, 47);
+  assert.equal(migrations.length, 48);
   assert.equal(
     migrations.includes("20260720140000_payments_financial_integrity_foundation"),
     true,
@@ -170,7 +171,11 @@ test("Stage 6 preserves Gate 5D through the Gate 6A foundation and Gate 6B addit
     migrations.includes("20260723150000_gate6a_gate6b_constraint_truth_tables"),
     true,
   );
-  assert.equal(migrations.filter((name) => name > "20260721130000_payment_financial_integrity_closure").length, 5);
+  assert.equal(
+    migrations.includes("20260723180000_communications_payment_automation"),
+    true,
+  );
+  assert.equal(migrations.filter((name) => name > "20260721130000_payment_financial_integrity_closure").length, 6);
 });
 
 test("provider registries reject production test-provider activation", async () => {
@@ -212,6 +217,33 @@ test("Gate 5D staging safety requires exact environment, database, and healthy 4
     migrations: "42/42",
     rolledBack: 0,
   });
+  let successorCalls = 0;
+  const successor = {
+    $queryRaw: async () => {
+      successorCalls += 1;
+      return successorCalls === 1
+        ? [{ database: "rezno_staging" }]
+        : [{
+            applied: BigInt(48),
+            failed: BigInt(0),
+            rolledBack: BigInt(0),
+            total: BigInt(48),
+          }];
+    },
+  };
+  assert.deepEqual(
+    await assertStage5ClosureStaging(successor as never, {
+      ...environment,
+      REZNO_STAGE6_GATE6C_CONFIRM:
+        COMMUNICATIONS_PAYMENT_GATE6C_CONFIRMATION,
+      REZNO_STAGE6_GATE6C_SUCCESSOR: "true",
+    }),
+    {
+      database: "rezno_staging",
+      migrations: "48/48",
+      rolledBack: 0,
+    },
+  );
 
   await assert.rejects(
     assertStage5ClosureStaging(healthy as never, {

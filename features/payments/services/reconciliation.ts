@@ -13,6 +13,7 @@ import { targetPaymentStatus } from "@/features/payments/domain/state-machine";
 import { paymentProvider } from "@/features/payments/providers/registry";
 import type { ProviderResult } from "@/features/payments/providers/provider";
 import { runPaymentSerializable } from "@/features/payments/services/transaction";
+import type { PaymentExecutionGuard } from "@/features/payments/services/provider-events";
 
 export type ReconciliationClassification =
   | "MATCHED"
@@ -71,6 +72,7 @@ export async function runPaymentReconciliation(
     organizationId?: string;
     paymentIntentId?: string;
   },
+  executionGuard?: PaymentExecutionGuard,
 ) {
   const limit = input.limit ?? 25;
   if (!Number.isInteger(limit) || limit < 1 || limit > 50) paymentError("VALIDATION_ERROR", "Reconciliation limit is invalid.");
@@ -82,6 +84,7 @@ export async function runPaymentReconciliation(
   });
   const prepared = await runPaymentSerializable(async (transaction) => {
     await assertCommerceAdminCurrent(transaction, context, "PAYMENTS_RECONCILE");
+    await executionGuard?.(transaction);
     if (input.organizationId) {
       const organization = await transaction.organization.findFirst({ where: { deletedAt: null, id: input.organizationId }, select: { id: true } });
       if (!organization) paymentError("NOT_FOUND", "Organization was not found.");
@@ -132,6 +135,9 @@ export async function runPaymentReconciliation(
   if (prepared.replay) return prepared.replay as unknown as PaymentReconciliationPage;
 
   const provider = paymentProvider();
+  if (executionGuard) {
+    await runPaymentSerializable((transaction) => executionGuard(transaction));
+  }
   const providerResults = new Map<string, ProviderResult>();
   if (provider.kind !== "NOT_CONFIGURED") {
     for (const candidate of prepared.candidates) {
@@ -150,6 +156,7 @@ export async function runPaymentReconciliation(
 
   const result = await runPaymentSerializable(async (transaction) => {
     await assertCommerceAdminCurrent(transaction, context, "PAYMENTS_RECONCILE");
+    await executionGuard?.(transaction);
     const ledgerTotals = await loadLedgerTotals(transaction, prepared.candidates.map((candidate) => candidate.id));
     const ledgerByIntent = new Map(ledgerTotals.map((total) => [total.intentId, total]));
     const items = prepared.candidates.map((candidate) => {
@@ -195,6 +202,7 @@ export async function runPaymentReconciliation(
         TARGET_STATE_MISMATCH: 0,
       }),
     };
+    await executionGuard?.(transaction);
     await transaction.adminAuditLog.update({
       where: { adminUserId_idempotencyKey: { adminUserId: context.userId, idempotencyKey: input.idempotencyKey } },
       data: {

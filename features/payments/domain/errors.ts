@@ -59,6 +59,16 @@ export class PaymentDomainError extends Error {
   }
 }
 
+export class PaymentOperationRetryableError extends Error {
+  constructor(
+    readonly retryAfterSeconds: number,
+    readonly state: string,
+  ) {
+    super("The exact payment operation is still owned by a live domain claim.");
+    this.name = "PaymentOperationRetryableError";
+  }
+}
+
 export function paymentError(code: PaymentErrorCode, message: string): never {
   throw new PaymentDomainError(code, message);
 }

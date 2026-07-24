@@ -8,7 +8,10 @@ import {
   stage5ClosureFixtureIds as ids,
   STAGE5_CLOSURE_MARKER,
 } from "./stage5-closure-fixture";
-import { materializePaymentsGate5cEvidence } from "./payments-gate5c-fixture";
+import {
+  inspectPaymentsGate5cSuccessorEvidence,
+  materializePaymentsGate5cEvidence,
+} from "./payments-gate5c-fixture";
 import { assertStage5ClosureStaging } from "./stage5-closure-safety";
 
 async function main() {
@@ -85,15 +88,32 @@ async function main() {
     checks += 4;
   }
 
-  const paymentEvidence = await materializePaymentsGate5cEvidence(prisma);
-  assert.equal(paymentEvidence.evidence.balanced, true);
-  assert.equal(paymentEvidence.evidence.journalImmutable, true);
-  assert.equal(paymentEvidence.evidence.postingImmutable, true);
-  assert.equal(paymentEvidence.evidence.settlementImmutable, true);
-  assert.equal(
-    paymentEvidence.evidence.meaning,
-    "LEDGER_STATEMENT_NOT_BANK_PAYOUT",
-  );
+  const gate6cSuccessor =
+    process.env.REZNO_STAGE6_GATE6C_SUCCESSOR === "true"
+    && process.env.REZNO_STAGE6_GATE6C_CONFIRM
+      === "REZNO_STAGE6_GATE6C_STAGING_ONLY";
+  if (gate6cSuccessor) {
+    const paymentEvidence =
+      await inspectPaymentsGate5cSuccessorEvidence(prisma);
+    assert.equal(paymentEvidence.evidence.balanced, true);
+    assert.equal(paymentEvidence.evidence.readOnlySuccessorInspection, true);
+    assert.equal(paymentEvidence.evidence.baseSettlementSentinels, 2);
+    assert.equal(paymentEvidence.evidence.settlementLineCount, 0);
+    assert.equal(
+      paymentEvidence.evidence.meaning,
+      "LEDGER_STATEMENT_NOT_BANK_PAYOUT",
+    );
+  } else {
+    const paymentEvidence = await materializePaymentsGate5cEvidence(prisma);
+    assert.equal(paymentEvidence.evidence.balanced, true);
+    assert.equal(paymentEvidence.evidence.journalImmutable, true);
+    assert.equal(paymentEvidence.evidence.postingImmutable, true);
+    assert.equal(paymentEvidence.evidence.settlementImmutable, true);
+    assert.equal(
+      paymentEvidence.evidence.meaning,
+      "LEDGER_STATEMENT_NOT_BANK_PAYOUT",
+    );
+  }
   checks += 5;
 
   const allFixtureIds = [

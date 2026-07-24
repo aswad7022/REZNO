@@ -68,14 +68,14 @@ test.after(async () => {
   await prisma.$disconnect();
 });
 
-test("migration chain is healthy at 47/47 and the additive Gate 6B migrations create no platform rows", async () => {
+test("migration chain is healthy at 48/48 and additive Stage 6 migrations create no platform rows", async () => {
   const migrationRows = await prisma.$queryRaw<Array<{ applied: bigint; failed: bigint; total: bigint }>>(Prisma.sql`
     SELECT COUNT(*) FILTER (WHERE "finished_at" IS NOT NULL AND "rolled_back_at" IS NULL) AS applied,
            COUNT(*) FILTER (WHERE "finished_at" IS NULL AND "rolled_back_at" IS NULL) AS failed,
            COUNT(*) AS total
     FROM "_prisma_migrations"
   `);
-  assert.deepEqual(migrationRows[0], { applied: BigInt(47), failed: BigInt(0), total: BigInt(47) });
+  assert.deepEqual(migrationRows[0], { applied: BigInt(48), failed: BigInt(0), total: BigInt(48) });
   assert.equal(await prisma.platformJob.count(), 0);
   assert.equal(await prisma.platformJobSchedule.count(), 0);
   assert.equal(await prisma.platformJobAttempt.count(), 0);
@@ -813,10 +813,13 @@ test("database constraints reject forged scope, excessive priority, and oversize
   assert.deepEqual(unchanged.payload, platformHealthPayload());
 });
 
-test("claim and recovery indexes plus all Gate 6A and Gate 6B foreign keys exist", async () => {
+test("claim, recovery, and Gate 6C due-scan indexes plus all Stage 6 foreign keys exist", async () => {
   const indexes = await prisma.$queryRaw<Array<{ indexname: string }>>(Prisma.sql`
     SELECT indexname FROM pg_indexes
-    WHERE schemaname = 'public' AND tablename IN ('PlatformJob', 'PlatformJobSchedule', 'PlatformJobAttempt', 'PlatformJobMutation')
+    WHERE schemaname = 'public' AND tablename IN (
+      'PlatformJob', 'PlatformJobSchedule', 'PlatformJobAttempt', 'PlatformJobMutation',
+      'OutboundDelivery', 'PaymentAttempt', 'PaymentRefund', 'SettlementBatch'
+    )
   `);
   const names = new Set(indexes.map((row) => row.indexname));
   for (const name of [
@@ -827,6 +830,12 @@ test("claim and recovery indexes plus all Gate 6A and Gate 6B foreign keys exist
     "PlatformJobMutation_actorAdminUserId_idempotencyKey_key",
     "PlatformJobMutation_action_operationLeaseExpiresAt_id_idx",
     "PlatformJobAttempt_workerId_createdAt_id_idx",
+    "PlatformJob_providerEventId_key",
+    "OutboundDelivery_status_nextAttemptAt_version_id_idx",
+    "PaymentAttempt_status_retryable_nextRetryAt_id_idx",
+    "PaymentRefund_status_retryable_nextRetryAt_id_idx",
+    "SettlementBatch_status_periodEnd_organizationId_id_idx",
+    "SettlementBatch_one_draft_period_key",
   ]) assert.equal(names.has(name), true, name);
   const foreignKeys = await prisma.$queryRaw<Array<{ name: string }>>(Prisma.sql`
     SELECT conname AS name FROM pg_constraint
@@ -849,6 +858,7 @@ test("claim and recovery indexes plus all Gate 6A and Gate 6B foreign keys exist
     "PlatformJob_createdByPersonId_fkey",
     "PlatformJob_organizationId_fkey",
     "PlatformJob_parentJobId_fkey",
+    "PlatformJob_providerEventId_fkey",
     "PlatformJob_requeueRootJobId_fkey",
     "PlatformJob_scheduleId_fkey",
   ]);

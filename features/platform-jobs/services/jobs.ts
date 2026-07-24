@@ -46,13 +46,14 @@ export async function enqueuePlatformJob(
   transaction: Prisma.TransactionClient,
   input: {
     availableAt: Date;
-    createdByAdminUserId: string;
-    createdByPersonId: string;
+    createdByAdminUserId: string | null;
+    createdByPersonId: string | null;
     deduplicationKey: string;
     jobType: PlatformJobType;
     maxAttempts?: number;
     organizationId?: string | null;
     parentJobId?: string | null;
+    providerEventId?: string | null;
     payload: unknown;
     payloadVersion: number;
     priority?: number;
@@ -67,9 +68,16 @@ export async function enqueuePlatformJob(
   const maxAttempts = input.maxAttempts ?? 5;
   const priority = input.priority ?? 5;
   assertPlatformJobCreationBounds(input.deduplicationKey, priority, maxAttempts);
-  if ((input.source === "SCHEDULE") !== Boolean(input.scheduleId)
+  const actorPairPresent = Boolean(input.createdByAdminUserId) && Boolean(input.createdByPersonId);
+  const providerEventSource = input.source === "PROVIDER_EVENT";
+  if (
+    (input.source === "SCHEDULE") !== Boolean(input.scheduleId)
     || (input.source === "DOMAIN_DISCOVERY") !== Boolean(input.parentJobId)
-    || (input.source !== "DOMAIN_DISCOVERY" && Boolean(input.parentJobId))) {
+    || (providerEventSource !== Boolean(input.providerEventId))
+    || (input.source !== "DOMAIN_DISCOVERY" && Boolean(input.parentJobId))
+    || (providerEventSource && (actorPairPresent || input.jobType !== "PAYMENT_PROVIDER_EVENT_PROCESS"))
+    || (!providerEventSource && !actorPairPresent)
+  ) {
     platformJobError("VALIDATION_ERROR", "The job source and schedule reference disagree.");
   }
   const scopeKey = input.organizationId ? `organization:${input.organizationId}` : "platform";
@@ -89,6 +97,8 @@ export async function enqueuePlatformJob(
       && existing.scheduleId === (input.scheduleId ?? null)
       && existing.createdByAdminUserId === input.createdByAdminUserId
       && existing.createdByPersonId === input.createdByPersonId
+      && existing.parentJobId === (input.parentJobId ?? null)
+      && existing.providerEventId === (input.providerEventId ?? null)
       && existing.priority === priority
       && existing.maxAttempts === maxAttempts
       && existing.availableAt.getTime() === input.availableAt.getTime()
@@ -109,6 +119,7 @@ export async function enqueuePlatformJob(
       maxAttempts,
       organizationId: input.organizationId ?? null,
       parentJobId: input.parentJobId ?? null,
+      providerEventId: input.providerEventId ?? null,
       payload: payload as Prisma.InputJsonValue,
       payloadHash,
       payloadVersion: input.payloadVersion,
@@ -122,6 +133,32 @@ export async function enqueuePlatformJob(
     },
   });
   return { job, replay: false as const };
+}
+
+export async function enqueueProviderEventPlatformJob(
+  transaction: Prisma.TransactionClient,
+  input: {
+    availableAt: Date;
+    expectedVersion: number;
+    providerEventId: string;
+  },
+) {
+  return enqueuePlatformJob(transaction, {
+    availableAt: input.availableAt,
+    createdByAdminUserId: null,
+    createdByPersonId: null,
+    deduplicationKey: `payment-provider-event:${input.providerEventId}:v${input.expectedVersion}`,
+    jobType: "PAYMENT_PROVIDER_EVENT_PROCESS",
+    maxAttempts: 5,
+    payload: {
+      expectedVersion: input.expectedVersion,
+      providerEventId: input.providerEventId,
+    },
+    payloadVersion: 1,
+    priority: 7,
+    providerEventId: input.providerEventId,
+    source: "PROVIDER_EVENT",
+  });
 }
 
 export async function enqueueDomainDiscoveryPlatformJob(

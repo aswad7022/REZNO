@@ -461,6 +461,31 @@ test("Gate 5A managed storage lifecycle is tenant-safe and exact", { concurrency
   });
 
   await t.test("bounded list, quota, expiry, cleanup, and mutation plans use Gate 5A indexes", async () => {
+    const requiredExpiryIndex = await prisma.$queryRaw<Array<{
+      columns: string[];
+      indexName: string;
+    }>>(Prisma.sql`
+      SELECT
+        index_class.relname AS "indexName",
+        ARRAY_AGG(attribute.attname ORDER BY indexed_key.ordinality)::text[] AS "columns"
+      FROM pg_class AS index_class
+      JOIN pg_index AS index_info
+        ON index_info.indexrelid = index_class.oid
+      JOIN pg_class AS table_class
+        ON table_class.oid = index_info.indrelid
+      CROSS JOIN LATERAL unnest(index_info.indkey)
+        WITH ORDINALITY AS indexed_key(attnum, ordinality)
+      JOIN pg_attribute AS attribute
+        ON attribute.attrelid = table_class.oid
+        AND attribute.attnum = indexed_key.attnum
+      WHERE table_class.relname = 'UploadSession'
+        AND index_class.relname = 'UploadSession_state_expiresAt_id_idx'
+      GROUP BY index_class.relname
+    `);
+    assert.deepEqual(requiredExpiryIndex, [{
+      columns: ["state", "expiresAt", "id"],
+      indexName: "UploadSession_state_expiresAt_id_idx",
+    }]);
     const plans = await prisma.$transaction(async (transaction) => {
       await transaction.$executeRaw`SET LOCAL enable_seqscan = off`;
       await transaction.$executeRaw`SET LOCAL enable_bitmapscan = off`;
@@ -478,7 +503,10 @@ test("Gate 5A managed storage lifecycle is tenant-safe and exact", { concurrency
     assert.match(serialized[0]!, /StoredAsset_ownerPersonId_createdAt_id_idx/);
     assert.match(serialized[1]!, /StoredAsset_organizationId_createdAt_id_idx/);
     assert.match(serialized[2]!, /UploadSession_ownerPersonId_(?:state_expiresAt|createdAt_id)_idx/);
-    assert.match(serialized[3]!, /UploadSession_state_expiresAt_id_idx/);
+    assert.match(
+      serialized[3]!,
+      /UploadSession_(?:provider_)?state_expiresAt_id_idx/,
+    );
     assert.match(serialized[4]!, /StoredAsset_state_deleteRequestedAt_id_idx/);
     assert.match(serialized[5]!, /StorageMutation_actorPersonId_idempotencyKey_key/);
     assert.match(serialized[6]!, /StoredAsset_createdAt_id_idx/);

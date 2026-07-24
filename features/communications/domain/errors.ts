@@ -20,6 +20,17 @@ export class CommunicationDomainError extends Error {
     this.name = "CommunicationDomainError";
   }
 }
+
+export class CommunicationOperationRetryableError extends Error {
+  constructor(
+    readonly retryAfterSeconds: number,
+    readonly state: string,
+  ) {
+    super("The exact communication operation is still owned by a live domain claim.");
+    this.name = "CommunicationOperationRetryableError";
+  }
+}
+
 const STATUS_BY_CODE: Record<CommunicationErrorCode, number> = {
   CAMPAIGN_CANCELLED: 409,
   CAMPAIGN_NOT_EDITABLE: 409,

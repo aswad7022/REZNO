@@ -37,9 +37,14 @@ const MEMBER_IDS = [
   "4c000000-0000-4000-8000-000000000016",
 ] as const;
 
+let cleanupPhase = "BOOT";
+
 async function main() {
+  cleanupPhase = "SAFETY";
   validateOutboundStage4cEnvironment(process.env);
+  cleanupPhase = "TRANSACTION";
   const result = await prisma.$transaction(async (transaction) => {
+    cleanupPhase = "CAMPAIGN_LOOKUP";
     const campaigns = await transaction.communicationCampaign.findMany({
       where: { createdByAdminUserId: USER_IDS[0] },
       select: { id: true, inAppNotificationId: true },
@@ -47,31 +52,54 @@ async function main() {
     const campaignIds = campaigns.map((campaign) => campaign.id);
     const notificationIds = campaigns.flatMap((campaign) => campaign.inAppNotificationId ? [campaign.inAppNotificationId] : []);
 
+    cleanupPhase = "OUTBOUND_ATTEMPTS";
     const attempts = await transaction.outboundDeliveryAttempt.deleteMany({
-      where: { delivery: { campaignId: { in: campaignIds } } },
+      where: {
+        delivery: {
+          OR: [
+            { campaignId: { in: campaignIds } },
+            { personId: { in: [...PERSON_IDS] } },
+          ],
+        },
+      },
     });
+    cleanupPhase = "OUTBOUND_DELIVERIES";
     const deliveries = await transaction.outboundDelivery.deleteMany({
-      where: { campaignId: { in: campaignIds } },
+      where: {
+        OR: [
+          { campaignId: { in: campaignIds } },
+          { personId: { in: [...PERSON_IDS] } },
+        ],
+      },
     });
+    cleanupPhase = "CAMPAIGN_MUTATIONS";
     const mutations = await transaction.communicationCampaignMutation.deleteMany({
       where: { campaignId: { in: campaignIds } },
     });
+    cleanupPhase = "AUDITS";
     const audits = await transaction.adminAuditLog.deleteMany({
       where: { adminUserId: USER_IDS[0], action: { startsWith: "COMMUNICATION" } },
     });
+    cleanupPhase = "CAMPAIGNS";
     const deletedCampaigns = await transaction.communicationCampaign.deleteMany({
       where: { id: { in: campaignIds } },
     });
+    cleanupPhase = "NOTIFICATIONS";
     const notifications = await transaction.notification.deleteMany({
       where: { id: { in: notificationIds }, createdByUserId: USER_IDS[0], eventType: "admin.communication_campaign" },
     });
+    cleanupPhase = "PREFERENCES";
     await transaction.outboundPreferenceMutation.deleteMany({ where: { personId: { in: [...PERSON_IDS] } } });
     await transaction.outboundPreference.deleteMany({ where: { personId: { in: [...PERSON_IDS] } } });
+    cleanupPhase = "AUTHORITY";
     await transaction.organizationMember.deleteMany({ where: { id: { in: [...MEMBER_IDS] }, organizationId: ORGANIZATION_ID } });
     await transaction.role.deleteMany({ where: { id: { in: [...ROLE_IDS] }, organizationId: ORGANIZATION_ID } });
     await transaction.adminAccess.deleteMany({ where: { userId: { in: [...USER_IDS] } } });
+    cleanupPhase = "ORGANIZATION";
     await transaction.organization.deleteMany({ where: { id: ORGANIZATION_ID, slug: "rezno-qa-stage4c-restaurant" } });
+    cleanupPhase = "PEOPLE";
     const people = await transaction.person.deleteMany({ where: { id: { in: [...PERSON_IDS] } } });
+    cleanupPhase = "USERS";
     const users = await transaction.user.deleteMany({ where: { id: { in: [...USER_IDS] } } });
 
     return {
@@ -84,13 +112,35 @@ async function main() {
       people: people.count,
       users: users.count,
     };
-  });
+  }, { timeout: 30_000 });
   process.stdout.write(`${JSON.stringify({ fixture: OUTBOUND_STAGE4C_FIXTURE, deleted: result })}\n`);
 }
 
 main()
-  .catch(() => {
-    process.stderr.write("Gate 4C staging cleanup failed with a sanitized error.\n");
+  .catch((error: unknown) => {
+    process.stderr.write(
+      `Gate 4C staging cleanup failed with a sanitized error at ${cleanupPhase} (${safeDatabaseDiagnostic(error)}).\n`,
+    );
     process.exitCode = 1;
   })
   .finally(async () => prisma.$disconnect());
+
+function safeDatabaseDiagnostic(error: unknown) {
+  let current = error;
+  for (let depth = 0; depth < 6; depth += 1) {
+    if (!current || typeof current !== "object") break;
+    const record = current as Record<string, unknown>;
+    const message = typeof record.originalMessage === "string"
+      ? record.originalMessage
+      : typeof record.message === "string"
+        ? record.message
+        : "";
+    const constraint = message.match(/constraint "([A-Za-z0-9_]+)"/u)?.[1];
+    const table = message.match(/table "([A-Za-z0-9_]+)"/u)?.[1];
+    if (constraint || table) {
+      return `table=${table ?? "unknown"},constraint=${constraint ?? "unknown"}`;
+    }
+    current = record.cause;
+  }
+  return "database-diagnostic=unknown";
+}

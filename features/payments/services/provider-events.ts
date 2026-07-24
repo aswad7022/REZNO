@@ -1,12 +1,19 @@
 import { createHash, randomUUID } from "node:crypto";
 
+import { Prisma } from "@prisma/client";
+
 import { paymentError } from "@/features/payments/domain/errors";
 import { parsePaymentCurrency, paymentDecimal } from "@/features/payments/domain/money";
 import { assertPaymentIntentTransition } from "@/features/payments/domain/state-machine";
-import { applyCapture } from "@/features/payments/services/payment-intents";
-import { lockPaymentIntent, runPaymentSerializable } from "@/features/payments/services/transaction";
 import { paymentProvider } from "@/features/payments/providers/registry";
 import type { SafeWebhookInput } from "@/features/payments/providers/provider";
+import { applyCapture } from "@/features/payments/services/payment-intents";
+import { lockPaymentIntent, runPaymentSerializable } from "@/features/payments/services/transaction";
+import { enqueueProviderEventPlatformJob } from "@/features/platform-jobs/services/jobs";
+
+export type PaymentExecutionGuard = (
+  transaction: Prisma.TransactionClient,
+) => Promise<void>;
 
 export async function processPaymentProviderWebhook(input: SafeWebhookInput) {
   const provider = paymentProvider();
@@ -19,22 +26,58 @@ export async function processPaymentProviderWebhook(input: SafeWebhookInput) {
   }
   const event = parsed.event;
   const payloadHash = createHash("sha256").update(input.body).digest("hex");
+  const normalizedMoney = normalizedEventMoney(event.amount, event.currency);
+
   return runPaymentSerializable(async (transaction) => {
-    const replay = await transaction.paymentProviderEvent.findUnique({
-      where: { provider_providerEventId: { provider: provider.kind, providerEventId: event.eventId } },
+    const existing = await transaction.paymentProviderEvent.findUnique({
+      where: {
+        provider_providerEventId: {
+          provider: provider.kind,
+          providerEventId: event.eventId,
+        },
+      },
+      include: { platformJob: { select: { id: true } } },
     });
-    if (replay) {
-      if (replay.payloadHash !== payloadHash || replay.providerReference !== event.providerReference) {
+    if (existing) {
+      if (
+        existing.payloadHash !== payloadHash
+        || existing.providerReference !== event.providerReference
+        || existing.normalizedType !== event.outcome
+        || !sameOptionalDecimal(existing.normalizedAmount, normalizedMoney.amount)
+        || existing.normalizedCurrency !== normalizedMoney.currency
+      ) {
         paymentError("IDEMPOTENCY_CONFLICT", "Payment provider event ID was reused with changed content.");
       }
-      return { kind: "PAYMENT_PROVIDER_EVENT" as const, duplicate: true, status: replay.status };
+      let jobId = existing.platformJob?.id ?? null;
+      if (!jobId && existing.status === "VERIFIED") {
+        const recovered = await enqueueProviderEventPlatformJob(transaction, {
+          availableAt: input.receivedAt,
+          expectedVersion: existing.processingVersion,
+          providerEventId: existing.id,
+        });
+        jobId = recovered.job.id;
+      }
+      return {
+        duplicate: true,
+        jobId,
+        kind: "PAYMENT_PROVIDER_EVENT" as const,
+        status: existing.status,
+      };
     }
+
     const intent = await transaction.paymentIntent.findUnique({
-      where: { provider_providerReference: { provider: provider.kind, providerReference: event.providerReference } },
+      where: {
+        provider_providerReference: {
+          provider: provider.kind,
+          providerReference: event.providerReference,
+        },
+      },
     });
     const providerEvent = await transaction.paymentProviderEvent.create({
       data: {
         id: randomUUID(),
+        normalizedAmount: normalizedMoney.amount,
+        normalizedCurrency: normalizedMoney.currency,
         normalizedType: event.outcome,
         occurredAt: event.occurredAt,
         payloadHash,
@@ -47,60 +90,168 @@ export async function processPaymentProviderWebhook(input: SafeWebhookInput) {
         verifiedAt: input.receivedAt,
       },
     });
-    if (!intent) {
-      await transaction.paymentProviderEvent.update({
-        where: { id: providerEvent.id },
-        data: { processedAt: input.receivedAt, status: "IGNORED" },
-      });
-      return { kind: "PAYMENT_PROVIDER_EVENT" as const, duplicate: false, status: "IGNORED" as const };
+    const enqueued = await enqueueProviderEventPlatformJob(transaction, {
+      availableAt: input.receivedAt,
+      expectedVersion: providerEvent.processingVersion,
+      providerEventId: providerEvent.id,
+    });
+    return {
+      duplicate: false,
+      jobId: enqueued.job.id,
+      kind: "PAYMENT_PROVIDER_EVENT" as const,
+      status: "VERIFIED" as const,
+    };
+  });
+}
+
+export async function processVerifiedPaymentProviderEvent(input: {
+  eventId: string;
+  executionGuard: PaymentExecutionGuard;
+  expectedVersion: number;
+}) {
+  return runPaymentSerializable(async (transaction) => {
+    await input.executionGuard(transaction);
+    await transaction.$queryRaw(Prisma.sql`
+      SELECT event."id"
+      FROM "PaymentProviderEvent" AS event
+      WHERE event."id" = ${input.eventId}::uuid
+      FOR UPDATE OF event
+    `);
+    const event = await transaction.paymentProviderEvent.findUnique({
+      where: { id: input.eventId },
+    });
+    if (!event) return { outcome: "ABSENT" as const, state: "ABSENT" as const };
+    if (event.processingVersion !== input.expectedVersion) {
+      return { outcome: "STALE" as const, state: event.status };
     }
-    await lockPaymentIntent(transaction, intent.id);
-    const current = await transaction.paymentIntent.findUniqueOrThrow({ where: { id: intent.id } });
+    if (["PROCESSED", "IGNORED"].includes(event.status)) {
+      return { outcome: "COMPLETED" as const, state: event.status };
+    }
+    if (event.status !== "VERIFIED" || !event.verifiedAt) {
+      return { outcome: "INELIGIBLE" as const, state: event.status };
+    }
+    if (!event.paymentIntentId) {
+      await input.executionGuard(transaction);
+      await transaction.paymentProviderEvent.update({
+        where: { id: event.id },
+        data: {
+          processedAt: event.verifiedAt,
+          processingVersion: { increment: 1 },
+          status: "IGNORED",
+        },
+      });
+      return { outcome: "COMPLETED" as const, state: "IGNORED" as const };
+    }
+
+    await lockPaymentIntent(transaction, event.paymentIntentId);
+    const current = await transaction.paymentIntent.findUniqueOrThrow({
+      where: { id: event.paymentIntentId },
+    });
     let status: "PROCESSED" | "IGNORED" = "PROCESSED";
-    if (event.outcome === "CAPTURED") {
-      if (!event.amount || event.currency !== current.currency) {
+    await input.executionGuard(transaction);
+    if (event.normalizedType === "CAPTURED") {
+      if (!event.normalizedAmount || event.normalizedCurrency !== current.currency) {
         paymentError("PAYMENT_CURRENCY_MISMATCH", "Provider event currency is inconsistent.");
       }
-      parsePaymentCurrency(event.currency);
-      const amount = paymentDecimal(event.amount, "event.amount");
       if (current.capturedAmount.equals(current.amount)) {
         status = "IGNORED";
       } else {
         await applyCapture(transaction, {
-          amount,
+          amount: event.normalizedAmount,
           paymentIntentId: current.id,
           providerReference: event.providerReference,
-          sourceId: providerEvent.id,
-          now: input.receivedAt,
+          sourceId: event.id,
+          now: event.verifiedAt,
         });
       }
-    } else if (event.outcome === "AUTHORIZED") {
-      if (["AUTHORIZED", "PARTIALLY_CAPTURED", "CAPTURED", "PARTIALLY_REFUNDED", "REFUNDED", "FAILED", "CANCELLED", "EXPIRED"].includes(current.status)) {
+      await transaction.paymentAttempt.updateMany({
+        where: {
+          paymentIntentId: current.id,
+          status: "PROCESSING",
+        },
+        data: {
+          claimedBy: null,
+          claimExpiresAt: null,
+          finishedAt: event.verifiedAt,
+          nextRetryAt: null,
+          retryable: null,
+          safeProviderCode: "SUPERSEDED_BY_PROVIDER_EVENT",
+          status: "CANCELLED",
+          version: { increment: 1 },
+        },
+      });
+    } else if (event.normalizedType === "AUTHORIZED") {
+      if ([
+        "AUTHORIZED",
+        "PARTIALLY_CAPTURED",
+        "CAPTURED",
+        "PARTIALLY_REFUNDED",
+        "REFUNDED",
+        "FAILED",
+        "CANCELLED",
+        "EXPIRED",
+      ].includes(current.status)) {
         status = "IGNORED";
       } else {
         assertPaymentIntentTransition(current.status, "AUTHORIZED");
         await transaction.paymentIntent.update({
           where: { id: current.id },
-          data: { authorizedAt: input.receivedAt, status: "AUTHORIZED", version: { increment: 1 } },
+          data: {
+            authorizedAt: event.verifiedAt,
+            status: "AUTHORIZED",
+            version: { increment: 1 },
+          },
         });
       }
-    } else if (event.outcome === "PERMANENT_FAILURE") {
-      if (current.capturedAmount.isPositive() || ["FAILED", "CANCELLED", "EXPIRED", "CAPTURED", "PARTIALLY_REFUNDED", "REFUNDED"].includes(current.status)) {
+    } else if (event.normalizedType === "PERMANENT_FAILURE") {
+      if (
+        current.capturedAmount.greaterThan(0)
+        || (current.authorizedAt !== null && event.occurredAt < current.authorizedAt)
+        || ["FAILED", "CANCELLED", "EXPIRED", "CAPTURED", "PARTIALLY_REFUNDED", "REFUNDED"].includes(current.status)
+      ) {
         status = "IGNORED";
       } else {
         assertPaymentIntentTransition(current.status, "FAILED");
         await transaction.paymentIntent.update({
           where: { id: current.id },
-          data: { failedAt: input.receivedAt, status: "FAILED", version: { increment: 1 } },
+          data: {
+            failedAt: event.verifiedAt,
+            status: "FAILED",
+            version: { increment: 1 },
+          },
         });
       }
     } else {
       status = "IGNORED";
     }
+    await input.executionGuard(transaction);
     await transaction.paymentProviderEvent.update({
-      where: { id: providerEvent.id },
-      data: { processedAt: input.receivedAt, status },
+      where: { id: event.id },
+      data: {
+        processedAt: event.verifiedAt,
+        processingVersion: { increment: 1 },
+        status,
+      },
     });
-    return { kind: "PAYMENT_PROVIDER_EVENT" as const, duplicate: false, status };
+    return { outcome: "COMPLETED" as const, state: status };
   });
+}
+
+function normalizedEventMoney(amount: string | null, currency: string | null) {
+  if (amount === null && currency === null) return { amount: null, currency: null };
+  if (amount === null || currency === null) {
+    paymentError("VALIDATION_ERROR", "Provider event money fields are incomplete.");
+  }
+  return {
+    amount: paymentDecimal(amount, "event.amount"),
+    currency: parsePaymentCurrency(currency),
+  };
+}
+
+function sameOptionalDecimal(
+  left: Prisma.Decimal | null,
+  right: Prisma.Decimal | null,
+) {
+  if (left === null || right === null) return left === right;
+  return left.equals(right);
 }

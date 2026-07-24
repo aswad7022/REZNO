@@ -6,7 +6,8 @@ import {
 } from "../../lib/db/postgres-transport";
 
 export const STORAGE_MEDIA_GATE6B_CONFIRMATION = "REZNO_STAGE6_GATE6B_STAGING_ONLY";
-const EXPECTED_MIGRATIONS = BigInt(47);
+const COMMUNICATIONS_PAYMENT_GATE6C_CONFIRMATION =
+  "REZNO_STAGE6_GATE6C_STAGING_ONLY";
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "::1", "localhost"]);
 
 type SafetyClient = Pick<PrismaClient, "$queryRaw">;
@@ -16,6 +17,11 @@ export async function assertStorageMediaGate6bStaging(
   environment: NodeJS.ProcessEnv = process.env,
   transportEvidence?: Gate6aTransportEvidence,
 ) {
+  const gate6cSuccessor =
+    environment.REZNO_STAGE6_GATE6C_SUCCESSOR === "true"
+    && environment.REZNO_STAGE6_GATE6C_CONFIRM
+      === COMMUNICATIONS_PAYMENT_GATE6C_CONFIRMATION;
+  const expectedMigrations = gate6cSuccessor ? BigInt(48) : BigInt(47);
   if (
     environment.NODE_ENV === "production"
     || environment.REZNO_ENV !== "staging"
@@ -64,11 +70,15 @@ export async function assertStorageMediaGate6bStaging(
     FROM "_prisma_migrations"
   `;
   if (
-    migrations?.total !== EXPECTED_MIGRATIONS
-    || migrations.applied !== EXPECTED_MIGRATIONS
+    migrations?.total !== expectedMigrations
+    || migrations.applied !== expectedMigrations
     || migrations.failed !== BigInt(0)
     || migrations.rolledBack !== BigInt(0)
-  ) throw new Error("Gate 6B fixture requires an exact healthy 47/47 migration state.");
+  ) {
+    throw new Error(
+      `Gate 6B fixture requires an exact healthy ${expectedMigrations}/${expectedMigrations} migration state.`,
+    );
+  }
 
   return {
     backendPgStatSsl: localUnencrypted ? connection.encrypted : transportEvidence!.backendPgStatSsl,
@@ -76,7 +86,7 @@ export async function assertStorageMediaGate6bStaging(
     database: "rezno_staging" as const,
     encrypted: localUnencrypted ? connection.encrypted : transportEvidence!.encrypted,
     hostnameVerified: localUnencrypted ? false : transportEvidence!.hostnameVerified,
-    migrations: "47/47" as const,
+    migrations: gate6cSuccessor ? "48/48" as const : "47/47" as const,
     prismaUsedAttestedPhysicalClient: localUnencrypted
       ? false
       : transportEvidence!.prismaUsedAttestedPhysicalClient,

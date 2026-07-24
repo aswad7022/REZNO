@@ -25,6 +25,12 @@ const sourceChecksum = createHash("sha256").update(STORAGE_MEDIA_GATE6B_SOURCE_B
 const outputChecksum = "b".repeat(64);
 const outputObjectVersion = "gate6b-output-object-version";
 const id = (value: number) => `6b000000-0000-4000-8000-${String(value).padStart(12, "0")}`;
+const gate6cSuccessor =
+  process.env.REZNO_STAGE6_GATE6C_SUCCESSOR === "true"
+  && process.env.REZNO_STAGE6_GATE6C_CONFIRM
+    === "REZNO_STAGE6_GATE6C_STAGING_ONLY";
+const successorUtcDay = new Date();
+successorUtcDay.setUTCHours(0, 0, 0, 0);
 
 export const storageMediaGate6bFixtureIds = {
   adminAccessId: id(11),
@@ -460,8 +466,20 @@ function sessionRows() {
     state: "FINALIZED" as const,
   });
   const rows = [
-    expired(ids.sessions.retainedOrphan, 1, new Date("2026-07-22T14:00:00.123456Z")),
-    expired(ids.sessions.dueOrphan, 2, new Date("2026-07-20T14:00:00.123456Z")),
+    expired(
+      ids.sessions.retainedOrphan,
+      1,
+      gate6cSuccessor
+        ? successorUtcDay
+        : new Date("2026-07-22T14:00:00.123456Z"),
+    ),
+    expired(
+      ids.sessions.dueOrphan,
+      2,
+      gate6cSuccessor
+        ? new Date(successorUtcDay.getTime() - 3 * 86_400_000)
+        : new Date("2026-07-20T14:00:00.123456Z"),
+    ),
     finalized(ids.sessions.deletePending, 3),
     {
       ...finalized(ids.sessions.activeBound, 4),

@@ -2,9 +2,12 @@ import "server-only";
 
 import type { PlatformJobErrorCode, PlatformJobType } from "@prisma/client";
 
-import { PLATFORM_JOB_LIMITS } from "@/features/platform-jobs/domain/contracts";
+import {
+  platformJobHandlerTimeoutMs,
+} from "@/features/platform-jobs/domain/contracts";
 import { parsePlatformJobPayload } from "@/features/platform-jobs/domain/registry";
 import { runStorageMediaAutomationHandler } from "@/features/storage-automation/services/handlers";
+import { runCommunicationsPaymentAutomationHandler } from "@/features/communications-payment-automation/services/handlers";
 import type { PlatformJobOperationAuthority } from "@/features/platform-jobs/services/operation-lease";
 
 export type PlatformJobHandlerContext = {
@@ -58,6 +61,26 @@ const productionHandlers: Record<PlatformJobType, PlatformJobHandler> = {
     runStorageMediaAutomationHandler("MEDIA_RENDITION_CLEANUP_DISCOVERY", payload, context),
   MEDIA_RENDITION_DELETE: (payload, context) =>
     runStorageMediaAutomationHandler("MEDIA_RENDITION_DELETE", payload, context),
+  COMMUNICATION_CAMPAIGN_DISCOVERY: (payload, context) =>
+    runCommunicationsPaymentAutomationHandler("COMMUNICATION_CAMPAIGN_DISCOVERY", payload, context),
+  COMMUNICATION_DELIVERY_DISCOVERY: (payload, context) =>
+    runCommunicationsPaymentAutomationHandler("COMMUNICATION_DELIVERY_DISCOVERY", payload, context),
+  COMMUNICATION_CAMPAIGN_DISPATCH: (payload, context) =>
+    runCommunicationsPaymentAutomationHandler("COMMUNICATION_CAMPAIGN_DISPATCH", payload, context),
+  COMMUNICATION_DELIVERY_DISPATCH: (payload, context) =>
+    runCommunicationsPaymentAutomationHandler("COMMUNICATION_DELIVERY_DISPATCH", payload, context),
+  PAYMENT_PROVIDER_EVENT_PROCESS: (payload, context) =>
+    runCommunicationsPaymentAutomationHandler("PAYMENT_PROVIDER_EVENT_PROCESS", payload, context),
+  PAYMENT_RETRY_DISCOVERY: (payload, context) =>
+    runCommunicationsPaymentAutomationHandler("PAYMENT_RETRY_DISCOVERY", payload, context),
+  PAYMENT_ATTEMPT_RETRY: (payload, context) =>
+    runCommunicationsPaymentAutomationHandler("PAYMENT_ATTEMPT_RETRY", payload, context),
+  PAYMENT_REFUND_RETRY: (payload, context) =>
+    runCommunicationsPaymentAutomationHandler("PAYMENT_REFUND_RETRY", payload, context),
+  PAYMENT_RECONCILIATION: (payload, context) =>
+    runCommunicationsPaymentAutomationHandler("PAYMENT_RECONCILIATION", payload, context),
+  SETTLEMENT_STATEMENT_GENERATE: (payload, context) =>
+    runCommunicationsPaymentAutomationHandler("SETTLEMENT_STATEMENT_GENERATE", payload, context),
 };
 
 const testHandlers = new Map<PlatformJobType, PlatformJobHandler>();
@@ -87,7 +110,7 @@ export async function executePlatformJobHandler(input: {
     timer = setTimeout(() => {
       controller.abort();
       resolve({ errorCode: "HANDLER_TIMEOUT", outcome: "FAILED", retryable: true });
-    }, PLATFORM_JOB_LIMITS.executionTimeoutMs);
+    }, platformJobHandlerTimeoutMs(input.jobType));
   });
   try {
     const execution = Promise.resolve(handler(payload, {

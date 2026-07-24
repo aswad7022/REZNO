@@ -1,13 +1,12 @@
 # Stage 6 — Admin and Platform Operations
 
-Status: canonical Stage 6 scope. Gate 6A is accepted and merged; Gate 6B is
-active. Gates 6C and 6D remain unstarted.
+Status: canonical Stage 6 scope. Gates 6A and 6B are accepted and merged; Gate
+6C is active. Gate 6D remains unstarted.
 
-Gate 6B baseline: `origin/main` at
-`e30c51468cc93388e210f636cadc1b097e481ebf`, the merge commit of PR #125,
-with exactly 44 repository migrations. PR #125 merged Gate 6A from exact head
-`c7f0f8a99eb27bf0dcc5fa853275e13963868ad5`. PR #100 remains an untouched
-Open Draft at `e46454df993ecccb06180060dda4353ec88e2641`.
+Gate 6C baseline: `origin/main` at
+`f58ac881746b72042e483629a0952f790302603b`, the merge commit of PR #126,
+with exactly 47 repository migrations. PR #100 remains an untouched Open Draft
+at `e46454df993ecccb06180060dda4353ec88e2641`.
 
 ## Accepted repository evidence
 
@@ -112,7 +111,8 @@ Status: **ACCEPTED** through merged PR #125.
 
 ### Gate 6B — Storage and Media Automation
 
-Status: **ACTIVE**. The authoritative design and acceptance record is
+Status: **ACCEPTED** through merged PR #126. The authoritative design and
+acceptance record is
 `docs/stage6/gate6b-storage-media-automation.md`.
 
 - automatic bounded exact-key storage cleanup and rescan orchestration;
@@ -122,7 +122,8 @@ Status: **ACTIVE**. The authoritative design and acceptance record is
 
 ### Gate 6C — Communications and Payment Automation
 
-Status: **UNSTARTED**.
+Status: **ACTIVE**. The authoritative design and acceptance record is
+`docs/stage6/gate6c-communications-payment-automation.md`.
 
 - outbound dispatch scheduling over accepted campaign/delivery truth;
 - asynchronous processing of already authenticated provider events;
@@ -139,8 +140,7 @@ Status: **UNSTARTED**.
   and incident state;
 - cross-gate staging, recovery, security, and Stage 6 closure evidence.
 
-Gate 6B, Gate 6C, and Gate 6D must not begin before Gate 6A is independently
-reviewed and merged.
+Gate 6D must not begin before Gate 6C is independently reviewed and merged.
 
 ## Gate 6A go/no-go decision
 

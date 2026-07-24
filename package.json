@@ -97,6 +97,10 @@
     "smoke:staging:storage-media-gate6b": "NODE_OPTIONS=--conditions=react-server tsx scripts/staging/smoke-storage-media-gate6b.ts",
     "cleanup:staging:storage-media-gate6b": "NODE_OPTIONS=--conditions=react-server tsx scripts/staging/cleanup-storage-media-gate6b.ts",
     "fingerprint:staging:storage-media-gate6b": "NODE_OPTIONS=--conditions=react-server tsx scripts/staging/fingerprint-storage-media-gate6b.ts",
+    "seed:staging:communications-payment-gate6c": "REZNO_STAGE6_GATE6C_SUCCESSOR=true NODE_OPTIONS=--conditions=react-server tsx scripts/staging/seed-communications-payment-gate6c.ts",
+    "smoke:staging:communications-payment-gate6c": "REZNO_STAGE6_GATE6C_SUCCESSOR=true NODE_OPTIONS=--conditions=react-server tsx scripts/staging/smoke-communications-payment-gate6c.ts",
+    "cleanup:staging:communications-payment-gate6c": "REZNO_STAGE6_GATE6C_SUCCESSOR=true NODE_OPTIONS=--conditions=react-server tsx scripts/staging/cleanup-communications-payment-gate6c.ts",
+    "fingerprint:staging:communications-payment-gate6c": "REZNO_STAGE6_GATE6C_SUCCESSOR=true NODE_OPTIONS=--conditions=react-server tsx scripts/staging/fingerprint-communications-payment-gate6c.ts",
     "payments:reconcile": "NODE_OPTIONS=--conditions=react-server tsx scripts/payments/reconcile.ts",
     "smoke:staging:commerce-admin-stage3d": "NODE_OPTIONS=--conditions=react-server tsx scripts/staging/smoke-commerce-admin-stage3d.ts",
     "test:commerce-stage3d": "tsx --test tests/commerce/unit/stage3d-admin-closure.test.ts tests/commerce/unit/commerce-admin-stage3d-seed.test.ts tests/commerce/unit/admin-commerce-pagination.test.ts && NODE_OPTIONS=--conditions=react-server tsx --test --test-concurrency=1 tests/commerce/integration/stage3d-admin-closure-e2e.test.ts",
@@ -155,6 +159,7 @@
     "@prisma/dev": "0.24.14",
     "brace-expansion@<1.1.16": "1.1.16",
     "fast-uri": "3.1.4",
+    "find-my-way": "9.7.0",
     "postcss": "8.5.20",
     "sharp": "0.35.3"
   }

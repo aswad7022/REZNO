@@ -4,8 +4,10 @@ import { assertGate6aTransportEvidence, type Gate6aTransportEvidence } from "../
 
 export const PLATFORM_JOBS_GATE6A_CONFIRMATION = "REZNO_STAGE6_GATE6A_STAGING_ONLY";
 const STORAGE_MEDIA_GATE6B_CONFIRMATION = "REZNO_STAGE6_GATE6B_STAGING_ONLY";
+const COMMUNICATIONS_PAYMENT_GATE6C_CONFIRMATION = "REZNO_STAGE6_GATE6C_STAGING_ONLY";
 const GATE6A_MIGRATIONS = BigInt(44);
 const GATE6B_SUCCESSOR_MIGRATIONS = BigInt(47);
+const GATE6C_SUCCESSOR_MIGRATIONS = BigInt(48);
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "::1", "localhost"]);
 
 type SafetyClient = Pick<PrismaClient, "$queryRaw">;
@@ -24,12 +26,18 @@ export async function assertPlatformJobsGate6aStaging(
   const target = parseDatabaseTarget(environment.DATABASE_URL);
   const gate6bSuccessor =
     environment.REZNO_STAGE6_GATE6B_CONFIRM === STORAGE_MEDIA_GATE6B_CONFIRMATION;
+  const gate6cSuccessor =
+    environment.REZNO_STAGE6_GATE6C_SUCCESSOR === "true"
+    && environment.REZNO_STAGE6_GATE6C_CONFIRM
+      === COMMUNICATIONS_PAYMENT_GATE6C_CONFIRMATION;
   const localOverrideRequested = isExactLocalTestTarget(environment, target);
   if (!localOverrideRequested) {
     assertGate6aTransportEvidence(
       transportEvidence,
       environment,
-      gate6bSuccessor ? { requireHealthy44: false } : undefined,
+      gate6bSuccessor || gate6cSuccessor
+        ? { requireHealthy44: false }
+        : undefined,
     );
   }
   const [connection] = await prisma.$queryRaw<Array<{ database: string; encrypted: boolean; user: string }>>`
@@ -57,9 +65,11 @@ export async function assertPlatformJobsGate6aStaging(
            count(*) FILTER (WHERE rolled_back_at IS NOT NULL)::bigint AS "rolledBack"
     FROM "_prisma_migrations"
   `;
-  const expectedMigrations = gate6bSuccessor
-    ? GATE6B_SUCCESSOR_MIGRATIONS
-    : GATE6A_MIGRATIONS;
+  const expectedMigrations = gate6cSuccessor
+    ? GATE6C_SUCCESSOR_MIGRATIONS
+    : gate6bSuccessor
+      ? GATE6B_SUCCESSOR_MIGRATIONS
+      : GATE6A_MIGRATIONS;
   if (
     migrations?.total !== expectedMigrations
     || migrations.applied !== expectedMigrations
@@ -77,7 +87,11 @@ export async function assertPlatformJobsGate6aStaging(
     database: "rezno_staging" as const,
     encrypted: localUnencrypted ? connection.encrypted : transportEvidence!.encrypted,
     hostnameVerified: localUnencrypted ? false : transportEvidence!.hostnameVerified,
-    migrations: gate6bSuccessor ? "47/47" as const : "44/44" as const,
+    migrations: gate6cSuccessor
+      ? "48/48" as const
+      : gate6bSuccessor
+        ? "47/47" as const
+        : "44/44" as const,
     prismaUsedAttestedPhysicalClient: localUnencrypted
       ? false
       : transportEvidence!.prismaUsedAttestedPhysicalClient,

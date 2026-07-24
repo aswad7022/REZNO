@@ -70,7 +70,7 @@ test("Gate 6B storage and media automation is durable, fenced, and exact", { con
     await prisma.$disconnect();
   });
 
-  await t.test("Migrations 45-47 are healthy, schema-only, indexed, and constrained", async () => {
+  await t.test("Migrations 45-48 are healthy, schema-only, indexed, and constrained", async () => {
     const [migration] = await prisma.$queryRaw<Array<{
       applied: bigint;
       failed: bigint;
@@ -84,7 +84,7 @@ test("Gate 6B storage and media automation is durable, fenced, and exact", { con
       FROM "_prisma_migrations"
     `);
     assert.deepEqual(migration, {
-      applied: BigInt(47), failed: BigInt(0), rolledBack: BigInt(0), total: BigInt(47),
+      applied: BigInt(48), failed: BigInt(0), rolledBack: BigInt(0), total: BigInt(48),
     });
     assert.equal(await prisma.platformJob.count(), 0);
     assert.equal(await prisma.platformJobSchedule.count(), 0);

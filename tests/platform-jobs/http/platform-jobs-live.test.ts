@@ -73,7 +73,23 @@ test("Gate 6A live Admin API is authenticated, permissioned, bounded, idempotent
 }, async (t) => {
   const [manager, viewer, basic] = await Promise.all([signUp("manager"), signUp("viewer"), signUp("basic")]);
   const [managerAccess, viewerAccess] = await Promise.all([
-    prisma.adminAccess.create({ data: { permissions: ["PLATFORM_JOBS_VIEW", "PLATFORM_JOBS_MANAGE"], userId: manager.userId } }),
+    prisma.adminAccess.create({
+      data: {
+        permissions: [
+          "PLATFORM_JOBS_VIEW",
+          "PLATFORM_JOBS_MANAGE",
+          "NOTIFICATIONS_VIEW",
+          "NOTIFICATIONS_SEND",
+          "COMMUNICATIONS_DISPATCH",
+          "PAYMENTS_VIEW",
+          "PAYMENTS_REFUND",
+          "PAYMENTS_RECONCILE",
+          "SETTLEMENTS_VIEW",
+          "SETTLEMENTS_MANAGE",
+        ],
+        userId: manager.userId,
+      },
+    }),
     prisma.adminAccess.create({ data: { permissions: ["PLATFORM_JOBS_VIEW"], userId: viewer.userId } }),
   ]);
 
@@ -143,6 +159,85 @@ test("Gate 6A live Admin API is authenticated, permissioned, bounded, idempotent
     assertError(await request("/api/admin/platform-jobs/jobs/trigger", { body: "{}", contentType: "text/plain", cookie: manager.cookie, method: "POST" }), 400, "VALIDATION_ERROR");
     assertError(await request("/api/admin/platform-jobs/jobs/trigger", { body: `"${"x".repeat(9_000)}"`, cookie: manager.cookie, method: "POST" }), 413, "PAYLOAD_TOO_LARGE");
     assertError(await request("/api/admin/platform-jobs/jobs/trigger", { body: "{", cookie: manager.cookie, method: "POST" }), 400, "VALIDATION_ERROR");
+  });
+
+  await t.test("Gate 6C status and manual discovery trigger are closed, truthful, and strict", async () => {
+    assertError(await request("/api/admin/platform-jobs/gate6c"), 403, "FORBIDDEN");
+    assertError(
+      await request("/api/admin/platform-jobs/gate6c", { cookie: viewer.cookie }),
+      403,
+      "FORBIDDEN",
+    );
+    const status = await request("/api/admin/platform-jobs/gate6c", {
+      cookie: manager.cookie,
+    });
+    assert.equal(status.response.status, 200, JSON.stringify(status.payload));
+    const statusData = status.payload.data as Record<string, unknown>;
+    assert.equal(statusData.gate, "6C");
+    assert.equal(statusData.state, "ACTIVE");
+    assert.equal(statusData.paymentProvider, "NOT_CONFIGURED");
+    assert.equal(statusData.payoutConnected, false);
+    assert.equal(statusData.humanDeliveryClaim, false);
+    assert.match(JSON.stringify(statusData.runtime), /NOT_CONNECTED/u);
+    assert.doesNotMatch(
+      JSON.stringify(statusData),
+      /password|signature|authorization|endpoint|amount|currency/iu,
+    );
+    assertError(
+      await request("/api/admin/platform-jobs/gate6c?unexpected=1", {
+        cookie: manager.cookie,
+      }),
+      400,
+      "VALIDATION_ERROR",
+    );
+
+    const idempotencyKey = randomUUID();
+    const body = {
+      batchSize: 5,
+      idempotencyKey,
+      jobType: "PAYMENT_RETRY_DISCOVERY",
+    };
+    const first = await request("/api/admin/platform-jobs/gate6c/trigger", {
+      body,
+      cookie: manager.cookie,
+      method: "POST",
+    });
+    assert.equal(first.response.status, 201, JSON.stringify(first.payload));
+    assert.equal((first.payload.data as { replay: boolean }).replay, false);
+    const replay = await request("/api/admin/platform-jobs/gate6c/trigger", {
+      body,
+      cookie: manager.cookie,
+      method: "POST",
+    });
+    assert.equal(replay.response.status, 201);
+    assert.equal((replay.payload.data as { replay: boolean }).replay, true);
+    assertError(
+      await request("/api/admin/platform-jobs/gate6c/trigger", {
+        body: { ...body, jobType: "PAYMENT_PROVIDER_EVENT_PROCESS" },
+        cookie: manager.cookie,
+        method: "POST",
+      }),
+      400,
+      "VALIDATION_ERROR",
+    );
+    assertError(
+      await request("/api/admin/platform-jobs/gate6c/trigger", {
+        body: { ...body, amount: "1.000" },
+        cookie: manager.cookie,
+        method: "POST",
+      }),
+      400,
+      "VALIDATION_ERROR",
+    );
+    assertError(
+      await request("/api/admin/platform-jobs/gate6c/trigger", {
+        body: `"${"x".repeat(9_000)}"`,
+        cookie: manager.cookie,
+        method: "POST",
+      }),
+      413,
+      "PAYLOAD_TOO_LARGE",
+    );
   });
 
   await t.test("cancellation uses version and idempotency and cannot be repeated with a new key", async () => {

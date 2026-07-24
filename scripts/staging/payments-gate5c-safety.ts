@@ -8,6 +8,9 @@ export async function assertPaymentsGate5cStaging(
   prisma: SafetyClient,
   environment: NodeJS.ProcessEnv = process.env,
 ) {
+  const expectedMigrations = environment.REZNO_STAGE6_GATE6C_SUCCESSOR === "true"
+    ? BigInt(48)
+    : BigInt(42);
   if (
     environment.NODE_ENV === "production" ||
     environment.REZNO_ENV !== "staging" ||
@@ -29,11 +32,16 @@ export async function assertPaymentsGate5cStaging(
     FROM "_prisma_migrations"
   `;
   if (
-    migrations?.total !== BigInt(42) ||
-    migrations.applied !== BigInt(42) ||
+    migrations?.total !== expectedMigrations ||
+    migrations.applied !== expectedMigrations ||
     migrations.failed !== BigInt(0)
   ) {
-    throw new Error("Gate 5C fixture requires an exact healthy 42/42 migration state.");
+    throw new Error(
+      `Gate 5C fixture requires an exact healthy ${expectedMigrations}/${expectedMigrations} migration state.`,
+    );
   }
-  return { database: "rezno_staging" as const, migrations: "42/42" as const };
+  return {
+    database: "rezno_staging" as const,
+    migrations: `${expectedMigrations}/${expectedMigrations}`,
+  };
 }
