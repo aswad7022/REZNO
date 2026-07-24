@@ -545,12 +545,24 @@ test("The full HTTP runner isolates server-only tests without replacing standard
 });
 
 test("Migration 49 is additive and Migration 48 remains byte-identical", async () => {
-  const migrations = (
-    await readdir(new URL("../../../prisma/migrations", import.meta.url), {
+  const [migrations, marketplaceWorkflow] = await Promise.all([
+    readdir(new URL("../../../prisma/migrations", import.meta.url), {
       withFileTypes: true,
-    })
-  ).filter((entry) => entry.isDirectory());
-  assert.equal(migrations.length, 49);
+    }),
+    readFile(
+      new URL(
+        "../../../.github/workflows/marketplace-pr-ci.yml",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  ]);
+  const migrationDirectories = migrations.filter((entry) =>
+    entry.isDirectory()
+  );
+  assert.equal(migrationDirectories.length, 49);
+  assert.match(marketplaceWorkflow, /migration_count" != "49"/u);
+  assert.match(marketplaceWorkflow, /Expected 49 migrations/u);
   const migration48 = await readFile(
     new URL(
       "../../../prisma/migrations/20260723180000_communications_payment_automation/migration.sql",
