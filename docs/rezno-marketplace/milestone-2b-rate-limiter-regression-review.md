@@ -10,7 +10,7 @@ The installed Next.js 16.2.9 `NextRequest` type extends the Web `Request` API an
 
 The repository has no `vercel.json`. `next.config.ts` configures response security headers only. `proxy.ts` does not match API routes and does not establish client identity. `docs/cloud-staging-setup.md` recommends Vercel and Neon or equivalents but does not prove a chosen edge, an overwrite rule, or the safety of a particular forwarding header.
 
-Therefore proxy trust remains disabled when `REZNO_TRUSTED_PROXY_HEADER` is absent or invalid. A future deployment may set exactly `x-forwarded-for` or `x-real-ip` only after proving its trusted edge overwrites that header with one client IP. Appended chains are rejected rather than selecting a client-controlled first element.
+Therefore proxy trust remains disabled when `REZNO_TRUSTED_PROXY_HEADER` is absent or invalid outside Vercel. Gate 6D uses Vercel's platform-injected `x-vercel-forwarded-for` automatically on that deployment platform. Other deployments may set exactly `x-vercel-forwarded-for`, `x-forwarded-for`, or `x-real-ip` only after proving their trusted edge overwrites that header with one client IP. Appended chains are rejected rather than selecting a client-controlled first element. Gate 6D additionally replaced the empty-header ephemeral key with a stable, route-scoped fail-closed key so an unidentified caller cannot obtain a fresh allowance per request.
 
 ## Client-key algorithm
 

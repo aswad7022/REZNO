@@ -286,8 +286,10 @@ The runtime performs one crash-recoverable bounded cycle:
 
 1. close/recover a bounded set of expired runtime/job leases;
 2. process at most ten due schedules using Gate 6A occurrence deduplication;
-3. claim and execute a bounded worker batch using Gate 6A claim/lease/fencing;
-4. update bounded monitoring alerts;
+3. claim and execute at most five jobs so the closed worst-case handler timeout
+   remains below the shared job lease;
+4. prioritize an enabled due monitor schedule, reconcile alerts only through
+   its fenced Gate 6A job, and record `NOT_CLAIMED` truthfully otherwise;
 5. finalize only with the same runtime lease and generation.
 
 It never performs provider work inside a Customer, Business, or ordinary Admin

@@ -102,7 +102,22 @@ Ordering always ends with Product/Store ID. `name_asc`, `price_asc`, `price_desc
 
 ## Rate limiting and proxy trust
 
-The existing process-local in-memory limiter is reused: 60 requests/minute for collections and 120 requests/minute for details. `429` returns `RATE_LIMITED` and `Retry-After`. Forwarded IP headers are ignored by default because clients can spoof them. A deployment may select exactly one header with `REZNO_TRUSTED_PROXY_HEADER=x-forwarded-for` or `REZNO_TRUSTED_PROXY_HEADER=x-real-ip` only after its trusted edge is proven to overwrite that header with one validated client IP. Chains and malformed IP values are rejected. The current Next.js route API does not expose a reliable direct peer address, so the fallback hashes the user-agent/language/encoding fingerprint. A request with neither a peer nor a fingerprint receives an ephemeral key (fail-open) instead of sharing one global denial-of-service bucket; such unidentified requests are not effectively rate-limited and require an edge/shared limiter before release.
+Gate 6D replaced the production process-local limiter with atomic PostgreSQL
+consumption: 60 requests/minute for collections and 120 requests/minute for
+details. `429` returns `RATE_LIMITED` and `Retry-After`; an unavailable
+distributed store fails closed as 503. Forwarded IP headers remain ignored by
+default because clients can spoof them. On Vercel, Gate 6D uses the
+platform-injected `x-vercel-forwarded-for` identity. Other deployments may
+select exactly one header with
+`REZNO_TRUSTED_PROXY_HEADER=x-vercel-forwarded-for`,
+`REZNO_TRUSTED_PROXY_HEADER=x-forwarded-for`, or
+`REZNO_TRUSTED_PROXY_HEADER=x-real-ip` only after their trusted edge is proven
+to overwrite that header with one validated client IP. Chains and malformed IP
+values are rejected. The current Next.js route API does not expose a reliable
+direct peer address, so the non-Vercel fallback hashes the
+user-agent/language/encoding fingerprint. A request with neither a peer nor a
+fingerprint receives a stable, route-scoped unidentified key and remains
+bounded instead of failing open.
 
 Process-local limiting is development protection only. A shared production limiter (for example, a reviewed Redis-backed implementation) and verified edge proxy policy remain release gates.
 
