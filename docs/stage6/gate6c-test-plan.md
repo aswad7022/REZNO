@@ -79,18 +79,33 @@ require second removal zero, and match final non-fixture fingerprint.
 
 No focused skip, open P0/P1/P2, failed check, unexplained audit, fingerprint
 drift, credential residue, unresolved review thread, or exact-head CI/Vercel
-failure is accepted. Gate 6C stays ACTIVE and the PR stays Draft until an
-independent reviewer accepts and merges it. Gate 6D and later stages remain
-unstarted.
+failure is accepted. The PR stays Draft until all author-side evidence is
+complete. Marking it Ready requests a new independent review; Gate 6C stays
+ACTIVE until that review accepts and merges it. Gate 6D and later stages
+remain unstarted.
 
-## Exact-head local evidence — 2026-07-23
+## Exact-head local evidence — 2026-07-24
 
-Focused Gate 6C coverage passed 6 unit and 9 PostgreSQL tests. The complete
-regression passed 442 unit, 407 PostgreSQL, and 121 built HTTP tests: 970
-tests, zero failures, and zero skips. The production build compiled and
-generated 107/107 static pages. Root lint, root and Mobile TypeScript, Prisma
-validation, Expo dependency alignment, and Expo Doctor 20/20 passed. The iOS
-and Android Hermes exports completed.
+The final capacity and crash-recovery suite passed 7/7 deterministic
+PostgreSQL tests. Platform Jobs passed 29/29 unit and 44/44 PostgreSQL tests.
+The complete regression passed 443 unit, 415 PostgreSQL, and 115 built
+HTTP/RSC/API tests: 973 tests, zero failures, and zero skips. The production
+build compiled and generated 107/107 static pages. Root lint, root and Mobile
+TypeScript, Prisma validation, Expo dependency alignment, and Expo Doctor
+20/20 passed. The iOS export completed with 912 modules and 30 assets; Android
+completed with 910 modules and 30 assets.
+
+Both initially reported Storage cases passed alone against the disposable
+database, and the clean complete Storage integration run passed 47/47. The
+expiry-plan failure was PostgreSQL choosing the equally valid
+`UploadSession_provider_state_expiresAt_id_idx`; the regression now proves
+that the required `UploadSession_state_expiresAt_id_idx` exists with exact
+`state, expiresAt, id` columns while accepting either valid planner choice.
+The Admin-revocation failure was disposable-database state shared across test
+processes, not a Gate 6C authorization change; clean isolated and full-suite
+runs both preserve the fail-closed assertion. The Stage 5 closure integration
+regression passed 2/2 after its Gate 6C successor seed was made read-only over
+canonical financial evidence.
 
 Production dependency audits for the root and Mobile trees reported zero
 vulnerabilities, and `npm ls --all` reported no tree problems. The full
@@ -98,7 +113,7 @@ development audit reported three Moderate findings and no High or Critical
 findings; all three are one Windows-only development chain from `shadcn`
 through the MCP SDK to Hono and are outside production dependencies.
 
-## Authenticated staging evidence — 2026-07-23
+## Authenticated staging and final remediation evidence — 2026-07-23/24
 
 Authenticated discovery selected only project `rezno-staging`, database
 `rezno_staging`, its ready primary branch, direct non-pooler endpoint, and the
@@ -119,24 +134,29 @@ Both exact fixture seeds produced
 `edd7dd5bcbc697272ad375ad9df87b2126ba8260037858acf27a51b2207c53b5`.
 The rollback-only Gate 5C financial evidence fingerprint was
 `b313552ea282376da895de0f9ff0cd264fc47c79a9e00ad144dbb63f8299f6cf`.
-The remediated Gate 6C smoke passed 93 checks, including retryable-failed
-refund reservation, concurrent request/retry capacity, zero-call rejection,
-attempt/refund/delivery interruption before and after provider work, live and
-expired replay, foreign claim fencing, stable provider identity, permission
-revocation, event/attempt capture race, mutation terminalization, and zero
-unfinished owned work. Stage 4C, Stage 4D, and Gate 5C successor
-smokes passed; Gate 5D passed 105 checks, Gate 6A passed 59, and Gate 6B
-passed 166. The Gate 6B retained-orphan sentinel is derived from the current
-UTC day under the exact Gate 6C successor marker so its 24-hour retention
-classification cannot change as a staging run crosses a calendar date.
+The final remediated Gate 6C smoke passed 110/110 checks, including
+retryable-failed refund reservation, concurrent request/retry capacity,
+zero-call rejection, deterministic A/B claim-generation interruption before
+and after provider work, live and expired replay, foreign claim fencing,
+stable provider identity, permission revocation, event/attempt capture race,
+mutation terminalization, and zero unfinished owned work. Stage 4C, Stage 4D,
+and Gate 5C successor smokes passed; Gate 5D passed 105/105, Gate 6A passed
+59/59, and Gate 6B passed 166/166. The Stage 5 successor seed inspected
+canonical payment evidence without creating destructive financial fixtures.
+The Stage 4C preview loop used deterministic sequential reads on the
+single-connection staging pool. The Gate 6B retained-orphan sentinel is
+derived from the current UTC day under the exact Gate 6C successor marker so
+its 24-hour retention classification cannot change as a staging run crosses a
+calendar date.
 
-Exact Gate 6C/payment cleanup removed the composed fixture rows; the repeated
-cleanup removed zero. Supporting Stage 4D, Gate 5A/5B, and Gate 6A/6B fixtures
-were independently removed by their exact-ID cleanups. Final Gate 6C counts
-were zero for campaigns, deliveries, provider events, refunds, schedules,
-jobs, attempts, and mutations. The final database fingerprint exactly returned
-to the preflight value above. Foreign Person and Organization sentinel hashes
-remained unchanged.
+Final exact Gate 6C/payment cleanup removed 203 composed fixture rows; the
+repeated cleanup removed zero. Supporting Stage 4D, Gate 5A/5B, and Gate
+6A/6B fixtures were independently removed by their exact-ID cleanups, each
+with a zero second run. Final Gate 6C counts were zero for campaigns,
+deliveries, provider events, refunds, schedules, jobs, attempts, and
+mutations. The final database fingerprint exactly returned to the preflight
+value above. Foreign Person and Organization sentinel hashes remained
+unchanged.
 
 Fresh 1→48 rehearsals A and B each ended 48/48 with zero failed or rolled-back
 rows and a second-deploy no-op. A populated 47→48 rehearsal preserved its

@@ -43,11 +43,15 @@ refund once, and claims it only when the amount fits. A rejected retry makes
 zero provider calls, changes no provider identity, posts no journal, and
 finishes its PaymentMutation safely.
 
-Exact attempt and refund jobs use `platform-job:<jobId>`. Live claims yield a
-bounded retryable result; expired claims are reclaimed with fencing. Provider
-uncertainty replays the stable request reference. A verified capture event
-supersedes an in-flight attempt by cancelling and finishing it without a
-second capture journal.
+Exact attempt and refund jobs use `platform-job:<jobId>` as stable ownership
+and the existing row `version` as a monotonic claim generation. Claim and
+reclaim increment the generation. Apply and recovery updates require exact
+`{id, state, owner, generation}`; stale execution A cannot publish, fail, or
+clean newer execution B. Live claims yield a bounded retryable result, and a
+manual refund replay returns stable in-progress truth rather than surfacing an
+exception that could become HTTP 500. Provider uncertainty replays the stable
+request reference. A verified capture event supersedes an in-flight attempt
+by cancelling and finishing it without a second capture journal.
 
 ## Reconciliation and settlement statements
 

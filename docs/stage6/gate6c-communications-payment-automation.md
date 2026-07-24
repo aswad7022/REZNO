@@ -252,14 +252,16 @@ automatically reversed, and no operator edits financial or communication truth.
 
 Gate 6C remains ACTIVE until complete local validation, rehearsals, security
 review, staging evidence, exact-head CI/Vercel, independent review, and merge.
-Its pull request remains Draft. Gate 6D must not start here.
+Its pull request remains Draft until the author-side evidence is complete;
+Ready requests the independent review and does not close the gate. Gate 6D
+must not start here.
 
 Authenticated staging completed the required 47/47→48/48 migration, identical
-two-seed fixture fingerprint, 93-check Gate 6C smoke, all six successor
+two-seed fixture fingerprint, final 110/110 Gate 6C smoke, all six successor
 smokes, exact cleanup with a zero second run, unchanged foreign sentinels, and
 restoration of the original non-fixture database fingerprint. This evidence
-does not close the gate: exact-head local validation, CI/Vercel, Draft PR
-review, and independent acceptance remain required.
+does not close the gate: exact-head CI/Vercel and independent acceptance
+remain required.
 
 ## Financial-capacity and crash-recovery closure
 
@@ -275,12 +277,42 @@ calls, changes no provider identity, creates no journal, and safely finishes
 the mutation.
 
 PaymentAttempt, PaymentRefund, and OutboundDelivery automation claims use
-`platform-job:<jobId>`. Live exact or foreign claims return bounded retryable
-outcomes; expired claims are reclaimed under locking and fencing. Provider
-uncertainty reuses the original request/idempotency identity. Existing
-unfinished delivery attempts are reused without a second attempt number.
-Capture events supersede a processing attempt by cancelling it, clearing its
-claim, and setting `finishedAt` without a duplicate journal. PlatformJob
-success is forbidden while its owned domain operation remains nonterminal.
+`platform-job:<jobId>` as stable ownership and the existing row `version` as a
+monotonic claim generation. Claim and reclaim increment that generation.
+Apply and recovery require exact `{id, state, owner, generation}`, so execution
+A cannot publish, fail, or clear a newer execution B claim even though both
+share the stable job owner. Live exact or foreign claims return bounded
+retryable outcomes; manual refund replay returns stable in-progress truth
+instead of escaping as a retryable exception that could become HTTP 500.
+Provider uncertainty reuses the original request/idempotency identity.
+Existing unfinished delivery attempts are reused without a second attempt
+number. Capture events supersede a processing attempt by cancelling it,
+clearing its claim, and setting `finishedAt` without a duplicate journal.
+PlatformJob success is forbidden while its owned domain operation remains
+nonterminal.
 
 No Migration 49 was required. Migrations 1–48 remained unchanged.
+
+## Final independent-review remediation — 2026-07-24
+
+The exact local regression passed 443 unit, 415 PostgreSQL integration, and
+115 built HTTP/RSC/API tests: 973/973 with zero skips. Platform Jobs passed
+29/29 unit and 44/44 PostgreSQL tests; the focused capacity/crash-recovery
+suite passed 7/7. Storage passed 47/47 and Stage 5 closure passed 2/2. Lint,
+root and Mobile TypeScript, Prisma validation, production build with 107/107
+static pages, Expo dependency check, Expo Doctor 20/20, iOS and Android Hermes
+exports, dependency/tree audits, and targeted secret/privacy/payment/provider/
+job/claim scans completed.
+
+Authenticated staging re-attested the rotated direct non-pooler connection
+with TLS 1.3, hostname/SNI and system-CA verification, exact database/role,
+and Prisma physical-client reuse. Health remained 48/48; the second and final
+deploys were no-ops. Both seeds produced
+`edd7dd5bcbc697272ad375ad9df87b2126ba8260037858acf27a51b2207c53b5`.
+Gate 6C passed 110/110; Stage 4C/4D and Gate 5C passed; Gate 5D passed
+105/105, Gate 6A 59/59, and Gate 6B 166/166. Exact cleanup ran twice, the
+second removed zero, and the final database fingerprint matched
+`51f91a54f3d34335477ad613342c374803a26d6b401271973f7cffa89613d2d2`.
+Migration 48 remained
+`04fa9fe4a87c7360ec3eb585951ff49c20e90675c74755d1127d716fbf009192`;
+no Migration 49 exists.

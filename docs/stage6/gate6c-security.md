@@ -31,8 +31,9 @@ not create a service principal.
 | duplicate/changed event | provider+event uniqueness and exact payload hash |
 | duplicate capture | locked totals, full-capture policy, unique journal source |
 | over-refund/race | intent-first lock and exact Decimal reservation including retryable failed refunds |
-| crash after domain claim | stable `platform-job:<jobId>` ownership, live retryable replay, expired fenced reclaim |
+| crash after domain claim | stable `platform-job:<jobId>` ownership plus monotonic row `version` as claim generation |
 | provider accepted before DB apply | stable provider identity and exact unfinished-operation reuse |
+| stale execution cleans newer claim | apply/recovery requires exact `{id, state, owner, generation}`; A cannot alter B |
 | event/attempt capture race | processing attempt cancelled and finished; capture journal remains exact-once |
 | retry amplification | bounded scan, five retries, backoff, terminal failures |
 | exact handler timeout | closed Gate 6C 15-second bound below the 30-second lease; discovery remains at five seconds and abort guards block publication |
@@ -92,6 +93,23 @@ rotation. It proved TLS 1.3, hostname/SNI and system-CA verification, direct
 non-pooler routing, exact database/role, and Prisma physical-client reuse.
 Initial and final state were 48/48 with non-fixture fingerprint
 `51f91a54f3d34335477ad613342c374803a26d6b401271973f7cffa89613d2d2`.
-The expanded smoke passed 93 checks. Final capacity-overcommit, attempt-claim,
+The final expanded smoke passed 110/110 checks, including deterministic A/B
+replacement both before provider work and after provider acceptance.
+PaymentAttempt, PaymentRefund, and OutboundDelivery increment `version` at
+claim and reclaim; every apply and recovery update requires exact
+`{id, state, owner, generation}`. An old execution cannot publish, fail, or
+clean a newer claim even though both executions intentionally share the stable
+job owner. Manual replay of a live refund claim returns a stable in-progress
+result rather than an HTTP 500 path. Final capacity-overcommit, attempt-claim,
 refund-claim, delivery-claim, and duplicate-unfinished-attempt counts were all
-zero. The first exact cleanup removed 152 rows and the second removed zero.
+zero. Final exact cleanup removed 203 rows and the second run removed zero.
+The database fingerprint returned exactly to the value above.
+
+Current tracked source, full Git history, production build, iOS/Android Hermes
+exports, and task temporary-artifact scans found zero matches for the rotated
+credential or exact connection URL. Targeted scans also found zero private-key
+blocks, database credentials, webhook secrets, payment instruments, recipient
+contacts, or forbidden job payload data. Production dependency audits were
+zero; the three Moderate full-tree findings are confined to the known
+Windows-only `shadcn` development chain, with zero High or Critical findings.
+The final code and documentation diff review found no open P0, P1, or P2.
