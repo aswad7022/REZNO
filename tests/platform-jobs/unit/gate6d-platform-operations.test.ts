@@ -563,6 +563,10 @@ test("Migration 49 is additive and Migration 48 remains byte-identical", async (
   assert.equal(migrationDirectories.length, 49);
   assert.match(marketplaceWorkflow, /migration_count" != "49"/u);
   assert.match(marketplaceWorkflow, /Expected 49 migrations/u);
+  assert.match(
+    marketplaceWorkflow,
+    /PLATFORM_OPERATIONS_HTTP_BASE_URL: http:\/\/127\.0\.0\.1:3000/u,
+  );
   const migration48 = await readFile(
     new URL(
       "../../../prisma/migrations/20260723180000_communications_payment_automation/migration.sql",
