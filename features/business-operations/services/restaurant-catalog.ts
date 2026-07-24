@@ -182,7 +182,7 @@ export async function createOperationalRestaurantTable(input: {
   const parsed = operationalRestaurantTableCreateSchema.safeParse(input.table);
   if (!parsed.success) businessOperationsError("INVALID_REQUEST", "Restaurant table input is invalid.");
   const actor = await resolveBusinessOperationActor(input.actor, "RESTAURANT_TABLE_WRITE");
-  assertBusinessOperationMutationRate(actor, "restaurant-table-create");
+  await assertBusinessOperationMutationRate(actor, "restaurant-table-create");
   assertRenderedOrganization(actor, input.contextOrganizationId);
   const requestHash = hashBusinessOperation({ action: "RESTAURANT_TABLE_CREATE", table: parsed.data });
   return runBusinessOperationTransaction(async (transaction) => {
@@ -234,7 +234,7 @@ export async function updateOperationalRestaurantTable(input: {
   const parsed = operationalRestaurantTableUpdateSchema.safeParse(input.table);
   if (!parsed.success) businessOperationsError("INVALID_REQUEST", "Restaurant table input is invalid.");
   const actor = await resolveBusinessOperationActor(input.actor, "RESTAURANT_TABLE_WRITE");
-  assertBusinessOperationMutationRate(actor, "restaurant-table-update");
+  await assertBusinessOperationMutationRate(actor, "restaurant-table-update");
   assertRenderedOrganization(actor, input.contextOrganizationId);
   const requestHash = hashBusinessOperation({
     action: "RESTAURANT_TABLE_UPDATE",
@@ -317,7 +317,7 @@ export async function setOperationalRestaurantTableActive(input: {
   assertUuid(input.tableId, "tableId");
   assertUuid(input.idempotencyKey, "idempotencyKey");
   const actor = await resolveBusinessOperationActor(input.actor, "RESTAURANT_TABLE_WRITE");
-  assertBusinessOperationMutationRate(actor, "restaurant-table-lifecycle");
+  await assertBusinessOperationMutationRate(actor, "restaurant-table-lifecycle");
   assertRenderedOrganization(actor, input.contextOrganizationId);
   const requestHash = hashBusinessOperation({
     action: "RESTAURANT_TABLE_LIFECYCLE",
@@ -394,7 +394,7 @@ export async function removeOperationalRestaurantTable(input: {
   assertUuid(input.tableId, "tableId");
   assertUuid(input.idempotencyKey, "idempotencyKey");
   const actor = await resolveBusinessOperationActor(input.actor, "RESTAURANT_TABLE_WRITE");
-  assertBusinessOperationMutationRate(actor, "restaurant-table-remove");
+  await assertBusinessOperationMutationRate(actor, "restaurant-table-remove");
   assertRenderedOrganization(actor, input.contextOrganizationId);
   const requestHash = hashBusinessOperation({
     action: "RESTAURANT_TABLE_REMOVE",
@@ -531,7 +531,7 @@ export async function createOperationalMenuCategory(input: {
   const parsed = operationalMenuCategorySchema.safeParse(input.category);
   if (!parsed.success) businessOperationsError("INVALID_REQUEST", "Menu category input is invalid.");
   const actor = await resolveBusinessOperationActor(input.actor, "RESTAURANT_MENU_WRITE");
-  assertBusinessOperationMutationRate(actor, "menu-category-create");
+  await assertBusinessOperationMutationRate(actor, "menu-category-create");
   assertRenderedOrganization(actor, input.contextOrganizationId);
   const requestHash = hashBusinessOperation({ action: "MENU_CATEGORY_CREATE", category: parsed.data });
   return runBusinessOperationTransaction(async (transaction) => {
@@ -572,7 +572,7 @@ export async function updateOperationalMenuCategory(input: {
   const parsed = operationalMenuCategorySchema.safeParse(input.category);
   if (!parsed.success) businessOperationsError("INVALID_REQUEST", "Menu category input is invalid.");
   const actor = await resolveBusinessOperationActor(input.actor, "RESTAURANT_MENU_WRITE");
-  assertBusinessOperationMutationRate(actor, "menu-category-update");
+  await assertBusinessOperationMutationRate(actor, "menu-category-update");
   assertRenderedOrganization(actor, input.contextOrganizationId);
   const requestHash = hashBusinessOperation({
     action: "MENU_CATEGORY_UPDATE",
@@ -625,7 +625,7 @@ export async function setOperationalMenuCategoryActive(input: {
   assertUuid(input.categoryId, "categoryId");
   assertUuid(input.idempotencyKey, "idempotencyKey");
   const actor = await resolveBusinessOperationActor(input.actor, "RESTAURANT_MENU_WRITE");
-  assertBusinessOperationMutationRate(actor, "menu-category-lifecycle");
+  await assertBusinessOperationMutationRate(actor, "menu-category-lifecycle");
   assertRenderedOrganization(actor, input.contextOrganizationId);
   const requestHash = hashBusinessOperation({
     action: "MENU_CATEGORY_LIFECYCLE",
@@ -676,7 +676,7 @@ export async function removeOperationalMenuCategory(input: {
   assertUuid(input.categoryId, "categoryId");
   assertUuid(input.idempotencyKey, "idempotencyKey");
   const actor = await resolveBusinessOperationActor(input.actor, "RESTAURANT_MENU_WRITE");
-  assertBusinessOperationMutationRate(actor, "menu-category-remove");
+  await assertBusinessOperationMutationRate(actor, "menu-category-remove");
   assertRenderedOrganization(actor, input.contextOrganizationId);
   const requestHash = hashBusinessOperation({
     action: "MENU_CATEGORY_REMOVE",
@@ -743,7 +743,7 @@ export async function createOperationalMenuItem(input: {
   const parsed = operationalMenuItemSchema.safeParse(input.item);
   if (!parsed.success) businessOperationsError("INVALID_REQUEST", "Menu item input is invalid.");
   const actor = await resolveBusinessOperationActor(input.actor, "RESTAURANT_MENU_WRITE");
-  assertBusinessOperationMutationRate(actor, "menu-item-create");
+  await assertBusinessOperationMutationRate(actor, "menu-item-create");
   assertRenderedOrganization(actor, input.contextOrganizationId);
   const requestHash = hashBusinessOperation({ action: "MENU_ITEM_CREATE", item: parsed.data });
   return runBusinessOperationTransaction(async (transaction) => {
@@ -791,7 +791,7 @@ export async function updateOperationalMenuItem(input: {
   const parsed = operationalMenuItemSchema.safeParse(input.item);
   if (!parsed.success) businessOperationsError("INVALID_REQUEST", "Menu item input is invalid.");
   const actor = await resolveBusinessOperationActor(input.actor, "RESTAURANT_MENU_WRITE");
-  assertBusinessOperationMutationRate(actor, "menu-item-update");
+  await assertBusinessOperationMutationRate(actor, "menu-item-update");
   assertRenderedOrganization(actor, input.contextOrganizationId);
   const requestHash = hashBusinessOperation({
     action: "MENU_ITEM_UPDATE",
@@ -850,7 +850,7 @@ export async function setOperationalMenuItemAvailable(input: {
   assertUuid(input.itemId, "itemId");
   assertUuid(input.idempotencyKey, "idempotencyKey");
   const actor = await resolveBusinessOperationActor(input.actor, "RESTAURANT_MENU_WRITE");
-  assertBusinessOperationMutationRate(actor, "menu-item-lifecycle");
+  await assertBusinessOperationMutationRate(actor, "menu-item-lifecycle");
   assertRenderedOrganization(actor, input.contextOrganizationId);
   const requestHash = hashBusinessOperation({
     action: "MENU_ITEM_LIFECYCLE",
@@ -899,7 +899,7 @@ export async function removeOperationalMenuItem(input: {
   assertUuid(input.itemId, "itemId");
   assertUuid(input.idempotencyKey, "idempotencyKey");
   const actor = await resolveBusinessOperationActor(input.actor, "RESTAURANT_MENU_WRITE");
-  assertBusinessOperationMutationRate(actor, "menu-item-remove");
+  await assertBusinessOperationMutationRate(actor, "menu-item-remove");
   assertRenderedOrganization(actor, input.contextOrganizationId);
   const requestHash = hashBusinessOperation({
     action: "MENU_ITEM_REMOVE",

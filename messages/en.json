@@ -1625,7 +1625,9 @@
       "SETTLEMENTS_VIEW": "View settlement statements",
       "SETTLEMENTS_MANAGE": "Manage settlement statements",
       "PLATFORM_JOBS_VIEW": "View durable platform jobs",
-      "PLATFORM_JOBS_MANAGE": "Operate durable platform jobs"
+      "PLATFORM_JOBS_MANAGE": "Operate durable platform jobs",
+      "PLATFORM_OPERATIONS_VIEW": "View platform operations",
+      "PLATFORM_OPERATIONS_MANAGE": "Manage platform operations"
     }
   },
   "Media": {

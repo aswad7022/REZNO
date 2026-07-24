@@ -6,30 +6,44 @@ import { PaymentDomainError } from "@/features/payments/domain/errors";
 import { assertPaymentWebhookProviderConfigured } from "@/features/payments/providers/registry";
 import {
   configuredTrustedProxyHeader,
-  consumeRateLimit,
   getRateLimitIdentifierFromHeaders,
 } from "@/lib/security/rate-limit-core";
+import {
+  consumeRateLimit,
+  type DistributedRateLimitResult,
+} from "@/lib/security/rate-limit";
 
 const PAYMENT_WEBHOOK_RATE_LIMIT = { limit: 60, windowMs: 60_000 } as const;
-type PaymentWebhookRateLimitConsumer = typeof consumeRateLimit;
+type PaymentWebhookRateLimitConsumer = (
+  scope: string,
+  identifier: string,
+  options: typeof PAYMENT_WEBHOOK_RATE_LIMIT,
+) => DistributedRateLimitResult | Promise<DistributedRateLimitResult>;
 let paymentWebhookRateLimitConsumer: PaymentWebhookRateLimitConsumer = consumeRateLimit;
 
-export function assertPaymentWebhookRequestAllowed(
+export async function assertPaymentWebhookRequestAllowed(
   request: Request,
   scope: string,
   provider: PaymentProviderKind,
-): void {
+): Promise<void> {
   const derivedIdentifier = getRateLimitIdentifierFromHeaders(
     request.headers,
     `payment-webhook:${provider.toLowerCase()}`,
     { trustedProxyHeader: configuredTrustedProxyHeader() },
   );
   const identifier = derivedIdentifier.startsWith("ephemeral:") ? "unidentified" : derivedIdentifier;
-  const rate = paymentWebhookRateLimitConsumer(
+  const rate = await paymentWebhookRateLimitConsumer(
     `payments.${scope}.${provider.toLowerCase()}`,
     identifier,
     PAYMENT_WEBHOOK_RATE_LIMIT,
   );
+  if (rate.unavailable) {
+    throw new PaymentDomainError(
+      "SERVICE_UNAVAILABLE",
+      "Payment webhook protection is temporarily unavailable.",
+      { retryAfterSeconds: 1 },
+    );
+  }
   if (!rate.success) {
     throw new PaymentDomainError("RATE_LIMITED", "Too many payment webhook requests.", {
       retryAfterSeconds: Math.min(60, Math.max(1, rate.retryAfterSeconds)),

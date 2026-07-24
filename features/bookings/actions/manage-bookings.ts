@@ -35,7 +35,7 @@ function bookingErrorUrl(
 
 export async function createBooking(formData: FormData): Promise<void> {
   const identity = await requireCustomerIdentity();
-  const rateLimit = consumeRateLimit("booking:create", identity.person.id, {
+  const rateLimit = await consumeRateLimit("booking:create", identity.person.id, {
     limit: 6,
     windowMs: 60_000,
   });

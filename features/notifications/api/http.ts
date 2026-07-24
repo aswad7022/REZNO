@@ -6,7 +6,7 @@ import { BookingApiError } from "@/features/bookings/api/errors";
 import { NotificationDomainError } from "@/features/notifications/domain/errors";
 import type { NotificationActorContext } from "@/features/notifications/domain/contracts";
 import { logServerError } from "@/lib/logging/server";
-import { consumeRateLimit } from "@/lib/security/rate-limit-core";
+import { consumeRateLimit } from "@/lib/security/rate-limit";
 
 type NotificationHttpResult = { body: unknown; status?: 200 | 201 };
 
@@ -22,7 +22,12 @@ export async function handleCustomerNotificationRequest(
 ) {
   try {
     const identity = await resolveBookingCustomerApiContext(request);
-    const rate = consumeRateLimit(`notification.customer.${scope}`, `person:${identity.personId}`, { limit, windowMs: 60_000 });
+    const rate = await consumeRateLimit(`notification.customer.${scope}`, `person:${identity.personId}`, { limit, windowMs: 60_000 });
+    if (rate.unavailable) {
+      return NextResponse.json({ error: { code: "SERVICE_UNAVAILABLE", message: "Notifications are temporarily unavailable." } }, {
+        headers: { "Cache-Control": "no-store, max-age=0", "Retry-After": "1" }, status: 503,
+      });
+    }
     if (!rate.success) {
       return NextResponse.json({ error: { code: "RATE_LIMITED", message: "Too many requests." } }, {
         headers: { "Cache-Control": "no-store, max-age=0", "Retry-After": String(rate.retryAfterSeconds) }, status: 429,

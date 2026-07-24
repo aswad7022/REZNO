@@ -8,7 +8,7 @@ import {
   type MerchantApiContext,
 } from "@/features/commerce/api/auth";
 import { commerceApiError, mapCommerceApiError } from "@/features/commerce/api/errors";
-import { consumeRateLimit } from "@/lib/security/rate-limit-core";
+import { consumeRateLimit } from "@/lib/security/rate-limit";
 
 const NO_STORE_HEADERS = { "Cache-Control": "no-store, max-age=0" } as const;
 
@@ -39,7 +39,7 @@ export async function handleCustomerCommerceRequest(
 ) {
   return handleAuthenticatedRequest(async () => {
     const context = await resolveCustomerApiContext(request);
-    assertAuthenticatedRateLimit(`commerce.customer.${scope}`, `person:${context.personId}`, options.limit ?? 60);
+    await assertAuthenticatedRateLimit(`commerce.customer.${scope}`, `person:${context.personId}`, options.limit ?? 60);
     return operation(context);
   });
 }
@@ -53,7 +53,7 @@ export async function handleMerchantCommerceRequest(
 ) {
   return handleAuthenticatedRequest(async () => {
     const context = await resolveMerchantApiContext(request, permission);
-    assertAuthenticatedRateLimit(
+    await assertAuthenticatedRateLimit(
       `commerce.merchant.${scope}`,
       `user:${context.userId}:organization:${context.organizationId}`,
       options.limit ?? 60,
@@ -87,8 +87,16 @@ async function handleAuthenticatedRequest(operation: () => Promise<CommerceHttpR
   }
 }
 
-function assertAuthenticatedRateLimit(scope: string, identifier: string, limit: number) {
-  const result = consumeRateLimit(scope, identifier, { limit, windowMs: 60_000 });
+async function assertAuthenticatedRateLimit(scope: string, identifier: string, limit: number) {
+  const result = await consumeRateLimit(scope, identifier, { limit, windowMs: 60_000 });
+  if (result.unavailable) {
+    commerceApiError(
+      "SERVICE_UNAVAILABLE",
+      503,
+      "Request protection is temporarily unavailable.",
+      { retryAfterSeconds: 1 },
+    );
+  }
   if (!result.success) {
     commerceApiError(
       "RATE_LIMITED",

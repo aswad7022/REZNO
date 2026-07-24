@@ -8,7 +8,7 @@ import {
 } from "@/features/platform-jobs/services/admin-context";
 import type { StorageAdminActor } from "@/features/storage/services/actor";
 import { logServerError } from "@/lib/logging/server";
-import { consumeRateLimit } from "@/lib/security/rate-limit-core";
+import { consumeRateLimit } from "@/lib/security/rate-limit";
 import { NextResponse } from "next/server";
 
 const NO_STORE = { "Cache-Control": "no-store, max-age=0" } as const;
@@ -26,10 +26,13 @@ export async function handleStorageAutomationAdminRequest(
       platformJobError("FORBIDDEN", "Current Admin storage and platform-job permissions are required.");
     }
     const context = platformJobAdminContext(access);
-    const rate = consumeRateLimit(`storage-automation.admin.${scope}`, `person:${context.personId}`, {
+    const rate = await consumeRateLimit(`storage-automation.admin.${scope}`, `person:${context.personId}`, {
       limit: 20,
       windowMs: 60_000,
     });
+    if (rate.unavailable) {
+      platformJobError("SERVICE_UNAVAILABLE", "Request protection is temporarily unavailable.");
+    }
     if (!rate.success) platformJobError("RATE_LIMITED", "Too many storage-automation requests.");
     const storageActor: StorageAdminActor = { ...context, kind: "admin" };
     return NextResponse.json(

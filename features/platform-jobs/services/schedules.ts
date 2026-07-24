@@ -14,6 +14,10 @@ import { parsePlatformJobPayload } from "@/features/platform-jobs/domain/registr
 import { assertPlatformJobAdminCurrent, type PlatformJobAdminContext } from "@/features/platform-jobs/services/admin-context";
 import { enqueuePlatformJob } from "@/features/platform-jobs/services/jobs";
 import { lockPlatformJobSchedule, runPlatformJobSerializable } from "@/features/platform-jobs/services/transaction";
+import {
+  assertPlatformRuntimeInvocationOwned,
+  type PlatformRuntimeAuthority,
+} from "@/features/platform-operations/services/runtime-authority";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -92,6 +96,9 @@ function scheduleMappingIsRegistered(scheduleKey: PlatformJobScheduleKey, jobTyp
     "PAYMENT_RETRY_DISCOVERY",
     "PAYMENT_RECONCILIATION",
     "SETTLEMENT_STATEMENT_GENERATE",
+    "COMMERCE_ORDER_EXPIRY",
+    "PLATFORM_OPERATIONS_MONITOR",
+    "DISTRIBUTED_RATE_LIMIT_CLEANUP",
   ].includes(scheduleKey);
 }
 
@@ -228,6 +235,122 @@ export async function runPlatformSchedulerTick(
       },
     });
     return { ...result, replay: false as const };
+  });
+}
+
+export async function runAutomaticPlatformSchedulerTick(
+  authority: PlatformRuntimeAuthority,
+  batchSize = PLATFORM_JOB_LIMITS.maxSchedulerBatch,
+) {
+  if (
+    !Number.isInteger(batchSize)
+    || batchSize < 1
+    || batchSize > PLATFORM_JOB_LIMITS.maxSchedulerBatch
+  ) {
+    platformJobError(
+      "VALIDATION_ERROR",
+      "The automatic scheduler batch is outside the accepted bound.",
+    );
+  }
+  return runPlatformJobSerializable(async (transaction) => {
+    const invocation = await assertPlatformRuntimeInvocationOwned(
+      transaction,
+      authority,
+    );
+    const [clock] = await transaction.$queryRaw<Array<{ now: Date }>>(
+      Prisma.sql`SELECT clock_timestamp() AS now`,
+    );
+    if (!clock?.now) {
+      platformJobError("PLATFORM_JOB_FAILURE", "The database clock is unavailable.");
+    }
+    const due = await transaction.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+      SELECT schedule."id"
+      FROM "PlatformJobSchedule" AS schedule
+      WHERE schedule."enabled" = TRUE
+        AND schedule."nextRunAt" <= ${clock.now}
+      ORDER BY
+        CASE
+          WHEN schedule."scheduleKey" = 'PLATFORM_OPERATIONS_MONITOR' THEN 0
+          ELSE 1
+        END,
+        schedule."nextRunAt",
+        schedule."id"
+      FOR UPDATE SKIP LOCKED
+      LIMIT ${batchSize}
+    `);
+    let jobsCreated = 0;
+    let intervalsSkipped = 0;
+    for (const item of due) {
+      const schedule = await transaction.platformJobSchedule.findUnique({
+        where: { id: item.id },
+      });
+      if (
+        !schedule?.enabled
+        || schedule.nextRunAt.getTime() > clock.now.getTime()
+        || !scheduleMappingIsRegistered(schedule.scheduleKey, schedule.jobType)
+      ) {
+        continue;
+      }
+      const tick = calculatePlatformScheduleTick({
+        cadenceSeconds: schedule.cadenceSeconds,
+        catchupLimit: schedule.catchupLimit,
+        nextRunAt: schedule.nextRunAt,
+        now: clock.now,
+      });
+      for (const dueAt of tick.due) {
+        const created = await enqueuePlatformJob(transaction, {
+          availableAt: clock.now,
+          createdByAdminUserId: invocation.configuredByAdminUserId,
+          createdByPersonId: invocation.configuredByPersonId,
+          deduplicationKey: `schedule:${schedule.id}:${dueAt.toISOString()}`,
+          jobType: schedule.jobType,
+          organizationId: schedule.organizationId,
+          payload: schedule.payload,
+          payloadVersion: schedule.payloadVersion,
+          priority:
+            schedule.scheduleKey === "PLATFORM_OPERATIONS_MONITOR" ? 9 : 5,
+          scheduleId: schedule.id,
+          source: "SCHEDULE",
+        });
+        if (!created.replay) jobsCreated += 1;
+      }
+      intervalsSkipped += tick.skipped;
+      await transaction.platformJobSchedule.update({
+        where: { id: schedule.id },
+        data: {
+          lastTickAt: clock.now,
+          nextRunAt: tick.nextRunAt,
+          updatedAt: clock.now,
+          version: { increment: 1 },
+        },
+      });
+    }
+    const result = {
+      intervalsSkipped,
+      jobsCreated,
+      schedulesProcessed: due.length,
+    };
+    const updated = await transaction.platformRuntimeInvocation.updateMany({
+      where: {
+        controlGeneration: authority.controlGeneration,
+        fencingToken: authority.fencingToken,
+        id: authority.invocationId,
+        leaseToken: authority.leaseToken,
+        state: "RUNNING",
+        workerId: authority.workerId,
+      },
+      data: {
+        schedulerCompletedAt: clock.now,
+        schedulerResult: result,
+      },
+    });
+    if (updated.count !== 1) {
+      platformJobError(
+        "STALE_LEASE",
+        "The automatic scheduler lost its runtime fence.",
+      );
+    }
+    return result;
   });
 }
 

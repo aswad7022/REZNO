@@ -10,12 +10,13 @@ export type BookingApiErrorCode =
   | "PROFILE_INCOMPLETE"
   | "PROFILE_UNAVAILABLE"
   | "RATE_LIMITED"
+  | "SERVICE_UNAVAILABLE"
   | "UNAUTHENTICATED";
 
 export class BookingApiError extends Error {
   constructor(
     readonly code: BookingApiErrorCode,
-    readonly status: 400 | 401 | 403 | 404 | 409 | 429 | 500,
+    readonly status: 400 | 401 | 403 | 404 | 409 | 429 | 500 | 503,
     message: string,
     readonly details?: Readonly<Record<string, unknown>>,
   ) {

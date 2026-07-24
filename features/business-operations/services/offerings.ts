@@ -126,7 +126,7 @@ export async function createOperationalOffering(input: {
   serviceId: string;
 }) {
   const actor = await resolveBusinessOperationActor(input.actor, "OFFERING_WRITE");
-  assertBusinessOperationMutationRate(actor, "offering-create");
+  await assertBusinessOperationMutationRate(actor, "offering-create");
   assertRenderedOrganization(actor, input.contextOrganizationId);
   const parsed = operationalOfferingSchema.safeParse(input.offering);
   if (!parsed.success) businessOperationsError("INVALID_REQUEST", "Offering input is invalid.");
@@ -209,7 +209,7 @@ export async function updateOperationalOffering(input: {
   offeringId: string;
 }) {
   const actor = await resolveBusinessOperationActor(input.actor, "OFFERING_WRITE");
-  assertBusinessOperationMutationRate(actor, "offering-update");
+  await assertBusinessOperationMutationRate(actor, "offering-update");
   assertRenderedOrganization(actor, input.contextOrganizationId);
   const parsed = operationalOfferingSchema.safeParse(input.offering);
   if (!parsed.success) businessOperationsError("INVALID_REQUEST", "Offering input is invalid.");
@@ -299,7 +299,7 @@ export async function removeOperationalOffering(input: {
   offeringId: string;
 }) {
   const actor = await resolveBusinessOperationActor(input.actor, "OFFERING_WRITE");
-  assertBusinessOperationMutationRate(actor, "offering-remove");
+  await assertBusinessOperationMutationRate(actor, "offering-remove");
   assertRenderedOrganization(actor, input.contextOrganizationId);
   const requestHash = hashBusinessOperation({ action: "OFFERING_REMOVE", offeringId: input.offeringId });
   return runBusinessOperationTransaction(async (transaction) => {

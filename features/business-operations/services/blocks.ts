@@ -141,7 +141,7 @@ export async function createOperationalBlock(input: {
   idempotencyKey: string;
 }) {
   const actor = await resolveBusinessOperationActor(input.actor, "BLOCK_WRITE");
-  assertBusinessOperationMutationRate(actor, "block-create");
+  await assertBusinessOperationMutationRate(actor, "block-create");
   assertRenderedOrganization(actor, input.contextOrganizationId);
   return runBusinessOperationTransaction(async (transaction) => {
     await lockOrganization(transaction, actor.organizationId);
@@ -211,7 +211,7 @@ export async function updateOperationalBlock(input: {
   idempotencyKey: string;
 }) {
   const actor = await resolveBusinessOperationActor(input.actor, "BLOCK_WRITE");
-  assertBusinessOperationMutationRate(actor, "block-update");
+  await assertBusinessOperationMutationRate(actor, "block-update");
   assertRenderedOrganization(actor, input.contextOrganizationId);
   return runBusinessOperationTransaction(async (transaction) => {
     await lockOrganization(transaction, actor.organizationId);
@@ -273,7 +273,7 @@ export async function deleteOperationalBlock(input: {
   idempotencyKey: string;
 }) {
   const actor = await resolveBusinessOperationActor(input.actor, "BLOCK_WRITE");
-  assertBusinessOperationMutationRate(actor, "block-delete");
+  await assertBusinessOperationMutationRate(actor, "block-delete");
   assertRenderedOrganization(actor, input.contextOrganizationId);
   const requestHash = hashBusinessOperation({ action: "BLOCK_DELETE", blockId: input.blockId, branchId: input.branchId });
   return runBusinessOperationTransaction(async (transaction) => {

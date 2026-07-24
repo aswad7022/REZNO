@@ -22,7 +22,7 @@ type AdminCursorEnvelope = AdminCursorCore & { checksum: string; version: 1 };
 
 export function adminActorScope(input: {
   adminAccessId: string | null;
-  source: "database" | "env";
+  source: "database" | "env" | "runtime";
   userId: string;
 }) {
   return `${input.source}:${input.adminAccessId ?? "environment"}:${input.userId}`;

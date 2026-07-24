@@ -233,7 +233,7 @@ export async function updateOperationalMemberProfile(input: {
   profile: unknown;
 }) {
   const actor = await resolveBusinessOperationActor(input.actor, "WORKFORCE_WRITE");
-  assertBusinessOperationMutationRate(actor, "member-profile");
+  await assertBusinessOperationMutationRate(actor, "member-profile");
   assertRenderedOrganization(actor, input.contextOrganizationId);
   const parsed = operationalMemberProfileSchema.safeParse(input.profile);
   if (!parsed.success) businessOperationsError("INVALID_REQUEST", "Member profile input is invalid.");
@@ -305,7 +305,7 @@ export async function updateOperationalMemberRole(input: {
   systemRole: "MANAGER" | "RECEPTIONIST" | "STAFF";
 }) {
   const actor = await resolveBusinessOperationActor(input.actor, "ROLE_WRITE");
-  assertBusinessOperationMutationRate(actor, "member-role");
+  await assertBusinessOperationMutationRate(actor, "member-role");
   assertRenderedOrganization(actor, input.contextOrganizationId);
   const requestHash = hashBusinessOperation({
     action: "MEMBERSHIP_ROLE_UPDATE",
@@ -375,7 +375,7 @@ export async function setOperationalMembershipActive(input: {
   memberId: string;
 }) {
   const actor = await resolveBusinessOperationActor(input.actor, "WORKFORCE_WRITE");
-  assertBusinessOperationMutationRate(actor, "member-lifecycle");
+  await assertBusinessOperationMutationRate(actor, "member-lifecycle");
   assertRenderedOrganization(actor, input.contextOrganizationId);
   const action = input.active ? "MEMBERSHIP_ACTIVATE" : "MEMBERSHIP_DEACTIVATE";
   const requestHash = hashBusinessOperation({
@@ -440,7 +440,7 @@ export async function removeOperationalMembership(input: {
   memberId: string;
 }) {
   const actor = await resolveBusinessOperationActor(input.actor, "WORKFORCE_WRITE");
-  assertBusinessOperationMutationRate(actor, "member-remove");
+  await assertBusinessOperationMutationRate(actor, "member-remove");
   assertRenderedOrganization(actor, input.contextOrganizationId);
   const requestHash = hashBusinessOperation({
     action: "MEMBERSHIP_REMOVE",

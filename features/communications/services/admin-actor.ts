@@ -9,12 +9,17 @@ import {
   resolvedAdminHasPermission,
 } from "@/features/admin/policies/admin-authorization";
 import { communicationError } from "@/features/communications/domain/errors";
+import {
+  assertPlatformRuntimeAuthorityCurrent,
+  type PlatformRuntimeAuthority,
+} from "@/features/platform-operations/services/runtime-authority";
 
 export type CommunicationAdminContext = {
   userId: string;
   personId: string;
-  source: "database" | "env";
+  source: "database" | "env" | "runtime";
   adminAccessId: string | null;
+  runtimeAuthority?: PlatformRuntimeAuthority;
 };
 
 type AuthorizationTestHook = (
@@ -47,6 +52,23 @@ export async function assertCommunicationAdminCurrent(
   context: CommunicationAdminContext,
   permission: AdminPermission,
 ): Promise<CommunicationAdminContext> {
+  if (context.source === "runtime") {
+    if (!context.runtimeAuthority) {
+      communicationError("FORBIDDEN", "Automatic communication authority is missing.");
+    }
+    const current = await assertPlatformRuntimeAuthorityCurrent(
+      transaction,
+      context.runtimeAuthority,
+      permission,
+    );
+    if (
+      current.userId !== context.userId
+      || current.personId !== context.personId
+    ) {
+      communicationError("FORBIDDEN", "Automatic communication authority changed.");
+    }
+    return context;
+  }
   const identities = await transaction.$queryRaw<Array<{ email: string }>>(Prisma.sql`
     SELECT auth_user."email"
     FROM "Person" AS person

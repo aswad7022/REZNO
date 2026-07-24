@@ -8,12 +8,13 @@ export type RestaurantReservationApiErrorCode =
   | "IDEMPOTENCY_KEY_REQUIRED"
   | "INTERNAL_ERROR"
   | "RATE_LIMITED"
+  | "SERVICE_UNAVAILABLE"
   | "UNAUTHENTICATED";
 
 export class RestaurantReservationApiError extends Error {
   constructor(
     readonly code: RestaurantReservationApiErrorCode,
-    readonly status: 400 | 401 | 403 | 404 | 409 | 429 | 500,
+    readonly status: 400 | 401 | 403 | 404 | 409 | 429 | 500 | 503,
     message: string,
     readonly details?: Readonly<Record<string, unknown>>,
   ) {

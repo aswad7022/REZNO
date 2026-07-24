@@ -8,6 +8,7 @@ import {
 import { parsePlatformJobPayload } from "@/features/platform-jobs/domain/registry";
 import { runStorageMediaAutomationHandler } from "@/features/storage-automation/services/handlers";
 import { runCommunicationsPaymentAutomationHandler } from "@/features/communications-payment-automation/services/handlers";
+import { runPlatformOperationsHandler } from "@/features/platform-operations/services/handlers";
 import type { PlatformJobOperationAuthority } from "@/features/platform-jobs/services/operation-lease";
 
 export type PlatformJobHandlerContext = {
@@ -81,6 +82,12 @@ const productionHandlers: Record<PlatformJobType, PlatformJobHandler> = {
     runCommunicationsPaymentAutomationHandler("PAYMENT_RECONCILIATION", payload, context),
   SETTLEMENT_STATEMENT_GENERATE: (payload, context) =>
     runCommunicationsPaymentAutomationHandler("SETTLEMENT_STATEMENT_GENERATE", payload, context),
+  COMMERCE_ORDER_EXPIRY: (payload, context) =>
+    runPlatformOperationsHandler("COMMERCE_ORDER_EXPIRY", payload, context),
+  PLATFORM_OPERATIONS_MONITOR: (payload, context) =>
+    runPlatformOperationsHandler("PLATFORM_OPERATIONS_MONITOR", payload, context),
+  DISTRIBUTED_RATE_LIMIT_CLEANUP: (payload, context) =>
+    runPlatformOperationsHandler("DISTRIBUTED_RATE_LIMIT_CLEANUP", payload, context),
 };
 
 const testHandlers = new Map<PlatformJobType, PlatformJobHandler>();

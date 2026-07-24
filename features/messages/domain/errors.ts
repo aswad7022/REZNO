@@ -4,6 +4,7 @@ export type MessageErrorCode =
   | "INVALID_CURSOR"
   | "NOT_FOUND"
   | "RATE_LIMITED"
+  | "SERVICE_UNAVAILABLE"
   | "STALE_VERSION"
   | "VALIDATION_ERROR";
 
@@ -24,6 +25,7 @@ const STATUS_BY_CODE: Record<MessageErrorCode, number> = {
   INVALID_CURSOR: 400,
   NOT_FOUND: 404,
   RATE_LIMITED: 429,
+  SERVICE_UNAVAILABLE: 503,
   STALE_VERSION: 409,
   VALIDATION_ERROR: 400,
 };

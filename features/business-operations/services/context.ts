@@ -10,7 +10,7 @@ import {
   type BusinessOperationCapability,
 } from "@/features/business-operations/domain/policy";
 import { prisma } from "@/lib/db/prisma";
-import { consumeRateLimit } from "@/lib/security/rate-limit-core";
+import { consumeRateLimit } from "@/lib/security/rate-limit";
 
 export interface BusinessOperationActorReference {
   contextOrganizationId: string;
@@ -102,15 +102,21 @@ export function assertRenderedOrganization(
   }
 }
 
-export function assertBusinessOperationMutationRate(
+export async function assertBusinessOperationMutationRate(
   actor: BusinessOperationActor,
   action: string,
 ) {
-  const result = consumeRateLimit(
+  const result = await consumeRateLimit(
     `businessOperations:${action}`,
     `membership:${actor.membershipId}`,
     { limit: 120, windowMs: 60_000 },
   );
+  if (result.unavailable) {
+    businessOperationsError(
+      "SERVICE_UNAVAILABLE",
+      "Request protection is temporarily unavailable.",
+    );
+  }
   if (!result.success) {
     businessOperationsError(
       "RATE_LIMITED",

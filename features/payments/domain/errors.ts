@@ -19,6 +19,7 @@ export type PaymentErrorCode =
   | "FINANCIAL_LEDGER_IMBALANCE"
   | "RECONCILIATION_MISMATCH"
   | "RATE_LIMITED"
+  | "SERVICE_UNAVAILABLE"
   | "INVALID_CURSOR";
 
 const statuses: Record<PaymentErrorCode, number> = {
@@ -42,6 +43,7 @@ const statuses: Record<PaymentErrorCode, number> = {
   FINANCIAL_LEDGER_IMBALANCE: 409,
   RECONCILIATION_MISMATCH: 409,
   RATE_LIMITED: 429,
+  SERVICE_UNAVAILABLE: 503,
   INVALID_CURSOR: 400,
 };
 

@@ -94,7 +94,7 @@ export async function mutateNotificationState(
     });
     const currentVersion = current?.version ?? 0;
     if (currentVersion !== input.expectedVersion) stale(currentVersion);
-    const changedAt = new Date();
+    const changedAt = await notificationTransactionTime(transaction);
     const data = mutationData(input.action, changedAt);
     const state = current
       ? await transaction.notificationRecipientState.update({

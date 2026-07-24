@@ -68,7 +68,7 @@ export async function addOperationalBranchAssignment(input: {
   memberId: string;
 }) {
   const actor = await resolveBusinessOperationActor(input.actor, "BRANCH_ASSIGNMENT_WRITE");
-  assertBusinessOperationMutationRate(actor, "branch-assignment-add");
+  await assertBusinessOperationMutationRate(actor, "branch-assignment-add");
   assertRenderedOrganization(actor, input.contextOrganizationId);
   const requestHash = hashBusinessOperation({
     action: "BRANCH_ASSIGNMENT_ADD",
@@ -144,7 +144,7 @@ export async function removeOperationalBranchAssignment(input: {
   idempotencyKey: string;
 }) {
   const actor = await resolveBusinessOperationActor(input.actor, "BRANCH_ASSIGNMENT_WRITE");
-  assertBusinessOperationMutationRate(actor, "branch-assignment-remove");
+  await assertBusinessOperationMutationRate(actor, "branch-assignment-remove");
   assertRenderedOrganization(actor, input.contextOrganizationId);
   const requestHash = hashBusinessOperation({
     action: "BRANCH_ASSIGNMENT_REMOVE",
@@ -213,7 +213,7 @@ export async function addOperationalServiceAssignment(input: {
   serviceId: string;
 }) {
   const actor = await resolveBusinessOperationActor(input.actor, "SERVICE_ASSIGNMENT_WRITE");
-  assertBusinessOperationMutationRate(actor, "service-assignment-add");
+  await assertBusinessOperationMutationRate(actor, "service-assignment-add");
   assertRenderedOrganization(actor, input.contextOrganizationId);
   const requestHash = hashBusinessOperation({
     action: "SERVICE_ASSIGNMENT_ADD",
@@ -306,7 +306,7 @@ export async function removeOperationalServiceAssignment(input: {
   idempotencyKey: string;
 }) {
   const actor = await resolveBusinessOperationActor(input.actor, "SERVICE_ASSIGNMENT_WRITE");
-  assertBusinessOperationMutationRate(actor, "service-assignment-remove");
+  await assertBusinessOperationMutationRate(actor, "service-assignment-remove");
   assertRenderedOrganization(actor, input.contextOrganizationId);
   const requestHash = hashBusinessOperation({
     action: "SERVICE_ASSIGNMENT_REMOVE",

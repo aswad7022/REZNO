@@ -62,7 +62,7 @@ export async function updateOperationalHours(input: {
   idempotencyKey: string;
 }) {
   const actor = await resolveBusinessOperationActor(input.actor, "HOURS_WRITE");
-  assertBusinessOperationMutationRate(actor, "hours-update");
+  await assertBusinessOperationMutationRate(actor, "hours-update");
   assertRenderedOrganization(actor, input.contextOrganizationId);
   const parsed = operationalHoursSchema.safeParse({ days: input.days });
   if (!parsed.success) businessOperationsError("INVALID_REQUEST", "Working hours are invalid.");

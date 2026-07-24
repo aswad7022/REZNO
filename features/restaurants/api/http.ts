@@ -33,7 +33,7 @@ export function handlePublicRestaurantRequest(
       request.headers,
       "mobile-restaurant-public",
     );
-    assertRateLimit(`restaurant.public.${scope}`, identifier, options.limit ?? 120);
+    await assertRateLimit(`restaurant.public.${scope}`, identifier, options.limit ?? 120);
     return operation();
   }, options.cacheControl ?? "public, max-age=30, stale-while-revalidate=120");
 }
@@ -46,7 +46,7 @@ export function handleCustomerRestaurantRequest(
 ) {
   return handleRestaurantRequest(async () => {
     const context = await resolveRestaurantReservationCustomer(request);
-    assertRateLimit(
+    await assertRateLimit(
       `restaurant.customer.${scope}`,
       `person:${context.personId}`,
       options.limit ?? 60,
@@ -94,8 +94,16 @@ async function handleRestaurantRequest(
   }
 }
 
-function assertRateLimit(scope: string, identifier: string, limit: number) {
-  const result = consumeRateLimit(scope, identifier, { limit, windowMs: 60_000 });
+async function assertRateLimit(scope: string, identifier: string, limit: number) {
+  const result = await consumeRateLimit(scope, identifier, { limit, windowMs: 60_000 });
+  if (result.unavailable) {
+    restaurantReservationApiError(
+      "SERVICE_UNAVAILABLE",
+      503,
+      "Request protection is temporarily unavailable.",
+      { retryAfterSeconds: 1 },
+    );
+  }
   if (!result.success) {
     restaurantReservationApiError("RATE_LIMITED", 429, "Too many requests.", {
       retryAfterSeconds: result.retryAfterSeconds,

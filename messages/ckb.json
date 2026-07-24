@@ -1537,7 +1537,9 @@
       "SETTLEMENTS_VIEW": "بینینی بەڵگەنامەکانی یەکلاکەرەوە",
       "SETTLEMENTS_MANAGE": "بەڕێوەبردنی بەڵگەنامەکانی یەکلاکەرەوە",
       "PLATFORM_JOBS_VIEW": "بینینی کارە بەردەوامەکانی پلاتفۆرم",
-      "PLATFORM_JOBS_MANAGE": "بەڕێوەبردنی کارە بەردەوامەکانی پلاتفۆرم"
+      "PLATFORM_JOBS_MANAGE": "بەڕێوەبردنی کارە بەردەوامەکانی پلاتفۆرم",
+      "PLATFORM_OPERATIONS_VIEW": "بینینی کارگێڕی پلاتفۆرم",
+      "PLATFORM_OPERATIONS_MANAGE": "بەڕێوەبردنی کارگێڕی پلاتفۆرم"
     }
   },
   "Media": {

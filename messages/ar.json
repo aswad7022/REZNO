@@ -1548,7 +1548,9 @@
       "SETTLEMENTS_VIEW": "عرض كشوف التسوية",
       "SETTLEMENTS_MANAGE": "إدارة كشوف التسوية",
       "PLATFORM_JOBS_VIEW": "عرض مهام المنصة الدائمة",
-      "PLATFORM_JOBS_MANAGE": "تشغيل مهام المنصة الدائمة"
+      "PLATFORM_JOBS_MANAGE": "تشغيل مهام المنصة الدائمة",
+      "PLATFORM_OPERATIONS_VIEW": "عرض عمليات المنصة",
+      "PLATFORM_OPERATIONS_MANAGE": "إدارة عمليات المنصة"
     }
   },
   "Media": {

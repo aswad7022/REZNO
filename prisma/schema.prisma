@@ -66,6 +66,14 @@ model Person {
   createdPlatformJobs             PlatformJob[]                       @relation("PlatformJobCreatedByPerson")
   createdPlatformJobSchedules     PlatformJobSchedule[]               @relation("PlatformJobScheduleCreatedByPerson")
   platformJobMutations            PlatformJobMutation[]               @relation("PlatformJobMutationActorPerson")
+  configuredPlatformRuntimes      PlatformRuntimeControl[]            @relation("PlatformRuntimeConfiguredByPerson")
+  acknowledgedPlatformAlerts      PlatformAlert[]                     @relation("PlatformAlertAcknowledgedByPerson")
+  resolvedPlatformAlerts          PlatformAlert[]                     @relation("PlatformAlertResolvedByPerson")
+  platformAlertHistory            PlatformAlertHistory[]              @relation("PlatformAlertHistoryActorPerson")
+  acknowledgedPlatformIncidents   PlatformIncident[]                  @relation("PlatformIncidentAcknowledgedByPerson")
+  resolvedPlatformIncidents       PlatformIncident[]                  @relation("PlatformIncidentResolvedByPerson")
+  platformIncidentHistory         PlatformIncidentHistory[]           @relation("PlatformIncidentHistoryActorPerson")
+  platformOperationMutations      PlatformOperationMutation[]         @relation("PlatformOperationMutationActorPerson")
 
   @@index([phone])
 }
@@ -735,6 +743,14 @@ model User {
   createdPlatformJobs            PlatformJob[]                   @relation("PlatformJobCreatedByUser")
   createdPlatformJobSchedules    PlatformJobSchedule[]           @relation("PlatformJobScheduleCreatedByUser")
   platformJobMutations           PlatformJobMutation[]           @relation("PlatformJobMutationActorUser")
+  configuredPlatformRuntimes     PlatformRuntimeControl[]        @relation("PlatformRuntimeConfiguredByUser")
+  acknowledgedPlatformAlerts     PlatformAlert[]                 @relation("PlatformAlertAcknowledgedByUser")
+  resolvedPlatformAlerts         PlatformAlert[]                 @relation("PlatformAlertResolvedByUser")
+  platformAlertHistory           PlatformAlertHistory[]          @relation("PlatformAlertHistoryActorUser")
+  acknowledgedPlatformIncidents  PlatformIncident[]              @relation("PlatformIncidentAcknowledgedByUser")
+  resolvedPlatformIncidents      PlatformIncident[]              @relation("PlatformIncidentResolvedByUser")
+  platformIncidentHistory        PlatformIncidentHistory[]       @relation("PlatformIncidentHistoryActorUser")
+  platformOperationMutations     PlatformOperationMutation[]     @relation("PlatformOperationMutationActorUser")
 
   @@map("user")
 }
@@ -2194,29 +2210,30 @@ model PlatformJobAttempt {
 }
 
 model PlatformJobSchedule {
-  id                   String                 @id @default(uuid()) @db.Uuid
+  id                   String                      @id @default(uuid()) @db.Uuid
   scheduleKey          PlatformJobScheduleKey
   jobType              PlatformJobType
   payloadVersion       Int
   payload              Json
-  payloadHash          String                 @db.VarChar(64)
-  scopeKey             String                 @db.VarChar(64)
-  organizationId       String?                @db.Uuid
+  payloadHash          String                      @db.VarChar(64)
+  scopeKey             String                      @db.VarChar(64)
+  organizationId       String?                     @db.Uuid
   createdByAdminUserId String
-  createdByPersonId    String                 @db.Uuid
+  createdByPersonId    String                      @db.Uuid
   cadenceSeconds       Int
-  catchupLimit         Int                    @default(1) @db.SmallInt
-  enabled              Boolean                @default(false)
-  nextRunAt            DateTime               @db.Timestamptz(6)
-  lastTickAt           DateTime?              @db.Timestamptz(6)
-  version              Int                    @default(1)
-  createdAt            DateTime               @default(now()) @db.Timestamptz(6)
-  updatedAt            DateTime               @updatedAt @db.Timestamptz(6)
-  organization         Organization?          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  createdByAdmin       User                   @relation("PlatformJobScheduleCreatedByUser", fields: [createdByAdminUserId], references: [id], onDelete: Restrict)
-  createdByPerson      Person                 @relation("PlatformJobScheduleCreatedByPerson", fields: [createdByPersonId], references: [id], onDelete: Restrict)
+  catchupLimit         Int                         @default(1) @db.SmallInt
+  enabled              Boolean                     @default(false)
+  nextRunAt            DateTime                    @db.Timestamptz(6)
+  lastTickAt           DateTime?                   @db.Timestamptz(6)
+  version              Int                         @default(1)
+  createdAt            DateTime                    @default(now()) @db.Timestamptz(6)
+  updatedAt            DateTime                    @updatedAt @db.Timestamptz(6)
+  organization         Organization?               @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  createdByAdmin       User                        @relation("PlatformJobScheduleCreatedByUser", fields: [createdByAdminUserId], references: [id], onDelete: Restrict)
+  createdByPerson      Person                      @relation("PlatformJobScheduleCreatedByPerson", fields: [createdByPersonId], references: [id], onDelete: Restrict)
   jobs                 PlatformJob[]
   mutations            PlatformJobMutation[]
+  operationMutations   PlatformOperationMutation[]
 
   @@unique([scheduleKey, scopeKey])
   @@index([enabled, nextRunAt, id])
@@ -2251,6 +2268,215 @@ model PlatformJobMutation {
   @@index([scheduleId, action, createdAt, id])
   @@index([actorAdminUserId, createdAt, id])
   @@index([action, operationLeaseExpiresAt, id])
+}
+
+model DistributedRateLimitBucket {
+  keyHash         String   @id @db.VarChar(64)
+  keyVersion      Int      @db.SmallInt
+  count           Int
+  windowStartedAt DateTime @db.Timestamptz(6)
+  resetAt         DateTime @db.Timestamptz(6)
+  expiresAt       DateTime @db.Timestamptz(6)
+  createdAt       DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @db.Timestamptz(6)
+
+  @@index([expiresAt, keyHash])
+  @@index([resetAt, keyHash])
+}
+
+model PlatformRuntimeControl {
+  id                      String                      @id @db.VarChar(32)
+  provider                PlatformRuntimeProvider
+  state                   PlatformRuntimeControlState @default(DISABLED)
+  expectedIntervalSeconds Int
+  generation              BigInt                      @default(1)
+  configuredByAdminUserId String
+  configuredByPersonId    String                      @db.Uuid
+  enabledAt               DateTime?                   @db.Timestamptz(6)
+  disabledAt              DateTime?                   @db.Timestamptz(6)
+  lastInvocationAt        DateTime?                   @db.Timestamptz(6)
+  lastSucceededAt         DateTime?                   @db.Timestamptz(6)
+  version                 Int                         @default(1)
+  createdAt               DateTime                    @default(now()) @db.Timestamptz(6)
+  updatedAt               DateTime                    @updatedAt @db.Timestamptz(6)
+  configuredByAdmin       User                        @relation("PlatformRuntimeConfiguredByUser", fields: [configuredByAdminUserId], references: [id], onDelete: Restrict)
+  configuredByPerson      Person                      @relation("PlatformRuntimeConfiguredByPerson", fields: [configuredByPersonId], references: [id], onDelete: Restrict)
+  invocations             PlatformRuntimeInvocation[]
+  mutations               PlatformOperationMutation[]
+
+  @@index([state, lastSucceededAt, id])
+}
+
+model PlatformRuntimeInvocation {
+  id                   String                         @id @default(uuid()) @db.Uuid
+  controlId            String                         @db.VarChar(32)
+  provider             PlatformRuntimeProvider
+  state                PlatformRuntimeInvocationState @default(RUNNING)
+  tokenJtiHash         String                         @unique @db.VarChar(64)
+  repositorySha        String                         @db.VarChar(40)
+  workflowRefHash      String                         @db.VarChar(64)
+  eventName            String                         @db.VarChar(32)
+  gitRefHash           String                         @db.VarChar(64)
+  requestedAt          DateTime                       @db.Timestamptz(6)
+  controlGeneration    BigInt
+  leaseToken           String?                        @db.Uuid
+  fencingToken         BigInt                         @default(1)
+  leaseExpiresAt       DateTime?                      @db.Timestamptz(6)
+  workerId             String                         @db.VarChar(96)
+  schedulerCompletedAt DateTime?                      @db.Timestamptz(6)
+  workerCompletedAt    DateTime?                      @db.Timestamptz(6)
+  monitorCompletedAt   DateTime?                      @db.Timestamptz(6)
+  schedulerResult      Json?
+  workerResult         Json?
+  monitorResult        Json?
+  safeErrorCode        String?                        @db.VarChar(64)
+  completedAt          DateTime?                      @db.Timestamptz(6)
+  createdAt            DateTime                       @default(now()) @db.Timestamptz(6)
+  updatedAt            DateTime                       @updatedAt @db.Timestamptz(6)
+  control              PlatformRuntimeControl         @relation(fields: [controlId], references: [id], onDelete: Restrict)
+  alertHistory         PlatformAlertHistory[]
+  incidentHistory      PlatformIncidentHistory[]
+  resolvedAlerts       PlatformAlert[]                @relation("PlatformAlertResolvedByRuntime")
+
+  @@index([state, leaseExpiresAt, id])
+  @@index([controlId, createdAt, id])
+  @@index([completedAt, id])
+}
+
+model PlatformAlert {
+  id                            String                      @id @default(uuid()) @db.Uuid
+  deduplicationKey              String                      @unique @db.VarChar(160)
+  rule                          PlatformAlertRule
+  domain                        PlatformOperationDomain
+  severity                      PlatformSeverity
+  state                         PlatformAlertState          @default(OPEN)
+  summaryCode                   String                      @db.VarChar(80)
+  observation                   Json
+  occurrenceCount               Int                         @default(1)
+  firstObservedAt               DateTime                    @db.Timestamptz(6)
+  lastObservedAt                DateTime                    @db.Timestamptz(6)
+  acknowledgedByAdminId         String?
+  acknowledgedByPersonId        String?                     @db.Uuid
+  acknowledgedAt                DateTime?                   @db.Timestamptz(6)
+  resolvedByAdminId             String?
+  resolvedByPersonId            String?                     @db.Uuid
+  resolvedByRuntimeInvocationId String?                     @db.Uuid
+  resolvedAt                    DateTime?                   @db.Timestamptz(6)
+  version                       Int                         @default(1)
+  createdAt                     DateTime                    @default(now()) @db.Timestamptz(6)
+  updatedAt                     DateTime                    @updatedAt @db.Timestamptz(6)
+  acknowledgedByAdmin           User?                       @relation("PlatformAlertAcknowledgedByUser", fields: [acknowledgedByAdminId], references: [id], onDelete: Restrict)
+  acknowledgedByPerson          Person?                     @relation("PlatformAlertAcknowledgedByPerson", fields: [acknowledgedByPersonId], references: [id], onDelete: Restrict)
+  resolvedByAdmin               User?                       @relation("PlatformAlertResolvedByUser", fields: [resolvedByAdminId], references: [id], onDelete: Restrict)
+  resolvedByPerson              Person?                     @relation("PlatformAlertResolvedByPerson", fields: [resolvedByPersonId], references: [id], onDelete: Restrict)
+  resolvedByRuntimeInvocation   PlatformRuntimeInvocation?  @relation("PlatformAlertResolvedByRuntime", fields: [resolvedByRuntimeInvocationId], references: [id], onDelete: Restrict)
+  history                       PlatformAlertHistory[]
+  incident                      PlatformIncident?
+  mutations                     PlatformOperationMutation[]
+
+  @@index([state, severity, lastObservedAt, id])
+  @@index([domain, state, lastObservedAt, id])
+  @@index([createdAt, id])
+}
+
+model PlatformAlertHistory {
+  id                  String                       @id @default(uuid()) @db.Uuid
+  alertId             String                       @db.Uuid
+  event               PlatformAlertHistoryEvent
+  source              PlatformOperationEventSource
+  fromState           PlatformAlertState?
+  toState             PlatformAlertState
+  actorAdminUserId    String?
+  actorPersonId       String?                      @db.Uuid
+  runtimeInvocationId String?                      @db.Uuid
+  metadata            Json
+  createdAt           DateTime                     @default(now()) @db.Timestamptz(6)
+  alert               PlatformAlert                @relation(fields: [alertId], references: [id], onDelete: Restrict)
+  actorAdmin          User?                        @relation("PlatformAlertHistoryActorUser", fields: [actorAdminUserId], references: [id], onDelete: Restrict)
+  actorPerson         Person?                      @relation("PlatformAlertHistoryActorPerson", fields: [actorPersonId], references: [id], onDelete: Restrict)
+  runtimeInvocation   PlatformRuntimeInvocation?   @relation(fields: [runtimeInvocationId], references: [id], onDelete: Restrict)
+
+  @@index([alertId, createdAt, id])
+  @@index([createdAt, id])
+}
+
+model PlatformIncident {
+  id                     String                      @id @default(uuid()) @db.Uuid
+  sourceAlertId          String                      @unique @db.Uuid
+  deduplicationKey       String                      @unique @db.VarChar(160)
+  domain                 PlatformOperationDomain
+  severity               PlatformSeverity
+  state                  PlatformIncidentState       @default(OPEN)
+  summaryCode            String                      @db.VarChar(80)
+  acknowledgedByAdminId  String?
+  acknowledgedByPersonId String?                     @db.Uuid
+  acknowledgedAt         DateTime?                   @db.Timestamptz(6)
+  resolvedByAdminId      String?
+  resolvedByPersonId     String?                     @db.Uuid
+  resolvedAt             DateTime?                   @db.Timestamptz(6)
+  version                Int                         @default(1)
+  createdAt              DateTime                    @default(now()) @db.Timestamptz(6)
+  updatedAt              DateTime                    @updatedAt @db.Timestamptz(6)
+  sourceAlert            PlatformAlert               @relation(fields: [sourceAlertId], references: [id], onDelete: Restrict)
+  acknowledgedByAdmin    User?                       @relation("PlatformIncidentAcknowledgedByUser", fields: [acknowledgedByAdminId], references: [id], onDelete: Restrict)
+  acknowledgedByPerson   Person?                     @relation("PlatformIncidentAcknowledgedByPerson", fields: [acknowledgedByPersonId], references: [id], onDelete: Restrict)
+  resolvedByAdmin        User?                       @relation("PlatformIncidentResolvedByUser", fields: [resolvedByAdminId], references: [id], onDelete: Restrict)
+  resolvedByPerson       Person?                     @relation("PlatformIncidentResolvedByPerson", fields: [resolvedByPersonId], references: [id], onDelete: Restrict)
+  history                PlatformIncidentHistory[]
+  mutations              PlatformOperationMutation[]
+
+  @@index([state, severity, updatedAt, id])
+  @@index([domain, state, updatedAt, id])
+  @@index([createdAt, id])
+}
+
+model PlatformIncidentHistory {
+  id                  String                       @id @default(uuid()) @db.Uuid
+  incidentId          String                       @db.Uuid
+  event               PlatformIncidentHistoryEvent
+  source              PlatformOperationEventSource
+  fromState           PlatformIncidentState?
+  toState             PlatformIncidentState
+  actorAdminUserId    String?
+  actorPersonId       String?                      @db.Uuid
+  runtimeInvocationId String?                      @db.Uuid
+  metadata            Json
+  createdAt           DateTime                     @default(now()) @db.Timestamptz(6)
+  incident            PlatformIncident             @relation(fields: [incidentId], references: [id], onDelete: Restrict)
+  actorAdmin          User?                        @relation("PlatformIncidentHistoryActorUser", fields: [actorAdminUserId], references: [id], onDelete: Restrict)
+  actorPerson         Person?                      @relation("PlatformIncidentHistoryActorPerson", fields: [actorPersonId], references: [id], onDelete: Restrict)
+  runtimeInvocation   PlatformRuntimeInvocation?   @relation(fields: [runtimeInvocationId], references: [id], onDelete: Restrict)
+
+  @@index([incidentId, createdAt, id])
+  @@index([createdAt, id])
+}
+
+model PlatformOperationMutation {
+  id               String                          @id @default(uuid()) @db.Uuid
+  actorAdminUserId String
+  actorPersonId    String                          @db.Uuid
+  action           PlatformOperationMutationAction
+  idempotencyKey   String                          @db.Uuid
+  requestHash      String                          @db.VarChar(64)
+  runtimeControlId String?                         @db.VarChar(32)
+  scheduleId       String?                         @db.Uuid
+  alertId          String?                         @db.Uuid
+  incidentId       String?                         @db.Uuid
+  result           Json
+  createdAt        DateTime                        @default(now()) @db.Timestamptz(6)
+  actorAdmin       User                            @relation("PlatformOperationMutationActorUser", fields: [actorAdminUserId], references: [id], onDelete: Restrict)
+  actorPerson      Person                          @relation("PlatformOperationMutationActorPerson", fields: [actorPersonId], references: [id], onDelete: Restrict)
+  runtimeControl   PlatformRuntimeControl?         @relation(fields: [runtimeControlId], references: [id], onDelete: Restrict)
+  schedule         PlatformJobSchedule?            @relation(fields: [scheduleId], references: [id], onDelete: Restrict)
+  alert            PlatformAlert?                  @relation(fields: [alertId], references: [id], onDelete: Restrict)
+  incident         PlatformIncident?               @relation(fields: [incidentId], references: [id], onDelete: Restrict)
+
+  @@unique([actorAdminUserId, idempotencyKey])
+  @@index([runtimeControlId, action, createdAt, id])
+  @@index([scheduleId, action, createdAt, id])
+  @@index([alertId, action, createdAt, id])
+  @@index([incidentId, action, createdAt, id])
+  @@index([actorAdminUserId, createdAt, id])
 }
 
 model CustomerFavoriteStore {
@@ -2307,6 +2533,9 @@ enum PlatformJobType {
   PAYMENT_REFUND_RETRY
   PAYMENT_RECONCILIATION
   SETTLEMENT_STATEMENT_GENERATE
+  COMMERCE_ORDER_EXPIRY
+  PLATFORM_OPERATIONS_MONITOR
+  DISTRIBUTED_RATE_LIMIT_CLEANUP
 }
 
 enum PlatformJobStatus {
@@ -2359,6 +2588,9 @@ enum PlatformJobScheduleKey {
   PAYMENT_RETRY_DISCOVERY
   PAYMENT_RECONCILIATION
   SETTLEMENT_STATEMENT_GENERATE
+  COMMERCE_ORDER_EXPIRY
+  PLATFORM_OPERATIONS_MONITOR
+  DISTRIBUTED_RATE_LIMIT_CLEANUP
 }
 
 enum PlatformJobMutationAction {
@@ -2369,6 +2601,95 @@ enum PlatformJobMutationAction {
   SCHEDULE_DISABLE
   WORKER_BATCH
   SCHEDULER_TICK
+}
+
+enum PlatformRuntimeProvider {
+  GITHUB_ACTIONS_SCHEDULED_HTTP
+}
+
+enum PlatformRuntimeControlState {
+  DISABLED
+  ENABLED
+}
+
+enum PlatformRuntimeInvocationState {
+  RUNNING
+  SUCCEEDED
+  FAILED
+  ABANDONED
+}
+
+enum PlatformOperationDomain {
+  PLATFORM
+  COMMERCE
+  STORAGE
+  MEDIA
+  COMMUNICATIONS
+  PAYMENTS
+  SETTLEMENTS
+}
+
+enum PlatformSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum PlatformAlertState {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+enum PlatformIncidentState {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+enum PlatformAlertRule {
+  RUNTIME_STALE
+  OVERDUE_JOBS
+  EXPIRED_LEASES
+  DEAD_LETTERED_JOBS
+  DELAYED_SCHEDULES
+  STORAGE_BACKLOG
+  COMMUNICATION_BACKLOG
+  PAYMENT_BACKLOG
+  SETTLEMENT_GENERATION_STALE
+  RATE_LIMIT_STORE_UNAVAILABLE
+}
+
+enum PlatformOperationEventSource {
+  ADMIN
+  RUNTIME
+}
+
+enum PlatformAlertHistoryEvent {
+  OPENED
+  OBSERVED
+  ACKNOWLEDGED
+  RESOLVED
+  REOPENED
+}
+
+enum PlatformIncidentHistoryEvent {
+  CREATED
+  ACKNOWLEDGED
+  RESOLVED
+  REOPENED
+}
+
+enum PlatformOperationMutationAction {
+  RUNTIME_INITIALIZE
+  RUNTIME_ENABLE
+  RUNTIME_DISABLE
+  SCHEDULE_BOOTSTRAP
+  ALERT_ACKNOWLEDGE
+  ALERT_RESOLVE
+  INCIDENT_CREATE
+  INCIDENT_ACKNOWLEDGE
+  INCIDENT_RESOLVE
 }
 
 enum StoragePurpose {

@@ -15,6 +15,7 @@ export type StorageErrorCode =
   | "STORAGE_PROVIDER_NOT_CONFIGURED"
   | "STORAGE_PROVIDER_FAILURE"
   | "RATE_LIMITED"
+  | "SERVICE_UNAVAILABLE"
   | "INVALID_CURSOR";
 
 const statuses: Record<StorageErrorCode, number> = {
@@ -34,6 +35,7 @@ const statuses: Record<StorageErrorCode, number> = {
   STORAGE_PROVIDER_NOT_CONFIGURED: 503,
   STORAGE_PROVIDER_FAILURE: 503,
   RATE_LIMITED: 429,
+  SERVICE_UNAVAILABLE: 503,
   INVALID_CURSOR: 400,
 };
 

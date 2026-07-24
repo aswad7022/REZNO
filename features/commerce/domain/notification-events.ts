@@ -17,6 +17,17 @@ export type CommerceNotificationEvent =
   | "order.customer_cancelled"
   | "order.admin_cancelled";
 
+export function commerceNotificationEventKey(
+  orderId: string,
+  event: CommerceNotificationEvent,
+  recipientPersonId: string,
+  destinationType: "customer" | "merchant" = "customer",
+) {
+  return destinationType === "merchant"
+    ? `commerce:${orderId}:${event}:merchant:${recipientPersonId}`
+    : `commerce:${orderId}:${event}:${recipientPersonId}`;
+}
+
 type CommerceNotificationLocale = "AR" | "EN" | "KU";
 
 export function notificationLanguageCodeFromUiLocale(locale: AppLocale): LanguageCode {

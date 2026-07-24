@@ -19,6 +19,7 @@ const links = [
   ["/admin/messages", "الرسائل", "MESSAGES_VIEW"],
   ["/admin/payments", "المدفوعات", "PAYMENTS_VIEW"],
   ["/admin/platform-jobs", "عمليات المنصة", "PLATFORM_JOBS_VIEW"],
+  ["/admin/platform-operations", "صحة المنصة", "PLATFORM_OPERATIONS_VIEW"],
   ["/admin/access", "صلاحيات الأدمن", "SUPER_ADMIN"],
   ["/admin/settings", "الإعدادات", "SETTINGS_VIEW"],
 ] as const;
