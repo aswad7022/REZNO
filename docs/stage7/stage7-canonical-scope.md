@@ -1,0 +1,112 @@
+# Stage 7 — Release and Physical-Device Validation
+
+Status: **ACTIVE — GATE 7A AUTHOR COMPLETE, INDEPENDENT REVIEW PENDING**.
+
+Canonical base: `origin/main` at
+`7b5fd511bdb8b7fa7968b233ad5f36cdd346d2b6`, the merge commit of PR #128.
+PR #100 remains an untouched Open Draft reference at
+`e46454df993ecccb06180060dda4353ec88e2641`.
+
+Stage 6 operational activation was explicitly deferred by the owner:
+
+`DEFERRED_BY_OWNER — CODE MERGED, RUNTIME NOT ACTIVATED`
+
+No Stage 6 runtime control, schedule, GitHub runtime variable, staging database,
+Vercel environment, or provider configuration is changed by Stage 7.
+
+## Objective
+
+Prove REZNO Mobile on real iPhone and Android hardware and close the release,
+media-input, hosted-payment return, device-token, and provider-receipt gaps
+that were intentionally deferred by Stages 4–6. Repository preparation may
+proceed without external credentials, but a build, store, provider, or
+physical-device result is never claimed without exact evidence.
+
+Stage 7 does not own broad visual redesign, Stage 6 runtime activation,
+production/provider activation, irreversible financial success, AI features,
+or changes to protected PR #100.
+
+## Canonical audit
+
+The audit matches current source and configuration, not historical reports
+alone. `IMPLEMENTED_AND_PROVEN` below means repository/static or safe
+read-only endpoint evidence; it does not imply physical-device proof.
+
+| Capability | Status | Current evidence and boundary |
+| --- | --- | --- |
+| Expo project linkage | `IMPLEMENTED_AND_PROVEN` | `@alhakeem7/rezno-mobile` and project ID `ef209c9c-0d04-4731-a998-6241fef1b29d` match `app.json` and the authenticated read-only EAS project lookup. |
+| iOS/Android identifiers | `IMPLEMENTED_AND_PROVEN` | Both canonical identifiers are `com.rezno.mobile`; Gate 7A validation rejects drift. |
+| Application scheme | `IMPLEMENTED_AND_PROVEN` | `rezno` is configured and statically locked; no deep-link handler is implied. |
+| Expo Web runtime | `IMPLEMENTED_AND_PROVEN` | Expo-compatible `react-dom` and `react-native-web` are installed, version-locked by validation, and the Web export passes. |
+| Development build profile | `IMPLEMENTED_AND_PROVEN` | Development client, internal distribution, `development` EAS environment, and the public staging API origin are validated. No current build was created. |
+| Preview build profile | `IMPLEMENTED_AND_PROVEN` | Standalone internal distribution, `preview` EAS environment, and the public staging API origin are validated. No current build was created. |
+| Production build profile | `PARTIAL` | Store distribution and the `production` EAS environment are explicit. The production API origin is deliberately not tracked and is not configured in EAS, so a release fails closed until separately approved. |
+| Public staging API origin | `IMPLEMENTED_AND_PROVEN` | `https://rezno-staging.vercel.app` resolves to the same exact-main staging deployment as the protected team alias and returns the unauthenticated session API with HTTP 200. |
+| Release API-origin safety | `IMPLEMENTED_AND_PROVEN` | Release bundles require HTTPS, a public multi-label hostname, the standard HTTPS port, and an origin with no credentials, path, query, or fragment. |
+| EAS account/project access | `IMPLEMENTED_AND_PROVEN` | Read-only `whoami` and `project:info` succeeded on 2026-07-25. No credential material was read or printed. |
+| Current signed Development/Preview artifact | `IMPLEMENTED_NOT_PHYSICAL_PROVEN` | Configuration and runbook exist. Historical Android evidence is not evidence for this Stage 7 commit. |
+| Physical iPhone install/open | `BLOCKED_BY_EXTERNAL_CREDENTIAL` | Requires an authorized Apple team/signing path, registered device or TestFlight path, and a physical iPhone. |
+| Physical Android install/open | `IMPLEMENTED_NOT_PHYSICAL_PROVEN` | An internal APK path is defined, but no Stage 7 build was created or installed on a physical phone. |
+| `ar`/`en`/`ckb` and RTL/LTR | `IMPLEMENTED_NOT_PHYSICAL_PROVEN` | Current app source contains all three locales and direction handling; physical-device regression remains required. |
+| SecureStore session persistence | `IMPLEMENTED_NOT_PHYSICAL_PROVEN` | Better Auth cookies are normalized and stored in Expo SecureStore; cold-process behavior is not physically proven. |
+| Photo Library selection | `IMPLEMENTED_NOT_PHYSICAL_PROVEN` | Customer avatar uses `expo-image-picker`, asks for library permission, and accepts one image. |
+| Camera capture | `NOT_IMPLEMENTED` | No camera launch path or camera permission flow exists. Gate 7B owns it. |
+| HEIC | `PARTIAL` | Current upload code explicitly rejects media outside JPEG/PNG/WebP. Safe rejection exists; normalization/conversion and physical proof do not. |
+| Upload retry/resume/cancel | `PARTIAL` | A bounded one-shot managed upload exists. Durable resume, explicit cancellation, process recovery, and duplicate prevention across relaunch are not implemented. |
+| Poor-network recovery | `PARTIAL` | Request failures remain truthful and no false success is created, but no upload/payment recovery state machine exists. |
+| Process-death recovery | `PARTIAL` | SecureStore can restore auth cookies; in-flight upload and payment operations do not recover after process death. |
+| Hosted payment handoff | `NOT_IMPLEMENTED` | Mobile receives a safe provider action classification/reference only; it has no hosted browser handoff. |
+| Deep-link return | `PARTIAL` | Native scheme exists, but no warm/cold URL handler, allowlist, replay protection, or server-status reconciliation exists. |
+| Device-token lifecycle | `NOT_IMPLEMENTED` | No device-token model or mobile registration lifecycle exists. |
+| APNs/FCM integration | `NOT_IMPLEMENTED` | No production adapter, credential configuration, or device endpoint exists. |
+| Real provider receipts | `BLOCKED_BY_EXTERNAL_CREDENTIAL` | Provider adapters and credentials are not configured; Stage 7 must not fabricate receipt success. |
+| TestFlight/Play validation | `BLOCKED_BY_EXTERNAL_CREDENTIAL` | Requires signed artifacts and authorized store access. No submission is authorized in Gate 7A. |
+| Broad visual redesign | `DEFERRED` | Stage 8 only. |
+| AI capabilities | `DEFERRED` | Blocked until Stage 8 is closed. |
+
+## Proposed gate decomposition
+
+This is the proposed Stage 7 decomposition. Only Gate 7A is active in the
+current work.
+
+### Gate 7A — Release and Physical-Device Foundation
+
+- lock Expo/EAS project, identifiers, scheme, and environment profiles;
+- validate the public staging API origin and release fail-closed behavior;
+- restore and validate the declared Expo Web runtime without changing native behavior;
+- document Development/Preview build, install, launch, and sanitized evidence;
+- inspect EAS access only; do not create or submit a build in this gate without
+  a separate authorization.
+
+### Gate 7B — Camera, Library, HEIC and Network Recovery
+
+- camera and Photo Library permission truth;
+- HEIC normalization or explicit retained safe rejection;
+- retry/resume/cancel, weak-network behavior, process-death recovery, and
+  duplicate prevention for managed uploads.
+
+### Gate 7C — Hosted Payment and Deep-Link Recovery
+
+- hosted browser handoff and exact return-URL allowlist;
+- warm-start and cold-start deep links;
+- replay protection, process-death recovery, and server-authoritative payment
+  status;
+- no provider credential or real financial success without separate authority.
+
+### Gate 7D — Device Tokens, Provider Receipts and Stage 7 Closure
+
+- device-token registration, rotation, logout/revocation, and deletion;
+- APNs/FCM readiness and receipt truth for configured providers only;
+- TestFlight/Play validation, physical-device regression, integrated closure,
+  and independent review.
+
+Gate 7B must not begin until Gate 7A is independently reviewed and merged.
+The same ordering applies to Gates 7C and 7D.
+
+## Provider and release truth
+
+- staging storage/payment/communications providers remain `NOT_CONFIGURED`;
+- no production or store submission was executed;
+- no EAS build was created in Gate 7A;
+- no physical-device result is claimed;
+- no migration is required or allowed by the audited Gate 7A design.
