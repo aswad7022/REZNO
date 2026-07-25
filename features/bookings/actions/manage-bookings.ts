@@ -44,6 +44,9 @@ export async function createBooking(formData: FormData): Promise<void> {
   const branchServiceId =
     typeof rawBranchServiceId === "string" ? rawBranchServiceId : undefined;
   const date = typeof rawDate === "string" ? rawDate : undefined;
+  if (rateLimit.unavailable) {
+    redirect(bookingErrorUrl("unavailable", branchServiceId, date));
+  }
   if (!rateLimit.success) {
     redirect(bookingErrorUrl("rateLimited", branchServiceId, date));
   }

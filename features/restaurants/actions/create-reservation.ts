@@ -41,6 +41,7 @@ export async function createRestaurantReservation(formData: FormData) {
     limit: 6,
     windowMs: 60_000,
   });
+  if (rateLimit.unavailable) failure("unavailable");
   if (!rateLimit.success) failure("rateLimited");
 
   const knownFields = new Set([
