@@ -17,6 +17,11 @@ export type CustomerMediaContainer = {
   version: number;
 };
 
+export type CustomerAvatarCommitPhase =
+  | "CANCELLABLE"
+  | "COMMITTING"
+  | "COMMITTED";
+
 export type CustomerAvatarUploadEngineDependencies = {
   attach(input: {
     assetId: string;
@@ -52,6 +57,7 @@ export type CustomerAvatarUploadEngineDependencies = {
     version: number;
   }): Promise<SafeUploadTarget>;
   now(): number;
+  onCommitPhaseChange?(phase: CustomerAvatarCommitPhase): void;
   onProgress(fraction: number): void;
   persist(manifest: CustomerAvatarUploadManifest): Promise<void>;
   signal: AbortSignal;
@@ -75,6 +81,22 @@ export class MediaUploadEngineError extends Error {
 }
 
 const runningOperations = new Set<string>();
+
+export function customerAvatarCancellationDisposition(
+  phase: CustomerAvatarCommitPhase,
+) {
+  return phase === "CANCELLABLE" ? "CANCEL" : "VERIFY";
+}
+
+export async function resolveCommittedAvatarPreview<T>(
+  loadPreview: () => Promise<T>,
+) {
+  try {
+    return { status: "READY", value: await loadPreview() } as const;
+  } catch {
+    return { status: "UNAVAILABLE" } as const;
+  }
+}
 
 export async function runCustomerAvatarUpload(
   initial: CustomerAvatarUploadManifest,
@@ -101,7 +123,17 @@ async function execute(
   for (let transition = 0; transition < 12; transition += 1) {
     assertNotCancelled(dependencies.signal);
     if (dependencies.now() >= manifest.expiresAt) {
+      try {
+        await dependencies.cleanupLocal(manifest);
+      } catch (error) {
+        throw new MediaUploadEngineError("RECOVERY_CLEANUP_FAILED", false, {
+          cause: error,
+        });
+      }
       throw new MediaUploadEngineError("RECOVERY_EXPIRED", false);
+    }
+    if (manifest.checkpoint === "VERIFY_ATTACH") {
+      dependencies.onCommitPhaseChange?.("COMMITTING");
     }
 
     if (manifest.checkpoint === "CREATE_SESSION") {
@@ -264,6 +296,7 @@ async function execute(
     if (!manifest.assetId) {
       throw new MediaUploadEngineError("RECOVERY_INVALID", false);
     }
+    const assetId = manifest.assetId;
     const container = await callRemote(
       () => dependencies.getContainer(dependencies.signal),
       "CONTAINER_REFRESH_FAILED",
@@ -271,19 +304,26 @@ async function execute(
     const binding =
       container.bindings.find((item) => item.slot === "CUSTOMER_AVATAR")
       ?? null;
-    if (binding?.media?.assetId === manifest.assetId) {
+    if (binding?.media?.assetId === assetId) {
+      dependencies.onCommitPhaseChange?.("COMMITTED");
       await dependencies.cleanupLocal(manifest);
       dependencies.onProgress(1);
-      return { assetId: manifest.assetId, container };
+      return { assetId, container };
     }
     if (container.version !== manifest.containerVersion) {
       await dependencies.cleanupLocal(manifest);
       throw new MediaUploadEngineError("DESTINATION_CHANGED", false);
     }
+    assertNotCancelled(dependencies.signal);
+    if (manifest.checkpoint === "ATTACH") {
+      dependencies.onCommitPhaseChange?.("COMMITTING");
+      manifest = { ...manifest, checkpoint: "VERIFY_ATTACH" };
+      await dependencies.persist(manifest);
+    }
     const attached = await callRemote(
       () =>
         dependencies.attach({
-          assetId: manifest.assetId!,
+          assetId,
           containerVersion: manifest.containerVersion,
           idempotencyKey: manifest.idempotency.attach,
           replace: Boolean(binding),
@@ -291,9 +331,10 @@ async function execute(
         }),
       "ATTACH_FAILED",
     );
+    dependencies.onCommitPhaseChange?.("COMMITTED");
     await dependencies.cleanupLocal(manifest);
     dependencies.onProgress(1);
-    return { assetId: manifest.assetId, container: attached };
+    return { assetId, container: attached };
   }
 
   throw new MediaUploadEngineError("TRANSITION_LIMIT_REACHED", false);

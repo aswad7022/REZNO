@@ -1,6 +1,6 @@
 # Gate 7B — Camera, Library, HEIC and Network Recovery
 
-Status: **AUTHOR COMPLETE — DRAFT REVIEW PENDING — PHYSICAL DEVICE NOT RUN**.
+Status: **AUTHOR REMEDIATION COMPLETE — DRAFT RE-REVIEW PENDING — PHYSICAL DEVICE NOT RUN**.
 
 Base: `0149ca6165e6117cf2f7d8d1a7dda49cfd1b0333`, the merge commit of PR #129.
 
@@ -57,13 +57,21 @@ The manifest is:
 - bound to the authenticated owner;
 - bound to `CUSTOMER_PROFILE/CUSTOMER_AVATAR`;
 - bound to the normalized file size and SHA-256;
-- checkpointed at create-session, issue-target, upload, finalize, and attach;
+- checkpointed at create-session, issue-target, upload, finalize, attach, and
+  durable attach verification;
 - equipped with stable UUID idempotency keys per transition;
 - limited to three provider-upload attempts.
 
 The normalized path must exactly match the app-owned directory and operation
 UUID. A different user, destination, path, checksum, size, schema, or expired
 manifest fails closed and is cleaned.
+
+Expiry cleanup is ordered and truthful. The private JPEG is removed before its
+SecureStore recovery pointer. A missing file or record is an idempotent
+success. If private-file deletion fails, the manifest remains as the pointer
+for a later cleanup attempt; if manifest deletion fails after file removal,
+the failure remains visible instead of being mislabeled as a successful
+cleanup.
 
 ## Network and provider behavior
 
@@ -83,6 +91,14 @@ finalization. If the object is absent, a new target/finalize idempotency
 generation is created. If a previous upload completed, finalization safely
 continues without a duplicate asset.
 
+Attach success is the final server commit boundary. The returned container is
+accepted and the upload manifest/private JPEG are cleaned before preview
+loading begins. Preview URL failure cannot turn a committed upload into a
+failed upload, and the localized preview-refresh action performs only the
+download request; it never repeats upload, finalize, or attach. The same
+non-blocking preview policy applies during startup, so it cannot prevent
+reconciliation of an already-sent attach.
+
 Expo upload tasks provide live progress and cancellation but do not provide
 byte-range upload resume after process termination. Gate 7B truthfully
 implements operation-level resume: replay the durable checkpoint, reconcile
@@ -95,17 +111,37 @@ If the finalized asset is already attached, recovery completes without a
 second mutation. If the container version changed to different content, the
 old operation is cleaned and does not overwrite it.
 
+The client also ignores a preview response whose asset no longer matches the
+current committed asset. Server-side expected container version and stable
+attach idempotency remain the authority that prevents an old operation from
+replacing newer content.
+
 No booking or restaurant upload destination is introduced in Gate 7B. The
 manifest parser rejects any destination other than the exact authenticated
 customer avatar.
 
 ## Cancellation and cleanup
 
-Cancellation stops the live native task, aborts the owner-scoped server
-session when still active, deletes the normalized file, and removes the
-manifest. Server abort failure cannot block local privacy cleanup; the
+The in-memory state machine exposes `CANCELLABLE`, `COMMITTING`, and
+`COMMITTED`. Cancellation stops the live native task and performs the
+idempotent abort/local cleanup only while the operation is `CANCELLABLE`,
+before attach is sent. Once attach enters `COMMITTING`, Cancel changes the UI
+to verification rather than aborting the request or deleting the manifest.
+Success received after that request is reported as committed. A network or
+timeout ambiguity retains the `ATTACH` checkpoint and private state so a
+later explicit Retry first reads the authoritative container and either
+recognizes the exact asset or safely rejects a changed destination.
+
+Immediately before the attach request is sent, `VERIFY_ATTACH` is persisted.
+That checkpoint restores directly into `COMMITTING` after process death, even
+if provider capability is temporarily unavailable, so a restart cannot
+downgrade an ambiguous commit back into a cancellable operation.
+
+Before commit, server abort failure cannot block local privacy cleanup; the
 owner-scoped session expires and existing storage automation handles provider
-orphan cleanup.
+orphan cleanup. Cleanup uses the stable abort key and is idempotent. If an old
+cleanup observes a different, newer recovery manifest, it removes only its
+own file and does not sweep the newer operation.
 
 Success, terminal rejection, destination conflict, corrupt recovery state,
 account switch, and expiry also remove local temporary state. Unreferenced

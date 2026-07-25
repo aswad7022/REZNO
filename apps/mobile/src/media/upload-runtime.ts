@@ -23,6 +23,10 @@ import {
   type CustomerMediaContainer,
 } from "./upload-engine";
 import {
+  cleanupCustomerAvatarRecoveryArtifacts,
+  CustomerAvatarCleanupError,
+} from "./upload-cleanup";
+import {
   CUSTOMER_AVATAR_NORMALIZED_MAX_BYTES,
   MEDIA_UPLOAD_MAX_DIMENSION,
   MEDIA_UPLOAD_MAX_PIXELS,
@@ -218,19 +222,37 @@ export async function cleanupCustomerAvatarUpload(
   manifest: CustomerAvatarUploadManifest,
 ) {
   assertManagedFile(manifest);
-  safeDelete(new File(manifest.file.uri));
-  const raw = await SecureStore.getItemAsync(MANIFEST_KEY, secureStoreOptions);
-  if (raw) {
-    try {
-      const stored = JSON.parse(raw) as { operationId?: unknown };
-      if (stored.operationId === manifest.operationId) {
+  let newerManifestPresent = false;
+  try {
+    await cleanupCustomerAvatarRecoveryArtifacts({
+      async cleanupFile() {
+        deleteManagedFile(new File(manifest.file.uri));
+      },
+      async cleanupManifest() {
+        const raw = await SecureStore.getItemAsync(
+          MANIFEST_KEY,
+          secureStoreOptions,
+        );
+        if (!raw) return;
+        try {
+          const stored = JSON.parse(raw) as { operationId?: unknown };
+          if (stored.operationId !== manifest.operationId) {
+            newerManifestPresent = true;
+            return;
+          }
+        } catch {
+          // Invalid state cannot safely be recovered and must not survive.
+        }
         await SecureStore.deleteItemAsync(MANIFEST_KEY, secureStoreOptions);
       }
-    } catch {
-      await SecureStore.deleteItemAsync(MANIFEST_KEY, secureStoreOptions);
+    });
+  } catch (error) {
+    if (error instanceof CustomerAvatarCleanupError) {
+      throw new MediaUploadRuntimeError(error.code, { cause: error });
     }
+    throw error;
   }
-  await cleanupManagedDirectory();
+  if (!newerManifestPresent) await cleanupManagedDirectory();
 }
 
 export async function cancelCustomerAvatarUpload(
@@ -265,6 +287,8 @@ export async function cancelCustomerAvatarUpload(
 }
 
 export function createCustomerAvatarUploadDependencies(input: {
+  onCommitPhaseChange?:
+    CustomerAvatarUploadEngineDependencies["onCommitPhaseChange"];
   onActiveCancel(cancel: (() => void) | null): void;
   onProgress(fraction: number): void;
   signal: AbortSignal;
@@ -361,6 +385,7 @@ export function createCustomerAvatarUploadDependencies(input: {
       });
     },
     now: Date.now,
+    onCommitPhaseChange: input.onCommitPhaseChange,
     onProgress: input.onProgress,
     persist: persistCustomerAvatarUpload,
     signal: input.signal,
@@ -521,6 +546,14 @@ function safeDelete(file: File) {
     if (file.exists) file.delete();
   } catch {
     // Cleanup is deliberately best-effort and never logs a private path.
+  }
+}
+
+function deleteManagedFile(file: File) {
+  if (!file.exists) return;
+  file.delete();
+  if (file.exists) {
+    throw new MediaUploadRuntimeError("RECOVERY_CLEANUP_FAILED");
   }
 }
 

@@ -18,8 +18,11 @@ import {
 import { mobileApiRequest, MobileApiRequestError } from "../api/client";
 import type { MobileLocale } from "../i18n/labels";
 import {
+  customerAvatarCancellationDisposition,
   MediaUploadEngineError,
+  resolveCommittedAvatarPreview,
   runCustomerAvatarUpload,
+  type CustomerAvatarCommitPhase,
 } from "../media/upload-engine";
 import {
   cancelCustomerAvatarUpload,
@@ -56,6 +59,8 @@ const copy = {
     cancelled: "أُلغيت عملية الصورة ونُظفت الملفات المؤقتة.",
     cancelling: "جارٍ إلغاء الرفع وتنظيف الملفات…",
     cameraPermission: "يلزم السماح باستخدام الكاميرا لالتقاط صورة.",
+    cleanupFailed: "تعذر تنظيف بيانات الصورة الخاصة بالكامل. أعد المحاولة لإكمال التنظيف بأمان.",
+    commitUnconfirmed: "قد يكون تحديث الصورة اكتمل. تعذر التحقق الآن، فبقيت العملية محفوظة للتحقق لاحقًا.",
     deleting: "جارٍ إزالة الصورة…",
     destinationChanged: "تغيّرت صورة الحساب أثناء الاستعادة، لذلك لم تُستبدل.",
     duplicate: "عملية رفع الصورة نفسها قيد التنفيذ بالفعل.",
@@ -71,10 +76,13 @@ const copy = {
     pickerCancelled: "لم تُختر صورة.",
     processingRecovered: "جارٍ استعادة الصورة التي أعاد Android تسليمها…",
     progress: "تقدم الرفع",
+    previewUnavailable: "تم تحديث صورة الحساب، لكن تعذر تحميل المعاينة الآن. يمكنك إعادة تحميلها دون رفع الصورة مجددًا.",
     quota: "تم بلوغ حد تخزين صور الحساب.",
     quarantined: "الصورة قيد الحجر الأمني ولا يمكن استخدامها.",
     rejected: "رُفضت الصورة لأسباب أمنية.",
     remove: "إزالة الصورة",
+    refreshPreview: "إعادة تحميل المعاينة",
+    refreshingPreview: "جارٍ إعادة تحميل معاينة الصورة…",
     retry: "إعادة المحاولة",
     retryable: "تعذر الرفع مؤقتًا. بقيت العملية محفوظة لإعادة المحاولة.",
     stale: "تغيّرت الصورة في جلسة أخرى. لم يُستبدل المحتوى الأحدث.",
@@ -84,6 +92,7 @@ const copy = {
     unsafeFile: "محتوى الملف لا يطابق صورة معتمدة.",
     unsupported: "اختر صورة JPEG أو PNG أو WebP أو HEIC/HEIF.",
     uploading: "جارٍ رفع الصورة وفحصها…",
+    verifyingCommit: "أُرسل ربط الصورة بالفعل. جارٍ التحقق من النتيجة بدل ادعاء الإلغاء…",
     libraryPermission: "يلزم السماح بالوصول إلى مكتبة الصور.",
   },
   en: {
@@ -94,6 +103,8 @@ const copy = {
     cancelled: "The image operation was cancelled and temporary files were cleaned.",
     cancelling: "Cancelling the upload and cleaning temporary files…",
     cameraPermission: "Camera access is required to take a photo.",
+    cleanupFailed: "Private image state could not be fully cleaned. Retry to finish cleanup safely.",
+    commitUnconfirmed: "The avatar update may have completed. It could not be verified now, so the operation remains saved for later verification.",
     deleting: "Removing the avatar…",
     destinationChanged: "The account avatar changed during recovery, so it was not replaced.",
     duplicate: "This image upload is already running.",
@@ -109,10 +120,13 @@ const copy = {
     pickerCancelled: "No image was selected.",
     processingRecovered: "Recovering the image returned by Android…",
     progress: "Upload progress",
+    previewUnavailable: "The account avatar was updated, but its preview is temporarily unavailable. Reload it without uploading again.",
     quota: "The account-avatar storage limit has been reached.",
     quarantined: "The image is quarantined and cannot be used.",
     rejected: "The image was rejected for security reasons.",
     remove: "Remove image",
+    refreshPreview: "Reload preview",
+    refreshingPreview: "Reloading the avatar preview…",
     retry: "Retry",
     retryable: "The upload failed temporarily. It remains saved for a safe retry.",
     stale: "The avatar changed in another session. Newer content was not replaced.",
@@ -122,6 +136,7 @@ const copy = {
     unsafeFile: "The file content is not a supported image.",
     unsupported: "Choose a JPEG, PNG, WebP, or HEIC/HEIF image.",
     uploading: "Uploading and checking the image…",
+    verifyingCommit: "The avatar attach was already sent. Verifying its result instead of claiming cancellation…",
     libraryPermission: "Photo-library access is required.",
   },
   ckb: {
@@ -132,6 +147,8 @@ const copy = {
     cancelled: "کرداری وێنە هەڵوەشایەوە و فایلە کاتییەکان پاککرانەوە.",
     cancelling: "بارکردن هەڵدەوەشێتەوە و فایلە کاتییەکان پاکدەکرێنەوە…",
     cameraPermission: "بۆ وێنەگرتن ڕێگەدان بە کامێرا پێویستە.",
+    cleanupFailed: "دۆخی تایبەتی وێنەکە بە تەواوی پاک نەکرایەوە. بۆ پاککردنەوەی پارێزراو دووبارە هەوڵبدە.",
+    commitUnconfirmed: "لەوانەیە نوێکردنەوەی وێنەکە تەواوبووبێت. ئێستا پشتڕاست نەکرایەوە، بۆیە کردارەکە بۆ پشکنینی دواتر هەڵگیراوە.",
     deleting: "وێنەکە لادەبرێت…",
     destinationChanged: "وێنەی هەژمار لە کاتی گەڕاندنەوەدا گۆڕا، بۆیە جێگۆڕکێی پێ نەکرا.",
     duplicate: "هەمان کرداری بارکردنی وێنە ئێستا بەردەوامە.",
@@ -147,10 +164,13 @@ const copy = {
     pickerCancelled: "هیچ وێنەیەک هەڵنەبژێردرا.",
     processingRecovered: "وێنەی گەڕێندراوەی Android ئامادە دەکرێت…",
     progress: "پێشکەوتنی بارکردن",
+    previewUnavailable: "وێنەی هەژمار نوێکرایەوە، بەڵام پێشبینینەکە ئێستا بەردەست نییە. بەبێ بارکردنەوەی دووبارە نوێی بکەرەوە.",
     quota: "سنووری هەڵگرتنی وێنەی هەژمار پڕ بووە.",
     quarantined: "وێنەکە لە قرنطینەدایە و ناتوانرێت بەکاربهێنرێت.",
     rejected: "وێنەکە بەهۆی هۆکاری ئاسایشی ڕەتکرایەوە.",
     remove: "لابردنی وێنە",
+    refreshPreview: "نوێکردنەوەی پێشبینین",
+    refreshingPreview: "پێشبینینی وێنەکە نوێدەکرێتەوە…",
     retry: "دووبارە هەوڵبدە",
     retryable: "بارکردن کاتییەکە سەرکەوتوو نەبوو. بۆ هەوڵێکی پارێزراو هەڵگیراوە.",
     stale: "وێنەکە لە دانیشتنێکی تر گۆڕاوە و ناوەڕۆکی نوێ جێگۆڕکێی پێ نەکرا.",
@@ -160,6 +180,7 @@ const copy = {
     unsafeFile: "ناوەڕۆکی فایلەکە وێنەیەکی پشتپێبەستراو نییە.",
     unsupported: "وێنەی JPEG یان PNG یان WebP یان HEIC/HEIF هەڵبژێرە.",
     uploading: "وێنەکە باردەکرێت و پشکنین دەکرێت…",
+    verifyingCommit: "داواکاری بەستنەوەی وێنەکە نێردراوە. لەبری بانگەشەی هەڵوەشاندنەوە، ئەنجامەکە پشتڕاست دەکرێتەوە…",
     libraryPermission: "ڕێگەدان بە گەیشتن بە کتێبخانەی وێنە پێویستە.",
   },
 } as const;
@@ -178,6 +199,7 @@ export function CustomerAvatarManager({
   );
   const [maximumBytes, setMaximumBytes] = useState<number | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [previewAssetId, setPreviewAssetId] = useState<string | null>(null);
   const [manifest, setManifest] =
     useState<CustomerAvatarUploadManifest | null>(null);
   const [pending, setPending] = useState(false);
@@ -186,8 +208,12 @@ export function CustomerAvatarManager({
   const [settingsRequired, setSettingsRequired] = useState(false);
   const [message, setMessage] = useState<string>(labels.loading);
   const activeCancelRef = useRef<(() => void) | null>(null);
+  const activeAvatarAssetIdRef = useRef<string | null>(null);
+  const commitPhaseRef =
+    useRef<CustomerAvatarCommitPhase>("CANCELLABLE");
   const runAbortRef = useRef<AbortController | null>(null);
   const cancelRequestedRef = useRef(false);
+  const verificationRequestedRef = useRef(false);
   const mountedRef = useRef(true);
   const binding =
     container?.bindings.find((item) => item.slot === "CUSTOMER_AVATAR")
@@ -197,6 +223,11 @@ export function CustomerAvatarManager({
     async (pendingManifest: CustomerAvatarUploadManifest) => {
       const controller = new AbortController();
       runAbortRef.current = controller;
+      commitPhaseRef.current =
+        pendingManifest.checkpoint === "VERIFY_ATTACH"
+          ? "COMMITTING"
+          : "CANCELLABLE";
+      verificationRequestedRef.current = false;
       setPending(true);
       setRetryable(false);
       setProgress(0);
@@ -205,6 +236,9 @@ export function CustomerAvatarManager({
         const result = await runCustomerAvatarUpload(
           pendingManifest,
           createCustomerAvatarUploadDependencies({
+            onCommitPhaseChange(phase) {
+              commitPhaseRef.current = phase;
+            },
             onActiveCancel(cancel) {
               activeCancelRef.current = cancel;
             },
@@ -213,24 +247,51 @@ export function CustomerAvatarManager({
           }),
         );
         if (!mountedRef.current) return;
+        const previousAssetId = activeAvatarAssetIdRef.current;
+        activeAvatarAssetIdRef.current = result.assetId;
         setContainer(result.container);
-        const download = await mobileApiRequest<Data<{ url: string }>>(
-          `/api/storage/customer/assets/${encodeURIComponent(result.assetId)}/download`,
-          { authenticated: true },
-        );
-        if (!mountedRef.current) return;
-        setAvatarUrl(download.data.url);
+        if (previousAssetId !== result.assetId) setAvatarUrl(null);
         setManifest(null);
         setProgress(1);
         setMessage(labels.success);
+        verificationRequestedRef.current = false;
+        const preview = await resolveCommittedAvatarPreview(() =>
+          mobileApiRequest<Data<{ url: string }>>(
+            `/api/storage/customer/assets/${encodeURIComponent(result.assetId)}/download`,
+            { authenticated: true, signal: controller.signal },
+          ),
+        );
+        if (
+          !mountedRef.current
+          || activeAvatarAssetIdRef.current !== result.assetId
+        ) {
+          return;
+        }
+        if (preview.status === "READY") {
+          setAvatarUrl(preview.value.data.url);
+          setPreviewAssetId(null);
+          setMessage(labels.success);
+        } else {
+          setPreviewAssetId(result.assetId);
+          setMessage(labels.previewUnavailable);
+        }
       } catch (error) {
         if (!mountedRef.current || cancelRequestedRef.current) return;
         const next = await loadCustomerAvatarUpload(ownerId).catch(() => null);
         if (!mountedRef.current) return;
         setManifest(next);
         const resolution = mediaErrorMessage(error, labels);
-        setRetryable(resolution.retryable && Boolean(next));
-        setMessage(resolution.message);
+        const commitPhase =
+          commitPhaseRef.current as CustomerAvatarCommitPhase;
+        const commitUnconfirmed =
+          verificationRequestedRef.current
+          && commitPhase === "COMMITTING"
+          && resolution.retryable
+          && Boolean(next);
+        setRetryable(Boolean(next) && (commitUnconfirmed || resolution.retryable));
+        setMessage(
+          commitUnconfirmed ? labels.commitUnconfirmed : resolution.message,
+        );
       } finally {
         activeCancelRef.current = null;
         if (runAbortRef.current === controller) runAbortRef.current = null;
@@ -305,24 +366,42 @@ export function CustomerAvatarManager({
           (item) => item.slot === "CUSTOMER_AVATAR",
         );
         const assetId = current?.media?.assetId;
+        activeAvatarAssetIdRef.current = assetId ?? null;
+        let previewUnavailable = false;
         if (assetId) {
-          const download = await mobileApiRequest<Data<{ url: string }>>(
-            `/api/storage/customer/assets/${encodeURIComponent(assetId)}/download`,
-            { authenticated: true, signal: controller.signal },
+          const preview = await resolveCommittedAvatarPreview(() =>
+            mobileApiRequest<Data<{ url: string }>>(
+              `/api/storage/customer/assets/${encodeURIComponent(assetId)}/download`,
+              { authenticated: true, signal: controller.signal },
+            ),
           );
-          if (mountedRef.current) setAvatarUrl(download.data.url);
+          if (!mountedRef.current) return;
+          if (preview.status === "READY") {
+            setAvatarUrl(preview.value.data.url);
+          } else {
+            previewUnavailable = true;
+            setPreviewAssetId(assetId);
+          }
         }
         const recovered = await loadCustomerAvatarUpload(ownerId);
         if (!mountedRef.current) return;
         if (recovered) {
           setManifest(recovered);
+          commitPhaseRef.current =
+            recovered.checkpoint === "VERIFY_ATTACH"
+              ? "COMMITTING"
+              : "CANCELLABLE";
           if (Date.now() >= recovered.expiresAt) {
             await cancelCustomerAvatarUpload(recovered, controller.signal);
             if (mountedRef.current) {
               setManifest(null);
               setMessage(labels.expired);
             }
-          } else if (capabilities.data.providerConfigured) {
+          } else if (
+            capabilities.data.providerConfigured
+            || recovered.checkpoint === "ATTACH"
+            || recovered.checkpoint === "VERIFY_ATTACH"
+          ) {
             await runUpload(recovered);
           } else {
             setMessage(labels.unavailable);
@@ -352,7 +431,11 @@ export function CustomerAvatarManager({
         }
         if (mountedRef.current) {
           setMessage(
-            capabilities.data.providerConfigured ? "" : labels.unavailable,
+            previewUnavailable
+              ? labels.previewUnavailable
+              : capabilities.data.providerConfigured
+                ? ""
+                : labels.unavailable,
           );
         }
       } catch (error) {
@@ -455,7 +538,17 @@ export function CustomerAvatarManager({
   }
 
   async function cancel() {
-    if (!manifest || cancelRequestedRef.current) return;
+    if (!manifest) return;
+    if (
+      customerAvatarCancellationDisposition(commitPhaseRef.current)
+      === "VERIFY"
+    ) {
+      verificationRequestedRef.current = true;
+      setRetryable(false);
+      setMessage(labels.verifyingCommit);
+      return;
+    }
+    if (cancelRequestedRef.current) return;
     cancelRequestedRef.current = true;
     setPending(true);
     setRetryable(false);
@@ -469,6 +562,7 @@ export function CustomerAvatarManager({
       await cancelCustomerAvatarUpload(latest ?? manifest, controller.signal);
       if (!mountedRef.current) return;
       setManifest(null);
+      commitPhaseRef.current = "CANCELLABLE";
       setProgress(0);
       setMessage(labels.cancelled);
     } catch (error) {
@@ -495,13 +589,41 @@ export function CustomerAvatarManager({
         },
       );
       setContainer(next);
+      activeAvatarAssetIdRef.current = null;
       setAvatarUrl(null);
+      setPreviewAssetId(null);
       setMessage("");
     } catch (error) {
       setMessage(mediaErrorMessage(error, labels).message);
     } finally {
       setPending(false);
     }
+  }
+
+  async function retryPreview() {
+    const assetId = previewAssetId;
+    if (!assetId || pending) return;
+    setPending(true);
+    setMessage(labels.refreshingPreview);
+    const preview = await resolveCommittedAvatarPreview(() =>
+      mobileApiRequest<Data<{ url: string }>>(
+        `/api/storage/customer/assets/${encodeURIComponent(assetId)}/download`,
+        { authenticated: true },
+      ),
+    );
+    if (
+      mountedRef.current
+      && activeAvatarAssetIdRef.current === assetId
+    ) {
+      if (preview.status === "READY") {
+        setAvatarUrl(preview.value.data.url);
+        setPreviewAssetId(null);
+        setMessage(labels.success);
+      } else {
+        setMessage(labels.previewUnavailable);
+      }
+    }
+    if (mountedRef.current) setPending(false);
   }
 
   const newUploadDisabled =
@@ -542,6 +664,13 @@ export function CustomerAvatarManager({
             disabled={false}
             label={labels.cancelOperation}
             onPress={() => void cancel()}
+          />
+        ) : null}
+        {previewAssetId ? (
+          <ActionButton
+            disabled={pending}
+            label={labels.refreshPreview}
+            onPress={() => void retryPreview()}
           />
         ) : null}
         {binding ? (
@@ -647,6 +776,9 @@ function mediaErrorMessage(
   if (code === "TIMEOUT") return result(labels.timeout, true);
   if (code === "MAX_RETRIES_REACHED") return result(labels.maxRetries);
   if (code === "RECOVERY_EXPIRED") return result(labels.expired);
+  if (code === "RECOVERY_CLEANUP_FAILED") {
+    return result(labels.cleanupFailed, true);
+  }
   if (code === "ALREADY_RUNNING" || code === "PENDING_OPERATION") {
     return result(labels.duplicate);
   }

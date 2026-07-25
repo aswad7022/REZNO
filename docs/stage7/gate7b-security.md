@@ -1,6 +1,6 @@
 # Gate 7B Security Review
 
-Status: **AUTHOR SECURITY REVIEW COMPLETE — NO OPEN P0/P1/P2**.
+Status: **AUTHOR P2 REMEDIATION REVIEW COMPLETE — DRAFT RE-REVIEW PENDING**.
 
 ## Threat and control matrix
 
@@ -15,8 +15,10 @@ Status: **AUTHOR SECURITY REVIEW COMPLETE — NO OPEN P0/P1/P2**.
 | Process death loses user intent | Every server transition is checkpointed in SecureStore and replayable. Android picker pending result is recovered before accepting new input. |
 | Old operation uploads to another user or domain target | Manifest owner and exact `CUSTOMER_PROFILE/CUSTOMER_AVATAR` destination are validated against the current authenticated user before recovery. Other destination kinds are invalid. |
 | Recovery overwrites a newer avatar | Attach first refreshes the current container. A different container version fails closed unless the exact finalized asset is already attached. |
+| A delayed preview response hides or replaces newer state | Attach success is committed independently of preview loading. Preview retry cannot bind again, and a response is applied only while its asset remains the current committed asset. |
 | Presigned target or local path persists in logs/state | Target URL/headers live only in memory. No image bytes, provider body, tokens, cookies, original paths, or managed local paths are logged. |
-| Cancel leaves private local data | Live task cancellation is followed by best-effort server abort and unconditional local file/manifest deletion. |
+| Cancel races the irreversible attach mutation | Direct cancel is allowed only in `CANCELLABLE`. `COMMITTING`/`COMMITTED` use server-result verification; `VERIFY_ATTACH` is persisted before the request so an ambiguous response or restart never claims cancellation. |
+| Cleanup failure leaves an untracked private image | Cleanup deletes the JPEG before its owner-scoped manifest. File failure preserves the manifest pointer, manifest failure is reported, missing artifacts are idempotent, and an old cleanup cannot sweep a newer operation. |
 | Infinite offline/retry loop | Offline performs no transfer, retries are user-visible and bounded to three provider attempts, and no unbounded timer or background loop exists. |
 | New native permission silently expands access | ImagePicker config explicitly requests Camera/Photos and blocks microphone. No video, audio, location, or broad file permission is introduced by application code. |
 
@@ -31,6 +33,13 @@ The local manifest contains the authenticated owner identifier only to reject
 cross-account recovery. It is stored with a this-device-only SecureStore
 accessibility class. The normalized image remains in an app-private directory
 and is deleted at every terminal boundary.
+
+Attach is the explicit irreversible boundary. Before it, abort plus local
+cleanup is safe. After the attach request is sent, the manifest remains until
+the response or a later container reconciliation establishes server truth.
+`VERIFY_ATTACH` restores as non-cancellable before any asynchronous read.
+Only a confirmed committed result performs terminal cleanup. Preview fetching
+is a separate non-mutating phase and cannot alter that truth.
 
 ## Release-origin boundary
 
@@ -54,10 +63,11 @@ No runtime schedule, provider configuration, Vercel setting, database,
 payment, deep link, device token, APNs/FCM, store, or production action belongs
 to Gate 7B. PR #100 remains an untouched deferred Draft reference.
 
-## Author review result
+## Author remediation review result
 
-The final diff is limited to Mobile media input/recovery, its tests, package
-locks, and Stage 7 documentation. The scoped secret scan found no credential,
+The remediation diff is limited to the Mobile avatar commit/cancel/preview
+state machine, ordered recovery cleanup, direct Gate 7B regression tests, and
+Stage 7 documentation. The scoped secret scan found no credential,
 database URL, private key, access token, or authorization value. The privacy
 scan found no image-content, token, presigned-target, original-path, or EXIF
 logging. Root production dependencies and all Mobile dependencies report zero

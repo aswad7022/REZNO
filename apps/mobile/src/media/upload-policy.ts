@@ -18,6 +18,7 @@ const CHECKPOINTS = [
   "UPLOAD",
   "FINALIZE",
   "ATTACH",
+  "VERIFY_ATTACH",
 ] as const;
 
 export type MediaInputSource = "CAMERA" | "LIBRARY" | "ANDROID_RECOVERY";
@@ -371,7 +372,10 @@ export function validateCustomerAvatarUploadManifest(
   } else if (value.checkpoint !== "CREATE_SESSION") {
     throw new MediaUploadPolicyError("RECOVERY_INVALID");
   }
-  if (value.checkpoint === "ATTACH" && !isUuid(value.assetId)) {
+  if (
+    ["ATTACH", "VERIFY_ATTACH"].includes(String(value.checkpoint))
+    && !isUuid(value.assetId)
+  ) {
     throw new MediaUploadPolicyError("RECOVERY_INVALID");
   }
   return value as CustomerAvatarUploadManifest;

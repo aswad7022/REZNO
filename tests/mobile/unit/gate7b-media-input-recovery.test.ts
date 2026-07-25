@@ -3,10 +3,16 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import {
+  customerAvatarCancellationDisposition,
   MediaUploadEngineError,
+  resolveCommittedAvatarPreview,
   runCustomerAvatarUpload,
   type CustomerAvatarUploadEngineDependencies,
 } from "../../../apps/mobile/src/media/upload-engine";
+import {
+  cleanupCustomerAvatarRecoveryArtifacts,
+  CustomerAvatarCleanupError,
+} from "../../../apps/mobile/src/media/upload-cleanup";
 import {
   CUSTOMER_AVATAR_NORMALIZED_MAX_BYTES,
   MEDIA_UPLOAD_MAX_ATTEMPTS,
@@ -217,7 +223,45 @@ test("Gate 7B completes the happy path with stable idempotency and exact destina
   ]);
   assert.deepEqual(
     harness.persisted.map((item) => item.checkpoint),
-    ["ISSUE_TARGET", "UPLOAD", "UPLOAD", "FINALIZE", "ATTACH"],
+    [
+      "ISSUE_TARGET",
+      "UPLOAD",
+      "UPLOAD",
+      "FINALIZE",
+      "ATTACH",
+      "VERIFY_ATTACH",
+    ],
+  );
+});
+
+test("Gate 7B keeps a committed attach successful when preview loading fails", async () => {
+  const harness = engineHarness();
+  const result = await runCustomerAvatarUpload(
+    manifestFor(),
+    harness.dependencies,
+  );
+  let previewLoads = 0;
+  const unavailable = await resolveCommittedAvatarPreview(async () => {
+    previewLoads += 1;
+    throw new TypeError("preview unavailable");
+  });
+  assert.deepEqual(unavailable, { status: "UNAVAILABLE" });
+  assert.equal(
+    harness.calls.filter((call) => call.startsWith("attach:")).length,
+    1,
+  );
+  assert.equal(harness.calls.filter((call) => call === "cleanup").length, 1);
+
+  const refreshed = await resolveCommittedAvatarPreview(async () => {
+    previewLoads += 1;
+    return { assetId: result.assetId, url: "https://preview.example/avatar" };
+  });
+  assert.equal(refreshed.status, "READY");
+  assert.equal(previewLoads, 2);
+  assert.equal(
+    harness.calls.filter((call) => call.startsWith("attach:")).length,
+    1,
+    "preview retry must not re-run attach",
   );
 });
 
@@ -365,7 +409,19 @@ test("Gate 7B rejects duplicate in-memory submission of the same operation", asy
   );
 });
 
-test("Gate 7B aborts before remote work when the user cancels", async () => {
+test("Gate 7B cancels directly only before the server commit boundary", async () => {
+  assert.equal(
+    customerAvatarCancellationDisposition("CANCELLABLE"),
+    "CANCEL",
+  );
+  assert.equal(
+    customerAvatarCancellationDisposition("COMMITTING"),
+    "VERIFY",
+  );
+  assert.equal(
+    customerAvatarCancellationDisposition("COMMITTED"),
+    "VERIFY",
+  );
   const controller = new AbortController();
   controller.abort();
   const harness = engineHarness();
@@ -376,6 +432,262 @@ test("Gate 7B aborts before remote work when the user cancels", async () => {
   );
   assert.deepEqual(harness.calls, []);
   assert.deepEqual(harness.persisted, []);
+});
+
+test("Gate 7B cancellation before commit prevents attach after a late container response", async () => {
+  let releaseContainer!: () => void;
+  let markContainerStarted!: () => void;
+  const containerStarted = new Promise<void>((resolve) => {
+    markContainerStarted = resolve;
+  });
+  const containerReleased = new Promise<void>((resolve) => {
+    releaseContainer = resolve;
+  });
+  const controller = new AbortController();
+  const manifest: CustomerAvatarUploadManifest = {
+    ...uploadCheckpoint(manifestFor()),
+    assetId: ASSET_ID,
+    checkpoint: "ATTACH",
+  };
+  const harness = engineHarness({
+    async getContainer() {
+      markContainerStarted();
+      await containerReleased;
+      return { bindings: [], version: manifest.containerVersion };
+    },
+  });
+  harness.dependencies.signal = controller.signal;
+  const running = runCustomerAvatarUpload(manifest, harness.dependencies);
+  await containerStarted;
+  assert.equal(
+    customerAvatarCancellationDisposition("CANCELLABLE"),
+    "CANCEL",
+  );
+  controller.abort();
+  releaseContainer();
+  await assert.rejects(
+    running,
+    hasEngineCode("CANCELLED", false),
+  );
+  assert.equal(
+    harness.calls.some((call) => call.startsWith("attach:")),
+    false,
+  );
+  assert.deepEqual(harness.commitPhases, []);
+});
+
+test("Gate 7B verifies cancellation during commit and accepts the later server success", async () => {
+  let releaseAttach!: () => void;
+  let markAttachStarted!: () => void;
+  let releaseVerificationPersist!: () => void;
+  let markVerificationPersistStarted!: () => void;
+  const attachStarted = new Promise<void>((resolve) => {
+    markAttachStarted = resolve;
+  });
+  const attachReleased = new Promise<void>((resolve) => {
+    releaseAttach = resolve;
+  });
+  const verificationPersistStarted = new Promise<void>((resolve) => {
+    markVerificationPersistStarted = resolve;
+  });
+  const verificationPersistReleased = new Promise<void>((resolve) => {
+    releaseVerificationPersist = resolve;
+  });
+  const manifest: CustomerAvatarUploadManifest = {
+    ...uploadCheckpoint(manifestFor()),
+    assetId: ASSET_ID,
+    checkpoint: "ATTACH",
+  };
+  const harness = engineHarness({
+    async attach(input) {
+      markAttachStarted();
+      await attachReleased;
+      return attachedContainer(input.assetId, input.containerVersion + 1);
+    },
+    async persist(nextManifest) {
+      if (nextManifest.checkpoint === "VERIFY_ATTACH") {
+        markVerificationPersistStarted();
+        await verificationPersistReleased;
+      }
+    },
+  });
+  const running = runCustomerAvatarUpload(manifest, harness.dependencies);
+  await verificationPersistStarted;
+  assert.deepEqual(harness.commitPhases, ["COMMITTING"]);
+  assert.equal(
+    customerAvatarCancellationDisposition(harness.commitPhases.at(-1)!),
+    "VERIFY",
+  );
+  releaseVerificationPersist();
+  await attachStarted;
+  releaseAttach();
+  const result = await running;
+  assert.equal(result.assetId, ASSET_ID);
+  assert.deepEqual(harness.commitPhases, ["COMMITTING", "COMMITTED"]);
+  assert.equal(harness.calls.filter((call) => call === "cleanup").length, 1);
+});
+
+test("Gate 7B retains recovery state when commit truth is unavailable and reconciles later", async () => {
+  const manifest: CustomerAvatarUploadManifest = {
+    ...uploadCheckpoint(manifestFor()),
+    assetId: ASSET_ID,
+    checkpoint: "ATTACH",
+  };
+  const interrupted = engineHarness({
+    attachError: Object.assign(new TypeError("network interrupted"), {
+      code: "NETWORK_ERROR",
+    }),
+  });
+  await assert.rejects(
+    runCustomerAvatarUpload(manifest, interrupted.dependencies),
+    hasEngineCode("NETWORK_ERROR", true),
+  );
+  assert.deepEqual(interrupted.commitPhases, ["COMMITTING"]);
+  assert.equal(
+    interrupted.calls.filter((call) => call === "cleanup").length,
+    0,
+    "an ambiguous attach must retain the recovery manifest and private file",
+  );
+  const verificationManifest = interrupted.persisted.at(-1);
+  assert.equal(verificationManifest?.checkpoint, "VERIFY_ATTACH");
+
+  const recovered = engineHarness({
+    container: attachedContainer(ASSET_ID, 1),
+  });
+  await runCustomerAvatarUpload(verificationManifest!, recovered.dependencies);
+  assert.equal(
+    recovered.calls.some((call) => call.startsWith("attach:")),
+    false,
+  );
+  assert.deepEqual(recovered.commitPhases, ["COMMITTING", "COMMITTED"]);
+  assert.equal(recovered.calls.at(-1), "cleanup");
+});
+
+test("Gate 7B restored attach verification cannot be downgraded to cancellable", async () => {
+  let releaseContainer!: () => void;
+  let markContainerStarted!: () => void;
+  const containerStarted = new Promise<void>((resolve) => {
+    markContainerStarted = resolve;
+  });
+  const containerReleased = new Promise<void>((resolve) => {
+    releaseContainer = resolve;
+  });
+  const manifest: CustomerAvatarUploadManifest = {
+    ...uploadCheckpoint(manifestFor()),
+    assetId: ASSET_ID,
+    checkpoint: "VERIFY_ATTACH",
+  };
+  const harness = engineHarness({
+    async getContainer() {
+      markContainerStarted();
+      await containerReleased;
+      return attachedContainer(ASSET_ID, 1);
+    },
+  });
+  const running = runCustomerAvatarUpload(manifest, harness.dependencies);
+  await containerStarted;
+  assert.deepEqual(harness.commitPhases, ["COMMITTING"]);
+  assert.equal(
+    customerAvatarCancellationDisposition(harness.commitPhases.at(-1)!),
+    "VERIFY",
+  );
+  releaseContainer();
+  await running;
+  assert.deepEqual(harness.commitPhases, ["COMMITTING", "COMMITTED"]);
+  assert.equal(harness.calls.at(-1), "cleanup");
+});
+
+test("Gate 7B expiry cleans recovery before returning expired and reports cleanup failure truthfully", async () => {
+  const manifest = manifestFor();
+  const cleaned = engineHarness({ now: manifest.expiresAt });
+  await assert.rejects(
+    runCustomerAvatarUpload(manifest, cleaned.dependencies),
+    hasEngineCode("RECOVERY_EXPIRED", false),
+  );
+  assert.deepEqual(cleaned.calls, ["cleanup"]);
+
+  const failed = engineHarness({
+    cleanupError: new Error("private file still exists"),
+    now: manifest.expiresAt,
+  });
+  await assert.rejects(
+    runCustomerAvatarUpload(manifest, failed.dependencies),
+    hasEngineCode("RECOVERY_CLEANUP_FAILED", false),
+  );
+  assert.deepEqual(failed.calls, ["cleanup"]);
+});
+
+test("Gate 7B cleanup is idempotent for missing artifacts and preserves recovery truth on partial failure", async () => {
+  let fileExists = true;
+  let manifestExists = true;
+  const cleanup = () =>
+    cleanupCustomerAvatarRecoveryArtifacts({
+      async cleanupFile() {
+        if (fileExists) fileExists = false;
+      },
+      async cleanupManifest() {
+        if (manifestExists) manifestExists = false;
+      },
+    });
+  await cleanup();
+  await cleanup();
+  assert.equal(fileExists, false);
+  assert.equal(manifestExists, false);
+
+  let manifestRemovedAfterMissingFile = false;
+  await cleanupCustomerAvatarRecoveryArtifacts({
+    async cleanupFile() {
+      // The private file was already absent.
+    },
+    async cleanupManifest() {
+      manifestRemovedAfterMissingFile = true;
+    },
+  });
+  assert.equal(manifestRemovedAfterMissingFile, true);
+
+  let fileRemovedWithMissingManifest = false;
+  await cleanupCustomerAvatarRecoveryArtifacts({
+    async cleanupFile() {
+      fileRemovedWithMissingManifest = true;
+    },
+    async cleanupManifest() {
+      // The SecureStore record was already absent.
+    },
+  });
+  assert.equal(fileRemovedWithMissingManifest, true);
+
+  let retainedManifest = true;
+  await assert.rejects(
+    cleanupCustomerAvatarRecoveryArtifacts({
+      async cleanupFile() {
+        throw new Error("file deletion failed");
+      },
+      async cleanupManifest() {
+        retainedManifest = false;
+      },
+    }),
+    hasCleanupStep("FILE"),
+  );
+  assert.equal(
+    retainedManifest,
+    true,
+    "the manifest must remain when its private file could not be deleted",
+  );
+
+  let removedFile = false;
+  await assert.rejects(
+    cleanupCustomerAvatarRecoveryArtifacts({
+      async cleanupFile() {
+        removedFile = true;
+      },
+      async cleanupManifest() {
+        throw new Error("SecureStore deletion failed");
+      },
+    }),
+    hasCleanupStep("MANIFEST"),
+  );
+  assert.equal(removedFile, true);
+
 });
 
 test("Gate 7B UI and native config cover camera, library, cancellation, and ar/en/ckb", async () => {
@@ -404,7 +716,12 @@ test("Gate 7B UI and native config cover camera, library, cancellation, and ar/e
     "timeout",
     "retry",
     "cancelOperation",
+    "cleanupFailed",
+    "commitUnconfirmed",
+    "previewUnavailable",
+    "refreshPreview",
     "success",
+    "verifyingCommit",
   ]) {
     assert.equal(
       [...component.matchAll(new RegExp(`\\n    ${key}:`, "g"))].length,
@@ -430,13 +747,24 @@ test("Gate 7B progress is clamped and normalized output remains within avatar po
 });
 
 function engineHarness(options: {
+  attach?: CustomerAvatarUploadEngineDependencies["attach"];
+  attachError?: unknown;
+  cleanupError?: unknown;
   container?: { bindings: Array<{ id: string; media: { assetId: string | null } | null; slot: string }>; version: number };
   finalize?: CustomerAvatarUploadEngineDependencies["finalize"];
+  getContainer?: CustomerAvatarUploadEngineDependencies["getContainer"];
+  now?: number;
   online?: boolean;
+  persist?: (manifest: CustomerAvatarUploadManifest) => Promise<void>;
   upload?: CustomerAvatarUploadEngineDependencies["upload"];
   uploadError?: unknown;
 } = {}) {
   const calls: string[] = [];
+  const commitPhases: Array<
+    Parameters<NonNullable<
+      CustomerAvatarUploadEngineDependencies["onCommitPhaseChange"]
+    >>[0]
+  > = [];
   const persisted: CustomerAvatarUploadManifest[] = [];
   const uuid = uuidFactory(800);
   const dependencies: CustomerAvatarUploadEngineDependencies = {
@@ -444,19 +772,13 @@ function engineHarness(options: {
       calls.push(
         `attach:${input.idempotencyKey}:${input.containerVersion}:${input.replace}`,
       );
-      return {
-        bindings: [
-          {
-            id: "binding",
-            media: { assetId: input.assetId },
-            slot: "CUSTOMER_AVATAR",
-          },
-        ],
-        version: input.containerVersion + 1,
-      };
+      if (options.attach) return options.attach(input);
+      if (options.attachError) throw options.attachError;
+      return attachedContainer(input.assetId, input.containerVersion + 1);
     },
     async cleanupLocal() {
       calls.push("cleanup");
+      if (options.cleanupError) throw options.cleanupError;
     },
     async createSession(input) {
       calls.push(`create:${input.idempotencyKey}`);
@@ -469,6 +791,7 @@ function engineHarness(options: {
     },
     async getContainer() {
       calls.push(`container:${OWNER}`);
+      if (options.getContainer) return options.getContainer(dependencies.signal);
       return options.container ?? { bindings: [], version: 0 };
     },
     async isOnline() {
@@ -480,10 +803,14 @@ function engineHarness(options: {
       );
       return targetFor(input.version + 1);
     },
-    now: () => NOW,
+    now: () => options.now ?? NOW,
+    onCommitPhaseChange(phase) {
+      commitPhases.push(phase);
+    },
     onProgress() {},
     async persist(manifest) {
       persisted.push(structuredClone(manifest));
+      await options.persist?.(manifest);
     },
     signal: new AbortController().signal,
     async upload(input) {
@@ -494,7 +821,20 @@ function engineHarness(options: {
     },
     uuid,
   };
-  return { calls, dependencies, persisted };
+  return { calls, commitPhases, dependencies, persisted };
+}
+
+function attachedContainer(assetId: string, version: number) {
+  return {
+    bindings: [
+      {
+        id: "binding",
+        media: { assetId },
+        slot: "CUSTOMER_AVATAR",
+      },
+    ],
+    version,
+  };
 }
 
 function manifestFor() {
@@ -568,4 +908,9 @@ function hasEngineCode(code: string, retryable: boolean) {
     error instanceof MediaUploadEngineError
     && error.code === code
     && error.retryable === retryable;
+}
+
+function hasCleanupStep(step: "FILE" | "MANIFEST") {
+  return (error: unknown) =>
+    error instanceof CustomerAvatarCleanupError && error.step === step;
 }
