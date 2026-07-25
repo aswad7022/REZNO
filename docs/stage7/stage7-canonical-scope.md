@@ -1,9 +1,9 @@
 # Stage 7 — Release and Physical-Device Validation
 
-Status: **ACTIVE — GATE 7A AUTHOR COMPLETE, INDEPENDENT REVIEW PENDING**.
+Status: **ACTIVE — GATE 7A CLOSED, GATE 7B AUTHOR COMPLETE/DRAFT REVIEW PENDING**.
 
 Canonical base: `origin/main` at
-`7b5fd511bdb8b7fa7968b233ad5f36cdd346d2b6`, the merge commit of PR #128.
+`0149ca6165e6117cf2f7d8d1a7dda49cfd1b0333`, the merge commit of PR #129.
 PR #100 remains an untouched Open Draft reference at
 `e46454df993ecccb06180060dda4353ec88e2641`.
 
@@ -50,11 +50,11 @@ read-only endpoint evidence; it does not imply physical-device proof.
 | `ar`/`en`/`ckb` and RTL/LTR | `IMPLEMENTED_NOT_PHYSICAL_PROVEN` | Current app source contains all three locales and direction handling; physical-device regression remains required. |
 | SecureStore session persistence | `IMPLEMENTED_NOT_PHYSICAL_PROVEN` | Better Auth cookies are normalized and stored in Expo SecureStore; cold-process behavior is not physically proven. |
 | Photo Library selection | `IMPLEMENTED_NOT_PHYSICAL_PROVEN` | Customer avatar uses `expo-image-picker`, asks for library permission, and accepts one image. |
-| Camera capture | `NOT_IMPLEMENTED` | No camera launch path or camera permission flow exists. Gate 7B owns it. |
-| HEIC | `PARTIAL` | Current upload code explicitly rejects media outside JPEG/PNG/WebP. Safe rejection exists; normalization/conversion and physical proof do not. |
-| Upload retry/resume/cancel | `PARTIAL` | A bounded one-shot managed upload exists. Durable resume, explicit cancellation, process recovery, and duplicate prevention across relaunch are not implemented. |
-| Poor-network recovery | `PARTIAL` | Request failures remain truthful and no false success is created, but no upload/payment recovery state machine exists. |
-| Process-death recovery | `PARTIAL` | SecureStore can restore auth cookies; in-flight upload and payment operations do not recover after process death. |
+| Camera capture | `IMPLEMENTED_NOT_PHYSICAL_PROVEN` | Gate 7B requests camera permission, distinguishes retryable and settings-blocked denial, handles cancellation, and launches image-only rear-camera capture. Physical proof remains open. |
+| HEIC | `IMPLEMENTED_NOT_PHYSICAL_PROVEN` | File signatures are inspected before decode. HEIC/HEIF enters a local JPEG re-encode that strips metadata; a platform decode failure remains an explicit safe rejection. Physical HEIC proof remains open. |
+| Upload retry/resume/cancel | `IMPLEMENTED_NOT_PHYSICAL_PROVEN` | Gate 7B adds progress, foreground cancellation, bounded attempts, write-once target reconciliation, durable checkpoints, stable idempotency keys, and cleanup. Native upload tasks do not claim byte-range resume across process death. |
+| Poor-network recovery | `IMPLEMENTED_NOT_PHYSICAL_PROVEN` | Offline, timeout, ambiguous completion, retry, and maximum-attempt states are explicit. The operation remains recoverable without false success. |
+| Process-death recovery | `IMPLEMENTED_NOT_PHYSICAL_PROVEN` | A short-lived SecureStore manifest plus a normalized app-private file restores the exact owner and destination through session, target, upload, finalize, and attach checkpoints. |
 | Hosted payment handoff | `NOT_IMPLEMENTED` | Mobile receives a safe provider action classification/reference only; it has no hosted browser handoff. |
 | Deep-link return | `PARTIAL` | Native scheme exists, but no warm/cold URL handler, allowlist, replay protection, or server-status reconciliation exists. |
 | Device-token lifecycle | `NOT_IMPLEMENTED` | No device-token model or mobile registration lifecycle exists. |
@@ -66,8 +66,8 @@ read-only endpoint evidence; it does not imply physical-device proof.
 
 ## Proposed gate decomposition
 
-This is the proposed Stage 7 decomposition. Only Gate 7A is active in the
-current work.
+This is the canonical Stage 7 decomposition. Gate 7A is closed and only Gate
+7B is active in the current work.
 
 ### Gate 7A — Release and Physical-Device Foundation
 
@@ -100,8 +100,9 @@ current work.
 - TestFlight/Play validation, physical-device regression, integrated closure,
   and independent review.
 
-Gate 7B must not begin until Gate 7A is independently reviewed and merged.
-The same ordering applies to Gates 7C and 7D.
+Gate 7B began only after Gate 7A was independently reviewed and merged through
+PR #129. Gate 7C must not begin until Gate 7B is independently reviewed and
+merged. The same ordering applies to Gate 7D.
 
 ## Provider and release truth
 
@@ -109,4 +110,5 @@ The same ordering applies to Gates 7C and 7D.
 - no production or store submission was executed;
 - no EAS build was created in Gate 7A;
 - no physical-device result is claimed;
-- no migration is required or allowed by the audited Gate 7A design.
+- no migration is required by the audited Gate 7B design; migrations 48 and 49
+  remain immutable.

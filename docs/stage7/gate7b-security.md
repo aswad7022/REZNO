@@ -1,0 +1,69 @@
+# Gate 7B Security Review
+
+Status: **AUTHOR SECURITY REVIEW COMPLETE — NO OPEN P0/P1/P2**.
+
+## Threat and control matrix
+
+| Threat | Gate 7B control |
+| --- | --- |
+| Image extension disguises executable or unsupported content | Magic-byte classification precedes decode and the server independently inspects final bytes. Filenames and declared MIME do not authorize content. |
+| HEIC or crafted image leaks EXIF/GPS | Accepted input is decoded and re-encoded as JPEG; EXIF, GPS, original filename, picker metadata, and Base64 are neither requested nor persisted. |
+| Decompression or storage exhaustion | Source is capped at 20 MiB/40 megapixels, longest edge at 2048, normalized avatar at 5 MiB, provider attempts at three, API at 20 seconds, transfer at 60 seconds, and operation age at 15 minutes. |
+| Session cookie leaks to provider origin | REZNO API calls alone use the authenticated client. Provider transfer uses FileSystem with only the three validated write-once headers. Cookie and authorization headers are rejected. |
+| Malicious or compromised upload target | Client revalidates HTTPS, no credentials/fragment, exact method, exact length/type, and exact header allowlist before native transfer. Server also validates provider targets. |
+| Duplicate tap, retry, or relaunch creates duplicate data | One in-memory operation lock, one durable manifest, stable per-transition UUID idempotency keys, provider write-once condition, and server mutation replay. |
+| Process death loses user intent | Every server transition is checkpointed in SecureStore and replayable. Android picker pending result is recovered before accepting new input. |
+| Old operation uploads to another user or domain target | Manifest owner and exact `CUSTOMER_PROFILE/CUSTOMER_AVATAR` destination are validated against the current authenticated user before recovery. Other destination kinds are invalid. |
+| Recovery overwrites a newer avatar | Attach first refreshes the current container. A different container version fails closed unless the exact finalized asset is already attached. |
+| Presigned target or local path persists in logs/state | Target URL/headers live only in memory. No image bytes, provider body, tokens, cookies, original paths, or managed local paths are logged. |
+| Cancel leaves private local data | Live task cancellation is followed by best-effort server abort and unconditional local file/manifest deletion. |
+| Infinite offline/retry loop | Offline performs no transfer, retries are user-visible and bounded to three provider attempts, and no unbounded timer or background loop exists. |
+| New native permission silently expands access | ImagePicker config explicitly requests Camera/Photos and blocks microphone. No video, audio, location, or broad file permission is introduced by application code. |
+
+## Storage and identity boundary
+
+The server remains authoritative for actor identity, purpose, quota, session
+ownership, content inspection, scanner outcome, and media-container version.
+Gate 7B does not create a client-supplied owner, object key, organization,
+booking, restaurant, storage provider, visibility, or delivery URL.
+
+The local manifest contains the authenticated owner identifier only to reject
+cross-account recovery. It is stored with a this-device-only SecureStore
+accessibility class. The normalized image remains in an app-private directory
+and is deleted at every terminal boundary.
+
+## Release-origin boundary
+
+Gate 7A remains authoritative:
+
+- non-development API traffic accepts only
+  `https://rezno-staging.vercel.app`;
+- Production remains fail-closed without an approved origin;
+- Development localhost behavior is unchanged.
+
+Gate 7B does not weaken this guard. The external provider target is returned
+by the authenticated storage API and receives no REZNO session material.
+
+## Deferred boundaries
+
+Stage 6 remains:
+
+`DEFERRED_BY_OWNER — CODE MERGED, RUNTIME NOT ACTIVATED`
+
+No runtime schedule, provider configuration, Vercel setting, database,
+payment, deep link, device token, APNs/FCM, store, or production action belongs
+to Gate 7B. PR #100 remains an untouched deferred Draft reference.
+
+## Author review result
+
+The final diff is limited to Mobile media input/recovery, its tests, package
+locks, and Stage 7 documentation. The scoped secret scan found no credential,
+database URL, private key, access token, or authorization value. The privacy
+scan found no image-content, token, presigned-target, original-path, or EXIF
+logging. Root production dependencies and all Mobile dependencies report zero
+known vulnerabilities. The root full audit retains the existing development-
+only baseline of 12 findings (3 moderate and 9 high); no production dependency
+finding is present.
+
+No Prisma schema or migration changed. Stage 6 runtime, staging, production,
+provider configuration, and protected PR #100 were not accessed or mutated.
