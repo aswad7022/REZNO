@@ -25,7 +25,7 @@ type ExpoConfig = {
     ios: { bundleIdentifier: string };
     name: string;
     owner: string;
-    plugins: string[];
+    plugins: unknown[];
     scheme: string;
     slug: string;
   };
