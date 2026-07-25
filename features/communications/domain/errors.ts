@@ -7,6 +7,7 @@ export type CommunicationErrorCode =
   | "NOT_FOUND"
   | "PROVIDER_NOT_CONFIGURED"
   | "RATE_LIMITED"
+  | "SERVICE_UNAVAILABLE"
   | "STALE_VERSION"
   | "VALIDATION_ERROR";
 
@@ -40,6 +41,7 @@ const STATUS_BY_CODE: Record<CommunicationErrorCode, number> = {
   NOT_FOUND: 404,
   PROVIDER_NOT_CONFIGURED: 503,
   RATE_LIMITED: 429,
+  SERVICE_UNAVAILABLE: 503,
   STALE_VERSION: 409,
   VALIDATION_ERROR: 400,
 };

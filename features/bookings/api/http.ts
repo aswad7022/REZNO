@@ -42,7 +42,7 @@ export function handlePublicBookingRequest(
         request.headers,
         "mobile-booking-public",
       );
-      assertRateLimit(
+      await assertRateLimit(
         `booking.public.${scope}`,
         identifier,
         options.limit ?? 120,
@@ -63,7 +63,7 @@ export function handleCustomerBookingRequest(
 ) {
   return handleBookingRequest(async () => {
     const context = await resolveBookingCustomerApiContext(request);
-    assertRateLimit(
+    await assertRateLimit(
       `booking.customer.${scope}`,
       `person:${context.personId}`,
       options.limit ?? 60,
@@ -109,11 +109,19 @@ async function handleBookingRequest(
   }
 }
 
-function assertRateLimit(scope: string, identifier: string, limit: number) {
-  const result = consumeRateLimit(scope, identifier, {
+async function assertRateLimit(scope: string, identifier: string, limit: number) {
+  const result = await consumeRateLimit(scope, identifier, {
     limit,
     windowMs: 60_000,
   });
+  if (result.unavailable) {
+    bookingApiError(
+      "SERVICE_UNAVAILABLE",
+      503,
+      "Request protection is temporarily unavailable.",
+      { retryAfterSeconds: 1 },
+    );
+  }
   if (!result.success) {
     bookingApiError("RATE_LIMITED", 429, "Too many requests.", {
       retryAfterSeconds: result.retryAfterSeconds,

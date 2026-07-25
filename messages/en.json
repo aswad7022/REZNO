@@ -1625,7 +1625,9 @@
       "SETTLEMENTS_VIEW": "View settlement statements",
       "SETTLEMENTS_MANAGE": "Manage settlement statements",
       "PLATFORM_JOBS_VIEW": "View durable platform jobs",
-      "PLATFORM_JOBS_MANAGE": "Operate durable platform jobs"
+      "PLATFORM_JOBS_MANAGE": "Operate durable platform jobs",
+      "PLATFORM_OPERATIONS_VIEW": "View platform operations",
+      "PLATFORM_OPERATIONS_MANAGE": "Manage platform operations"
     }
   },
   "Media": {
@@ -1815,6 +1817,7 @@
       "table": "The selected table is not available for this reservation.",
       "table-unavailable": "This table was just reserved. Choose another table or time.",
       "time": "The selected time is outside working hours or during a special closure.",
+      "unavailable": "Reservation service is temporarily unavailable. Please try again shortly.",
       "rateLimited": "Too many reservation attempts in a short time. Please wait a moment and try again.",
       "failed": "Could not confirm the table reservation right now. Please try again shortly."
     },

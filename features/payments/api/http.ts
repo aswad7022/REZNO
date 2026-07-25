@@ -8,7 +8,7 @@ import type { CommerceAdminContext } from "@/features/commerce/services/authoriz
 import { assertPaymentWebhookRequestAllowed } from "@/features/payments/api/webhook-guard";
 import { PaymentDomainError } from "@/features/payments/domain/errors";
 import { logServerError } from "@/lib/logging/server";
-import { consumeRateLimit } from "@/lib/security/rate-limit-core";
+import { consumeRateLimit } from "@/lib/security/rate-limit";
 import type { CommercePermission, PaymentProviderKind } from "@prisma/client";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
@@ -27,7 +27,7 @@ export async function handleCustomerPaymentRequest(
 ) {
   return handlePaymentRequest(scope, async () => {
     const actor = await resolveCustomerApiContext(request);
-    rateLimit("customer." + scope, "person:" + actor.personId, limit);
+    await rateLimit("customer." + scope, "person:" + actor.personId, limit);
     return operation(actor);
   });
 }
@@ -41,7 +41,7 @@ export async function handleBusinessPaymentRequest(
 ) {
   return handlePaymentRequest(scope, async () => {
     const actor = await resolveMerchantApiContext(request, permission);
-    rateLimit("business." + scope, "person:" + actor.personId + ":organization:" + actor.organizationId, limit);
+    await rateLimit("business." + scope, "person:" + actor.personId + ":organization:" + actor.organizationId, limit);
     return operation(actor);
   });
 }
@@ -65,7 +65,7 @@ export async function handleAdminPaymentRequest(
       source: state.source,
       userId: state.identity.session.user.id,
     };
-    rateLimit("admin." + scope, "person:" + context.personId, limit);
+    await rateLimit("admin." + scope, "person:" + context.personId, limit);
     return operation(context);
   });
 }
@@ -77,7 +77,7 @@ export async function handleProviderWebhookRequest(
   operation: () => Promise<unknown>,
 ) {
   return handlePaymentRequest(scope, async () => {
-    assertPaymentWebhookRequestAllowed(request, scope, provider);
+    await assertPaymentWebhookRequestAllowed(request, scope, provider);
     return { data: await operation(), status: 202 as const };
   });
 }
@@ -91,7 +91,8 @@ async function handlePaymentRequest(
     return NextResponse.json({ data: result.data }, { headers: NO_STORE, status: result.status ?? 200 });
   } catch (error) {
     if (error instanceof PaymentDomainError) {
-      const retryAfter = error.code === "RATE_LIMITED" && error.details?.retryAfterSeconds
+      const retryAfter = (error.code === "RATE_LIMITED" || error.code === "SERVICE_UNAVAILABLE")
+        && error.details?.retryAfterSeconds
         ? String(error.details.retryAfterSeconds)
         : undefined;
       return NextResponse.json(
@@ -114,9 +115,20 @@ async function handlePaymentRequest(
   }
 }
 
-function rateLimit(scope: string, actor: string, limit: number): void {
-  const result = consumeRateLimit("payments." + scope, actor, { limit, windowMs: 60_000 });
+async function rateLimit(scope: string, actor: string, limit: number): Promise<void> {
+  const result = await consumeRateLimit("payments." + scope, actor, { limit, windowMs: 60_000 });
+  if (result.unavailable) {
+    throw new PaymentDomainError(
+      "SERVICE_UNAVAILABLE",
+      "Request protection is temporarily unavailable.",
+      { retryAfterSeconds: 1 },
+    );
+  }
   if (!result.success) {
-    throw new PaymentDomainError("RATE_LIMITED", "Too many payment requests.");
+    throw new PaymentDomainError(
+      "RATE_LIMITED",
+      "Too many payment requests.",
+      { retryAfterSeconds: result.retryAfterSeconds },
+    );
   }
 }

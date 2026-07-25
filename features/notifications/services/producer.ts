@@ -6,6 +6,7 @@ import {
   type CanonicalNotificationEvent,
   validateCanonicalNotificationEvent,
 } from "@/features/notifications/domain/contracts";
+import { getExactPostgresTime } from "@/lib/db/postgres-timestamp";
 
 export async function createCanonicalNotifications(
   transaction: Prisma.TransactionClient,
@@ -30,7 +31,8 @@ export async function createCanonicalNotifications(
     categoryEnabled(preferenceByPerson.get(event.recipientPersonId!), event.category)
   );
   if (deliverable.length === 0) return { created: 0, suppressed: events.length };
-  const producedAt = options.producedAt ?? new Date();
+  const producedAt =
+    options.producedAt ?? await getExactPostgresTime(transaction);
   const result = await transaction.notification.createMany({
     data: deliverable.map((event) => {
       const occurredAt = event.occurredAt ?? producedAt;

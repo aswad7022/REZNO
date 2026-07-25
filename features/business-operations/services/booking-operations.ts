@@ -366,7 +366,7 @@ export async function transitionOperationalBooking(input: {
   assertUuid(input.idempotencyKey, "idempotencyKey");
   const capability = capabilityForTransition(input.nextStatus);
   const actor = await resolveBusinessOperationActor(input.actor, capability);
-  assertBusinessOperationMutationRate(actor, `booking-${input.nextStatus.toLowerCase()}`);
+  await assertBusinessOperationMutationRate(actor, `booking-${input.nextStatus.toLowerCase()}`);
   assertRenderedOrganization(actor, input.contextOrganizationId);
   const cancellationReason = input.nextStatus === "CANCELLED"
     ? operationalCancellationReasonSchema.safeParse(input.cancellationReason)
@@ -537,7 +537,7 @@ export async function respondToOperationalCustomerChangeRequest(input: {
     input.actor,
     "BOOKING_CHANGE_REQUEST_RESPOND",
   );
-  assertBusinessOperationMutationRate(actor, "booking-change-request-response");
+  await assertBusinessOperationMutationRate(actor, "booking-change-request-response");
   assertRenderedOrganization(actor, input.contextOrganizationId);
   const target = await prisma.bookingChangeRequest.findUnique({
     where: { id: input.requestId },
@@ -747,7 +747,7 @@ export async function proposeOperationalBookingChange(input: {
     businessOperationsError("INVALID_REQUEST", "A canonical proposal date and startsAt are required.");
   }
   const actor = await resolveBusinessOperationActor(input.actor, "BOOKING_CHANGE_PROPOSE");
-  assertBusinessOperationMutationRate(actor, "booking-change-proposal");
+  await assertBusinessOperationMutationRate(actor, "booking-change-proposal");
   assertRenderedOrganization(actor, input.contextOrganizationId);
   const requestHash = hashBusinessOperation({
     action: "BOOKING_CHANGE_PROPOSAL",

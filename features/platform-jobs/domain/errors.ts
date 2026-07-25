@@ -12,6 +12,7 @@ export type PlatformJobErrorCode =
   | "STALE_LEASE"
   | "LEASE_EXPIRED"
   | "RATE_LIMITED"
+  | "SERVICE_UNAVAILABLE"
   | "PLATFORM_JOB_FAILURE";
 
 const STATUS: Record<PlatformJobErrorCode, number> = {
@@ -28,6 +29,7 @@ const STATUS: Record<PlatformJobErrorCode, number> = {
   STALE_LEASE: 409,
   LEASE_EXPIRED: 409,
   RATE_LIMITED: 429,
+  SERVICE_UNAVAILABLE: 503,
   PLATFORM_JOB_FAILURE: 500,
 };
 

@@ -151,8 +151,8 @@ test("payment webhook guard rejects before body ingestion", async (t) => {
     });
     setPaymentProviderForTests(null);
     const streamed = webhookRouteRequest([bytes(32, 7)]);
-    assert.throws(
-      () => assertPaymentWebhookRequestAllowed(streamed.request, "webhooks.deterministic", "DETERMINISTIC_TEST"),
+    await assert.rejects(
+      assertPaymentWebhookRequestAllowed(streamed.request, "webhooks.deterministic", "DETERMINISTIC_TEST"),
       paymentCode("PAYMENT_PROVIDER_NOT_CONFIGURED"),
     );
     assert.equal(rateLimitCalled, true);
@@ -170,8 +170,8 @@ test("payment webhook guard rejects before body ingestion", async (t) => {
       return { retryAfterSeconds: 999, success: false };
     });
     const streamed = webhookRouteRequest([Buffer.from('{"eventId":"must-not-be-read"}')]);
-    const error = capturePaymentErrorSync(
-      () => assertPaymentWebhookRequestAllowed(streamed.request, "webhooks.deterministic", "DETERMINISTIC_TEST"),
+    const error = await capturePaymentError(
+      assertPaymentWebhookRequestAllowed(streamed.request, "webhooks.deterministic", "DETERMINISTIC_TEST"),
     );
     assert.equal(error.code, "RATE_LIMITED");
     assert.equal(error.details?.retryAfterSeconds, 60);
@@ -182,26 +182,43 @@ test("payment webhook guard rejects before body ingestion", async (t) => {
     assert.equal(streamed.request.bodyUsed, false);
   });
 
-  await t.test("requests without a safe fingerprint share one bounded unidentified bucket", () => {
-    let observedIdentifier = "";
+  await t.test("requests without a safe fingerprint share one bounded unidentified bucket", async () => {
+    const observedIdentifiers: string[] = [];
     setPaymentProviderForTests(new DeterministicPaymentProvider("gate5c-unidentified-secret"));
     setPaymentWebhookRateLimitConsumerForTests((_scope, identifier) => {
-      observedIdentifier = identifier;
+      observedIdentifiers.push(identifier);
       return { retryAfterSeconds: 0, success: true };
     });
-    const streamed = streamRequest([bytes(1)]);
-    assertPaymentWebhookRequestAllowed(streamed.request, "webhooks.deterministic", "DETERMINISTIC_TEST");
-    assert.equal(observedIdentifier, "unidentified");
-    assert.equal(streamed.probe.pullCount, 0);
+    const first = streamRequest([bytes(1)]);
+    const second = streamRequest([bytes(1)]);
+    await assertPaymentWebhookRequestAllowed(
+      first.request,
+      "webhooks.deterministic",
+      "DETERMINISTIC_TEST",
+    );
+    await assertPaymentWebhookRequestAllowed(
+      second.request,
+      "webhooks.deterministic",
+      "DETERMINISTIC_TEST",
+    );
+    assert.equal(observedIdentifiers.length, 2);
+    assert.match(observedIdentifiers[0] ?? "", /^unidentified:[0-9a-f]{64}$/);
+    assert.equal(observedIdentifiers[0], observedIdentifiers[1]);
+    assert.equal(first.probe.pullCount, 0);
+    assert.equal(second.probe.pullCount, 0);
   });
 
-  await t.test("configured exact provider passes after the request-derived limit", () => {
+  await t.test("configured exact provider passes after the request-derived limit", async () => {
     const provider = new DeterministicPaymentProvider("gate5c-route-verify-secret");
     setPaymentProviderForTests(provider);
     setPaymentWebhookRateLimitConsumerForTests(() => ({ retryAfterSeconds: 0, success: true }));
     const streamed = webhookRouteRequest([bytes(1)]);
-    assert.doesNotThrow(
-      () => assertPaymentWebhookRequestAllowed(streamed.request, "webhooks.deterministic", "DETERMINISTIC_TEST"),
+    await assert.doesNotReject(
+      assertPaymentWebhookRequestAllowed(
+        streamed.request,
+        "webhooks.deterministic",
+        "DETERMINISTIC_TEST",
+      ),
     );
     assert.equal(streamed.probe.pullCount, 0);
     assert.equal(streamed.request.bodyUsed, false);
@@ -261,16 +278,6 @@ function paymentCode(code: string) {
 async function capturePaymentError(promise: Promise<unknown>): Promise<PaymentDomainError> {
   try {
     await promise;
-  } catch (error) {
-    assert.ok(error instanceof PaymentDomainError);
-    return error;
-  }
-  assert.fail("Expected PaymentDomainError.");
-}
-
-function capturePaymentErrorSync(operation: () => unknown): PaymentDomainError {
-  try {
-    operation();
   } catch (error) {
     assert.ok(error instanceof PaymentDomainError);
     return error;

@@ -32,6 +32,7 @@ import {
 } from "../../../lib/db/postgres-transport";
 import { assertPlatformJobsGate6aStaging, PLATFORM_JOBS_GATE6A_CONFIRMATION } from "../../../scripts/staging/platform-jobs-gate6a-safety";
 import { COMMUNICATIONS_PAYMENT_GATE6C_CONFIRMATION } from "../../../scripts/staging/communications-payment-gate6c-safety";
+import { PLATFORM_OPERATIONS_GATE6D_CONFIRMATION } from "../../../scripts/staging/platform-operations-gate6d-safety";
 import { STORAGE_MEDIA_GATE6B_CONFIRMATION } from "../../../scripts/staging/storage-media-gate6b-safety";
 
 const secret = "gate6a-cursor-secret-with-sufficient-entropy-2026-07-21";
@@ -45,7 +46,7 @@ test.after(() => {
 
 test("Stage 6 architecture locks the accepted title, gate order, providers, and later-stage boundaries", () => {
   assert.equal(STAGE_6_ARCHITECTURE.title, "Stage 6 — Admin and Platform Operations");
-  assert.deepEqual(Object.values(STAGE_6_ARCHITECTURE.gates), ["ACCEPTED", "ACCEPTED", "ACTIVE", "UNSTARTED"]);
+  assert.deepEqual(Object.values(STAGE_6_ARCHITECTURE.gates), ["ACCEPTED", "ACCEPTED", "ACCEPTED", "ACTIVE"]);
   assert.equal(STAGE_6_ARCHITECTURE.runtime.durableStore, "POSTGRESQL");
   assert.equal(STAGE_6_ARCHITECTURE.runtime.externalQueueProvider, "NOT_CONFIGURED");
   assert.equal(STAGE_6_ARCHITECTURE.runtime.automaticScheduler, "NOT_CONNECTED");
@@ -57,7 +58,7 @@ test("Stage 6 architecture locks the accepted title, gate order, providers, and 
   assert.equal(STAGE_6_ARCHITECTURE.boundaries.ai, "AFTER_STAGE_8");
 });
 
-test("Gate 6C extends the accepted registry with only the closed automation job types", () => {
+test("Gate 6D closes the Stage 6 registry with the accepted automation job types", () => {
   assert.deepEqual(PLATFORM_JOB_ALLOWED_TYPES, [
     "PLATFORM_HEALTH_PROBE",
     "STORAGE_MAINTENANCE_DISCOVERY",
@@ -79,6 +80,9 @@ test("Gate 6C extends the accepted registry with only the closed automation job 
     "PAYMENT_REFUND_RETRY",
     "PAYMENT_RECONCILIATION",
     "SETTLEMENT_STATEMENT_GENERATE",
+    "COMMERCE_ORDER_EXPIRY",
+    "PLATFORM_OPERATIONS_MONITOR",
+    "DISTRIBUTED_RATE_LIMIT_CLEANUP",
   ]);
   assert.equal(PLATFORM_JOB_LIMITS.maxRequestBytes, 8_192);
   assert.equal(PLATFORM_JOB_LIMITS.maxPayloadBytes, 4_096);
@@ -249,7 +253,7 @@ test("health handler succeeds with bounded metadata and converts raw exceptions 
   setPlatformJobHandlerForTests("PLATFORM_HEALTH_PROBE");
 });
 
-test("production-only guards and additive migrations 43-48 are explicit in source", async () => {
+test("production-only guards and additive migrations 43-49 are explicit in source", async () => {
   const [cursorSource, handlerSource, workerSource, migrations] = await Promise.all([
     readFile(new URL("../../../features/platform-jobs/domain/cursor-signing.ts", import.meta.url), "utf8"),
     readFile(new URL("../../../features/platform-jobs/services/handlers.ts", import.meta.url), "utf8"),
@@ -260,13 +264,14 @@ test("production-only guards and additive migrations 43-48 are explicit in sourc
   assert.match(handlerSource, /NODE_ENV === "production"/);
   assert.match(workerSource, /NODE_ENV === "production"/);
   const names = migrations.filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort();
-  assert.equal(names.length, 48);
-  assert.equal(names.at(-6), "20260721160000_platform_jobs_foundation");
-  assert.equal(names.at(-5), "20260722090000_platform_worker_operation_recovery");
-  assert.equal(names.at(-4), "20260722150000_storage_media_automation");
-  assert.equal(names.at(-3), "20260723120000_media_rendition_claim_integrity");
-  assert.equal(names.at(-2), "20260723150000_gate6a_gate6b_constraint_truth_tables");
-  assert.equal(names.at(-1), "20260723180000_communications_payment_automation");
+  assert.equal(names.length, 49);
+  assert.equal(names.at(-7), "20260721160000_platform_jobs_foundation");
+  assert.equal(names.at(-6), "20260722090000_platform_worker_operation_recovery");
+  assert.equal(names.at(-5), "20260722150000_storage_media_automation");
+  assert.equal(names.at(-4), "20260723120000_media_rendition_claim_integrity");
+  assert.equal(names.at(-3), "20260723150000_gate6a_gate6b_constraint_truth_tables");
+  assert.equal(names.at(-2), "20260723180000_communications_payment_automation");
+  assert.equal(names.at(-1), "20260724180000_platform_operations_closure");
 });
 
 test("production runtime refuses cursor-secret and handler test overrides", () => {
@@ -379,6 +384,39 @@ test("Gate 6A staging safety accepts only exact direct Neon verification or exac
       transport: "TCP_POSTGRESQL_TLS",
       transportConfigurationSha256:
         gate6cEvidence.transportConfigurationSha256,
+    },
+  );
+  const gate6dEnvironment = {
+    ...gate6cEnvironment,
+    REZNO_STAGE6_GATE6D_CONFIRM:
+      PLATFORM_OPERATIONS_GATE6D_CONFIRMATION,
+    REZNO_STAGE6_GATE6D_SUCCESSOR: "true",
+  };
+  const gate6dEvidence = {
+    ...validTransportEvidence(gate6dEnvironment),
+    migrationApplied: 49,
+    migrationTotal: 49,
+  };
+  assert.deepEqual(
+    await assertPlatformJobsGate6aStaging(
+      safetyClient(undefined, { applied: BigInt(49), total: BigInt(49) }),
+      gate6dEnvironment,
+      gate6dEvidence,
+    ),
+    {
+      backendPgStatSsl: true,
+      clientTlsVerified: true,
+      database: "rezno_staging",
+      encrypted: true,
+      hostnameVerified: true,
+      migrations: "49/49",
+      prismaUsedAttestedPhysicalClient: true,
+      role: "neondb_owner",
+      rolledBack: 0,
+      tlsProtocol: "TLSv1.3",
+      transport: "TCP_POSTGRESQL_TLS",
+      transportConfigurationSha256:
+        gate6dEvidence.transportConfigurationSha256,
     },
   );
 });

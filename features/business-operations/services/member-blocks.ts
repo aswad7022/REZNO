@@ -244,7 +244,7 @@ export async function createOperationalMemberBlock(input: {
   memberId: string;
 }) {
   const actor = await resolveBusinessOperationActor(input.actor, "MEMBER_BLOCK_READ");
-  assertBusinessOperationMutationRate(actor, "member-block-create");
+  await assertBusinessOperationMutationRate(actor, "member-block-create");
   assertRenderedOrganization(actor, input.contextOrganizationId);
   const parsed = operationalMemberBlockSchema.safeParse(input.block);
   if (!parsed.success) businessOperationsError("INVALID_REQUEST", "Member block input is invalid.");
@@ -346,7 +346,7 @@ export async function updateOperationalMemberBlock(input: {
   memberId: string;
 }) {
   const actor = await resolveBusinessOperationActor(input.actor, "MEMBER_BLOCK_READ");
-  assertBusinessOperationMutationRate(actor, "member-block-update");
+  await assertBusinessOperationMutationRate(actor, "member-block-update");
   assertRenderedOrganization(actor, input.contextOrganizationId);
   const parsed = operationalMemberBlockSchema.safeParse(input.block);
   if (!parsed.success) businessOperationsError("INVALID_REQUEST", "Member block input is invalid.");
@@ -444,7 +444,7 @@ export async function deleteOperationalMemberBlock(input: {
   memberId: string;
 }) {
   const actor = await resolveBusinessOperationActor(input.actor, "MEMBER_BLOCK_READ");
-  assertBusinessOperationMutationRate(actor, "member-block-delete");
+  await assertBusinessOperationMutationRate(actor, "member-block-delete");
   assertRenderedOrganization(actor, input.contextOrganizationId);
   const requestHash = hashBusinessOperation({
     action: "MEMBER_BLOCK_DELETE",

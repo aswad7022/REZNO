@@ -27,12 +27,12 @@ import {
 const code = (expected: string) => (error: unknown) =>
   error instanceof PlatformJobDomainError && error.code === expected;
 
-test("Gate 6C locks status, joint authority, and schedule ownership", () => {
+test("accepted Gate 6C retains joint authority and schedule ownership during Gate 6D", () => {
   assert.deepEqual(STAGE_6_ARCHITECTURE.gates, {
     gate6A: "ACCEPTED",
     gate6B: "ACCEPTED",
-    gate6C: "ACTIVE",
-    gate6D: "UNSTARTED",
+    gate6C: "ACCEPTED",
+    gate6D: "ACTIVE",
   });
   assert.deepEqual(requiredPlatformJobPermissions("PAYMENT_PROVIDER_EVENT_PROCESS"), [
     "PLATFORM_JOBS_MANAGE",
@@ -66,11 +66,16 @@ test("Gate 6C locks status, joint authority, and schedule ownership", () => {
     [
       "COMMUNICATION_CAMPAIGN_DISPATCH",
       "COMMUNICATION_DELIVERY_DISPATCH",
+      "MEDIA_RENDITION_DELETE",
+      "MEDIA_RENDITION_GENERATE",
       "PAYMENT_ATTEMPT_RETRY",
       "PAYMENT_PROVIDER_EVENT_PROCESS",
       "PAYMENT_RECONCILIATION",
       "PAYMENT_REFUND_RETRY",
       "SETTLEMENT_STATEMENT_GENERATE",
+      "STORAGE_ASSET_DELETE_RETRY",
+      "STORAGE_ASSET_RESCAN",
+      "STORAGE_ORPHAN_CLEANUP",
     ],
   );
   assert.ok(

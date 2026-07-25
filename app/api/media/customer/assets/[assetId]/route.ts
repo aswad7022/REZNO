@@ -5,14 +5,20 @@ import { mediaErrorResponse } from "@/features/media/api/http";
 import { assertNoMediaQuery, mediaRouteUuid } from "@/features/media/api/validation";
 import { createPrivateAvatarDownloadTarget } from "@/features/media/services/delivery";
 import { resolveStorageActorFromRequest } from "@/features/storage/services/web-actor";
-import { consumeRateLimit } from "@/lib/security/rate-limit-core";
+import { consumeRateLimit } from "@/lib/security/rate-limit";
 
 export async function GET(request: NextRequest, context: { params: Promise<{ assetId: string }> }) {
   try {
     assertNoMediaQuery(request);
     const actor = await resolveStorageActorFromRequest(request, "customer");
     if (actor.kind !== "customer") throw new Error("Customer actor resolution failed.");
-    const rate = consumeRateLimit("media.customer.delivery", `person:${actor.personId}`, { limit: 60, windowMs: 60_000 });
+    const rate = await consumeRateLimit("media.customer.delivery", `person:${actor.personId}`, { limit: 60, windowMs: 60_000 });
+    if (rate.unavailable) {
+      return NextResponse.json(
+        { error: { code: "SERVICE_UNAVAILABLE", message: "Media delivery is temporarily unavailable." } },
+        { headers: { "Cache-Control": "no-store, max-age=0", "Retry-After": "1" }, status: 503 },
+      );
+    }
     if (!rate.success) {
       return NextResponse.json(
         { error: { code: "RATE_LIMITED", message: "Too many media requests." } },

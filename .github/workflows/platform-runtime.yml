@@ -1,0 +1,42 @@
+name: REZNO Platform Runtime
+
+on:
+  schedule:
+    - cron: "7-57/5 * * * *"
+
+concurrency:
+  group: rezno-platform-runtime
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  run:
+    name: Run bounded platform cycle
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Invoke the authenticated runtime
+        env:
+          RUNTIME_URL: ${{ vars.REZNO_PLATFORM_RUNTIME_URL }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${RUNTIME_URL}" ]]; then
+            echo "REZNO_PLATFORM_RUNTIME_URL is not configured."
+            exit 1
+          fi
+          oidc_response="$(
+            curl --fail --silent --show-error \
+              --header "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+              "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=rezno-platform-runtime"
+          )"
+          oidc_token="$(jq -er '.value' <<<"${oidc_response}")"
+          curl --fail --silent --show-error \
+            --header "Authorization: Bearer ${oidc_token}" \
+            --header "Content-Type: application/json" \
+            --data '{"version":1}' \
+            --request POST \
+            "${RUNTIME_URL%/}/api/internal/platform-runtime/github"

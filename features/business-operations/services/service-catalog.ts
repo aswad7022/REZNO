@@ -345,7 +345,7 @@ export async function createOperationalService(input: {
   service: unknown;
 }) {
   const actor = await resolveBusinessOperationActor(input.actor, "SERVICE_WRITE");
-  assertBusinessOperationMutationRate(actor, "service-create");
+  await assertBusinessOperationMutationRate(actor, "service-create");
   assertRenderedOrganization(actor, input.contextOrganizationId);
   const parsed = operationalServiceSchema.safeParse(input.service);
   if (!parsed.success) businessOperationsError("INVALID_REQUEST", "Service input is invalid.");
@@ -403,7 +403,7 @@ export async function updateOperationalService(input: {
   serviceId: string;
 }) {
   const actor = await resolveBusinessOperationActor(input.actor, "SERVICE_WRITE");
-  assertBusinessOperationMutationRate(actor, "service-update");
+  await assertBusinessOperationMutationRate(actor, "service-update");
   assertRenderedOrganization(actor, input.contextOrganizationId);
   const parsed = operationalServiceSchema.safeParse(input.service);
   if (!parsed.success) businessOperationsError("INVALID_REQUEST", "Service input is invalid.");
@@ -478,7 +478,7 @@ export async function setOperationalServiceActive(input: {
   serviceId: string;
 }) {
   const actor = await resolveBusinessOperationActor(input.actor, "SERVICE_WRITE");
-  assertBusinessOperationMutationRate(actor, "service-lifecycle");
+  await assertBusinessOperationMutationRate(actor, "service-lifecycle");
   assertRenderedOrganization(actor, input.contextOrganizationId);
   const action = input.active ? "SERVICE_ACTIVATE" : "SERVICE_DEACTIVATE";
   const requestHash = hashBusinessOperation({
@@ -548,7 +548,7 @@ export async function archiveOperationalService(input: {
   serviceId: string;
 }) {
   const actor = await resolveBusinessOperationActor(input.actor, "SERVICE_WRITE");
-  assertBusinessOperationMutationRate(actor, "service-archive");
+  await assertBusinessOperationMutationRate(actor, "service-archive");
   assertRenderedOrganization(actor, input.contextOrganizationId);
   const requestHash = hashBusinessOperation({ action: "SERVICE_ARCHIVE", serviceId: input.serviceId });
   return runBusinessOperationTransaction(async (transaction) => {

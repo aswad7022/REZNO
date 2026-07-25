@@ -17,10 +17,13 @@ export async function updateOutboundPreferencesAction(
     personId: identity.person.id,
     userId: identity.session.user.id,
   };
-  const consumed = consumeRateLimit("outboundPreferences:update", context.personId, {
+  const consumed = await consumeRateLimit("outboundPreferences:update", context.personId, {
     limit: 20,
     windowMs: 60_000,
   });
+  if (consumed.unavailable) {
+    return { ok: false, code: "SERVICE_UNAVAILABLE", message: "Request protection is temporarily unavailable." };
+  }
   if (!consumed.success) {
     return { ok: false, code: "RATE_LIMITED", message: "Too many preference updates. Retry shortly." };
   }

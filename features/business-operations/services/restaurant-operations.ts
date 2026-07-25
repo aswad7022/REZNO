@@ -288,7 +288,7 @@ export async function rescheduleOperationalRestaurantReservation(input: {
     input.actor,
     "RESTAURANT_RESERVATION_OPERATE",
   );
-  assertBusinessOperationMutationRate(actor, "restaurant-reschedule");
+  await assertBusinessOperationMutationRate(actor, "restaurant-reschedule");
   assertRenderedOrganization(actor, input.contextOrganizationId);
   const requestHash = hashBusinessOperation({
     action: "RESTAURANT_RESCHEDULE",

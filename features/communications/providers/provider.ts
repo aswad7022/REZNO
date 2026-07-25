@@ -70,6 +70,16 @@ export function deterministicSinkEnabled(
   }
 }
 
+export function communicationProviderConfigurationTruth(
+  environment: NodeJS.ProcessEnv = process.env,
+) {
+  if (environment.NODE_ENV === "production") return "NOT_CONFIGURED" as const;
+  if (testProviderFactory || deterministicSinkEnabled(environment)) {
+    return "DETERMINISTIC_TEST_ONLY" as const;
+  }
+  return "NOT_CONFIGURED" as const;
+}
+
 export class DeterministicSinkProvider implements OutboundProvider {
   constructor(
     public readonly channel: OutboundChannel,

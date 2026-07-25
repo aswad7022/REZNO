@@ -10,7 +10,7 @@
     "test": "npm run test:all",
     "test:unit": "tsx --test tests/commerce/unit/*.test.ts tests/identity/unit/*.test.ts tests/bookings/unit/*.test.ts tests/reviews/unit/*.test.ts tests/restaurants/unit/*.test.ts tests/business-operations/unit/*.test.ts && NODE_OPTIONS=--conditions=react-server tsx --test tests/notifications/unit/*.test.ts tests/messages/unit/*.test.ts tests/communications/unit/*.test.ts tests/storage/unit/*.test.ts tests/media/unit/*.test.ts tests/payments/unit/*.test.ts tests/stage5/unit/*.test.ts tests/platform-jobs/unit/*.test.ts",
     "test:integration": "NODE_OPTIONS=--conditions=react-server tsx --test --test-concurrency=1 tests/commerce/integration/*.test.ts tests/identity/integration/*.test.ts tests/bookings/integration/*.test.ts tests/reviews/integration/*.test.ts tests/restaurants/integration/*.test.ts tests/business-operations/integration/*.test.ts tests/notifications/integration/*.test.ts tests/messages/integration/*.test.ts tests/communications/integration/*.test.ts tests/storage/integration/*.test.ts tests/media/integration/*.test.ts tests/payments/integration/*.test.ts tests/stage5/integration/*.test.ts tests/platform-jobs/integration/*.test.ts",
-    "test:http": "NODE_OPTIONS=--conditions=react-server tsx --test --test-concurrency=1 tests/commerce/http/public-catalog-routes.test.ts && tsx --test --test-concurrency=1 tests/commerce/http/milestone-2c-live.test.ts tests/commerce/http/milestone-2d-live.test.ts tests/commerce/http/mobile-customer-onboarding-live.test.ts tests/commerce/http/stage3a-merchant-store-live.test.ts tests/commerce/http/stage3b-products-inventory-live.test.ts tests/commerce/http/stage3c-orders-fulfillment-live.test.ts tests/commerce/http/stage3d-admin-closure-live.test.ts tests/identity/http/*.test.ts tests/bookings/http/*.test.ts tests/reviews/http/*.test.ts tests/restaurants/http/*.test.ts tests/business-operations/http/*.test.ts tests/notifications/http/*.test.ts tests/messages/http/*.test.ts tests/communications/http/*.test.ts tests/storage/http/*.test.ts tests/media/http/*.test.ts tests/payments/http/*.test.ts tests/stage5/http/*.test.ts tests/platform-jobs/http/*.test.ts",
+    "test:http": "NODE_OPTIONS=--conditions=react-server tsx --test --test-concurrency=1 tests/commerce/http/public-catalog-routes.test.ts && tsx --test --test-concurrency=1 tests/commerce/http/milestone-2c-live.test.ts tests/commerce/http/milestone-2d-live.test.ts tests/commerce/http/mobile-customer-onboarding-live.test.ts tests/commerce/http/stage3a-merchant-store-live.test.ts tests/commerce/http/stage3b-products-inventory-live.test.ts tests/commerce/http/stage3c-orders-fulfillment-live.test.ts tests/commerce/http/stage3d-admin-closure-live.test.ts tests/identity/http/*.test.ts tests/bookings/http/*.test.ts tests/reviews/http/*.test.ts tests/restaurants/http/*.test.ts tests/business-operations/http/*.test.ts tests/messages/http/*.test.ts tests/communications/http/*.test.ts tests/storage/http/*.test.ts tests/media/http/*.test.ts tests/payments/http/*.test.ts tests/stage5/http/*.test.ts tests/platform-jobs/http/*.test.ts && NODE_OPTIONS=--conditions=react-server tsx --test --test-concurrency=1 tests/notifications/http/*.test.ts",
     "test:all": "npm run test:unit && npm run test:integration && npm run test:http",
     "test:messages": "NODE_OPTIONS=--conditions=react-server tsx --test tests/messages/unit/*.test.ts && NODE_OPTIONS=--conditions=react-server tsx --test --test-concurrency=1 tests/messages/integration/*.test.ts",
     "test:communications": "NODE_OPTIONS=--conditions=react-server tsx --test tests/communications/unit/*.test.ts && NODE_OPTIONS=--conditions=react-server tsx --test --test-concurrency=1 tests/communications/integration/*.test.ts",
@@ -38,6 +38,10 @@
     "test:platform-jobs:postgres": "NODE_ENV=test NODE_OPTIONS=--conditions=react-server tsx --test --test-concurrency=1 tests/platform-jobs/integration/*.test.ts",
     "test:platform-jobs:http": "tsx --test --test-concurrency=1 tests/platform-jobs/http/*.test.ts",
     "test:platform-jobs": "npm run test:platform-jobs:unit && npm run test:platform-jobs:postgres && npm run test:platform-jobs:http",
+    "test:platform-operations:unit": "NODE_ENV=test NODE_OPTIONS=--conditions=react-server tsx --test tests/platform-jobs/unit/gate6d-platform-operations.test.ts",
+    "test:platform-operations:postgres": "NODE_ENV=test NODE_OPTIONS=--conditions=react-server tsx --test --test-concurrency=1 tests/platform-jobs/integration/gate6d-platform-operations-e2e.test.ts",
+    "test:platform-operations:http": "tsx --test --test-concurrency=1 tests/platform-jobs/http/gate6d-platform-operations-live.test.ts",
+    "test:platform-operations": "npm run test:platform-operations:unit && npm run test:platform-operations:postgres && npm run test:platform-operations:http",
     "test:storage-automation:unit": "NODE_ENV=test NODE_OPTIONS=--conditions=react-server tsx --test tests/storage/unit/storage-media-automation.test.ts",
     "test:storage-automation:postgres": "NODE_ENV=test NODE_OPTIONS=--conditions=react-server tsx --test --test-concurrency=1 tests/storage/integration/storage-media-automation-e2e.test.ts",
     "test:storage-automation:http": "tsx --test --test-concurrency=1 tests/storage/http/storage-automation-live.test.ts",
@@ -101,6 +105,10 @@
     "smoke:staging:communications-payment-gate6c": "REZNO_STAGE6_GATE6C_SUCCESSOR=true NODE_OPTIONS=--conditions=react-server tsx scripts/staging/smoke-communications-payment-gate6c.ts",
     "cleanup:staging:communications-payment-gate6c": "REZNO_STAGE6_GATE6C_SUCCESSOR=true NODE_OPTIONS=--conditions=react-server tsx scripts/staging/cleanup-communications-payment-gate6c.ts",
     "fingerprint:staging:communications-payment-gate6c": "REZNO_STAGE6_GATE6C_SUCCESSOR=true NODE_OPTIONS=--conditions=react-server tsx scripts/staging/fingerprint-communications-payment-gate6c.ts",
+    "seed:staging:platform-operations-gate6d": "NODE_OPTIONS=--conditions=react-server tsx scripts/staging/seed-platform-operations-gate6d.ts",
+    "smoke:staging:platform-operations-gate6d": "NODE_OPTIONS=--conditions=react-server tsx scripts/staging/smoke-platform-operations-gate6d.ts",
+    "cleanup:staging:platform-operations-gate6d": "NODE_OPTIONS=--conditions=react-server tsx scripts/staging/cleanup-platform-operations-gate6d.ts",
+    "fingerprint:staging:platform-operations-gate6d": "NODE_OPTIONS=--conditions=react-server tsx scripts/staging/fingerprint-platform-operations-gate6d.ts",
     "payments:reconcile": "NODE_OPTIONS=--conditions=react-server tsx scripts/payments/reconcile.ts",
     "smoke:staging:commerce-admin-stage3d": "NODE_OPTIONS=--conditions=react-server tsx scripts/staging/smoke-commerce-admin-stage3d.ts",
     "test:commerce-stage3d": "tsx --test tests/commerce/unit/stage3d-admin-closure.test.ts tests/commerce/unit/commerce-admin-stage3d-seed.test.ts tests/commerce/unit/admin-commerce-pagination.test.ts && NODE_OPTIONS=--conditions=react-server tsx --test --test-concurrency=1 tests/commerce/integration/stage3d-admin-closure-e2e.test.ts",
@@ -120,6 +128,7 @@
     "cmdk": "^1.1.1",
     "date-fns": "^4.4.0",
     "framer-motion": "^12.42.2",
+    "jose": "6.2.3",
     "leaflet": "^1.9.4",
     "lucide-react": "^1.22.0",
     "next": "16.2.11",
@@ -161,6 +170,7 @@
     "fast-uri": "3.1.4",
     "find-my-way": "9.7.0",
     "postcss": "8.5.20",
-    "sharp": "0.35.3"
+    "sharp": "0.35.3",
+    "valibot": "1.4.2"
   }
 }

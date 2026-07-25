@@ -5,6 +5,10 @@ import { hasCommercePermission } from "@/features/identity/policies/authorizatio
 import { effectiveCommercePermissions } from "@/features/commerce/domain/merchant-access";
 import { prisma } from "@/lib/db/prisma";
 import type { CommercePermission, Prisma, SystemRole } from "@prisma/client";
+import {
+  assertPlatformRuntimeAuthorityCurrent,
+  type PlatformRuntimeAuthority,
+} from "@/features/platform-operations/services/runtime-authority";
 
 type CommerceDatabase = Prisma.TransactionClient | typeof prisma;
 
@@ -35,8 +39,9 @@ export interface CommerceAdminContext {
   isSuperAdmin: boolean;
   personId: string;
   permissions: readonly AdminPermission[];
-  source: "database" | "env";
+  source: "database" | "env" | "runtime";
   userId: string;
+  runtimeAuthority?: PlatformRuntimeAuthority;
 }
 
 export async function resolveMerchantCommerceContext(
@@ -150,6 +155,23 @@ export async function assertCommerceAdminCurrent(
   context: CommerceAdminContext,
   permission: AdminPermission,
 ) {
+  if (context.source === "runtime") {
+    if (!context.runtimeAuthority) {
+      commerceError("FORBIDDEN", "Automatic Commerce authority is missing.");
+    }
+    const current = await assertPlatformRuntimeAuthorityCurrent(
+      transaction,
+      context.runtimeAuthority,
+      permission,
+    );
+    if (
+      current.userId !== context.userId
+      || current.personId !== context.personId
+    ) {
+      commerceError("FORBIDDEN", "Automatic Commerce authority changed.");
+    }
+    return;
+  }
   const person = await transaction.person.findFirst({
     where: {
       authUserId: context.userId,

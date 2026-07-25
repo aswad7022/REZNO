@@ -30,6 +30,7 @@ export type CommerceApiErrorCode =
   | "FAVORITE_ALREADY_EXISTS"
   | "FAVORITE_NOT_FOUND"
   | "RATE_LIMITED"
+  | "SERVICE_UNAVAILABLE"
   | PaymentErrorCode
   | "INTERNAL_ERROR";
 

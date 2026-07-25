@@ -48,7 +48,7 @@ export async function updateOperationalSettings(input: {
   settings: unknown;
 }) {
   const actor = await resolveBusinessOperationActor(input.actor, "SETTINGS_WRITE");
-  assertBusinessOperationMutationRate(actor, "settings-update");
+  await assertBusinessOperationMutationRate(actor, "settings-update");
   assertRenderedOrganization(actor, input.contextOrganizationId);
   const parsed = operationalSettingsSchema.safeParse(input.settings);
   if (!parsed.success) businessOperationsError("INVALID_REQUEST", "Operational settings are invalid.");

@@ -6,19 +6,41 @@ import {
   assertPlatformJobAdminCurrent,
   type PlatformJobAdminContext,
 } from "@/features/platform-jobs/services/admin-context";
+import {
+  assertPlatformRuntimeAuthorityCurrent,
+  assertPlatformRuntimeInvocationOwned,
+  type PlatformRuntimeAuthority,
+} from "@/features/platform-operations/services/runtime-authority";
 
-export type PlatformJobOperationAuthority = {
+export type AdminPlatformJobOperationAuthority = {
   fencingToken: bigint;
+  kind?: "ADMIN_MUTATION";
   leaseToken: string;
   mutationId: string;
   workerId: string;
 };
+
+export type PlatformJobOperationAuthority =
+  | AdminPlatformJobOperationAuthority
+  | PlatformRuntimeAuthority;
 
 export async function assertPlatformJobOperationOwned(
   transaction: Prisma.TransactionClient,
   authority: PlatformJobOperationAuthority,
   now: Date,
 ) {
+  if (authority.kind === "RUNTIME_INVOCATION") {
+    const invocation = await assertPlatformRuntimeInvocationOwned(
+      transaction,
+      authority,
+    );
+    return {
+      adminAccessId: null,
+      personId: invocation.configuredByPersonId,
+      source: "runtime" as const,
+      userId: invocation.configuredByAdminUserId,
+    };
+  }
   const operation = await transaction.$queryRaw<Array<{
     actorAdminUserId: string;
     actorPersonId: string;
@@ -55,7 +77,18 @@ export async function assertPlatformJobOperationAuthorized(
   now: Date,
   permissions: readonly AdminPermission[],
 ) {
-  const actor = await assertPlatformJobOperationOwned(transaction, authority, now);
+  if (authority.kind === "RUNTIME_INVOCATION") {
+    return assertPlatformRuntimeAuthorityCurrent(
+      transaction,
+      authority,
+      permissions,
+    );
+  }
+  const actor = await assertPlatformJobOperationOwned(
+    transaction,
+    authority,
+    now,
+  ) as PlatformJobAdminContext;
   return assertPlatformJobAdminCurrent(transaction, actor, permissions);
 }
 

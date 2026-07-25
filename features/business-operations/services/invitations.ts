@@ -85,7 +85,7 @@ export async function createOperationalInvitation(input: {
   invitation: unknown;
 }) {
   const actor = await resolveBusinessOperationActor(input.actor, "WORKFORCE_WRITE");
-  assertBusinessOperationMutationRate(actor, "invitation-create");
+  await assertBusinessOperationMutationRate(actor, "invitation-create");
   assertRenderedOrganization(actor, input.contextOrganizationId);
   const parsed = operationalInvitationSchema.safeParse(input.invitation);
   if (!parsed.success) businessOperationsError("INVALID_REQUEST", "Invitation input is invalid.");
@@ -235,7 +235,7 @@ export async function revokeOperationalInvitation(input: {
   invitationId: string;
 }) {
   const actor = await resolveBusinessOperationActor(input.actor, "WORKFORCE_WRITE");
-  assertBusinessOperationMutationRate(actor, "invitation-revoke");
+  await assertBusinessOperationMutationRate(actor, "invitation-revoke");
   assertRenderedOrganization(actor, input.contextOrganizationId);
   const requestHash = hashBusinessOperation({ action: "INVITATION_REVOKE", invitationId: input.invitationId });
   return runBusinessOperationTransaction(async (transaction) => {

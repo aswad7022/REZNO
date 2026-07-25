@@ -3,9 +3,9 @@ import { NextResponse, type NextRequest } from "next/server";
 import { publicCommerceErrorResponse } from "@/features/commerce/public/errors";
 import {
   configuredTrustedProxyHeader,
-  consumeRateLimit,
   getRateLimitIdentifierFromHeaders,
 } from "@/lib/security/rate-limit-core";
+import { consumeRateLimit } from "@/lib/security/rate-limit";
 
 const NO_STORE_HEADERS = {
   "Cache-Control": "no-store, max-age=0",
@@ -22,10 +22,19 @@ export async function handlePublicCommerceRequest<T>(
     "commerce-public-unknown",
     { trustedProxyHeader: configuredTrustedProxyHeader() },
   );
-  const rateLimit = consumeRateLimit(`commerce.public.${scope}`, identifier, {
+  const rateLimit = await consumeRateLimit(`commerce.public.${scope}`, identifier, {
     limit: options.limit ?? 60,
     windowMs: 60_000,
   });
+  if (rateLimit.unavailable) {
+    return NextResponse.json(
+      { error: { code: "SERVICE_UNAVAILABLE", message: "Marketplace is temporarily unavailable." } },
+      {
+        headers: { ...NO_STORE_HEADERS, "Retry-After": "1" },
+        status: 503,
+      },
+    );
+  }
   if (!rateLimit.success) {
     return NextResponse.json(
       { error: { code: "RATE_LIMITED", message: "Too many requests." } },

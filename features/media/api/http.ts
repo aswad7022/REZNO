@@ -10,7 +10,7 @@ import { getMediaContainer } from "@/features/media/services/media-query";
 import { StorageDomainError } from "@/features/storage/domain/errors";
 import { resolveStorageActorFromRequest } from "@/features/storage/services/web-actor";
 import { logServerError } from "@/lib/logging/server";
-import { consumeRateLimit } from "@/lib/security/rate-limit-core";
+import { consumeRateLimit } from "@/lib/security/rate-limit";
 import { assertNoMediaQuery, parseAltMutation, parseAttachMedia, parseBindingMutation, parseReorderMedia } from "@/features/media/api/validation";
 
 const noStore = { "Cache-Control": "no-store, max-age=0" };
@@ -60,7 +60,13 @@ async function handle(
 ) {
   try {
     const actor = await resolveStorageActorFromRequest(request, mode);
-    const rate = consumeRateLimit(`media.${mode}.${scope}`, `person:${actor.personId}`, { limit: 30, windowMs: 60_000 });
+    const rate = await consumeRateLimit(`media.${mode}.${scope}`, `person:${actor.personId}`, { limit: 30, windowMs: 60_000 });
+    if (rate.unavailable) {
+      return NextResponse.json(
+        { error: { code: "SERVICE_UNAVAILABLE", message: "Media is temporarily unavailable." } },
+        { headers: { ...noStore, "Retry-After": "1" }, status: 503 },
+      );
+    }
     if (!rate.success) {
       return NextResponse.json(
         { error: { code: "RATE_LIMITED", message: "Too many media requests." } },

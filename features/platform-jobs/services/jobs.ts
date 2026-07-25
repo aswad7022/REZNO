@@ -13,7 +13,10 @@ import {
   authorizedPlatformJobTypes,
   requiredPlatformJobPermissions,
 } from "@/features/platform-jobs/domain/authority";
-import { PLATFORM_JOB_LIMITS } from "@/features/platform-jobs/domain/contracts";
+import {
+  PLATFORM_JOB_ALLOWED_TYPES,
+  PLATFORM_JOB_LIMITS,
+} from "@/features/platform-jobs/domain/contracts";
 import { platformJobError } from "@/features/platform-jobs/domain/errors";
 import {
   platformHeartbeatExpiry,
@@ -29,6 +32,7 @@ import {
   platformJobDatabaseNow,
   type PlatformJobOperationAuthority,
 } from "@/features/platform-jobs/services/operation-lease";
+import { assertPlatformRuntimeInvocationOwned } from "@/features/platform-operations/services/runtime-authority";
 
 export type ClaimedPlatformJob = {
   attemptCount: number;
@@ -260,13 +264,18 @@ export async function claimPlatformJobsInTransaction(
     platformJobError("VALIDATION_ERROR", "The worker batch is outside the accepted bound.");
   }
   const now = input.now ?? new Date();
-  const eligibleJobTypes = input.operation
-    ? authorizedPlatformJobTypes((await assertPlatformJobOperationAuthorized(
-        transaction,
-        input.operation,
-        now,
-        ["PLATFORM_JOBS_MANAGE"],
-      )).permissions)
+  const eligibleJobTypes = input.operation?.kind === "RUNTIME_INVOCATION"
+    ? (
+        await assertPlatformRuntimeInvocationOwned(transaction, input.operation),
+        [...PLATFORM_JOB_ALLOWED_TYPES]
+      )
+    : input.operation
+      ? authorizedPlatformJobTypes((await assertPlatformJobOperationAuthorized(
+          transaction,
+          input.operation,
+          now,
+          ["PLATFORM_JOBS_MANAGE"],
+        )).permissions)
     : ["PLATFORM_HEALTH_PROBE" as const];
   const eligibleJobTypesSql = Prisma.join(
     eligibleJobTypes.map((jobType) => Prisma.sql`${jobType}::"PlatformJobType"`),

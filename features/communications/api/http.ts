@@ -6,7 +6,7 @@ import { NextResponse } from "next/server";
 import { resolveBookingCustomerApiContext } from "@/features/bookings/api/auth";
 import { BookingApiError } from "@/features/bookings/api/errors";
 import { CommunicationDomainError } from "@/features/communications/domain/errors";
-import { consumeRateLimit } from "@/lib/security/rate-limit-core";
+import { consumeRateLimit } from "@/lib/security/rate-limit";
 
 export async function handleCustomerCommunicationRequest(
   request: NextRequest,
@@ -16,11 +16,20 @@ export async function handleCustomerCommunicationRequest(
 ) {
   try {
     const context = await resolveBookingCustomerApiContext(request);
-    const rate = consumeRateLimit(
+    const rate = await consumeRateLimit(
       `communication.customer.${scope}`,
       `person:${context.personId}`,
       { limit, windowMs: 60_000 },
     );
+    if (rate.unavailable) {
+      return NextResponse.json(
+        { error: { code: "SERVICE_UNAVAILABLE", message: "Communications are temporarily unavailable." } },
+        {
+          status: 503,
+          headers: { "Cache-Control": "no-store, max-age=0", "Retry-After": "1" },
+        },
+      );
+    }
     if (!rate.success) {
       return NextResponse.json(
         { error: { code: "RATE_LIMITED", message: "Too many requests." } },

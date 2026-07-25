@@ -28,7 +28,7 @@ import {
   merchantOrderNextHref,
 } from "../../../features/commerce/domain/merchant-order-filter-policy";
 import { merchantOrderSummary } from "../../../features/commerce/domain/order-dto";
-import { commerceNotificationEventKey } from "../../../features/commerce/services/commerce-notification-service";
+import { commerceNotificationEventKey } from "../../../features/commerce/domain/notification-events";
 import {
   customerOrderCancellationSchema,
   merchantOrderCancellationSchema,

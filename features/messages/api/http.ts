@@ -36,11 +36,20 @@ export async function handleCustomerMessageRequest(
     const identity = await resolveBookingCustomerApiContext(request);
     const rate = limit === null
       ? null
-      : consumeRateLimit(
+      : await consumeRateLimit(
           `message.customer.${scope}`,
           `person:${identity.personId}`,
           { limit, windowMs: 60_000 },
         );
+    if (rate?.unavailable) {
+      return NextResponse.json(
+        { error: { code: "SERVICE_UNAVAILABLE", message: "Messaging is temporarily unavailable." } },
+        {
+          headers: { ...NO_STORE_HEADERS, "Retry-After": "1" },
+          status: 503,
+        },
+      );
+    }
     if (rate && !rate.success) {
       return NextResponse.json(
         { error: { code: "RATE_LIMITED", message: "Too many requests." } },

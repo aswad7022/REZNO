@@ -178,7 +178,7 @@ export async function updateOperationalStaffSchedule(input: {
   schedule: unknown;
 }) {
   const actor = await resolveBusinessOperationActor(input.actor, "STAFF_SCHEDULE_WRITE");
-  assertBusinessOperationMutationRate(actor, "staff-schedule-update");
+  await assertBusinessOperationMutationRate(actor, "staff-schedule-update");
   assertRenderedOrganization(actor, input.contextOrganizationId);
   const parsed = operationalStaffScheduleSchema.safeParse(input.schedule);
   if (!parsed.success) businessOperationsError("INVALID_REQUEST", "Staff schedule input is invalid.");

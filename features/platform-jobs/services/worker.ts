@@ -7,6 +7,7 @@ import { PlatformJobAttemptStatus, Prisma } from "@prisma/client";
 import { platformJobHash } from "@/features/platform-jobs/domain/canonical";
 import { PLATFORM_JOB_LIMITS } from "@/features/platform-jobs/domain/contracts";
 import { platformJobError } from "@/features/platform-jobs/domain/errors";
+import { parsePlatformJobResult } from "@/features/platform-jobs/domain/registry";
 import { assertPlatformJobAdminCurrent, type PlatformJobAdminContext } from "@/features/platform-jobs/services/admin-context";
 import { executePlatformJobHandler } from "@/features/platform-jobs/services/handlers";
 import {
@@ -20,13 +21,18 @@ import {
 import {
   assertPlatformJobOperationOwned,
   platformJobDatabaseNow,
-  type PlatformJobOperationAuthority,
+  type AdminPlatformJobOperationAuthority,
 } from "@/features/platform-jobs/services/operation-lease";
 import { runPlatformJobSerializable } from "@/features/platform-jobs/services/transaction";
 import { prisma } from "@/lib/db/prisma";
+import {
+  assertPlatformRuntimeInvocationOwned,
+  type PlatformRuntimeAuthority,
+} from "@/features/platform-operations/services/runtime-authority";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ACTIVE_ATTEMPTS = new Set<PlatformJobAttemptStatus>(["CLAIMED", "RUNNING"]);
+const AUTOMATIC_WORKER_BATCH_SIZE = 5;
 
 type WorkerCompleteResult = {
   claimed: number;
@@ -176,6 +182,148 @@ export async function runPlatformWorkerBatch(
   return { ...result, replay: prepared.replay };
 }
 
+export async function runAutomaticPlatformWorkerBatch(
+  authority: PlatformRuntimeAuthority,
+  batchSize = AUTOMATIC_WORKER_BATCH_SIZE,
+) {
+  if (
+    !Number.isInteger(batchSize)
+    || batchSize < 1
+    || batchSize > AUTOMATIC_WORKER_BATCH_SIZE
+  ) {
+    platformJobError(
+      "VALIDATION_ERROR",
+      "The automatic worker batch is outside the accepted bound.",
+    );
+  }
+  const recovered = await recoverExpiredPlatformJobLeases(
+    new Date(0),
+    batchSize,
+    { operation: authority },
+  );
+  const claimed = await prisma.$transaction(async (transaction) => {
+    const now = await platformJobDatabaseNow(transaction);
+    await assertPlatformRuntimeInvocationOwned(transaction, authority);
+    return claimPlatformJobsInTransaction(transaction, {
+      batchSize,
+      now,
+      operation: authority,
+      workerId: authority.workerId,
+    });
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted });
+
+  const outcomes: Array<{
+    job: { status: string };
+    status: PlatformJobAttemptStatus;
+  }> = [];
+  let monitor:
+    | { result: Prisma.InputJsonValue; state: "SUCCEEDED" }
+    | { errorCode: string; state: "FAILED" }
+    | { state: "NOT_CLAIMED" } = { state: "NOT_CLAIMED" };
+  for (const job of claimed) {
+    const jobAuthority: PlatformRuntimeAuthority = {
+      ...authority,
+      jobType: job.jobType,
+    };
+    await startPlatformJob({
+      fencingToken: job.fencingToken,
+      jobId: job.id,
+      leaseToken: job.leaseToken,
+      operation: jobAuthority,
+      workerId: authority.workerId,
+    });
+    const outcome = await executePlatformJobHandler({
+      fencingToken: job.fencingToken,
+      jobId: job.id,
+      jobType: job.jobType,
+      leaseToken: job.leaseToken,
+      operation: jobAuthority,
+      payload: job.payload,
+      payloadVersion: job.payloadVersion,
+    });
+    if (outcome.outcome === "SUCCEEDED") {
+      if (job.jobType === "PLATFORM_OPERATIONS_MONITOR") {
+        monitor = {
+          result: parsePlatformJobResult(
+            "PLATFORM_OPERATIONS_MONITOR",
+            outcome.metadata,
+          ) as Prisma.InputJsonValue,
+          state: "SUCCEEDED",
+        };
+      }
+      const completion = await completePlatformJob({
+        fencingToken: job.fencingToken,
+        jobId: job.id,
+        leaseToken: job.leaseToken,
+        operation: jobAuthority,
+        result: outcome.metadata,
+        workerId: authority.workerId,
+      });
+      outcomes.push({
+        job: { status: completion.status },
+        status: "SUCCEEDED",
+      });
+    } else {
+      if (job.jobType === "PLATFORM_OPERATIONS_MONITOR") {
+        monitor = { errorCode: outcome.errorCode, state: "FAILED" };
+      }
+      const failure = await failPlatformJob({
+        errorCode: outcome.errorCode,
+        fencingToken: job.fencingToken,
+        jobId: job.id,
+        leaseToken: job.leaseToken,
+        operation: jobAuthority,
+        retryable: outcome.retryable,
+        workerId: authority.workerId,
+      });
+      outcomes.push({
+        job: { status: failure.status },
+        status:
+          failure.status === "RETRY_WAIT"
+            ? "RETRY_SCHEDULED"
+            : failure.status === "DEAD_LETTERED"
+              ? "DEAD_LETTERED"
+              : "FAILED",
+      });
+    }
+  }
+  const summary = summarizeAttempts(outcomes);
+  const result = {
+    ...summary,
+    deadLettered: summary.deadLettered + recovered.deadLettered,
+    monitor,
+    recovered: summary.recovered + recovered.recovered,
+    retryWait: summary.retryWait + recovered.retryWait,
+  };
+  await prisma.$transaction(async (transaction) => {
+    await assertPlatformRuntimeInvocationOwned(transaction, authority);
+    const now = await platformJobDatabaseNow(transaction);
+    const updated = await transaction.platformRuntimeInvocation.updateMany({
+      where: {
+        controlGeneration: authority.controlGeneration,
+        fencingToken: authority.fencingToken,
+        id: authority.invocationId,
+        leaseToken: authority.leaseToken,
+        state: "RUNNING",
+        workerId: authority.workerId,
+      },
+      data: {
+        monitorCompletedAt: now,
+        monitorResult: monitor,
+        workerCompletedAt: now,
+        workerResult: result,
+      },
+    });
+    if (updated.count !== 1) {
+      platformJobError(
+        "STALE_LEASE",
+        "The automatic worker lost its runtime fence.",
+      );
+    }
+  });
+  return result;
+}
+
 async function acquireWorkerOperation(
   context: PlatformJobAdminContext,
   input: { batchSize: number; idempotencyKey: string },
@@ -266,7 +414,7 @@ async function acquireWorkerOperation(
 
 async function finalizeWorkerOperation(
   context: PlatformJobAdminContext,
-  authority: PlatformJobOperationAuthority,
+  authority: AdminPlatformJobOperationAuthority,
 ) {
   return runPlatformJobSerializable(async (transaction) => {
     await assertPlatformJobAdminCurrent(transaction, context, "PLATFORM_JOBS_MANAGE");

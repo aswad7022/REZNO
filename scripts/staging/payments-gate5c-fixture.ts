@@ -246,7 +246,7 @@ export async function seedPaymentsGate5cFixture(prisma: PrismaClient) {
       status: "DRAFT",
       updatedAt: at(80 + index),
     })) });
-  }, { isolationLevel: "Serializable" });
+  }, { isolationLevel: "Serializable", timeout: 30_000 });
   return materializePaymentsGate5cEvidence(prisma);
 }
 

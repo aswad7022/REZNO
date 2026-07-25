@@ -5,7 +5,7 @@ import { getCurrentAdminAccess } from "@/features/admin/services/admin-auth";
 import { PlatformJobDomainError, platformJobError } from "@/features/platform-jobs/domain/errors";
 import { platformJobAdminContext, type PlatformJobAdminContext } from "@/features/platform-jobs/services/admin-context";
 import { logServerError } from "@/lib/logging/server";
-import { consumeRateLimit } from "@/lib/security/rate-limit-core";
+import { consumeRateLimit } from "@/lib/security/rate-limit";
 import { NextResponse } from "next/server";
 
 const NO_STORE = { "Cache-Control": "no-store, max-age=0" } as const;
@@ -22,10 +22,13 @@ export async function handlePlatformJobAdminRequest(
       platformJobError("FORBIDDEN", "Current Admin platform-job permission is required.");
     }
     const context = platformJobAdminContext(access);
-    const rate = consumeRateLimit(`platform-jobs.admin.${scope}`, `person:${context.personId}`, {
+    const rate = await consumeRateLimit(`platform-jobs.admin.${scope}`, `person:${context.personId}`, {
       limit: 30,
       windowMs: 60_000,
     });
+    if (rate.unavailable) {
+      platformJobError("SERVICE_UNAVAILABLE", "Request protection is temporarily unavailable.");
+    }
     if (!rate.success) platformJobError("RATE_LIMITED", "Too many platform-job requests.");
     return NextResponse.json({ data: await operation(context) }, { headers: NO_STORE, status });
   } catch (error) {

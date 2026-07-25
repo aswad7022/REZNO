@@ -68,14 +68,14 @@ test.after(async () => {
   await prisma.$disconnect();
 });
 
-test("migration chain is healthy at 48/48 and additive Stage 6 migrations create no platform rows", async () => {
+test("migration chain is healthy at 49/49 and additive Stage 6 migrations create no platform rows", async () => {
   const migrationRows = await prisma.$queryRaw<Array<{ applied: bigint; failed: bigint; total: bigint }>>(Prisma.sql`
     SELECT COUNT(*) FILTER (WHERE "finished_at" IS NOT NULL AND "rolled_back_at" IS NULL) AS applied,
            COUNT(*) FILTER (WHERE "finished_at" IS NULL AND "rolled_back_at" IS NULL) AS failed,
            COUNT(*) AS total
     FROM "_prisma_migrations"
   `);
-  assert.deepEqual(migrationRows[0], { applied: BigInt(48), failed: BigInt(0), total: BigInt(48) });
+  assert.deepEqual(migrationRows[0], { applied: BigInt(49), failed: BigInt(0), total: BigInt(49) });
   assert.equal(await prisma.platformJob.count(), 0);
   assert.equal(await prisma.platformJobSchedule.count(), 0);
   assert.equal(await prisma.platformJobAttempt.count(), 0);

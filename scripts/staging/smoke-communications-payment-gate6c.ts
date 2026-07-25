@@ -62,6 +62,10 @@ import { assertCommunicationsPaymentGate6cStaging } from "./communications-payme
 import { paymentsGate5cFixtureIds } from "./payments-gate5c-fixture";
 
 let phase = "BOOT";
+const STAGE4C_FULL_ADMIN_USER_ID =
+  "4c000000-0000-4000-8000-000000000001";
+const STAGE4C_TRANSIENT_CAMPAIGN_CREATE_KEY =
+  "4c100000-0000-4000-8000-000000000018";
 
 async function main() {
   phase = "SAFETY";
@@ -296,7 +300,22 @@ async function main() {
     jobType: "SETTLEMENT_STATEMENT_GENERATE",
   });
   await runUntilIdle(context);
-  checks += 2;
+  let stage4cRetryRemaining = await stage4cTransientRetryCount();
+  for (
+    let discovery = 1;
+    discovery < 5 && stage4cRetryRemaining > 0;
+    discovery += 1
+  ) {
+    await triggerGate6CAutomation(context, {
+      batchSize: 10,
+      idempotencyKey: randomUUID(),
+      jobType: "COMMUNICATION_DELIVERY_DISCOVERY",
+    });
+    await runUntilIdle(context);
+    stage4cRetryRemaining = await stage4cTransientRetryCount();
+  }
+  assert.equal(stage4cRetryRemaining, 0);
+  checks += 3;
 
   phase = "COMMUNICATION_ASSERTIONS";
   const [dueCampaign, inAppCampaign, directDelivery, cancelledChildren] =
@@ -1485,6 +1504,24 @@ async function runUntilIdle(context: PlatformJobAdminContext) {
     if (run.claimed === 0) return executions;
   }
   throw new Error("Gate 6C staging work did not converge within its bound.");
+}
+
+function stage4cTransientRetryCount() {
+  return prisma.outboundDelivery.count({
+    where: {
+      campaign: {
+        createdByAdminUserId: STAGE4C_FULL_ADMIN_USER_ID,
+        mutations: {
+          some: {
+            adminUserId: STAGE4C_FULL_ADMIN_USER_ID,
+            idempotencyKey: STAGE4C_TRANSIENT_CAMPAIGN_CREATE_KEY,
+          },
+        },
+      },
+      lastProviderCode: "SINK_TRANSIENT",
+      status: "RETRY_SCHEDULED",
+    },
+  });
 }
 
 function paymentCode(expected: string) {

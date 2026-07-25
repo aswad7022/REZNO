@@ -1,26 +1,13 @@
-import type {
-  CommerceOrderStatus,
-  FulfillmentMethod,
-  FulfillmentStatus,
-  PaymentStatus,
-  Prisma,
-} from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 
-import { decodePublicCursor, encodePublicCursor, publicQueryFingerprint } from "@/features/commerce/public/cursor";
+import {
+  customerOrderFingerprint,
+  type CustomerOrderQuery,
+} from "@/features/commerce/domain/customer-order-query";
+import { decodePublicCursor, encodePublicCursor } from "@/features/commerce/public/cursor";
 import { commerceError } from "@/features/commerce/domain/errors";
 import { requireActiveCommerceCustomer } from "@/features/commerce/services/authorization";
 import { prisma } from "@/lib/db/prisma";
-
-export interface CustomerOrderQuery {
-  cursor?: string;
-  fulfillmentMethod?: FulfillmentMethod;
-  fulfillmentStatus?: FulfillmentStatus;
-  limit: number;
-  paymentStatus?: PaymentStatus;
-  sort: "newest" | "oldest";
-  status?: CommerceOrderStatus;
-  storeSlug?: string;
-}
 
 export const customerOrderInclude = {
   address: true,
@@ -98,19 +85,6 @@ export async function getCustomerOrderDetail(customerId: string, orderId: string
   });
   if (!order) commerceError("NOT_FOUND", "Order was not found.");
   return order;
-}
-
-export function customerOrderFingerprint(customerId: string, query: CustomerOrderQuery) {
-  return publicQueryFingerprint({
-    customerId,
-    fulfillmentMethod: query.fulfillmentMethod,
-    fulfillmentStatus: query.fulfillmentStatus,
-    paymentStatus: query.paymentStatus,
-    scope: "customer-orders",
-    sort: query.sort,
-    status: query.status,
-    storeSlug: query.storeSlug,
-  });
 }
 
 function strictCursorDate(value: string) {

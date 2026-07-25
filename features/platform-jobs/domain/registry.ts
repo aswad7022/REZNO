@@ -60,6 +60,15 @@ const settlementPayload = z.object({
   batchSize: z.number().int().min(1).max(PLATFORM_JOB_LIMITS.maxDomainDiscoveryBatch),
   periodDays: z.literal(1),
 }).strict();
+const commerceOrderExpiryPayload = z.object({
+  batchSize: z.number().int().min(1).max(50),
+}).strict();
+const platformOperationsMonitorPayload = z.object({
+  version: z.literal(1),
+}).strict();
+const distributedRateLimitCleanupPayload = z.object({
+  batchSize: z.number().int().min(1).max(500),
+}).strict();
 
 function discoveryResult(kind: string) {
   return z.object({
@@ -110,6 +119,25 @@ const settlementResult = z.object({
   scanned: z.number().int().min(0).max(PLATFORM_JOB_LIMITS.maxDomainDiscoveryBatch),
   skipped: z.number().int().min(0).max(PLATFORM_JOB_LIMITS.maxDomainDiscoveryBatch),
 }).strict();
+const commerceOrderExpiryResult = z.object({
+  expired: z.number().int().min(0).max(50),
+  kind: z.literal("COMMERCE_PENDING_ORDERS_EXPIRED"),
+  scanned: z.number().int().min(0).max(50),
+  skipped: z.number().int().min(0).max(50),
+}).strict();
+const platformOperationsMonitorResult = z.object({
+  acknowledged: z.number().int().min(0).max(10),
+  kind: z.literal("PLATFORM_OPERATIONS_OBSERVED"),
+  observed: z.number().int().min(0).max(10),
+  opened: z.number().int().min(0).max(10),
+  reopened: z.number().int().min(0).max(10),
+  resolved: z.number().int().min(0).max(10),
+}).strict();
+const distributedRateLimitCleanupResult = z.object({
+  deleted: z.number().int().min(0).max(500),
+  kind: z.literal("DISTRIBUTED_RATE_LIMIT_BUCKETS_CLEANED"),
+  scanned: z.number().int().min(0).max(500),
+}).strict();
 
 const retryableErrors = new Set(["TRANSIENT_FAILURE", "HANDLER_TIMEOUT", "HANDLER_EXCEPTION"]);
 
@@ -139,6 +167,15 @@ const registry = {
   PAYMENT_REFUND_RETRY: definition(exactRefundPayload, automationExactResult("PAYMENT_REFUND_RETRIED")),
   PAYMENT_RECONCILIATION: definition(discoveryPayload, reconciliationResult),
   SETTLEMENT_STATEMENT_GENERATE: definition(settlementPayload, settlementResult),
+  COMMERCE_ORDER_EXPIRY: definition(commerceOrderExpiryPayload, commerceOrderExpiryResult),
+  PLATFORM_OPERATIONS_MONITOR: definition(
+    platformOperationsMonitorPayload,
+    platformOperationsMonitorResult,
+  ),
+  DISTRIBUTED_RATE_LIMIT_CLEANUP: definition(
+    distributedRateLimitCleanupPayload,
+    distributedRateLimitCleanupResult,
+  ),
 } as const satisfies Record<PlatformJobType, {
   payloadVersion: number;
   payload: z.ZodType;

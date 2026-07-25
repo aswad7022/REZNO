@@ -5,8 +5,10 @@ import { StorageDomainError } from "@/features/storage/domain/errors";
 import type { StorageActor, StorageAdminActor } from "@/features/storage/services/actor";
 import { resolveStorageActorFromRequest, resolveStorageAdminActor } from "@/features/storage/services/web-actor";
 import { logServerError } from "@/lib/logging/server";
-import { consumeRateLimit } from "@/lib/security/rate-limit-core";
-import { getRequestRateLimitIdentifierFromHeaders } from "@/lib/security/rate-limit";
+import {
+  consumeRateLimit,
+  getRequestRateLimitIdentifierFromHeaders,
+} from "@/lib/security/rate-limit";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
@@ -21,7 +23,10 @@ export async function handleStorageRequest(
 ) {
   try {
     const actor = await resolveStorageActorFromRequest(request, mode);
-    const rate = consumeRateLimit(`storage.${mode}.${scope}`, `person:${actor.personId}`, { limit, windowMs: 60_000 });
+    const rate = await consumeRateLimit(`storage.${mode}.${scope}`, `person:${actor.personId}`, { limit, windowMs: 60_000 });
+    if (rate.unavailable) {
+      return serviceUnavailableResponse();
+    }
     if (!rate.success) {
       return NextResponse.json(
         { error: { code: "RATE_LIMITED", message: "Too many storage requests." } },
@@ -41,7 +46,10 @@ export async function handleAdminStorageRequest(
 ) {
   try {
     const actor = await resolveStorageAdminActor(permission);
-    const rate = consumeRateLimit(`storage.admin.${scope}`, `person:${actor.personId}`, { limit: 30, windowMs: 60_000 });
+    const rate = await consumeRateLimit(`storage.admin.${scope}`, `person:${actor.personId}`, { limit: 30, windowMs: 60_000 });
+    if (rate.unavailable) {
+      return serviceUnavailableResponse();
+    }
     if (!rate.success) {
       return NextResponse.json(
         { error: { code: "RATE_LIMITED", message: "Too many storage requests." } },
@@ -61,7 +69,10 @@ export async function handlePublicStorageRequest(
 ) {
   try {
     const identifier = getRequestRateLimitIdentifierFromHeaders(request.headers, `storage-public:${scope}`);
-    const rate = consumeRateLimit(`storage.public.${scope}`, identifier, { limit: 120, windowMs: 60_000 });
+    const rate = await consumeRateLimit(`storage.public.${scope}`, identifier, { limit: 120, windowMs: 60_000 });
+    if (rate.unavailable) {
+      return serviceUnavailableResponse();
+    }
     if (!rate.success) {
       return NextResponse.json(
         { error: { code: "RATE_LIMITED", message: "Too many storage requests." } },
@@ -72,6 +83,13 @@ export async function handlePublicStorageRequest(
   } catch (error) {
     return storageErrorResponse(error, scope);
   }
+}
+
+function serviceUnavailableResponse() {
+  return NextResponse.json(
+    { error: { code: "SERVICE_UNAVAILABLE", message: "Storage is temporarily unavailable." } },
+    { headers: { ...noStore, "Retry-After": "1" }, status: 503 },
+  );
 }
 
 function storageErrorResponse(error: unknown, scope: string) {

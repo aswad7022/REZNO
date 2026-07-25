@@ -28,7 +28,7 @@ export function handleCustomerReviewRequest(
 ) {
   return handleReviewRequest(async () => {
     const context = await resolveBookingCustomerApiContext(request);
-    assertRateLimit(`review.customer.${scope}`, `person:${context.personId}`, options.limit ?? 60);
+    await assertRateLimit(`review.customer.${scope}`, `person:${context.personId}`, options.limit ?? 60);
     return operation(context);
   }, NO_STORE);
 }
@@ -44,7 +44,7 @@ export function handlePublicReviewRequest(
       request.headers,
       "mobile-review-public",
     );
-    assertRateLimit(`review.public.${scope}`, identifier, options.limit ?? 120);
+    await assertRateLimit(`review.public.${scope}`, identifier, options.limit ?? 120);
     return operation();
   }, "public, max-age=30, stale-while-revalidate=120");
 }
@@ -114,8 +114,16 @@ function mapReviewError(error: unknown) {
   };
 }
 
-function assertRateLimit(scope: string, identifier: string, limit: number) {
-  const result = consumeRateLimit(scope, identifier, { limit, windowMs: 60_000 });
+async function assertRateLimit(scope: string, identifier: string, limit: number) {
+  const result = await consumeRateLimit(scope, identifier, { limit, windowMs: 60_000 });
+  if (result.unavailable) {
+    throw new BookingApiError(
+      "SERVICE_UNAVAILABLE",
+      503,
+      "Request protection is temporarily unavailable.",
+      { retryAfterSeconds: 1 },
+    );
+  }
   if (!result.success) {
     throw new BookingApiError("RATE_LIMITED", 429, "Too many requests.", {
       retryAfterSeconds: result.retryAfterSeconds,

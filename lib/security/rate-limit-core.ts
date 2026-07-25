@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import { isIP } from "node:net";
 
 interface RateLimitBucket {
@@ -14,13 +14,17 @@ export interface RateLimitOptions {
 export interface RateLimitResult {
   success: boolean;
   retryAfterSeconds: number;
+  unavailable?: false;
 }
 
 export interface RateLimitStore {
   consume(scope: string, identifier: string, options: RateLimitOptions): RateLimitResult;
 }
 
-export type TrustedProxyHeader = "x-forwarded-for" | "x-real-ip";
+export type TrustedProxyHeader =
+  | "x-forwarded-for"
+  | "x-real-ip"
+  | "x-vercel-forwarded-for";
 
 export interface RateLimitIdentityOptions {
   directPeerAddress?: string | null;
@@ -75,16 +79,6 @@ export class MemoryRateLimitStore implements RateLimitStore {
   }
 }
 
-const globalForRateLimit = globalThis as typeof globalThis & {
-  __reznoRateLimitStore?: RateLimitStore;
-};
-const store = globalForRateLimit.__reznoRateLimitStore ?? new MemoryRateLimitStore();
-globalForRateLimit.__reznoRateLimitStore = store;
-
-export function consumeRateLimit(scope: string, identifier: string, options: RateLimitOptions) {
-  return store.consume(scope, identifier, options);
-}
-
 export function getRateLimitIdentifierFromHeaders(
   headerStore: Headers,
   fallback = "unknown-client",
@@ -118,8 +112,18 @@ export function normalizeRateLimitIpAddress(value: string | null | undefined) {
 
 export function configuredTrustedProxyHeader(
   value = process.env.REZNO_TRUSTED_PROXY_HEADER,
+  vercelEnvironment = process.env.VERCEL,
 ): TrustedProxyHeader | undefined {
-  if (value === "x-forwarded-for" || value === "x-real-ip") return value;
+  if (
+    value === "x-forwarded-for"
+    || value === "x-real-ip"
+    || value === "x-vercel-forwarded-for"
+  ) {
+    return value;
+  }
+  if (value === undefined && vercelEnvironment === "1") {
+    return "x-vercel-forwarded-for";
+  }
   return undefined;
 }
 
@@ -132,7 +136,7 @@ function fallbackIdentifier(headerStore: Headers, fallback: string) {
     .filter(Boolean)
     .join("|");
   if (fingerprint) return `fingerprint:${hashIdentifier(fingerprint)}`;
-  return `ephemeral:${hashIdentifier(`${fallback}:${randomUUID()}`)}`;
+  return `unidentified:${hashIdentifier(fallback)}`;
 }
 
 function hashIdentifier(value: string) {

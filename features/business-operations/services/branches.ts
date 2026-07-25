@@ -130,7 +130,7 @@ export async function createOperationalBranch(input: {
   idempotencyKey: string;
 }) {
   const actor = await resolveBusinessOperationActor(input.actor, "BRANCH_WRITE");
-  assertBusinessOperationMutationRate(actor, "branch-create");
+  await assertBusinessOperationMutationRate(actor, "branch-create");
   assertRenderedOrganization(actor, input.contextOrganizationId);
   const parsed = operationalBranchSchema.safeParse(input.branch);
   if (!parsed.success) businessOperationsError("INVALID_REQUEST", "Branch input is invalid.");
@@ -214,7 +214,7 @@ export async function updateOperationalBranch(input: {
   idempotencyKey: string;
 }) {
   const actor = await resolveBusinessOperationActor(input.actor, "BRANCH_WRITE");
-  assertBusinessOperationMutationRate(actor, "branch-update");
+  await assertBusinessOperationMutationRate(actor, "branch-update");
   assertRenderedOrganization(actor, input.contextOrganizationId);
   const parsed = operationalBranchSchema.safeParse(input.branch);
   if (!parsed.success) businessOperationsError("INVALID_REQUEST", "Branch input is invalid.");
@@ -263,7 +263,7 @@ export async function setOperationalBranchActive(input: {
   idempotencyKey: string;
 }) {
   const actor = await resolveBusinessOperationActor(input.actor, "BRANCH_WRITE");
-  assertBusinessOperationMutationRate(actor, "branch-lifecycle");
+  await assertBusinessOperationMutationRate(actor, "branch-lifecycle");
   assertRenderedOrganization(actor, input.contextOrganizationId);
   const action = input.active ? "BRANCH_ACTIVATE" : "BRANCH_DEACTIVATE";
   const requestHash = hashBusinessOperation({
@@ -320,7 +320,7 @@ export async function archiveOperationalBranch(input: {
   idempotencyKey: string;
 }) {
   const actor = await resolveBusinessOperationActor(input.actor, "BRANCH_ARCHIVE");
-  assertBusinessOperationMutationRate(actor, "branch-archive");
+  await assertBusinessOperationMutationRate(actor, "branch-archive");
   assertRenderedOrganization(actor, input.contextOrganizationId);
   const requestHash = hashBusinessOperation({ action: "BRANCH_ARCHIVE", branchId: input.branchId });
   return runBusinessOperationTransaction(async (transaction) => {

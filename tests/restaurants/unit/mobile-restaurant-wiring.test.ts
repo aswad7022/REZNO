@@ -89,3 +89,55 @@ test("web and mobile creation both use the canonical shared service", async () =
     /canCustomerReschedule:\s*!booking\.restaurantReservation\s*&&/,
   );
 });
+
+test("web Restaurant creation distinguishes rate-limit outage from exhaustion before persistence", async () => {
+  const action = await readFile(
+    new URL(
+      "../../../features/restaurants/actions/create-reservation.ts",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  const unavailableGuard = action.indexOf("if (rateLimit.unavailable)");
+  const exhaustedGuard = action.indexOf("if (!rateLimit.success)");
+  const createCall = action.indexOf(
+    "const result = await createCustomerRestaurantReservation",
+  );
+
+  assert.ok(unavailableGuard >= 0, "the store outage must be handled");
+  assert.ok(
+    unavailableGuard < exhaustedGuard,
+    "store outage must be checked before quota exhaustion",
+  );
+  assert.ok(
+    exhaustedGuard < createCall,
+    "both rate-limit failures must stop before Restaurant Reservation creation",
+  );
+
+  const unavailableBranch = action.slice(unavailableGuard, exhaustedGuard);
+  assert.match(unavailableBranch, /failure\("unavailable"\)/u);
+  assert.doesNotMatch(unavailableBranch, /rateLimited/u);
+
+  const exhaustedBranch = action.slice(exhaustedGuard, createCall);
+  assert.match(exhaustedBranch, /failure\("rateLimited"\)/u);
+  assert.doesNotMatch(exhaustedBranch, /failure\("unavailable"\)/u);
+
+  const localeFiles = ["ar", "en", "ckb"].map((locale) =>
+    readFile(
+      new URL(`../../../messages/${locale}.json`, import.meta.url),
+      "utf8",
+    ),
+  );
+  for (const source of await Promise.all(localeFiles)) {
+    const messages = JSON.parse(source) as {
+      RestaurantReservations: {
+        errors: { rateLimited: string; unavailable: string };
+      };
+    };
+    assert.ok(messages.RestaurantReservations.errors.unavailable.length > 0);
+    assert.notEqual(
+      messages.RestaurantReservations.errors.unavailable,
+      messages.RestaurantReservations.errors.rateLimited,
+    );
+  }
+});

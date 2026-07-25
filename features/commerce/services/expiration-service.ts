@@ -5,11 +5,13 @@ import { runCommerceSerializable } from "@/features/commerce/services/transactio
 
 export async function expirePendingOrdersBatch(options?: {
   batchSize?: number;
+  executionGuard?: (transaction: Prisma.TransactionClient) => Promise<void>;
   now?: Date;
 }) {
   const batchSize = boundedBatchSize(options?.batchSize);
   const now = options?.now ?? new Date();
   return runCommerceSerializable(async (transaction) => {
+    await options?.executionGuard?.(transaction);
     const rows = await transaction.$queryRaw<Array<{ id: string }>>(
       Prisma.sql`
         SELECT "id"
@@ -23,6 +25,7 @@ export async function expirePendingOrdersBatch(options?: {
     );
     let expired = 0;
     for (const row of rows) {
+      await options?.executionGuard?.(transaction);
       const result = await expirePendingOrderInTransaction(transaction, row.id, now);
       if (result) expired += 1;
     }

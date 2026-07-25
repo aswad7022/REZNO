@@ -30,9 +30,16 @@ import { assertMessageActorCurrent } from "@/features/messages/services/actor";
 import { toMessageSummary } from "@/features/messages/services/query-service";
 import { messagingSerializable } from "@/features/messages/services/transaction";
 import { createCanonicalNotifications } from "@/features/notifications/services/producer";
-import { consumeRateLimit } from "@/lib/security/rate-limit-core";
+import {
+  consumeRateLimit,
+  type DistributedRateLimitResult,
+} from "@/lib/security/rate-limit";
 
-type MessageRateLimitConsumer = typeof consumeRateLimit;
+type MessageRateLimitConsumer = (
+  scope: string,
+  identifier: string,
+  options: { limit: number; windowMs: number },
+) => DistributedRateLimitResult | Promise<DistributedRateLimitResult>;
 
 let messageRateLimitConsumer: MessageRateLimitConsumer = consumeRateLimit;
 
@@ -65,7 +72,7 @@ export async function sendMessage(
     actor.userId,
     input.idempotencyKey,
   );
-  if (!existing) enforceSendRate(actor.userId);
+  if (!existing) await enforceSendRate(actor.userId);
   return messagingSerializable(async (transaction) => {
     const currentActor = await assertMessageActorCurrent(
       transaction,
@@ -144,7 +151,7 @@ export async function startCustomerBusinessConversation(
     actor.userId,
     input.idempotencyKey,
   );
-  if (!existing) enforceStartRate(actor.userId);
+  if (!existing) await enforceStartRate(actor.userId);
   return messagingSerializable(async (transaction) => {
     const currentActor = await assertMessageActorCurrent(transaction, actor);
     if (currentActor.kind !== "customer") {
@@ -231,7 +238,7 @@ export async function startAdminConversation(
     actor.userId,
     input.idempotencyKey,
   );
-  if (!existing) enforceAdminStartRate(actor.userId);
+  if (!existing) await enforceAdminStartRate(actor.userId);
   return messagingSerializable(async (transaction) => {
     const currentActor = await assertMessageActorCurrent(
       transaction,
@@ -762,32 +769,44 @@ function assertIds(targetId: string, idempotencyKey: string) {
   }
 }
 
-function enforceSendRate(userId: string) {
-  const result = messageRateLimitConsumer("message:send", userId, {
+async function enforceSendRate(userId: string) {
+  const result = await messageRateLimitConsumer("message:send", userId, {
     limit: 20,
     windowMs: 60_000,
   });
+  assertMessageRateLimitAvailable(result);
   if (!result.success) {
     messageError("RATE_LIMITED", "Too many Messages were sent.");
   }
 }
 
-function enforceStartRate(userId: string) {
-  const result = messageRateLimitConsumer("message:start", userId, {
+async function enforceStartRate(userId: string) {
+  const result = await messageRateLimitConsumer("message:start", userId, {
     limit: 10,
     windowMs: 60_000,
   });
+  assertMessageRateLimitAvailable(result);
   if (!result.success) {
     messageError("RATE_LIMITED", "Too many Conversations were started.");
   }
 }
 
-function enforceAdminStartRate(userId: string) {
-  const result = messageRateLimitConsumer("message:adminStart", userId, {
+async function enforceAdminStartRate(userId: string) {
+  const result = await messageRateLimitConsumer("message:adminStart", userId, {
     limit: 20,
     windowMs: 60_000,
   });
+  assertMessageRateLimitAvailable(result);
   if (!result.success) {
     messageError("RATE_LIMITED", "Too many Admin Conversations were started.");
+  }
+}
+
+function assertMessageRateLimitAvailable(result: DistributedRateLimitResult) {
+  if (result.unavailable) {
+    messageError(
+      "SERVICE_UNAVAILABLE",
+      "Messaging protection is temporarily unavailable.",
+    );
   }
 }

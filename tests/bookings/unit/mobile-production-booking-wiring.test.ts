@@ -53,3 +53,42 @@ test("mobile booking screen exposes loading, retry, persisted success, and recov
   assert.match(source, /recovery\.requiresAuthentication/);
   assert.match(source, /onPress=\{onSignIn\}/);
 });
+
+test("web Booking creation distinguishes rate-limit outage from exhaustion before persistence", async () => {
+  const source = await readFile(
+    new URL(
+      "../../../features/bookings/actions/manage-bookings.ts",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  const unavailableGuard = source.indexOf("if (rateLimit.unavailable)");
+  const exhaustedGuard = source.indexOf("if (!rateLimit.success)");
+  const createCall = source.indexOf(
+    "const result = await createCustomerBooking",
+  );
+
+  assert.ok(unavailableGuard >= 0, "the store outage must be handled");
+  assert.ok(
+    unavailableGuard < exhaustedGuard,
+    "store outage must be checked before quota exhaustion",
+  );
+  assert.ok(
+    exhaustedGuard < createCall,
+    "both rate-limit failures must stop before Booking creation",
+  );
+
+  const unavailableBranch = source.slice(unavailableGuard, exhaustedGuard);
+  assert.match(
+    unavailableBranch,
+    /bookingErrorUrl\(\s*"unavailable"/u,
+  );
+  assert.doesNotMatch(unavailableBranch, /rateLimited/u);
+
+  const exhaustedBranch = source.slice(exhaustedGuard, createCall);
+  assert.match(exhaustedBranch, /bookingErrorUrl\(\s*"rateLimited"/u);
+  assert.doesNotMatch(
+    exhaustedBranch,
+    /bookingErrorUrl\(\s*"unavailable"/u,
+  );
+});

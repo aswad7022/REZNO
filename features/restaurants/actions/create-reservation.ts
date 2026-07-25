@@ -37,10 +37,11 @@ export async function createRestaurantReservation(formData: FormData) {
   const guests = String(formData.get("guestCount") ?? "");
   const failure = (error: string): never =>
     redirect(errorUrl({ slug, branchId, date, startsAt, guests, error }));
-  const rateLimit = consumeRateLimit("restaurantReservation:create", person.id, {
+  const rateLimit = await consumeRateLimit("restaurantReservation:create", person.id, {
     limit: 6,
     windowMs: 60_000,
   });
+  if (rateLimit.unavailable) failure("unavailable");
   if (!rateLimit.success) failure("rateLimited");
 
   const knownFields = new Set([

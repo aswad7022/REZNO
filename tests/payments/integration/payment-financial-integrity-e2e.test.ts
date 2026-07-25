@@ -590,7 +590,7 @@ function paymentWebhookStreamRequest(
 }
 
 async function processGuardedPaymentWebhook(request: Request) {
-  assertPaymentWebhookRequestAllowed(
+  await assertPaymentWebhookRequestAllowed(
     request,
     "webhooks.deterministic",
     "DETERMINISTIC_TEST",

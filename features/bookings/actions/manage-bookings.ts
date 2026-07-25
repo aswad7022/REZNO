@@ -35,7 +35,7 @@ function bookingErrorUrl(
 
 export async function createBooking(formData: FormData): Promise<void> {
   const identity = await requireCustomerIdentity();
-  const rateLimit = consumeRateLimit("booking:create", identity.person.id, {
+  const rateLimit = await consumeRateLimit("booking:create", identity.person.id, {
     limit: 6,
     windowMs: 60_000,
   });
@@ -44,6 +44,9 @@ export async function createBooking(formData: FormData): Promise<void> {
   const branchServiceId =
     typeof rawBranchServiceId === "string" ? rawBranchServiceId : undefined;
   const date = typeof rawDate === "string" ? rawDate : undefined;
+  if (rateLimit.unavailable) {
+    redirect(bookingErrorUrl("unavailable", branchServiceId, date));
+  }
   if (!rateLimit.success) {
     redirect(bookingErrorUrl("rateLimited", branchServiceId, date));
   }

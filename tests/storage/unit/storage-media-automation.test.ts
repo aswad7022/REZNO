@@ -40,6 +40,7 @@ import {
 } from "../../../features/storage-automation/domain/policy";
 import { setStorageAutomationErrorTestHook } from "../../../features/storage-automation/services/handlers";
 import { COMMUNICATIONS_PAYMENT_GATE6C_CONFIRMATION } from "../../../scripts/staging/communications-payment-gate6c-safety";
+import { PLATFORM_OPERATIONS_GATE6D_CONFIRMATION } from "../../../scripts/staging/platform-operations-gate6d-safety";
 import {
   assertStorageMediaGate6bStaging,
   STORAGE_MEDIA_GATE6B_CONFIRMATION,
@@ -168,7 +169,7 @@ test("the schedule registry preserves Gate 6A and the four Gate 6B discovery map
   );
 });
 
-test("Gate 6B staging safety admits 48/48 only under the exact Gate 6C successor confirmation", async () => {
+test("Gate 6B staging safety admits 48/48 and 49/49 only under exact successor confirmations", async () => {
   const rows = [
     [{ database: "rezno_staging", encrypted: false, user: "postgres" }],
     [{
@@ -193,6 +194,30 @@ test("Gate 6B staging safety admits 48/48 only under the exact Gate 6C successor
     },
   );
   assert.equal(result.migrations, "48/48");
+  const gate6dRows = [
+    [{ database: "rezno_staging", encrypted: false, user: "postgres" }],
+    [{
+      applied: BigInt(49),
+      failed: BigInt(0),
+      rolledBack: BigInt(0),
+      total: BigInt(49),
+    }],
+  ];
+  const gate6d = await assertStorageMediaGate6bStaging(
+    { $queryRaw: async () => gate6dRows.shift() } as never,
+    {
+      DATABASE_URL:
+        "postgresql://postgres:local-only@127.0.0.1:55448/rezno_staging?sslmode=disable",
+      NODE_ENV: "test",
+      REZNO_ENV: "staging",
+      REZNO_STAGE6_GATE6B_ALLOW_LOCAL_UNENCRYPTED: "true",
+      REZNO_STAGE6_GATE6B_CONFIRM: STORAGE_MEDIA_GATE6B_CONFIRMATION,
+      REZNO_STAGE6_GATE6D_CONFIRM:
+        PLATFORM_OPERATIONS_GATE6D_CONFIRMATION,
+      REZNO_STAGE6_GATE6D_SUCCESSOR: "true",
+    },
+  );
+  assert.equal(gate6d.migrations, "49/49");
 });
 
 test("cleanup, rescan, and rendition eligibility policies fail closed", () => {

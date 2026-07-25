@@ -520,8 +520,9 @@ function commerceActor(
     adminAccessId: string | null;
     permissions: readonly import("@/features/admin/config/permissions").AdminPermission[];
     personId: string;
-    source: "database" | "env";
+    source: "database" | "env" | "runtime";
     userId: string;
+    runtimeAuthority?: import("@/features/platform-operations/services/runtime-authority").PlatformRuntimeAuthority;
   },
 ): CommerceAdminContext {
   return {

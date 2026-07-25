@@ -38,13 +38,21 @@ const CUSTOMER_USER_ID = "4c000000-0000-4000-8000-000000000007";
 const CUSTOMER_PERSON_ID = "4c000000-0000-4000-8000-000000000008";
 const ORGANIZATION_ID = "4c000000-0000-4000-8000-000000000011";
 const BROADCAST_CREATE_KEY = "4c100000-0000-4000-8000-00000000001e";
+const NOT_CONFIGURED_CREATE_KEY =
+  "4c100000-0000-4000-8000-000000000015";
+const TRANSIENT_CREATE_KEY = "4c100000-0000-4000-8000-000000000018";
+const PERMANENT_CREATE_KEY = "4c100000-0000-4000-8000-00000000001b";
 let smokeCheckpoint = "bootstrap";
+let smokeDiagnostic: unknown = null;
 
 async function main() {
   validateOutboundStage4cEnvironment(process.env);
   const gate6cSuccessor = process.env.REZNO_STAGE6_GATE6C_SUCCESSOR === "true"
     && process.env.REZNO_STAGE6_GATE6C_CONFIRM === "REZNO_STAGE6_GATE6C_STAGING_ONLY";
-  const expectedMigrations = gate6cSuccessor ? 48 : 38;
+  const gate6dSuccessor = process.env.REZNO_STAGE6_GATE6D_SUCCESSOR === "true"
+    && process.env.REZNO_STAGE6_GATE6D_CONFIRM === "REZNO_STAGE6_GATE6D_STAGING_ONLY";
+  const automationSuccessor = gate6cSuccessor || gate6dSuccessor;
+  const expectedMigrations = gate6dSuccessor ? 49 : gate6cSuccessor ? 48 : 38;
   smokeCheckpoint = "aggregate-queries";
   const [
     campaigns,
@@ -127,13 +135,49 @@ async function main() {
       where: { createdByUserId: FULL_ADMIN_USER_ID, eventType: "admin.communication_campaign" },
     }),
     prisma.outboundDelivery.count({
-      where: { campaign: { createdByAdminUserId: FULL_ADMIN_USER_ID }, lastProviderCode: "PROVIDER_NOT_CONFIGURED", status: "PERMANENT_FAILURE" },
+      where: {
+        campaign: {
+          createdByAdminUserId: FULL_ADMIN_USER_ID,
+          mutations: {
+            some: {
+              adminUserId: FULL_ADMIN_USER_ID,
+              idempotencyKey: NOT_CONFIGURED_CREATE_KEY,
+            },
+          },
+        },
+        lastProviderCode: "PROVIDER_NOT_CONFIGURED",
+        status: "PERMANENT_FAILURE",
+      },
     }),
     prisma.outboundDelivery.count({
-      where: { campaign: { createdByAdminUserId: FULL_ADMIN_USER_ID }, lastProviderCode: "SINK_TRANSIENT", status: "RETRY_SCHEDULED" },
+      where: {
+        campaign: {
+          createdByAdminUserId: FULL_ADMIN_USER_ID,
+          mutations: {
+            some: {
+              adminUserId: FULL_ADMIN_USER_ID,
+              idempotencyKey: TRANSIENT_CREATE_KEY,
+            },
+          },
+        },
+        lastProviderCode: "SINK_TRANSIENT",
+        status: "RETRY_SCHEDULED",
+      },
     }),
     prisma.outboundDelivery.count({
-      where: { campaign: { createdByAdminUserId: FULL_ADMIN_USER_ID }, lastProviderCode: "SINK_PERMANENT", status: "PERMANENT_FAILURE" },
+      where: {
+        campaign: {
+          createdByAdminUserId: FULL_ADMIN_USER_ID,
+          mutations: {
+            some: {
+              adminUserId: FULL_ADMIN_USER_ID,
+              idempotencyKey: PERMANENT_CREATE_KEY,
+            },
+          },
+        },
+        lastProviderCode: "SINK_PERMANENT",
+        status: "PERMANENT_FAILURE",
+      },
     }),
   ]);
 
@@ -151,6 +195,7 @@ async function main() {
   assert.ok(statuses.COMPLETED >= 1);
   assert.ok(statuses.FAILED >= 1);
   smokeCheckpoint = "accepted-channel-assertions";
+  smokeDiagnostic = { acceptedByChannel, outcomes };
   assert.ok(acceptedByChannel.EMAIL >= 1);
   assert.ok(acceptedByChannel.SMS >= 1);
   assert.ok(acceptedByChannel.PUSH >= 1);
@@ -164,9 +209,10 @@ async function main() {
   smokeCheckpoint = "provider-outcome-assertions";
   assert.equal(notConfigured, 1);
   // Gate 6C deliberately consumes the one retryable Gate 4C fixture delivery.
-  // Its successor smoke therefore proves the retry left RETRY_SCHEDULED, while
-  // the original Gate 4C smoke continues to prove the pre-automation state.
-  assert.equal(transient, gate6cSuccessor ? 0 : 1);
+  // Gate 6D retains that automation, so either successor proves the retry left
+  // RETRY_SCHEDULED while the original Gate 4C smoke proves the pre-automation
+  // state.
+  assert.equal(transient, automationSuccessor ? 0 : 1);
   assert.equal(permanent, 1);
   assert.equal(inAppCampaigns, inAppNotifications);
   smokeCheckpoint = "audit-access-assertions";
@@ -431,7 +477,7 @@ async function main() {
     suppressedByReason,
     providerNotConfigured: notConfigured,
     retryScheduled: transient,
-    gate6cProcessedRetry: gate6cSuccessor,
+    gate6cProcessedRetry: automationSuccessor,
     sinkPermanentFailure: permanent,
     inAppExactOnce: inAppCampaigns,
     campaignPagesVerified: 2,
@@ -453,7 +499,9 @@ async function main() {
 
 main()
   .catch(() => {
-    process.stderr.write(`Gate 4C staging smoke failed at ${smokeCheckpoint} with a sanitized error.\n`);
+    process.stderr.write(
+      `Gate 4C staging smoke failed at ${smokeCheckpoint} with sanitized diagnostics ${JSON.stringify(smokeDiagnostic)}.\n`,
+    );
     process.exitCode = 1;
   })
   .finally(async () => prisma.$disconnect());

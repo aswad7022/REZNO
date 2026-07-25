@@ -3,6 +3,8 @@ import type { PrismaClient } from "@prisma/client";
 export const STAGE5_CLOSURE_CONFIRMATION = "REZNO_STAGE5_GATE5D_STAGING_ONLY";
 const COMMUNICATIONS_PAYMENT_GATE6C_CONFIRMATION =
   "REZNO_STAGE6_GATE6C_STAGING_ONLY";
+const PLATFORM_OPERATIONS_GATE6D_CONFIRMATION =
+  "REZNO_STAGE6_GATE6D_STAGING_ONLY";
 
 type SafetyClient = Pick<PrismaClient, "$queryRaw">;
 
@@ -14,7 +16,15 @@ export async function assertStage5ClosureStaging(
     environment.REZNO_STAGE6_GATE6C_SUCCESSOR === "true"
     && environment.REZNO_STAGE6_GATE6C_CONFIRM
       === COMMUNICATIONS_PAYMENT_GATE6C_CONFIRMATION;
-  const expectedMigrations = gate6cSuccessor ? BigInt(48) : BigInt(42);
+  const gate6dSuccessor =
+    environment.REZNO_STAGE6_GATE6D_SUCCESSOR === "true"
+    && environment.REZNO_STAGE6_GATE6D_CONFIRM
+      === PLATFORM_OPERATIONS_GATE6D_CONFIRMATION;
+  const expectedMigrations = gate6dSuccessor
+    ? BigInt(49)
+    : gate6cSuccessor
+      ? BigInt(48)
+      : BigInt(42);
   if (
     environment.NODE_ENV === "production" ||
     environment.REZNO_ENV !== "staging" ||
@@ -61,7 +71,11 @@ export async function assertStage5ClosureStaging(
   }
   return {
     database: "rezno_staging" as const,
-    migrations: gate6cSuccessor ? "48/48" as const : "42/42" as const,
+    migrations: gate6dSuccessor
+      ? "49/49" as const
+      : gate6cSuccessor
+        ? "48/48" as const
+        : "42/42" as const,
     rolledBack: 0 as const,
   };
 }

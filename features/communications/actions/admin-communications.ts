@@ -79,11 +79,14 @@ async function adminAction<T>(
 ): Promise<CommunicationActionResult<T>> {
   const access = await requireAdminPermission(permission);
   const context = communicationAdminContext(access);
-  const consumed = consumeRateLimit(
+  const consumed = await consumeRateLimit(
     `adminCommunications:${scope}`,
     context.userId,
     { limit: rateLimit, windowMs: 60_000 },
   );
+  if (consumed.unavailable) {
+    return { ok: false, code: "SERVICE_UNAVAILABLE", message: "Request protection is temporarily unavailable." };
+  }
   if (!consumed.success) {
     return { ok: false, code: "RATE_LIMITED", message: "Too many communication requests. Retry shortly." };
   }

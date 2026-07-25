@@ -30,11 +30,17 @@ export async function GET(request: NextRequest) {
   const identifier = await getRequestRateLimitIdentifier(
     "mobile-marketplace-unknown",
   );
-  const rateLimit = consumeRateLimit("mobile.marketplace", identifier, {
+  const rateLimit = await consumeRateLimit("mobile.marketplace", identifier, {
     limit: 120,
     windowMs: 60_000,
   });
 
+  if (rateLimit.unavailable) {
+    return NextResponse.json(
+      { error: { code: "SERVICE_UNAVAILABLE", message: "Marketplace is temporarily unavailable." } },
+      { status: 503, headers: { "Retry-After": "1" } },
+    );
+  }
   if (!rateLimit.success) {
     return mobileError("RATE_LIMITED", "Too many requests.", 429, {
       "Retry-After": String(rateLimit.retryAfterSeconds),

@@ -7,7 +7,8 @@ import {
 
 export const COMMUNICATIONS_PAYMENT_GATE6C_CONFIRMATION =
   "REZNO_STAGE6_GATE6C_STAGING_ONLY";
-const EXPECTED_MIGRATIONS = BigInt(48);
+const PLATFORM_OPERATIONS_GATE6D_CONFIRMATION =
+  "REZNO_STAGE6_GATE6D_STAGING_ONLY";
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "::1", "localhost"]);
 
 type SafetyClient = Pick<PrismaClient, "$queryRaw">;
@@ -27,6 +28,11 @@ export async function assertCommunicationsPaymentGate6cStaging(
       "Gate 6C fixture requires the exact non-production staging environment and confirmation marker.",
     );
   }
+  const gate6dSuccessor =
+    environment.REZNO_STAGE6_GATE6D_SUCCESSOR === "true"
+    && environment.REZNO_STAGE6_GATE6D_CONFIRM
+      === PLATFORM_OPERATIONS_GATE6D_CONFIRMATION;
+  const expectedMigrations = gate6dSuccessor ? BigInt(49) : BigInt(48);
 
   const target = parseDatabaseTarget(environment.DATABASE_URL);
   const localOverrideRequested = isExactLocalTestTarget(environment, target);
@@ -90,13 +96,13 @@ export async function assertCommunicationsPaymentGate6cStaging(
     FROM "_prisma_migrations"
   `;
   if (
-    migrations?.total !== EXPECTED_MIGRATIONS
-    || migrations.applied !== EXPECTED_MIGRATIONS
+    migrations?.total !== expectedMigrations
+    || migrations.applied !== expectedMigrations
     || migrations.failed !== BigInt(0)
     || migrations.rolledBack !== BigInt(0)
   ) {
     throw new Error(
-      "Gate 6C fixture requires an exact healthy 48/48 migration state.",
+      `Gate 6C fixture requires an exact healthy ${expectedMigrations}/${expectedMigrations} migration state.`,
     );
   }
 
@@ -114,7 +120,7 @@ export async function assertCommunicationsPaymentGate6cStaging(
     hostnameVerified: localUnencrypted
       ? false
       : transportEvidence!.hostnameVerified,
-    migrations: "48/48" as const,
+    migrations: gate6dSuccessor ? "49/49" as const : "48/48" as const,
     prismaUsedAttestedPhysicalClient: localUnencrypted
       ? false
       : transportEvidence!.prismaUsedAttestedPhysicalClient,

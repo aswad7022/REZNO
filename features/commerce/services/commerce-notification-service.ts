@@ -1,6 +1,7 @@
 import type { LanguageCode, Prisma } from "@prisma/client";
 
 import {
+  commerceNotificationEventKey,
   commerceNotificationCopy,
   type CommerceNotificationEvent,
 } from "@/features/commerce/domain/notification-events";
@@ -130,15 +131,4 @@ async function createNotifications(
       };
     }),
   );
-}
-
-export function commerceNotificationEventKey(
-  orderId: string,
-  event: CommerceNotificationEvent,
-  recipientPersonId: string,
-  destinationType: "customer" | "merchant" = "customer",
-) {
-  return destinationType === "merchant"
-    ? `commerce:${orderId}:${event}:merchant:${recipientPersonId}`
-    : `commerce:${orderId}:${event}:${recipientPersonId}`;
 }

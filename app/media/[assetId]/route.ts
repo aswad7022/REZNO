@@ -1,18 +1,24 @@
 import { mediaErrorResponse } from "@/features/media/api/http";
 import { assertNoMediaQuery, mediaRouteUuid } from "@/features/media/api/validation";
 import { createPublicMediaDownloadTarget } from "@/features/media/services/delivery";
-import { consumeRateLimit } from "@/lib/security/rate-limit-core";
+import { consumeRateLimit } from "@/lib/security/rate-limit";
 import { getRequestRateLimitIdentifierFromHeaders } from "@/lib/security/rate-limit";
 import { NextResponse } from "next/server";
 
 export async function GET(request: Request, context: { params: Promise<{ assetId: string }> }) {
   try {
     assertNoMediaQuery(request);
-    const rate = consumeRateLimit(
+    const rate = await consumeRateLimit(
       "media.public.delivery",
       getRequestRateLimitIdentifierFromHeaders(request.headers, "media-public"),
       { limit: 120, windowMs: 60_000 },
     );
+    if (rate.unavailable) {
+      return new Response("Media delivery is temporarily unavailable.", {
+        headers: { "Cache-Control": "no-store, max-age=0", "Retry-After": "1" },
+        status: 503,
+      });
+    }
     if (!rate.success) {
       return NextResponse.json(
         { error: { code: "RATE_LIMITED", message: "Too many media requests." } },

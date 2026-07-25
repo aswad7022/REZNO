@@ -8,7 +8,7 @@ import { commerceApiError } from "@/features/commerce/api/errors";
 import type { CustomerAddressInput } from "@/features/commerce/services/customer-service";
 import type { MerchantInventoryQuery } from "@/features/commerce/services/merchant-inventory-service";
 import type { MerchantOrderQuery } from "@/features/commerce/services/merchant-order-query-service";
-import type { CustomerOrderQuery } from "@/features/commerce/services/customer-order-query-service";
+import type { CustomerOrderQuery } from "@/features/commerce/domain/customer-order-query";
 import type { FavoriteQuery } from "@/features/commerce/services/customer-favorite-service";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;

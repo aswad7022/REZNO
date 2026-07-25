@@ -8,7 +8,7 @@ import {
 } from "@/features/onboarding/services/customer-onboarding";
 import { auth } from "@/lib/auth/auth";
 import { logServerError } from "@/lib/logging/server";
-import { consumeRateLimit } from "@/lib/security/rate-limit-core";
+import { consumeRateLimit } from "@/lib/security/rate-limit";
 
 const NO_STORE_HEADERS = { "Cache-Control": "no-store, max-age=0" } as const;
 
@@ -25,11 +25,17 @@ export async function GET(request: Request) {
       );
     }
 
-    const rateLimit = consumeRateLimit(
+    const rateLimit = await consumeRateLimit(
       "mobile.onboarding.customer.status",
       `user:${session.user.id}`,
       { limit: 30, windowMs: 60_000 },
     );
+    if (rateLimit.unavailable) {
+      return NextResponse.json(
+        { error: { code: "SERVICE_UNAVAILABLE", message: "Onboarding is temporarily unavailable." } },
+        { status: 503, headers: { "Retry-After": "1" } },
+      );
+    }
     if (!rateLimit.success) {
       return onboardingError("RATE_LIMITED", "Too many requests.", 429, {
         "Retry-After": String(rateLimit.retryAfterSeconds),
@@ -70,11 +76,17 @@ export async function POST(request: Request) {
       );
     }
 
-    const rateLimit = consumeRateLimit(
+    const rateLimit = await consumeRateLimit(
       "mobile.onboarding.customer",
       `user:${session.user.id}`,
       { limit: 10, windowMs: 60_000 },
     );
+    if (rateLimit.unavailable) {
+      return NextResponse.json(
+        { error: { code: "SERVICE_UNAVAILABLE", message: "Onboarding is temporarily unavailable." } },
+        { status: 503, headers: { "Retry-After": "1" } },
+      );
+    }
     if (!rateLimit.success) {
       return onboardingError("RATE_LIMITED", "Too many requests.", 429, {
         "Retry-After": String(rateLimit.retryAfterSeconds),
