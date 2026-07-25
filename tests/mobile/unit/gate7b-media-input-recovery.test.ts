@@ -5,7 +5,7 @@ import test from "node:test";
 import {
   customerAvatarCancellationDisposition,
   MediaUploadEngineError,
-  resolveCommittedAvatarPreview,
+  resolveAssetBoundAvatarPreview,
   runCustomerAvatarUpload,
   type CustomerAvatarUploadEngineDependencies,
 } from "../../../apps/mobile/src/media/upload-engine";
@@ -241,9 +241,14 @@ test("Gate 7B keeps a committed attach successful when preview loading fails", a
     harness.dependencies,
   );
   let previewLoads = 0;
-  const unavailable = await resolveCommittedAvatarPreview(async () => {
-    previewLoads += 1;
-    throw new TypeError("preview unavailable");
+  const currentAssetId: string | null = result.assetId;
+  const unavailable = await resolveAssetBoundAvatarPreview({
+    assetId: result.assetId,
+    currentAssetId: () => currentAssetId,
+    async loadPreview() {
+      previewLoads += 1;
+      throw new TypeError("preview unavailable");
+    },
   });
   assert.deepEqual(unavailable, { status: "UNAVAILABLE" });
   assert.equal(
@@ -252,9 +257,13 @@ test("Gate 7B keeps a committed attach successful when preview loading fails", a
   );
   assert.equal(harness.calls.filter((call) => call === "cleanup").length, 1);
 
-  const refreshed = await resolveCommittedAvatarPreview(async () => {
-    previewLoads += 1;
-    return { assetId: result.assetId, url: "https://preview.example/avatar" };
+  const refreshed = await resolveAssetBoundAvatarPreview({
+    assetId: result.assetId,
+    currentAssetId: () => currentAssetId,
+    async loadPreview() {
+      previewLoads += 1;
+      return { assetId: result.assetId, url: "https://preview.example/avatar" };
+    },
   });
   assert.equal(refreshed.status, "READY");
   assert.equal(previewLoads, 2);
@@ -263,6 +272,74 @@ test("Gate 7B keeps a committed attach successful when preview loading fails", a
     1,
     "preview retry must not re-run attach",
   );
+});
+
+test("Gate 7B ignores a delayed successful preview after a newer avatar becomes current", async () => {
+  const preview = deferred<{ url: string }>();
+  let currentAssetId: string | null = "asset-a";
+  const pending = resolveAssetBoundAvatarPreview({
+    assetId: "asset-a",
+    currentAssetId: () => currentAssetId,
+    loadPreview: () => preview.promise,
+  });
+  currentAssetId = "asset-b";
+  preview.resolve({ url: "https://preview.example/avatar-a" });
+  assert.deepEqual(await pending, { status: "STALE" });
+});
+
+test("Gate 7B ignores a delayed failed preview after a newer avatar becomes current", async () => {
+  const preview = deferred<{ url: string }>();
+  let currentAssetId: string | null = "asset-a";
+  const pending = resolveAssetBoundAvatarPreview({
+    assetId: "asset-a",
+    currentAssetId: () => currentAssetId,
+    loadPreview: () => preview.promise,
+  });
+  currentAssetId = "asset-b";
+  preview.reject(new TypeError("old preview failed"));
+  assert.deepEqual(await pending, { status: "STALE" });
+});
+
+test("Gate 7B ignores delayed preview success and failure after avatar removal", async () => {
+  for (const outcome of ["READY", "UNAVAILABLE"] as const) {
+    const preview = deferred<{ url: string }>();
+    let currentAssetId: string | null = "asset-a";
+    const pending = resolveAssetBoundAvatarPreview({
+      assetId: "asset-a",
+      currentAssetId: () => currentAssetId,
+      loadPreview: () => preview.promise,
+    });
+    currentAssetId = null;
+    if (outcome === "READY") {
+      preview.resolve({ url: "https://preview.example/avatar-a" });
+    } else {
+      preview.reject(new TypeError("removed preview failed"));
+    }
+    assert.deepEqual(await pending, { status: "STALE" });
+  }
+});
+
+test("Gate 7B applies ready and non-blocking unavailable only to the current avatar", async () => {
+  const currentAssetId: string | null = "asset-a";
+  const ready = await resolveAssetBoundAvatarPreview({
+    assetId: "asset-a",
+    currentAssetId: () => currentAssetId,
+    async loadPreview() {
+      return { url: "https://preview.example/avatar-a" };
+    },
+  });
+  assert.deepEqual(ready, {
+    status: "READY",
+    value: { url: "https://preview.example/avatar-a" },
+  });
+  const unavailable = await resolveAssetBoundAvatarPreview({
+    assetId: "asset-a",
+    currentAssetId: () => currentAssetId,
+    async loadPreview() {
+      throw new TypeError("current preview unavailable");
+    },
+  });
+  assert.deepEqual(unavailable, { status: "UNAVAILABLE" });
 });
 
 test("Gate 7B resumes after process death without creating a duplicate session", async () => {
@@ -892,6 +969,16 @@ function uuidFactory(start = 1) {
   let value = start;
   return () =>
     `00000000-0000-4000-8000-${String(value++).padStart(12, "0")}`;
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (error: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, reject, resolve };
 }
 
 function bytes(value: string) {

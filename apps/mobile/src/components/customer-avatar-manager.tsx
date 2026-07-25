@@ -20,7 +20,7 @@ import type { MobileLocale } from "../i18n/labels";
 import {
   customerAvatarCancellationDisposition,
   MediaUploadEngineError,
-  resolveCommittedAvatarPreview,
+  resolveAssetBoundAvatarPreview,
   runCustomerAvatarUpload,
   type CustomerAvatarCommitPhase,
 } from "../media/upload-engine";
@@ -255,18 +255,16 @@ export function CustomerAvatarManager({
         setProgress(1);
         setMessage(labels.success);
         verificationRequestedRef.current = false;
-        const preview = await resolveCommittedAvatarPreview(() =>
-          mobileApiRequest<Data<{ url: string }>>(
-            `/api/storage/customer/assets/${encodeURIComponent(result.assetId)}/download`,
-            { authenticated: true, signal: controller.signal },
-          ),
-        );
-        if (
-          !mountedRef.current
-          || activeAvatarAssetIdRef.current !== result.assetId
-        ) {
-          return;
-        }
+        const preview = await resolveAssetBoundAvatarPreview({
+          assetId: result.assetId,
+          currentAssetId: () => activeAvatarAssetIdRef.current,
+          loadPreview: () =>
+            mobileApiRequest<Data<{ url: string }>>(
+              `/api/storage/customer/assets/${encodeURIComponent(result.assetId)}/download`,
+              { authenticated: true, signal: controller.signal },
+            ),
+        });
+        if (!mountedRef.current || preview.status === "STALE") return;
         if (preview.status === "READY") {
           setAvatarUrl(preview.value.data.url);
           setPreviewAssetId(null);
@@ -366,19 +364,29 @@ export function CustomerAvatarManager({
           (item) => item.slot === "CUSTOMER_AVATAR",
         );
         const assetId = current?.media?.assetId;
+        const previousAssetId = activeAvatarAssetIdRef.current;
         activeAvatarAssetIdRef.current = assetId ?? null;
+        if (previousAssetId !== activeAvatarAssetIdRef.current) {
+          setAvatarUrl(null);
+          setPreviewAssetId(null);
+        }
         let previewUnavailable = false;
         if (assetId) {
-          const preview = await resolveCommittedAvatarPreview(() =>
-            mobileApiRequest<Data<{ url: string }>>(
-              `/api/storage/customer/assets/${encodeURIComponent(assetId)}/download`,
-              { authenticated: true, signal: controller.signal },
-            ),
-          );
+          const preview = await resolveAssetBoundAvatarPreview({
+            assetId,
+            currentAssetId: () => activeAvatarAssetIdRef.current,
+            loadPreview: () =>
+              mobileApiRequest<Data<{ url: string }>>(
+                `/api/storage/customer/assets/${encodeURIComponent(assetId)}/download`,
+                { authenticated: true, signal: controller.signal },
+              ),
+          });
           if (!mountedRef.current) return;
+          if (preview.status === "STALE") return;
           if (preview.status === "READY") {
             setAvatarUrl(preview.value.data.url);
-          } else {
+            setPreviewAssetId(null);
+          } else if (preview.status === "UNAVAILABLE") {
             previewUnavailable = true;
             setPreviewAssetId(assetId);
           }
@@ -605,21 +613,21 @@ export function CustomerAvatarManager({
     if (!assetId || pending) return;
     setPending(true);
     setMessage(labels.refreshingPreview);
-    const preview = await resolveCommittedAvatarPreview(() =>
-      mobileApiRequest<Data<{ url: string }>>(
-        `/api/storage/customer/assets/${encodeURIComponent(assetId)}/download`,
-        { authenticated: true },
-      ),
-    );
-    if (
-      mountedRef.current
-      && activeAvatarAssetIdRef.current === assetId
-    ) {
+    const preview = await resolveAssetBoundAvatarPreview({
+      assetId,
+      currentAssetId: () => activeAvatarAssetIdRef.current,
+      loadPreview: () =>
+        mobileApiRequest<Data<{ url: string }>>(
+          `/api/storage/customer/assets/${encodeURIComponent(assetId)}/download`,
+          { authenticated: true },
+        ),
+    });
+    if (mountedRef.current) {
       if (preview.status === "READY") {
         setAvatarUrl(preview.value.data.url);
         setPreviewAssetId(null);
         setMessage(labels.success);
-      } else {
+      } else if (preview.status === "UNAVAILABLE") {
         setMessage(labels.previewUnavailable);
       }
     }

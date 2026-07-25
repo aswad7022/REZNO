@@ -19,6 +19,9 @@ The Gate 7B suite must prove, with zero failure, skip, todo, or cancellation:
   attach;
 - preview failure after confirmed attach remains committed, cleans recovery
   once, and preview retry never repeats attach;
+- delayed preview success or failure for asset A becomes `STALE` after asset B
+  is current or A is removed, while the same current asset still receives
+  normal `READY` or non-blocking `UNAVAILABLE`;
 - cancel before attach prevents the mutation even if an earlier container
   read returns late;
 - cancel during attach waits for server truth, accepts a later success, and
@@ -77,6 +80,7 @@ The Gate 7B suite must prove, with zero failure, skip, todo, or cancellation:
 | Attach response is network-ambiguous | `VERIFY_ATTACH` recovery remains; Retry reconciles the authoritative container before mutation |
 | Process restarts after attach was sent | `VERIFY_ATTACH` restores as verification-only and cannot claim cancellation |
 | Attach succeeds but preview fails | Commit remains successful; local upload state is cleaned; preview-only retry performs no attach |
+| Preview A settles after B is current or A was removed | Both success and failure are ignored; B or the empty state remains authoritative |
 | Retry after the 15-minute TTL | Private JPEG and manifest are cleaned before `RECOVERY_EXPIRED` |
 | File or SecureStore cleanup fails | Failure is explicit; a private file is never orphaned by deleting its recovery pointer |
 
@@ -100,8 +104,8 @@ hidden failure is counted as success.
 
 | Check | Result |
 | --- | --- |
-| P2 focused Gate 7B + Gate 7A regression + release validator | `33/33` pass |
-| Complete Unit suites | `493/493` pass (`293 + 200`) |
+| P2 focused Gate 7B + Gate 7A regression + release validator | `37/37` pass |
+| Complete Unit suites | `497/497` pass (`297 + 200`) |
 | Complete PostgreSQL integration on disposable `49/49` database | `425/425` pass |
 | Complete live HTTP/RSC/API suites | `131/131` pass (`6 + 120 + 5`) |
 | Root and Mobile TypeScript | PASS |

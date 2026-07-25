@@ -111,10 +111,12 @@ If the finalized asset is already attached, recovery completes without a
 second mutation. If the container version changed to different content, the
 old operation is cleaned and does not overwrite it.
 
-The client also ignores a preview response whose asset no longer matches the
-current committed asset. Server-side expected container version and stable
-attach idempotency remain the authority that prevents an old operation from
-replacing newer content.
+Every preview entry point—startup, post-commit, and preview-only Retry—checks
+the requested asset identity again after the asynchronous request settles.
+Both successful and unavailable responses become `STALE` without changing UI
+state when a newer asset is current or the avatar was removed. Server-side
+expected container version and stable attach idempotency remain the authority
+that prevents an old operation from replacing newer content.
 
 No booking or restaurant upload destination is introduced in Gate 7B. The
 manifest parser rejects any destination other than the exact authenticated

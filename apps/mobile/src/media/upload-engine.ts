@@ -98,6 +98,18 @@ export async function resolveCommittedAvatarPreview<T>(
   }
 }
 
+export async function resolveAssetBoundAvatarPreview<T>(input: {
+  assetId: string;
+  currentAssetId(): string | null;
+  loadPreview(): Promise<T>;
+}) {
+  const preview = await resolveCommittedAvatarPreview(input.loadPreview);
+  if (input.currentAssetId() !== input.assetId) {
+    return { status: "STALE" } as const;
+  }
+  return preview;
+}
+
 export async function runCustomerAvatarUpload(
   initial: CustomerAvatarUploadManifest,
   dependencies: CustomerAvatarUploadEngineDependencies,
