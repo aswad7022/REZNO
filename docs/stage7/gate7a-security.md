@@ -6,10 +6,10 @@ Status: **AUTHOR SECURITY REVIEW COMPLETE**.
 
 | Threat | Gate 7A control |
 | --- | --- |
-| Release silently targets localhost | Non-development bundles require an explicit public HTTPS origin; localhost, local suffixes, IP literals, and single-label hosts are rejected. |
+| Release targets an unapproved origin | Non-development bundles use a source-controlled exact-origin allowlist containing only `https://rezno-staging.vercel.app`; every other origin is rejected regardless of hostname shape or DNS behavior. |
 | Embedded URL contains credentials or attacker-controlled suffixes | API base must be an origin only, with no username, password, path, query, or fragment. |
 | Preview accidentally uses Production configuration | Static validator binds each profile to its exact EAS environment and distribution. |
-| Production accidentally uses staging | The tracked Production profile cannot contain the staging API origin; the separately approved EAS Production environment must supply its own value. |
+| Production accidentally uses staging or another unapproved origin | The tracked Production profile cannot contain the staging API origin, and the runtime allowlist contains no Production origin. Production remains fail-closed until an approved origin is added through independent review. |
 | Build identity drift | Project ID, owner, slug, scheme, iOS bundle ID, and Android package are exact tested constants. |
 | Declared Web target silently fails | Expo-compatible Web dependencies are explicit, audited, and locked by the Gate 7A validator. |
 | Protected Vercel bypass token enters Mobile | Mobile uses the public alias of the exact staging deployment; no bypass token is accepted or documented. |

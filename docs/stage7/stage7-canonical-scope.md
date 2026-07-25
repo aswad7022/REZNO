@@ -42,7 +42,7 @@ read-only endpoint evidence; it does not imply physical-device proof.
 | Preview build profile | `IMPLEMENTED_AND_PROVEN` | Standalone internal distribution, `preview` EAS environment, and the public staging API origin are validated. No current build was created. |
 | Production build profile | `PARTIAL` | Store distribution and the `production` EAS environment are explicit. The production API origin is deliberately not tracked and is not configured in EAS, so a release fails closed until separately approved. |
 | Public staging API origin | `IMPLEMENTED_AND_PROVEN` | `https://rezno-staging.vercel.app` resolves to the same exact-main staging deployment as the protected team alias and returns the unauthenticated session API with HTTP 200. |
-| Release API-origin safety | `IMPLEMENTED_AND_PROVEN` | Release bundles require HTTPS, a public multi-label hostname, the standard HTTPS port, and an origin with no credentials, path, query, or fragment. |
+| Release API-origin safety | `IMPLEMENTED_AND_PROVEN` | Non-development bundles accept only the exact source-controlled staging origin. Hostname shape is never treated as proof of safety; every special-use, DNS-to-private, or otherwise unapproved origin is rejected. |
 | EAS account/project access | `IMPLEMENTED_AND_PROVEN` | Read-only `whoami` and `project:info` succeeded on 2026-07-25. No credential material was read or printed. |
 | Current signed Development/Preview artifact | `IMPLEMENTED_NOT_PHYSICAL_PROVEN` | Configuration and runbook exist. Historical Android evidence is not evidence for this Stage 7 commit. |
 | Physical iPhone install/open | `BLOCKED_BY_EXTERNAL_CREDENTIAL` | Requires an authorized Apple team/signing path, registered device or TestFlight path, and a physical iPhone. |

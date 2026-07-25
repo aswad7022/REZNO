@@ -56,15 +56,19 @@ bundle must never embed a Vercel protection bypass token.
 A non-development bundle:
 
 - requires `EXPO_PUBLIC_REZNO_API_BASE_URL`;
-- accepts HTTPS only;
-- rejects localhost, `.localhost`, `.local`, `.internal`, `.lan`, single-label
-  hosts, IPv4 literals, and IPv6 literals;
+- accepts only the exact approved origin
+  `https://rezno-staging.vercel.app`;
+- rejects every other origin, including syntactically public-looking,
+  special-use, DNS-to-private, and unapproved public hosts;
 - rejects credentials, path, query, fragment, and non-standard HTTPS ports;
 - normalizes the accepted value to its exact origin.
 
 Development without configuration may still use `http://localhost:3000`.
 Physical-device Development and every EAS profile set the staging origin
 explicitly because device-local `localhost` is not the developer computer.
+The allowlist is source-controlled and intentionally contains no Production
+origin. Production remains fail-closed until its origin is separately approved
+and added through an independently reviewed change.
 
 ## Repository preflight
 

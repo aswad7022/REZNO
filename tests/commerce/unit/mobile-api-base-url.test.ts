@@ -26,7 +26,22 @@ test("mobile API origin requires HTTPS outside development", () => {
   );
 });
 
-test("mobile API origin rejects loopback and private-looking release hosts", () => {
+test("mobile API origin accepts only the exact approved staging release origin", () => {
+  assert.equal(
+    resolveMobileApiBaseUrl(
+      "https://rezno-staging.vercel.app",
+      false,
+    ),
+    "https://rezno-staging.vercel.app",
+  );
+  assert.equal(
+    resolveMobileApiBaseUrl(
+      "https://rezno-staging.vercel.app/",
+      false,
+    ),
+    "https://rezno-staging.vercel.app",
+  );
+
   for (const value of [
     "https://localhost",
     "https://api.localhost",
@@ -36,10 +51,16 @@ test("mobile API origin rejects loopback and private-looking release hosts", () 
     "https://rezno.internal",
     "https://rezno.local",
     "https://single-label",
+    "https://api.invalid",
+    "https://router.home.arpa",
+    "https://service.test",
+    "https://169.254.169.254.nip.io",
+    "https://example.com",
+    "https://rezno-staging.vercel.app.example.com",
   ]) {
     assert.throws(
       () => resolveMobileApiBaseUrl(value, false),
-      /public hostname/,
+      /approved release origin/,
     );
   }
 });

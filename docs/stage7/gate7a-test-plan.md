@@ -26,7 +26,10 @@ The focused tests must prove:
 - Production store distribution and exact production environment;
 - Development/Preview use the public staging origin;
 - Production cannot embed the staging origin in tracked config;
-- a release requires HTTPS and rejects local/private-looking hosts;
+- a non-development release accepts only
+  `https://rezno-staging.vercel.app`;
+- special-use, DNS-to-private, and unapproved public origins are rejected,
+  including `.invalid`, `.home.arpa`, `.test`, `nip.io`, and `example.com`;
 - a release rejects URL credentials, suffixes, and non-standard ports;
 - unconfigured development alone may use local HTTP;
 - Expo Web keeps a React-matched `react-dom` and compatible
