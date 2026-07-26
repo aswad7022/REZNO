@@ -242,6 +242,132 @@ test("Gate 5C production routes are strict, scope-safe, truthful, and redacted",
     }), 503, "PAYMENT_PROVIDER_NOT_CONFIGURED");
   });
 
+  await t.test("hosted handoff and deep-link return routes fail closed, reject untrusted input, and stay Person-scoped", async () => {
+    const hostedOrder = await createOrder(
+      customer.person.id,
+      store.id,
+      "16000.000",
+    );
+    const hostedIntent = await prisma.paymentIntent.create({
+      data: {
+        amount: "16000.000",
+        commissionAmount: "0",
+        commissionBasisPoints: 0,
+        commissionPolicyId: "zero-v1",
+        currency: "IQD",
+        customerPersonId: customer.person.id,
+        expiresAt: hostedOrder.reservationExpiresAt,
+        merchantNetAmount: "0",
+        method: "ONLINE_PROVIDER",
+        orderId: hostedOrder.id,
+        organizationId: organization.id,
+        provider: "NOT_CONFIGURED",
+        status: "REQUIRES_ACTION",
+        storeId: store.id,
+      },
+    });
+    await prisma.paymentAttempt.create({
+      data: {
+        actionExpiresAt: new Date(Date.now() + 5 * 60_000),
+        actionReference: "action_production-unconfigured",
+        attemptNumber: 1,
+        idempotencyKey: randomUUID(),
+        paymentIntentId: hostedIntent.id,
+        provider: "NOT_CONFIGURED",
+        providerRequestReference: `attempt_${randomUUID()}`,
+        requiresAction: true,
+        status: "REQUIRES_ACTION",
+      },
+    });
+
+    const handoffPath =
+      `/api/mobile/payments/intents/${hostedIntent.id}/hosted-handoff`;
+    assert.equal(
+      (await request(handoffPath, { key: randomUUID(), method: "POST" }))
+        .response.status,
+      401,
+    );
+    assertError(
+      await request(handoffPath, {
+        cookie: customerCookie,
+        key: randomUUID(),
+        method: "POST",
+      }),
+      503,
+      "PAYMENT_PROVIDER_NOT_CONFIGURED",
+    );
+    assertError(
+      await request(`${handoffPath}?next=https://attacker.invalid`, {
+        cookie: customerCookie,
+        key: randomUUID(),
+        method: "POST",
+      }),
+      400,
+      "VALIDATION_ERROR",
+    );
+    assertError(
+      await request(handoffPath, {
+        body: { redirectUrl: "https://attacker.invalid" },
+        cookie: customerCookie,
+        key: randomUUID(),
+        method: "POST",
+      }),
+      400,
+      "VALIDATION_ERROR",
+    );
+    assertError(
+      await request(handoffPath, {
+        cookie: foreignCookie,
+        key: randomUUID(),
+        method: "POST",
+      }),
+      404,
+      "NOT_FOUND",
+    );
+
+    const returnPath =
+      `/api/mobile/payments/intents/${hostedIntent.id}/hosted-return`;
+    assertError(
+      await request(returnPath, {
+        body: { state: "a".repeat(64) },
+        cookie: customerCookie,
+        method: "POST",
+      }),
+      400,
+      "VALIDATION_ERROR",
+    );
+    assertError(
+      await request(returnPath, {
+        body: {
+          redirectUrl: "https://attacker.invalid",
+          state: "a".repeat(64),
+        },
+        cookie: customerCookie,
+        method: "POST",
+      }),
+      400,
+      "VALIDATION_ERROR",
+    );
+    assertError(
+      await request(`${returnPath}?outcome=success`, {
+        body: { state: "a".repeat(64) },
+        cookie: customerCookie,
+        method: "POST",
+      }),
+      400,
+      "VALIDATION_ERROR",
+    );
+    assert.equal(
+      await prisma.paymentMutation.count({
+        where: {
+          action: "RUN_RECONCILIATION",
+          paymentIntentId: hostedIntent.id,
+        },
+      }),
+      0,
+    );
+  });
+
   await t.test("production webhook rejects chunked bodies before provider work and rate-limits repeated callers", async () => {
     const chunked = await chunkedWebhookRequest(
       [Buffer.alloc(64 * 1024, 65), Buffer.from("raw-webhook-marker")],
