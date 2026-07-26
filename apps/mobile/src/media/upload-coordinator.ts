@@ -3,6 +3,7 @@ import {
   createCustomerAvatarRunnerRegistry,
   customerAvatarCancellationDisposition,
   isCustomerAvatarRunnerOwner,
+  MediaUploadEngineError,
   releaseCustomerAvatarRunner,
   type CustomerAvatarCommitPhase,
   type CustomerAvatarRunnerOwner,
@@ -129,6 +130,7 @@ type RunnerContext = {
   allowAutomaticHandoff: boolean;
   checkpoint: MediaUploadCheckpoint | "PREPARE";
   completion: Promise<void>;
+  execution: Promise<void> | null;
   owner: CustomerAvatarRunnerOwner;
   ownerId: string;
   resolveCompletion(): void;
@@ -245,7 +247,7 @@ export class CustomerAvatarUploadCoordinator {
     });
     if (!context) return "ACTIVE" as const;
 
-    void this.prepareAndExecute(context, {
+    context.execution = this.prepareAndExecute(context, {
       ...input,
       containerVersion: snapshot.container.version,
       maximumBytes: snapshot.maximumBytes,
@@ -522,7 +524,7 @@ export class CustomerAvatarUploadCoordinator {
       checkpoint: manifest.checkpoint,
       manifest,
     });
-    void this.executeOwned(context, manifest);
+    context.execution = this.executeOwned(context, manifest);
     await context.completion;
   }
 
@@ -559,8 +561,13 @@ export class CustomerAvatarUploadCoordinator {
       });
       const persist = dependencies.persist;
       dependencies.persist = async (manifest) => {
+        if (!this.isOwner(context) || context.owner.cancelRequested) {
+          throw new MediaUploadEngineError("CANCELLED", false);
+        }
         await persist(manifest);
-        if (!this.isOwner(context)) return;
+        if (!this.isOwner(context) || context.owner.cancelRequested) {
+          throw new MediaUploadEngineError("CANCELLED", false);
+        }
         context.checkpoint = manifest.checkpoint;
         this.publishFor(context.ownerId, {
           checkpoint: manifest.checkpoint,
@@ -645,6 +652,8 @@ export class CustomerAvatarUploadCoordinator {
     cleanupController: AbortController,
   ) {
     try {
+      await context.execution;
+      if (!this.isOwner(context)) return;
       const latest = await this.dependencies
         .load(context.ownerId)
         .catch(() => fallback);
@@ -701,6 +710,7 @@ export class CustomerAvatarUploadCoordinator {
       allowAutomaticHandoff: input.allowAutomaticHandoff,
       checkpoint: input.checkpoint,
       completion,
+      execution: null,
       owner: acquisition.owner,
       ownerId: input.ownerId,
       resolveCompletion,

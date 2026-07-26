@@ -134,6 +134,80 @@ test("Gate 7B delayed startup preview cannot adopt or disturb upload B", async (
   releaseRun.resolve();
 });
 
+test("Gate 7B cancellation waits for a pending persist before cleanup and release", async () => {
+  const persistStarted = deferred<void>();
+  const releasePersist = deferred<void>();
+  let runCount = 0;
+  const harness = coordinatorHarness({
+    async persist(manifest) {
+      if (runCount === 1 && manifest.checkpoint === "ISSUE_TARGET") {
+        persistStarted.resolve();
+        await releasePersist.promise;
+      }
+    },
+    async run(manifest, dependencies) {
+      runCount += 1;
+      if (runCount === 1) {
+        await dependencies.persist({
+          ...manifest,
+          checkpoint: "ISSUE_TARGET",
+        });
+        assert.equal(dependencies.signal.aborted, true);
+        throw Object.assign(new Error("cancelled"), {
+          code: "CANCELLED",
+        });
+      }
+      harness.stored = null;
+      dependencies.onCommitPhaseChange?.("COMMITTED");
+      return { assetId: ASSET_B, container: containerFor(ASSET_B, 3) };
+    },
+  });
+  await harness.coordinator.bootstrap(OWNER);
+  const firstRun = harness.coordinator.prepareAndStart({
+    asset: inputAsset(),
+    ownerId: OWNER,
+    source: "LIBRARY",
+  });
+  await persistStarted.promise;
+  const original = harness.coordinator.getSnapshot(OWNER);
+  const cancellation = harness.coordinator.cancel(OWNER);
+  await flush();
+
+  assert.equal(harness.coordinator.getSnapshot(OWNER).status, "CANCELLING");
+  assert.equal(harness.coordinator.getSnapshot(OWNER).pending, true);
+  assert.equal(
+    harness.coordinator.getSnapshot(OWNER).runnerId,
+    original.runnerId,
+  );
+  assert.equal(harness.calls.cancel, 0);
+  const rejectedNewRun = await harness.coordinator.prepareAndStart({
+    asset: inputAsset(),
+    ownerId: OWNER,
+    source: "CAMERA",
+  });
+  assert.equal(rejectedNewRun, "ACTIVE");
+  assert.equal(harness.calls.prepare, 1);
+  assert.equal(harness.calls.run, 1);
+
+  releasePersist.resolve();
+  await Promise.all([firstRun, cancellation]);
+  assert.equal(harness.calls.cancel, 1);
+  assert.equal(harness.stored, null);
+  assert.equal(harness.coordinator.getSnapshot(OWNER).status, "CANCELLED");
+  assert.equal(harness.coordinator.getSnapshot(OWNER).pending, false);
+  assert.equal(harness.coordinator.getSnapshot(OWNER).runnerId, null);
+
+  await harness.coordinator.prepareAndStart({
+    asset: inputAsset(),
+    ownerId: OWNER,
+    source: "CAMERA",
+  });
+  assert.equal(harness.calls.prepare, 2);
+  assert.equal(harness.calls.run, 2);
+  assert.equal(harness.stored, null);
+  assert.equal(harness.coordinator.getSnapshot(OWNER).status, "SUCCESS");
+});
+
 test("Gate 7B cancel during COMMITTING verifies instead of aborting", async () => {
   const releaseCommit = deferred<void>();
   const harness = coordinatorHarness({
@@ -373,6 +447,7 @@ function coordinatorHarness(options: {
   initialAssetId?: string | null;
   initialManifest?: CustomerAvatarUploadManifest | null;
   loadPreview?(assetId: string): Promise<string>;
+  persist?(manifest: CustomerAvatarUploadManifest): Promise<void>;
   run?(
     manifest: CustomerAvatarUploadManifest,
     dependencies: CustomerAvatarUploadEngineDependencies,
@@ -452,6 +527,7 @@ function coordinatorHarness(options: {
         onCommitPhaseChange: input.onCommitPhaseChange,
         onProgress: input.onProgress,
         async persist(manifest) {
+          await options.persist?.(manifest);
           harness.stored = manifest;
         },
         signal: input.signal,
