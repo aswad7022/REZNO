@@ -4,9 +4,9 @@ Status: **LOCAL PASS — REMOTE CI AND DEVICE/PROVIDER EVIDENCE OPEN**.
 
 ## Author verification — 2026-07-26
 
-- focused Gate 7D Unit: `97/97` (`88` Mobile/Gates 7A–7D plus `9`
+- focused Gate 7D Unit: `98/98` (`89` Mobile/Gates 7A–7D plus `9`
   server/provider), zero skipped/todo/cancelled;
-- complete Unit: `557/557` (`348` plus `209`), zero
+- complete Unit: `558/558` (`349` plus `209`), zero
   skipped/todo/cancelled;
 - fresh disposable PostgreSQL at Migration `51/51`: `430/430`, zero
   skipped/todo/cancelled;
@@ -17,7 +17,8 @@ Status: **LOCAL PASS — REMOTE CI AND DEVICE/PROVIDER EVIDENCE OPEN**.
 - Expo dependency check and Expo Doctor: PASS (`20/20`);
 - iOS Hermes, Android Hermes, and Web exports: PASS (`32`, `32`, and `34`
   files respectively);
-- Next.js production build: PASS with the canonical Turbopack build;
+- Next.js production build: PASS with the canonical Turbopack build and a
+  dedicated production type graph that excludes native-only Mobile sources;
 - production dependency audit and Mobile dependency audit: zero
   vulnerabilities;
 - changed-file secret scan and Gate 7D privacy-log scan: zero findings.

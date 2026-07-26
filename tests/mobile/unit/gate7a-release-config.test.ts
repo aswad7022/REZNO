@@ -39,6 +39,11 @@ type MobilePackage = {
   scripts: Record<string, string>;
 };
 
+type NextBuildTsConfig = {
+  exclude: string[];
+  include: string[];
+};
+
 async function repositoryConfiguration() {
   const [appConfig, easConfig, mobilePackage] = await Promise.all([
     readJson<ExpoConfig>("apps/mobile/app.json"),
@@ -119,6 +124,22 @@ test("Gate 7A pins the iOS export-compliance declaration", async () => {
       ),
     /non-exempt encryption/,
   );
+});
+
+test("The Next production type graph excludes native-only Mobile sources", async () => {
+  const [nextConfigSource, nextBuildTsConfig] = await Promise.all([
+    readFile("next.config.ts", "utf8"),
+    readJson<NextBuildTsConfig>("tsconfig.next.json"),
+  ]);
+  assert.match(
+    nextConfigSource,
+    /tsconfigPath:\s*"tsconfig\.next\.json"/,
+  );
+  assert.equal(nextBuildTsConfig.include.includes("app/**/*.ts"), true);
+  assert.equal(nextBuildTsConfig.include.includes("features/**/*.ts"), true);
+  assert.equal(nextBuildTsConfig.include.includes("**/*.ts"), false);
+  assert.equal(nextBuildTsConfig.exclude.includes("apps/mobile/**"), true);
+  assert.equal(nextBuildTsConfig.exclude.includes("tests/**"), true);
 });
 
 test("Gate 7A rejects unsafe or cross-environment device profiles", async () => {
