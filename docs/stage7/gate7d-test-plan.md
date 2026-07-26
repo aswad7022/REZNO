@@ -8,7 +8,7 @@ Status: **LOCAL PASS — REMOTE CI AND DEVICE/PROVIDER EVIDENCE OPEN**.
   server/provider), zero skipped/todo/cancelled;
 - complete Unit: `558/558` (`349` plus `209`), zero
   skipped/todo/cancelled;
-- fresh disposable PostgreSQL at Migration `51/51`: `430/430`, zero
+- fresh disposable PostgreSQL at Migration `51/51`: `433/433`, zero
   skipped/todo/cancelled;
 - production HTTP/RSC/API: `133/133` (`6` plus `122` plus `5`), zero
   skipped/todo/cancelled;
@@ -49,6 +49,12 @@ device/provider matrix below.
 - bounded logout/revocation and token-material deletion tombstones;
 - multiple active devices and no raw token in endpoint resolution;
 - fanout exactly once per target and accepted-target replay;
+- send-time token generation fencing for direct invalid-token results and
+  delayed invalid-token receipts after token rotation;
+- targetless Customer messages-hub routing without weakening UUID requirements
+  for entity destinations;
+- fail-closed recipient revalidation if the Person is deactivated after
+  communications preparation but before provider execution;
 - concurrent receipt replay, changed replay rejection, unknown receipt replay,
   delivered state, and invalid-token disabling.
 

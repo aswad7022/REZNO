@@ -40,11 +40,16 @@ Status: **AUTHOR REVIEW PENDING FINAL INDEPENDENT REVIEW**.
   platform/provider pairs, terminal timestamps, hashes, attempts, and receipt
   syntax.
 - Fanout resolves only current active and granted/provisional installations.
+  It also revalidates the current Person as active, onboarded, and not deleted
+  at provider execution time.
   It passes an opaque Person/digest reference through communications; raw
   tokens never enter `OutboundDelivery`.
-- Target status and generation fence every provider result. Accepted/delivered
-  targets are terminal. Unknown results are not blindly resent, and retryable
-  targets stop after three attempts.
+- Target status, claim generation, and the send-time installation token
+  generation fence every provider result. Direct invalid-token results and
+  authenticated late receipts can erase only the generation they actually
+  targeted; rotation makes stale feedback harmless. Accepted/delivered targets
+  are terminal. Unknown results are not blindly resent, and retryable targets
+  stop after three attempts.
 - APNs/FCM configuration requires an explicit staging/production push
   environment that matches provider environment. Staging cannot select the
   APNs production host.
@@ -58,6 +63,9 @@ Status: **AUTHOR REVIEW PENDING FINAL INDEPENDENT REVIEW**.
   content, and customer identifiers are not logged by Gate 7D code.
 - Mobile API requests retain Gate 7A exact-origin enforcement. Notification
   data cannot supply a scheme, host, path, or arbitrary navigation action.
+  `CUSTOMER_MESSAGES` intentionally routes to the messages hub without an
+  invented target identifier; all entity-specific destinations still require
+  exact UUID targets.
 - Logout is conditional on confirmed bounded revocation. An offline revoke
   does not allow the UI to remove the authenticated session and leave the
   old account's device binding live.

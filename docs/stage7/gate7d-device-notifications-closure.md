@@ -38,6 +38,15 @@ physical-device evidence.
 - Each device target has a three-attempt ceiling and a claim generation.
   Accepted targets are not resent. An ambiguous transport result becomes
   `UNKNOWN` instead of being blindly retried.
+- Every device target snapshots the installation token generation that was
+  selected for the send. Direct provider failures and later receipts may
+  invalidate an installation only while that generation is still current, so
+  delayed feedback for token A cannot erase a rotated token B. Historical
+  targets retain the generation number, not reusable token material.
+- Provider fanout revalidates that the recipient Person is still active,
+  onboarded, and not deleted immediately before target selection. A
+  deactivation between communications preparation and provider execution
+  therefore produces no native transport call.
 - APNs uses the exact Apple HTTP/2 origins and token JWT authentication. FCM
   uses the exact Google OAuth and FCM v1 origins. Both are fail-closed unless
   the complete, environment-matched configuration exists.
@@ -48,7 +57,9 @@ physical-device evidence.
 - Definitive invalid-token results disable that installation. Delivered truth
   cannot be downgraded by an older or weaker receipt.
 - Notification-open routing accepts only typed Customer destinations and UUID
-  targets. It never opens a URL supplied by notification data.
+  targets where the destination requires one. The Customer messages hub is a
+  deliberate targetless destination. It never opens a URL supplied by
+  notification data.
 - Logout attempts bounded authenticated revocation before the session is
   removed. If revocation cannot be confirmed, logout fails closed and the
   still-authenticated owner is re-registered; the app never reports a logout
