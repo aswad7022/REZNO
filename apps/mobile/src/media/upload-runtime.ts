@@ -62,6 +62,7 @@ export async function prepareCustomerAvatarUpload(input: {
   asset: ImagePickerAsset;
   containerVersion: number;
   maximumBytes: number;
+  operationId: string;
   ownerId: string;
   source: MediaInputSource;
 }) {
@@ -78,7 +79,6 @@ export async function prepareCustomerAvatarUpload(input: {
   );
   if (existing) throw new MediaUploadRuntimeError("PENDING_OPERATION");
 
-  const operationId = Crypto.randomUUID();
   await cleanupManagedDirectory();
   const sourceFile = new File(input.asset.uri);
   const sourceSize = sourceFile.size ?? sourceFile.info().size ?? 0;
@@ -98,7 +98,7 @@ export async function prepareCustomerAvatarUpload(input: {
 
   const directory = managedDirectory();
   ensureDirectory(directory);
-  const destination = new File(directory, `${operationId}.jpg`);
+  const destination = new File(directory, `${input.operationId}.jpg`);
   let generated: File | null = null;
   let context: ReturnType<typeof ImageManipulator.manipulate> | null = null;
   let rendered: Awaited<ReturnType<
@@ -155,7 +155,7 @@ export async function prepareCustomerAvatarUpload(input: {
       containerVersion: input.containerVersion,
       fileUri: normalized.uri,
       now: Date.now(),
-      operationId,
+      operationId: input.operationId,
       ownerId: input.ownerId,
       sizeBytes,
       source: input.source,

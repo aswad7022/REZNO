@@ -1,11 +1,5 @@
-import * as Crypto from "expo-crypto";
 import * as ImagePicker from "expo-image-picker";
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { useEffect, useState } from "react";
 import {
   Image,
   Linking,
@@ -15,44 +9,17 @@ import {
   View,
 } from "react-native";
 
-import { mobileApiRequest, MobileApiRequestError } from "../api/client";
 import type { MobileLocale } from "../i18n/labels";
+import type {
+  CustomerAvatarCoordinatorStatus,
+} from "../media/upload-coordinator";
 import {
-  acquireCustomerAvatarRunner,
-  createCustomerAvatarRunnerRegistry,
-  customerAvatarCancellationDisposition,
-  isCustomerAvatarRunnerOwner,
-  MediaUploadEngineError,
-  releaseCustomerAvatarRunner,
-  resolveAssetBoundAvatarPreview,
-  runCustomerAvatarUpload,
-  updateCustomerAvatarRunner,
-} from "../media/upload-engine";
-import {
-  cancelCustomerAvatarUpload,
-  createCustomerAvatarUploadDependencies,
-  loadCustomerAvatarUpload,
-  MediaUploadRuntimeError,
-  prepareCustomerAvatarUpload,
-} from "../media/upload-runtime";
+  customerAvatarUploadCoordinator,
+} from "../media/upload-coordinator-runtime";
 import {
   firstSelectedImage,
-  isImagePickerErrorResult,
-  MediaUploadPolicyError,
   mediaPermissionDisposition,
-  type CustomerAvatarUploadManifest,
-  type MediaInputSource,
 } from "../media/upload-policy";
-
-type Data<T> = { data: T };
-type Container = {
-  bindings: Array<{
-    id: string;
-    media: { assetId: string | null } | null;
-    slot: string;
-  }>;
-  version: number;
-};
 
 const copy = {
   ar: {
@@ -189,6 +156,8 @@ const copy = {
   },
 } as const;
 
+type Labels = (typeof copy)[MobileLocale];
+
 export function CustomerAvatarManager({
   locale,
   ownerId,
@@ -197,316 +166,35 @@ export function CustomerAvatarManager({
   ownerId: string;
 }) {
   const labels = copy[locale];
-  const [container, setContainer] = useState<Container | null>(null);
-  const [providerConfigured, setProviderConfigured] = useState<boolean | null>(
-    null,
+  const [snapshot, setSnapshot] = useState(
+    () => customerAvatarUploadCoordinator.getSnapshot(ownerId),
   );
-  const [maximumBytes, setMaximumBytes] = useState<number | null>(null);
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [previewAssetId, setPreviewAssetId] = useState<string | null>(null);
-  const [manifest, setManifest] =
-    useState<CustomerAvatarUploadManifest | null>(null);
-  const [pending, setPending] = useState(false);
-  const [retryable, setRetryable] = useState(false);
-  const [progress, setProgress] = useState(0);
   const [settingsRequired, setSettingsRequired] = useState(false);
-  const [message, setMessage] = useState<string>(labels.loading);
-  const activeAvatarAssetIdRef = useRef<string | null>(null);
-  const runnerRegistryRef = useRef(createCustomerAvatarRunnerRegistry());
-  const mountedRef = useRef(true);
-  const binding =
-    container?.bindings.find((item) => item.slot === "CUSTOMER_AVATAR")
-    ?? null;
-
-  const runUpload = useCallback(
-    async (pendingManifest: CustomerAvatarUploadManifest) => {
-      const registry = runnerRegistryRef.current;
-      const acquisition = acquireCustomerAvatarRunner(registry, {
-        createAbortController: () => new AbortController(),
-        createRunnerId: () => Crypto.randomUUID(),
-        operationId: pendingManifest.operationId,
-      });
-      if (acquisition.status !== "ACQUIRED") return acquisition.status;
-      const owner = acquisition.owner;
-      if (pendingManifest.checkpoint === "VERIFY_ATTACH") {
-        updateCustomerAvatarRunner(registry, owner, {
-          commitPhase: "COMMITTING",
-        });
-      }
-      setManifest(pendingManifest);
-      setPending(true);
-      setRetryable(false);
-      setProgress(0);
-      setMessage(labels.uploading);
-      try {
-        const result = await runCustomerAvatarUpload(
-          pendingManifest,
-          createCustomerAvatarUploadDependencies({
-            onCommitPhaseChange(phase) {
-              updateCustomerAvatarRunner(registry, owner, {
-                commitPhase: phase,
-              });
-            },
-            onActiveCancel(cancel) {
-              updateCustomerAvatarRunner(registry, owner, {
-                activeCancel: cancel,
-              });
-            },
-            onProgress(progressFraction) {
-              if (isCustomerAvatarRunnerOwner(registry, owner)) {
-                setProgress(progressFraction);
-              }
-            },
-            signal: owner.abortController.signal,
-          }),
-        );
-        if (
-          !mountedRef.current
-          || !isCustomerAvatarRunnerOwner(registry, owner)
-        ) {
-          return;
-        }
-        const previousAssetId = activeAvatarAssetIdRef.current;
-        activeAvatarAssetIdRef.current = result.assetId;
-        setContainer(result.container);
-        if (previousAssetId !== result.assetId) setAvatarUrl(null);
-        setManifest(null);
-        setProgress(1);
-        setMessage(labels.success);
-        updateCustomerAvatarRunner(registry, owner, {
-          verificationRequested: false,
-        });
-        const preview = await resolveAssetBoundAvatarPreview({
-          assetId: result.assetId,
-          currentAssetId: () => activeAvatarAssetIdRef.current,
-          loadPreview: () =>
-            mobileApiRequest<Data<{ url: string }>>(
-              `/api/storage/customer/assets/${encodeURIComponent(result.assetId)}/download`,
-              {
-                authenticated: true,
-                signal: owner.abortController.signal,
-              },
-            ),
-        });
-        if (
-          !mountedRef.current
-          || !isCustomerAvatarRunnerOwner(registry, owner)
-          || preview.status === "STALE"
-        ) {
-          return;
-        }
-        if (preview.status === "READY") {
-          setAvatarUrl(preview.value.data.url);
-          setPreviewAssetId(null);
-          setMessage(labels.success);
-        } else {
-          setPreviewAssetId(result.assetId);
-          setMessage(labels.previewUnavailable);
-        }
-      } catch (error) {
-        if (
-          !mountedRef.current
-          || !isCustomerAvatarRunnerOwner(registry, owner)
-          || owner.cancelRequested
-        ) {
-          return;
-        }
-        const next = await loadCustomerAvatarUpload(ownerId).catch(() => null);
-        if (
-          !mountedRef.current
-          || !isCustomerAvatarRunnerOwner(registry, owner)
-        ) {
-          return;
-        }
-        setManifest(next);
-        const resolution = mediaErrorMessage(error, labels);
-        const commitUnconfirmed =
-          owner.verificationRequested
-          && owner.commitPhase === "COMMITTING"
-          && resolution.retryable
-          && Boolean(next);
-        setRetryable(Boolean(next) && (commitUnconfirmed || resolution.retryable));
-        setMessage(
-          commitUnconfirmed ? labels.commitUnconfirmed : resolution.message,
-        );
-      } finally {
-        updateCustomerAvatarRunner(registry, owner, { activeCancel: null });
-        if (
-          !owner.cancelRequested
-          && releaseCustomerAvatarRunner(registry, owner)
-          && mountedRef.current
-        ) {
-          setPending(false);
-        }
-      }
-      return "COMPLETED";
-    },
-    [labels, ownerId],
-  );
-
-  const prepareAndRun = useCallback(
-    async (
-      asset: ImagePicker.ImagePickerAsset,
-      source: MediaInputSource,
-      activeContainer: Container,
-      activeMaximumBytes: number,
-    ) => {
-      setPending(true);
-      setRetryable(false);
-      setProgress(0);
-      setMessage(
-        source === "ANDROID_RECOVERY"
-          ? labels.processingRecovered
-          : labels.normalizing,
-      );
-      try {
-        const prepared = await prepareCustomerAvatarUpload({
-          asset,
-          containerVersion: activeContainer.version,
-          maximumBytes: activeMaximumBytes,
-          ownerId,
-          source,
-        });
-        if (!mountedRef.current) return;
-        await runUpload(prepared);
-      } catch (error) {
-        if (!mountedRef.current) return;
-        const resolution = mediaErrorMessage(error, labels);
-        setRetryable(false);
-        setMessage(resolution.message);
-        if (!runnerRegistryRef.current.current) setPending(false);
-      }
-    },
-    [labels, ownerId, runUpload],
-  );
 
   useEffect(() => {
-    mountedRef.current = true;
-    const controller = new AbortController();
-    const runnerRegistry = runnerRegistryRef.current;
-    async function load() {
-      try {
-        const [media, capabilities] = await Promise.all([
-          mobileApiRequest<Data<Container>>("/api/media/customer/profile", {
-            authenticated: true,
-            signal: controller.signal,
-          }),
-          mobileApiRequest<
-            Data<{
-              maximumSizeByPurpose: Record<string, number>;
-              providerConfigured: boolean;
-            }>
-          >("/api/media/capabilities", { signal: controller.signal }),
-        ]);
-        if (!mountedRef.current) return;
-        setContainer(media.data);
-        setProviderConfigured(capabilities.data.providerConfigured);
-        const limit =
-          capabilities.data.maximumSizeByPurpose.CUSTOMER_AVATAR
-          ?? null;
-        setMaximumBytes(limit);
-        const current = media.data.bindings.find(
-          (item) => item.slot === "CUSTOMER_AVATAR",
-        );
-        const assetId = current?.media?.assetId;
-        const previousAssetId = activeAvatarAssetIdRef.current;
-        activeAvatarAssetIdRef.current = assetId ?? null;
-        if (previousAssetId !== activeAvatarAssetIdRef.current) {
-          setAvatarUrl(null);
-          setPreviewAssetId(null);
-        }
-        let previewUnavailable = false;
-        if (assetId) {
-          const preview = await resolveAssetBoundAvatarPreview({
-            assetId,
-            currentAssetId: () => activeAvatarAssetIdRef.current,
-            loadPreview: () =>
-              mobileApiRequest<Data<{ url: string }>>(
-                `/api/storage/customer/assets/${encodeURIComponent(assetId)}/download`,
-                { authenticated: true, signal: controller.signal },
-              ),
-          });
-          if (!mountedRef.current) return;
-          if (preview.status === "STALE") return;
-          if (preview.status === "READY") {
-            setAvatarUrl(preview.value.data.url);
-            setPreviewAssetId(null);
-          } else if (preview.status === "UNAVAILABLE") {
-            previewUnavailable = true;
-            setPreviewAssetId(assetId);
-          }
-        }
-        const recovered = await loadCustomerAvatarUpload(ownerId);
-        if (!mountedRef.current) return;
-        if (recovered) {
-          if (runnerRegistry.current) return;
-          if (
-            Date.now() >= recovered.expiresAt
-            || capabilities.data.providerConfigured
-            || recovered.checkpoint === "ATTACH"
-            || recovered.checkpoint === "VERIFY_ATTACH"
-          ) {
-            await runUpload(recovered);
-          } else {
-            setManifest(recovered);
-            setMessage(labels.unavailable);
-          }
-          return;
-        }
-        const pendingPicker = await ImagePicker.getPendingResultAsync();
-        if (isImagePickerErrorResult(pendingPicker)) {
-          setMessage(labels.error);
-          return;
-        }
-        const recoveredAsset = firstSelectedImage<ImagePicker.ImagePickerAsset>(
-          pendingPicker,
-        );
-        if (
-          recoveredAsset
-          && limit
-          && capabilities.data.providerConfigured
-        ) {
-          await prepareAndRun(
-            recoveredAsset,
-            "ANDROID_RECOVERY",
-            media.data,
-            limit,
-          );
-          return;
-        }
-        if (mountedRef.current) {
-          setMessage(
-            previewUnavailable
-              ? labels.previewUnavailable
-              : capabilities.data.providerConfigured
-                ? ""
-                : labels.unavailable,
-          );
-        }
-      } catch (error) {
-        if (mountedRef.current && !controller.signal.aborted) {
-          setMessage(mediaErrorMessage(error, labels).message);
-        }
-      }
-    }
-    void load();
-    return () => {
-      mountedRef.current = false;
-      controller.abort();
-      const owner = runnerRegistry.current;
-      owner?.activeCancel?.();
-      owner?.abortController.abort();
-      owner?.cleanupAbortController?.abort();
-    };
-  }, [labels, ownerId, prepareAndRun, runUpload]);
+    const unsubscribe = customerAvatarUploadCoordinator.subscribe(
+      ownerId,
+      setSnapshot,
+    );
+    void customerAvatarUploadCoordinator.bootstrap(ownerId);
+    return unsubscribe;
+  }, [ownerId]);
+
+  const current = snapshot.ownerId === ownerId
+    ? snapshot
+    : customerAvatarUploadCoordinator.getSnapshot(ownerId);
+  const binding =
+    current.container?.bindings.find(
+      (item) => item.slot === "CUSTOMER_AVATAR",
+    ) ?? null;
 
   async function choose(source: "CAMERA" | "LIBRARY") {
     if (
-      !container
-      || !providerConfigured
-      || !maximumBytes
-      || pending
-      || manifest
+      !current.container
+      || current.providerConfigured !== true
+      || !current.maximumBytes
+      || current.pending
+      || current.manifest
     ) {
       return;
     }
@@ -518,13 +206,15 @@ export function CustomerAvatarManager({
           : await ImagePicker.requestMediaLibraryPermissionsAsync();
       const permissionState = mediaPermissionDisposition(permission);
       if (permissionState !== "GRANTED") {
-        setSettingsRequired(permissionState === "DENIED_BLOCKED");
-        setMessage(
-          permissionState === "DENIED_BLOCKED"
-            ? labels.permissionBlocked
+        const blocked = permissionState === "DENIED_BLOCKED";
+        setSettingsRequired(blocked);
+        customerAvatarUploadCoordinator.reportStatus(
+          ownerId,
+          blocked
+            ? "PERMISSION_BLOCKED"
             : source === "CAMERA"
-              ? labels.cameraPermission
-              : labels.libraryPermission,
+              ? "CAMERA_PERMISSION"
+              : "LIBRARY_PERMISSION",
         );
         return;
       }
@@ -543,196 +233,37 @@ export function CustomerAvatarManager({
               cameraType: ImagePicker.CameraType.back,
             })
           : await ImagePicker.launchImageLibraryAsync(options);
-      const selectedAsset = firstSelectedImage<ImagePicker.ImagePickerAsset>(
-        selection,
-      );
+      const selectedAsset =
+        firstSelectedImage<ImagePicker.ImagePickerAsset>(selection);
       if (!selectedAsset) {
-        setMessage(labels.pickerCancelled);
+        customerAvatarUploadCoordinator.reportStatus(
+          ownerId,
+          "PICKER_CANCELLED",
+        );
         return;
       }
-      await prepareAndRun(
-        selectedAsset,
+      await customerAvatarUploadCoordinator.prepareAndStart({
+        asset: selectedAsset,
+        ownerId,
         source,
-        container,
-        maximumBytes,
-      );
-    } catch (error) {
-      if (mountedRef.current) {
-        setMessage(mediaErrorMessage(error, labels).message);
-      }
-    }
-  }
-
-  async function retry() {
-    if (pending) return;
-    let recovered: CustomerAvatarUploadManifest | null;
-    try {
-      recovered = await loadCustomerAvatarUpload(ownerId);
-    } catch (error) {
-      setManifest(null);
-      setRetryable(false);
-      setMessage(mediaErrorMessage(error, labels).message);
-      return;
-    }
-    if (!recovered) {
-      setManifest(null);
-      setRetryable(false);
-      setMessage(labels.expired);
-      return;
-    }
-    await runUpload(recovered);
-  }
-
-  async function cancel() {
-    if (!manifest) return;
-    const registry = runnerRegistryRef.current;
-    const activeOwner = registry.current;
-    if (activeOwner && activeOwner.operationId !== manifest.operationId) return;
-    const commitPhase =
-      activeOwner?.commitPhase
-      ?? (manifest.checkpoint === "VERIFY_ATTACH"
-        ? "COMMITTING"
-        : "CANCELLABLE");
-    if (
-      customerAvatarCancellationDisposition(commitPhase)
-      === "VERIFY"
-    ) {
-      if (activeOwner) {
-        updateCustomerAvatarRunner(registry, activeOwner, {
-          verificationRequested: true,
-        });
-      }
-      setRetryable(false);
-      setMessage(labels.verifyingCommit);
-      return;
-    }
-    const acquisition =
-      activeOwner
-        ? { owner: activeOwner, status: "ACQUIRED" as const }
-        : acquireCustomerAvatarRunner(registry, {
-            createAbortController: () => new AbortController(),
-            createRunnerId: () => Crypto.randomUUID(),
-            operationId: manifest.operationId,
-          });
-    if (acquisition.status !== "ACQUIRED") return;
-    const owner = acquisition.owner;
-    if (owner.cancelRequested) return;
-    if (
-      !updateCustomerAvatarRunner(registry, owner, {
-        cancelRequested: true,
-      })
-    ) {
-      return;
-    }
-    setPending(true);
-    setRetryable(false);
-    setMessage(labels.cancelling);
-    owner.activeCancel?.();
-    owner.abortController.abort();
-    const cleanupController = new AbortController();
-    if (
-      !updateCustomerAvatarRunner(registry, owner, {
-        cleanupAbortController: cleanupController,
-      })
-    ) {
-      return;
-    }
-    try {
-      const latest =
-        await loadCustomerAvatarUpload(ownerId).catch(() => manifest);
-      await cancelCustomerAvatarUpload(
-        latest ?? manifest,
-        cleanupController.signal,
-      );
-      if (
-        !mountedRef.current
-        || !isCustomerAvatarRunnerOwner(registry, owner)
-      ) {
-        return;
-      }
-      setManifest(null);
-      setProgress(0);
-      setMessage(labels.cancelled);
-    } catch (error) {
-      if (
-        mountedRef.current
-        && isCustomerAvatarRunnerOwner(registry, owner)
-      ) {
-        setMessage(mediaErrorMessage(error, labels).message);
-      }
-    } finally {
-      updateCustomerAvatarRunner(registry, owner, {
-        cleanupAbortController: null,
       });
-      if (
-        releaseCustomerAvatarRunner(registry, owner)
-        && mountedRef.current
-      ) {
-        setPending(false);
-      }
-    }
-  }
-
-  async function remove() {
-    if (!container || !binding || pending || manifest) return;
-    setPending(true);
-    setMessage(labels.deleting);
-    try {
-      const next = await mutate<Container>(
-        `/api/media/customer/profile/bindings/${binding.id}`,
-        "DELETE",
-        {
-          expectedVersion: container.version,
-          slot: "CUSTOMER_AVATAR",
-        },
-      );
-      setContainer(next);
-      activeAvatarAssetIdRef.current = null;
-      setAvatarUrl(null);
-      setPreviewAssetId(null);
-      setMessage("");
     } catch (error) {
-      setMessage(mediaErrorMessage(error, labels).message);
-    } finally {
-      setPending(false);
+      customerAvatarUploadCoordinator.reportError(ownerId, error);
     }
-  }
-
-  async function retryPreview() {
-    const assetId = previewAssetId;
-    if (!assetId || pending) return;
-    setPending(true);
-    setMessage(labels.refreshingPreview);
-    const preview = await resolveAssetBoundAvatarPreview({
-      assetId,
-      currentAssetId: () => activeAvatarAssetIdRef.current,
-      loadPreview: () =>
-        mobileApiRequest<Data<{ url: string }>>(
-          `/api/storage/customer/assets/${encodeURIComponent(assetId)}/download`,
-          { authenticated: true },
-        ),
-    });
-    if (mountedRef.current) {
-      if (preview.status === "READY") {
-        setAvatarUrl(preview.value.data.url);
-        setPreviewAssetId(null);
-        setMessage(labels.success);
-      } else if (preview.status === "UNAVAILABLE") {
-        setMessage(labels.previewUnavailable);
-      }
-    }
-    if (mountedRef.current) setPending(false);
   }
 
   const newUploadDisabled =
-    pending || Boolean(manifest) || providerConfigured !== true;
+    current.pending
+    || Boolean(current.manifest)
+    || current.providerConfigured !== true;
+  const message = statusMessage(current.status, labels);
   return (
     <View style={styles.card} accessibilityLiveRegion="polite">
-      {avatarUrl ? (
+      {current.avatarUrl ? (
         <Image
           accessibilityLabel={labels.avatarLabel}
           alt={labels.avatarLabel}
-          source={{ uri: avatarUrl }}
+          source={{ uri: current.avatarUrl }}
           style={styles.avatar}
         />
       ) : null}
@@ -749,33 +280,34 @@ export function CustomerAvatarManager({
           onPress={() => void choose("LIBRARY")}
           primary
         />
-        {retryable && manifest ? (
+        {current.retryable && current.manifest ? (
           <ActionButton
-            disabled={pending}
+            disabled={current.pending}
             label={labels.retry}
-            onPress={() => void retry()}
+            onPress={() => void customerAvatarUploadCoordinator.retry(ownerId)}
             primary
           />
         ) : null}
-        {manifest ? (
+        {current.manifest ? (
           <ActionButton
             disabled={false}
             label={labels.cancelOperation}
-            onPress={() => void cancel()}
+            onPress={() => void customerAvatarUploadCoordinator.cancel(ownerId)}
           />
         ) : null}
-        {previewAssetId ? (
+        {current.previewAssetId ? (
           <ActionButton
-            disabled={pending}
+            disabled={current.pending}
             label={labels.refreshPreview}
-            onPress={() => void retryPreview()}
+            onPress={() =>
+              void customerAvatarUploadCoordinator.retryPreview(ownerId)}
           />
         ) : null}
         {binding ? (
           <ActionButton
-            disabled={pending || Boolean(manifest)}
+            disabled={current.pending || Boolean(current.manifest)}
             label={labels.remove}
-            onPress={() => void remove()}
+            onPress={() => void customerAvatarUploadCoordinator.remove(ownerId)}
           />
         ) : null}
         {settingsRequired ? (
@@ -786,19 +318,73 @@ export function CustomerAvatarManager({
           />
         ) : null}
       </View>
-      {manifest || pending ? (
+      {current.manifest || current.pending ? (
         <View
-          accessibilityLabel={`${labels.progress}: ${Math.round(progress * 100)}%`}
+          accessibilityLabel={`${labels.progress}: ${Math.round(current.progress * 100)}%`}
           accessibilityRole="progressbar"
-          accessibilityValue={{ max: 100, min: 0, now: Math.round(progress * 100) }}
+          accessibilityValue={{
+            max: 100,
+            min: 0,
+            now: Math.round(current.progress * 100),
+          }}
           style={styles.progressTrack}
         >
-          <View style={[styles.progressFill, { width: `${Math.round(progress * 100)}%` }]} />
+          <View
+            style={[
+              styles.progressFill,
+              { width: `${Math.round(current.progress * 100)}%` },
+            ]}
+          />
         </View>
       ) : null}
       {message ? <Text style={styles.message}>{message}</Text> : null}
     </View>
   );
+}
+
+function statusMessage(
+  status: CustomerAvatarCoordinatorStatus,
+  labels: Labels,
+) {
+  const keys: Record<
+    Exclude<CustomerAvatarCoordinatorStatus, "IDLE">,
+    keyof Labels
+  > = {
+    CAMERA_PERMISSION: "cameraPermission",
+    CANCELLED: "cancelled",
+    CANCELLING: "cancelling",
+    CLEANUP_FAILED: "cleanupFailed",
+    COMMIT_UNCONFIRMED: "commitUnconfirmed",
+    DELETING: "deleting",
+    DESTINATION_CHANGED: "destinationChanged",
+    DUPLICATE: "duplicate",
+    ERROR: "error",
+    EXPIRED: "expired",
+    FILE_TOO_LARGE: "fileTooLarge",
+    LIBRARY_PERMISSION: "libraryPermission",
+    LOADING: "loading",
+    MAX_RETRIES: "maxRetries",
+    NORMALIZING: "normalizing",
+    OFFLINE: "offline",
+    PERMISSION_BLOCKED: "permissionBlocked",
+    PICKER_CANCELLED: "pickerCancelled",
+    PREVIEW_UNAVAILABLE: "previewUnavailable",
+    PROCESSING_RECOVERED: "processingRecovered",
+    QUARANTINED: "quarantined",
+    QUOTA: "quota",
+    REFRESHING_PREVIEW: "refreshingPreview",
+    REJECTED: "rejected",
+    RETRYABLE: "retryable",
+    STALE: "stale",
+    SUCCESS: "success",
+    TIMEOUT: "timeout",
+    UNAVAILABLE: "unavailable",
+    UNSAFE_FILE: "unsafeFile",
+    UNSUPPORTED: "unsupported",
+    UPLOADING: "uploading",
+    VERIFYING_COMMIT: "verifyingCommit",
+  };
+  return status === "IDLE" ? "" : labels[keys[status]];
 }
 
 function ActionButton({
@@ -828,90 +414,6 @@ function ActionButton({
       </Text>
     </Pressable>
   );
-}
-
-async function mutate<T>(
-  path: string,
-  method: "DELETE" | "POST" | "PUT",
-  body: unknown,
-) {
-  const response = await mobileApiRequest<Data<T>>(path, {
-    authenticated: true,
-    body,
-    headers: { "Idempotency-Key": Crypto.randomUUID() },
-    method,
-  });
-  return response.data;
-}
-
-function mediaErrorMessage(
-  error: unknown,
-  labels: (typeof copy)[MobileLocale],
-) {
-  const code = errorCode(error);
-  if (code === "STORAGE_PROVIDER_NOT_CONFIGURED") {
-    return result(labels.unavailable);
-  }
-  if (code === "STORAGE_QUOTA_EXCEEDED") return result(labels.quota);
-  if (code === "FILE_TOO_LARGE") return result(labels.fileTooLarge);
-  if (code === "UNSUPPORTED_MEDIA_TYPE") return result(labels.unsupported);
-  if (
-    code === "INVALID_FILE"
-    || code === "NORMALIZATION_FAILED"
-    || code === "PIXEL_LIMIT_EXCEEDED"
-    || code === "RECOVERY_FILE_MISMATCH"
-    || code === "RECOVERY_INVALID"
-    || code === "RECOVERY_UNSAFE_PATH"
-    || code === "UNSAFE_UPLOAD_TARGET"
-  ) {
-    return result(labels.unsafeFile);
-  }
-  if (code === "REJECTED") return result(labels.rejected);
-  if (code === "QUARANTINED") return result(labels.quarantined);
-  if (code === "STALE_VERSION") return result(labels.stale);
-  if (code === "DESTINATION_CHANGED") return result(labels.destinationChanged);
-  if (code === "OFFLINE") return result(labels.offline, true);
-  if (code === "TIMEOUT") return result(labels.timeout, true);
-  if (code === "MAX_RETRIES_REACHED") return result(labels.maxRetries);
-  if (code === "RECOVERY_EXPIRED") return result(labels.expired);
-  if (code === "RECOVERY_CLEANUP_FAILED") {
-    return result(labels.cleanupFailed, true);
-  }
-  if (code === "ALREADY_RUNNING" || code === "PENDING_OPERATION") {
-    return result(labels.duplicate);
-  }
-  if (code === "CANCELLED") return result(labels.cancelled);
-  if (
-    error instanceof MediaUploadEngineError
-    && error.retryable
-  ) {
-    return result(labels.retryable, true);
-  }
-  if (
-    error instanceof MobileApiRequestError
-    && ["RATE_LIMITED", "SERVICE_UNAVAILABLE", "STORAGE_PROVIDER_FAILURE"].includes(
-      error.code ?? "",
-    )
-  ) {
-    return result(labels.retryable, true);
-  }
-  return result(labels.error);
-}
-
-function errorCode(error: unknown) {
-  if (
-    error instanceof MediaUploadEngineError
-    || error instanceof MediaUploadPolicyError
-    || error instanceof MediaUploadRuntimeError
-    || error instanceof MobileApiRequestError
-  ) {
-    return error.code ?? "";
-  }
-  return "";
-}
-
-function result(message: string, retryable = false) {
-  return { message, retryable };
 }
 
 const styles = StyleSheet.create({

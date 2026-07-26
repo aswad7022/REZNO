@@ -1040,11 +1040,13 @@ test("Gate 7B cleanup is idempotent for missing artifacts and preserves recovery
 });
 
 test("Gate 7B UI and native config cover camera, library, cancellation, and ar/en/ckb", async () => {
-  const [component, appConfigText] = await Promise.all([
+  const [component, coordinator, runtime, appConfigText] = await Promise.all([
     readFile(
       "apps/mobile/src/components/customer-avatar-manager.tsx",
       "utf8",
     ),
+    readFile("apps/mobile/src/media/upload-coordinator.ts", "utf8"),
+    readFile("apps/mobile/src/media/upload-coordinator-runtime.ts", "utf8"),
     readFile("apps/mobile/app.json", "utf8"),
   ]);
   const appConfig = JSON.parse(appConfigText) as {
@@ -1052,25 +1054,28 @@ test("Gate 7B UI and native config cover camera, library, cancellation, and ar/e
   };
   assert.match(component, /requestCameraPermissionsAsync/);
   assert.match(component, /requestMediaLibraryPermissionsAsync/);
-  assert.match(component, /getPendingResultAsync/);
-  assert.match(component, /cancelCustomerAvatarUpload/);
-  const runnerClaim = component.indexOf("acquireCustomerAvatarRunner(registry");
-  const runnerStateChange = component.indexOf(
-    "setManifest(pendingManifest)",
+  assert.match(runtime, /getPendingResultAsync/);
+  assert.match(runtime, /cancelCustomerAvatarUpload/);
+  assert.doesNotMatch(component, /AbortController|activeCancel|commitPhase/);
+  assert.match(component, /return unsubscribe/);
+  assert.match(component, /\}, \[ownerId\]\);/);
+  const runnerClaim = coordinator.indexOf("const context = this.claim({");
+  const runnerStateChange = coordinator.indexOf(
+    "this.dependencies.prepare(input)",
     runnerClaim,
   );
   assert.ok(runnerClaim >= 0);
   assert.ok(
     runnerStateChange > runnerClaim,
-    "runner ownership must precede upload refs and UI state",
+    "stable runner ownership must precede preparation and transport",
   );
   assert.match(
-    component,
-    /if \(runnerRegistry\.current\) return;[\s\S]*await runUpload\(recovered\)/,
+    coordinator,
+    /if \(this\.runner\) return this\.runner\.completion/,
   );
   assert.match(
-    component,
-    /releaseCustomerAvatarRunner\(registry, owner\)[\s\S]*setPending\(false\)/,
+    coordinator,
+    /if \(!this\.isOwner\(context\)\) return false;[\s\S]*releaseCustomerAvatarRunner/,
   );
   for (const locale of ["ar", "en", "ckb"]) {
     assert.match(component, new RegExp(`\\n  ${locale}: \\{`));
