@@ -96,7 +96,10 @@ therefore use the same session for the runner's complete lifetime. A later
 login cannot make an old `COMMITTING` operation read or send the new account's
 cookie after `VERIFY_ATTACH` persistence. The captured cookie is neither
 exposed by the snapshot nor stored in the recovery manifest, logged, or sent
-to the external provider.
+to the external provider. Captured-session requests also set Fetch
+`credentials` to `omit`, so the native iOS/Android Cookie Jar cannot add a
+newer account session beside the captured cookie. Callers cannot override
+`Cookie` or `Authorization` headers on this requester.
 
 The normalized path must exactly match the app-owned directory and operation
 UUID. A different user, destination, path, checksum, size, schema, or expired

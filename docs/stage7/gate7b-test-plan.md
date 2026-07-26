@@ -35,7 +35,10 @@ The Gate 7B suite must prove, with zero failure, skip, todo, or cancellation:
 - the runner captures its opaque API session at atomic claim, before
   asynchronous preparation; a session switch while production-ordered
   `VERIFY_ATTACH` persistence is pending cannot make the old attach use the
-  new account;
+  new account; a direct transport test proves the captured request uses
+  `credentials: "omit"`, keeps only its claim-time Cookie after the simulated
+  native jar changes, and rejects Cookie/Authorization overrides before
+  Fetch;
 - process restart after target issuance, ambiguous upload, finalization, and
   attach;
 - preview failure after confirmed attach remains committed, cleans recovery
@@ -133,17 +136,17 @@ hidden failure is counted as success.
 
 | Check | Result |
 | --- | --- |
-| P2 focused Gate 7B + Gate 7A regression + release validator | `55/55` pass |
-| Complete Unit suites | `515/515` pass (`315 + 200`) |
+| Focused Gate 7B + Gate 7A regression + release validator | `57/57` pass |
+| Complete Unit suites | `517/517` pass (`317 + 200`) |
 | Complete PostgreSQL integration on disposable `49/49` database | `425/425` pass |
 | Complete live HTTP/RSC/API suites | `131/131` pass (`6 + 120 + 5`) |
 | Root and Mobile TypeScript | PASS |
 | Full ESLint and `git diff --check` | PASS, zero warning/error |
 | Prisma format/validate/generate | PASS, Prisma Client `7.8.0` |
 | Expo config/install check/Doctor | PASS; dependencies current; `20/20` |
-| iOS Hermes export | PASS; 944 modules; 3.3 MB bundle |
-| Android Hermes export | PASS; 942 modules; 3.3 MB bundle |
-| Expo Web export | PASS; 675 modules; 1.9 MB bundle |
+| iOS Hermes export | PASS; 945 modules; 3.3 MB bundle |
+| Android Hermes export | PASS; 943 modules; 3.3 MB bundle |
+| Expo Web export | PASS; 676 modules; 1.9 MB bundle |
 | Next.js production build | PASS; compile/typecheck and `115/115` pages |
 | Root production dependency audit | PASS; 0 findings |
 | Mobile full dependency audit | PASS; 0 findings |
