@@ -11,6 +11,7 @@ import {
 } from "./upload-engine";
 import {
   cancelCustomerAvatarUpload,
+  cleanupCustomerAvatarUpload,
   createCustomerAvatarUploadDependencies,
   loadCustomerAvatarUpload,
   prepareCustomerAvatarUpload,
@@ -48,6 +49,7 @@ export const customerAvatarUploadCoordinator =
     cancel: cancelCustomerAvatarUpload,
     createAbortController: () => new AbortController(),
     createRunDependencies: createCustomerAvatarUploadDependencies,
+    discard: cleanupCustomerAvatarUpload,
     load: loadCustomerAvatarUpload,
     async loadPreview(assetId) {
       const response = await mobileApiRequest<Data<{ url: string }>>(

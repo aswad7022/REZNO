@@ -16,6 +16,7 @@ import {
 
 const NOW = 1_800_000_000_000;
 const OWNER = "person_coordinator";
+const OTHER_OWNER = "person_coordinator_other";
 const ASSET_A = "00000000-0000-4000-8000-000000000201";
 const ASSET_B = "00000000-0000-4000-8000-000000000202";
 
@@ -208,6 +209,54 @@ test("Gate 7B cancellation waits for a pending persist before cleanup and releas
   assert.equal(harness.coordinator.getSnapshot(OWNER).status, "SUCCESS");
 });
 
+test("Gate 7B account switch quiesces pre-commit work before the new owner starts", async () => {
+  const prepareStarted = deferred<void>();
+  const releasePrepare = deferred<void>();
+  const harness = coordinatorHarness({
+    async beforePrepare() {
+      prepareStarted.resolve();
+      await releasePrepare.promise;
+    },
+    async run() {
+      throw new Error("old-owner transport must not start after account switch");
+    },
+  });
+  await harness.coordinator.bootstrap(OWNER);
+  const oldRun = harness.coordinator.prepareAndStart({
+    asset: inputAsset(),
+    ownerId: OWNER,
+    source: "LIBRARY",
+  });
+  await prepareStarted.promise;
+  const oldOwner = harness.coordinator.getSnapshot(OWNER);
+
+  const switchOwner = harness.coordinator.bootstrap(OTHER_OWNER);
+  await flush();
+  assert.equal(harness.controllers[0]?.signal.aborted, true);
+  assert.equal(harness.coordinator.getSnapshot(OWNER).status, "CANCELLING");
+  assert.equal(harness.coordinator.getSnapshot(OWNER).pending, true);
+  assert.equal(
+    harness.coordinator.getSnapshot(OWNER).runnerId,
+    oldOwner.runnerId,
+  );
+  assert.equal(harness.calls.run, 0);
+  assert.equal(harness.calls.cancel, 0);
+  assert.equal(harness.calls.discard, 0);
+
+  releasePrepare.resolve();
+  await Promise.all([oldRun, switchOwner]);
+  assert.equal(harness.calls.prepare, 1);
+  assert.equal(harness.calls.run, 0);
+  assert.equal(harness.calls.cancel, 0);
+  assert.equal(harness.calls.discard, 1);
+  assert.equal(harness.stored, null);
+  const current = harness.coordinator.getSnapshot(OTHER_OWNER);
+  assert.equal(current.ownerId, OTHER_OWNER);
+  assert.equal(current.pending, false);
+  assert.equal(current.runnerId, null);
+  assert.equal(current.status, "IDLE");
+});
+
 test("Gate 7B cancel during COMMITTING verifies instead of aborting", async () => {
   const releaseCommit = deferred<void>();
   const harness = coordinatorHarness({
@@ -259,6 +308,91 @@ test("Gate 7B cancel during COMMITTING verifies instead of aborting", async () =
   assert.equal(harness.coordinator.getSnapshot(OWNER).status, "SUCCESS");
   assert.equal(harness.coordinator.getSnapshot(OWNER).pending, false);
   assert.equal(harness.calls.run, 1);
+});
+
+test("Gate 7B account switch waits for an owned commit without new-owner overlap", async () => {
+  const releaseCommit = deferred<void>();
+  const harness = coordinatorHarness({
+    async run(manifest, dependencies) {
+      await dependencies.persist({
+        ...manifest,
+        assetId: ASSET_B,
+        checkpoint: "VERIFY_ATTACH",
+      });
+      dependencies.onCommitPhaseChange?.("COMMITTING");
+      harness.commitStarted.resolve();
+      await releaseCommit.promise;
+      dependencies.onCommitPhaseChange?.("COMMITTED");
+      harness.stored = null;
+      return { assetId: ASSET_B, container: containerFor(ASSET_B, 2) };
+    },
+  });
+  await harness.coordinator.bootstrap(OWNER);
+  const running = harness.coordinator.prepareAndStart({
+    asset: inputAsset(),
+    ownerId: OWNER,
+    source: "LIBRARY",
+  });
+  await harness.commitStarted.promise;
+
+  const switchOwner = harness.coordinator.bootstrap(OTHER_OWNER);
+  await flush();
+  assert.equal(harness.controllers[0]?.signal.aborted, false);
+  assert.equal(
+    harness.coordinator.getSnapshot(OWNER).status,
+    "VERIFYING_COMMIT",
+  );
+  assert.equal(harness.coordinator.getSnapshot(OWNER).pending, true);
+  assert.equal(harness.calls.run, 1);
+  assert.equal(harness.calls.bootstrap, 1);
+
+  releaseCommit.resolve();
+  await Promise.all([running, switchOwner]);
+  assert.equal(harness.calls.run, 1);
+  assert.equal(harness.calls.bootstrap, 2);
+  assert.equal(harness.calls.cancel, 0);
+  assert.equal(harness.calls.discard, 0);
+  assert.equal(harness.coordinator.getSnapshot(OTHER_OWNER).status, "IDLE");
+  assert.equal(harness.coordinator.getSnapshot(OTHER_OWNER).pending, false);
+});
+
+test("Gate 7B stale owner actions cannot cancel the current account runner", async () => {
+  const runStarted = deferred<void>();
+  const releaseRun = deferred<void>();
+  const harness = coordinatorHarness({
+    async run(manifest, dependencies) {
+      assert.equal(manifest.ownerId, OTHER_OWNER);
+      runStarted.resolve();
+      await releaseRun.promise;
+      dependencies.onCommitPhaseChange?.("COMMITTED");
+      harness.stored = null;
+      return { assetId: ASSET_B, container: containerFor(ASSET_B, 2) };
+    },
+  });
+  await harness.coordinator.bootstrap(OWNER);
+  await harness.coordinator.bootstrap(OTHER_OWNER);
+  const running = harness.coordinator.prepareAndStart({
+    asset: inputAsset(),
+    ownerId: OTHER_OWNER,
+    source: "LIBRARY",
+  });
+  await runStarted.promise;
+
+  const current = harness.coordinator.getSnapshot(OTHER_OWNER);
+  await harness.coordinator.cancel(OWNER);
+  assert.equal(harness.controllers[0]?.signal.aborted, false);
+  assert.equal(
+    harness.coordinator.getSnapshot(OTHER_OWNER).runnerId,
+    current.runnerId,
+  );
+  assert.equal(harness.coordinator.getSnapshot(OTHER_OWNER).pending, true);
+  assert.equal(harness.calls.cancel, 0);
+  assert.equal(harness.calls.run, 1);
+
+  releaseRun.resolve();
+  await running;
+  assert.equal(harness.coordinator.getSnapshot(OTHER_OWNER).status, "SUCCESS");
+  assert.equal(harness.coordinator.getSnapshot(OTHER_OWNER).pending, false);
 });
 
 test("Gate 7B committed attach stays successful when preview is unavailable", async () => {
@@ -444,6 +578,9 @@ test("Gate 7B stale preview responses never replace a newer or removed avatar", 
 });
 
 function coordinatorHarness(options: {
+  beforePrepare?(
+    input: Parameters<CustomerAvatarCoordinatorDependencies["prepare"]>[0],
+  ): Promise<void>;
   initialAssetId?: string | null;
   initialManifest?: CustomerAvatarUploadManifest | null;
   loadPreview?(assetId: string): Promise<string>;
@@ -457,6 +594,7 @@ function coordinatorHarness(options: {
     attach: 0,
     bootstrap: 0,
     cancel: 0,
+    discard: 0,
     prepare: 0,
     remove: 0,
     run: 0,
@@ -538,6 +676,10 @@ function coordinatorHarness(options: {
       };
       return dependencies;
     },
+    async discard() {
+      calls.discard += 1;
+      harness.stored = null;
+    },
     async load() {
       return harness.stored;
     },
@@ -546,7 +688,8 @@ function coordinatorHarness(options: {
     now: () => NOW,
     async prepare(input) {
       calls.prepare += 1;
-      const manifest = manifestFor(input.operationId);
+      await options.beforePrepare?.(input);
+      const manifest = manifestFor(input.operationId, input.ownerId);
       harness.stored = manifest;
       return manifest;
     },
@@ -573,7 +716,7 @@ function coordinatorHarness(options: {
   return harness;
 }
 
-function manifestFor(operationId: string) {
+function manifestFor(operationId: string, ownerId = OWNER) {
   let uuidCounter = 500;
   return createCustomerAvatarUploadManifest({
     checksumSha256: "b".repeat(64),
@@ -581,7 +724,7 @@ function manifestFor(operationId: string) {
     fileUri: "file:///safe/coordinator.jpg",
     now: NOW,
     operationId,
-    ownerId: OWNER,
+    ownerId,
     sizeBytes: 1024,
     source: "LIBRARY",
     uuid: () =>

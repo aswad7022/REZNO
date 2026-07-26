@@ -95,6 +95,7 @@ export type CustomerAvatarCoordinatorDependencies = {
     onProgress(fraction: number): void;
     signal: AbortSignal;
   }): CustomerAvatarUploadEngineDependencies;
+  discard(manifest: CustomerAvatarUploadManifest): Promise<void>;
   load(ownerId: string): Promise<CustomerAvatarUploadManifest | null>;
   loadPreview(assetId: string): Promise<string>;
   now(): number;
@@ -133,6 +134,7 @@ type RunnerContext = {
   execution: Promise<void> | null;
   owner: CustomerAvatarRunnerOwner;
   ownerId: string;
+  ownerTransitionRequested: boolean;
   resolveCompletion(): void;
 };
 
@@ -155,6 +157,7 @@ const EMPTY_SNAPSHOT: CustomerAvatarCoordinatorSnapshot = {
 };
 
 export class CustomerAvatarUploadCoordinator {
+  private activeOwnerId: string | null = null;
   private bootstrapOwnerId: string | null = null;
   private bootstrapPromise: Promise<void> | null = null;
   private readonly dependencies: CustomerAvatarCoordinatorDependencies;
@@ -186,7 +189,9 @@ export class CustomerAvatarUploadCoordinator {
   };
 
   async bootstrap(ownerId: string) {
-    await this.waitForOtherOwner(ownerId);
+    this.activeOwnerId = ownerId;
+    await this.transitionFromOtherOwner(ownerId);
+    if (this.activeOwnerId !== ownerId) return;
     if (
       this.bootstrapPromise
       && this.bootstrapOwnerId === ownerId
@@ -215,10 +220,10 @@ export class CustomerAvatarUploadCoordinator {
     ownerId: string;
     source: MediaInputSource;
   }) {
-    await this.waitForOtherOwner(input.ownerId);
+    if (this.activeOwnerId !== input.ownerId) return "STALE_OWNER" as const;
     const snapshot = this.getSnapshot(input.ownerId);
     if (
-      (this.runner && this.runner.ownerId === input.ownerId)
+      this.runner
       || snapshot.pending
     ) {
       return "ACTIVE" as const;
@@ -258,7 +263,7 @@ export class CustomerAvatarUploadCoordinator {
   }
 
   async retry(ownerId: string) {
-    await this.waitForOtherOwner(ownerId);
+    if (this.activeOwnerId !== ownerId) return;
     if (this.runner) return this.runner.completion;
     let recovered: CustomerAvatarUploadManifest | null;
     try {
@@ -284,7 +289,7 @@ export class CustomerAvatarUploadCoordinator {
   }
 
   async cancel(ownerId: string) {
-    await this.waitForOtherOwner(ownerId);
+    if (this.activeOwnerId !== ownerId) return;
     let context = this.runner;
     const manifest = this.snapshot.ownerId === ownerId
       ? this.snapshot.manifest
@@ -321,34 +326,13 @@ export class CustomerAvatarUploadCoordinator {
         status: "CANCELLING",
       });
     }
-    if (!context || !manifest || context.owner.cancelRequested) return;
+    if (!context) return;
     if (!this.isOwner(context)) return;
-
-    updateCustomerAvatarRunner(this.registry, context.owner, {
-      cancelRequested: true,
-    });
-    this.publishFor(ownerId, {
-      pending: true,
-      retryable: false,
-      status: "CANCELLING",
-    });
-    context.owner.activeCancel?.();
-    context.owner.abortController.abort();
-    const cleanupController = this.dependencies.createAbortController();
-    updateCustomerAvatarRunner(this.registry, context.owner, {
-      cleanupAbortController: cleanupController,
-    });
-
-    void this.finishCancellation(
-      context,
-      manifest,
-      cleanupController,
-    );
-    await context.completion;
+    await this.requestCancellation(context, manifest, false);
   }
 
   async remove(ownerId: string) {
-    await this.waitForOtherOwner(ownerId);
+    if (this.activeOwnerId !== ownerId) return;
     const snapshot = this.getSnapshot(ownerId);
     const binding =
       snapshot.container?.bindings.find(
@@ -390,6 +374,7 @@ export class CustomerAvatarUploadCoordinator {
   }
 
   async retryPreview(ownerId: string) {
+    if (this.activeOwnerId !== ownerId) return;
     const snapshot = this.getSnapshot(ownerId);
     if (!snapshot.previewAssetId || snapshot.pending) return;
     this.publishFor(ownerId, {
@@ -408,11 +393,13 @@ export class CustomerAvatarUploadCoordinator {
     ownerId: string,
     status: CustomerAvatarCoordinatorStatus,
   ) {
+    if (this.activeOwnerId !== ownerId) return;
     if (this.runner && this.runner.ownerId === ownerId) return;
     this.publishFor(ownerId, { status });
   }
 
   reportError(ownerId: string, error: unknown) {
+    if (this.activeOwnerId !== ownerId) return;
     if (this.runner && this.runner.ownerId === ownerId) return;
     this.publishFor(ownerId, {
       retryable: false,
@@ -489,6 +476,7 @@ export class CustomerAvatarUploadCoordinator {
       const manifest = await this.dependencies.prepare(input);
       if (!this.isOwner(context)) return;
       context.checkpoint = manifest.checkpoint;
+      if (context.owner.cancelRequested) return;
       this.publishFor(context.ownerId, {
         checkpoint: manifest.checkpoint,
         manifest,
@@ -497,6 +485,7 @@ export class CustomerAvatarUploadCoordinator {
       await this.executeOwned(context, manifest);
     } catch (error) {
       if (!this.isOwner(context)) return;
+      if (context.owner.cancelRequested) return;
       this.publishFor(context.ownerId, {
         retryable: false,
         status: statusForError(error),
@@ -633,7 +622,7 @@ export class CustomerAvatarUploadCoordinator {
       }
     }
 
-    if (committed) {
+    if (committed && !context.ownerTransitionRequested) {
       void this.loadPreview(
         context.ownerId,
         committed.assetId,
@@ -648,8 +637,9 @@ export class CustomerAvatarUploadCoordinator {
 
   private async finishCancellation(
     context: RunnerContext,
-    fallback: CustomerAvatarUploadManifest,
+    fallback: CustomerAvatarUploadManifest | null,
     cleanupController: AbortController,
+    localOnly: boolean,
   ) {
     try {
       await context.execution;
@@ -657,10 +647,14 @@ export class CustomerAvatarUploadCoordinator {
       const latest = await this.dependencies
         .load(context.ownerId)
         .catch(() => fallback);
-      await this.dependencies.cancel(
-        latest ?? fallback,
-        cleanupController.signal,
-      );
+      const target = latest ?? fallback;
+      if (target) {
+        if (localOnly) {
+          await this.dependencies.discard(target);
+        } else {
+          await this.dependencies.cancel(target, cleanupController.signal);
+        }
+      }
       if (!this.isOwner(context)) return;
       this.publishFor(context.ownerId, {
         checkpoint: null,
@@ -713,6 +707,7 @@ export class CustomerAvatarUploadCoordinator {
       execution: null,
       owner: acquisition.owner,
       ownerId: input.ownerId,
+      ownerTransitionRequested: false,
       resolveCompletion,
     };
     this.runner = context;
@@ -813,10 +808,70 @@ export class CustomerAvatarUploadCoordinator {
     }
   }
 
-  private async waitForOtherOwner(ownerId: string) {
+  private async transitionFromOtherOwner(ownerId: string) {
     const active = this.runner;
     if (active && active.ownerId !== ownerId) {
-      await active.completion;
+      active.ownerTransitionRequested = true;
+      active.allowAutomaticHandoff = false;
+      if (
+        customerAvatarCancellationDisposition(active.owner.commitPhase)
+        === "CANCEL"
+      ) {
+        const manifest = this.snapshot.ownerId === active.ownerId
+          ? this.snapshot.manifest
+          : null;
+        await this.requestCancellation(active, manifest, true);
+      } else {
+        this.publishFor(active.ownerId, {
+          retryable: false,
+          status: "VERIFYING_COMMIT",
+        });
+        await active.completion;
+        await this.discardTransitionRecovery(active);
+      }
+    }
+  }
+
+  private async requestCancellation(
+    context: RunnerContext,
+    fallback: CustomerAvatarUploadManifest | null,
+    localOnly: boolean,
+  ) {
+    if (!this.isOwner(context)) return;
+    if (!context.owner.cancelRequested) {
+      updateCustomerAvatarRunner(this.registry, context.owner, {
+        cancelRequested: true,
+      });
+      this.publishFor(context.ownerId, {
+        pending: true,
+        retryable: false,
+        status: "CANCELLING",
+      });
+      context.owner.activeCancel?.();
+      context.owner.abortController.abort();
+      const cleanupController = this.dependencies.createAbortController();
+      updateCustomerAvatarRunner(this.registry, context.owner, {
+        cleanupAbortController: cleanupController,
+      });
+      void this.finishCancellation(
+        context,
+        fallback,
+        cleanupController,
+        localOnly,
+      );
+    }
+    await context.completion;
+  }
+
+  private async discardTransitionRecovery(context: RunnerContext) {
+    const manifest = await this.dependencies
+      .load(context.ownerId)
+      .catch(() => null);
+    if (
+      manifest
+      && manifest.operationId === context.owner.operationId
+    ) {
+      await this.dependencies.discard(manifest);
     }
   }
 
