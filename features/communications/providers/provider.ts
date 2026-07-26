@@ -8,6 +8,7 @@ import type {
   CommunicationLocale,
   OutboundChannel,
 } from "@/features/communications/domain/contracts";
+import { DevicePushProvider } from "@/features/push-notifications/providers/native";
 
 export type SafeProviderMessage = {
   channel: OutboundChannel;
@@ -48,6 +49,7 @@ export function setCommunicationTestProviderFactory(
 export function resolveOutboundProvider(channel: OutboundChannel): OutboundProvider {
   if (testProviderFactory) return testProviderFactory(channel);
   if (deterministicSinkEnabled(process.env)) return new DeterministicSinkProvider(channel);
+  if (channel === "PUSH") return new DevicePushProvider();
   return new NotConfiguredProvider(channel);
 }
 

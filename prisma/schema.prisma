@@ -40,6 +40,8 @@ model Person {
   outboundPreferenceMutations     OutboundPreferenceMutation[]
   targetedCommunicationCampaigns  CommunicationCampaign[]             @relation("CommunicationCampaignTargetPerson")
   outboundDeliveries              OutboundDelivery[]
+  pushInstallations               PushInstallation[]
+  pushInstallationMutations       PushInstallationMutation[]
   customerConversations           Conversation[]                      @relation("ConversationCustomer")
   conversationReadStates          ConversationReadState[]
   favoriteBusinesses              CustomerFavoriteBusiness[]
@@ -1269,6 +1271,7 @@ model OutboundDelivery {
   campaign            CommunicationCampaign     @relation(fields: [campaignId], references: [id], onDelete: Restrict)
   person              Person                    @relation(fields: [personId], references: [id], onDelete: Restrict)
   attempts            OutboundDeliveryAttempt[]
+  pushTargets         PushDeliveryTarget[]
 
   @@unique([campaignId, personId, channel])
   @@index([status, nextAttemptAt, id])
@@ -1297,6 +1300,90 @@ model OutboundDeliveryAttempt {
 
   @@unique([deliveryId, attemptNumber])
   @@index([deliveryId, createdAt, id])
+}
+
+model PushInstallation {
+  id                     String                 @id @default(uuid()) @db.Uuid
+  installationId         String                 @unique @db.Uuid
+  personId               String                 @db.Uuid
+  platform               PushPlatform
+  provider               PushProvider
+  status                 PushInstallationStatus @default(ACTIVE)
+  permissionStatus       PushPermissionStatus
+  installationSecretHash String                 @db.VarChar(64)
+  tokenCiphertext        String                 @db.Text
+  tokenFingerprint       String                 @db.VarChar(64)
+  tokenVersion           Int                    @default(1)
+  appVersion             String                 @db.VarChar(50)
+  lastRegisteredAt       DateTime               @db.Timestamptz(6)
+  revokedAt              DateTime?              @db.Timestamptz(6)
+  invalidatedAt          DateTime?              @db.Timestamptz(6)
+  createdAt              DateTime               @default(now()) @db.Timestamptz(6)
+  updatedAt              DateTime               @updatedAt @db.Timestamptz(6)
+  person                 Person                 @relation(fields: [personId], references: [id], onDelete: Cascade)
+  deliveryTargets        PushDeliveryTarget[]
+
+  @@index([personId, status, updatedAt, id])
+  @@index([status, provider, updatedAt, id])
+  @@index([tokenFingerprint])
+}
+
+model PushInstallationMutation {
+  id                     String                         @id @default(uuid()) @db.Uuid
+  personId               String                         @db.Uuid
+  installationId         String                         @db.Uuid
+  installationSecretHash String                         @db.VarChar(64)
+  operationGeneration    Int
+  idempotencyKey         String                         @db.Uuid
+  action                 PushInstallationMutationAction
+  requestHash            String                         @db.VarChar(64)
+  result                 Json
+  createdAt              DateTime                       @default(now()) @db.Timestamptz(6)
+  person                 Person                         @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@unique([personId, idempotencyKey])
+  @@index([installationId, createdAt, id])
+  @@index([installationId, installationSecretHash, operationGeneration])
+}
+
+model PushDeliveryTarget {
+  id                 String                   @id @default(uuid()) @db.Uuid
+  outboundDeliveryId String                   @db.Uuid
+  installationId     String                   @db.Uuid
+  status             PushDeliveryTargetStatus @default(PENDING)
+  attemptCount       Int                      @default(0)
+  claimGeneration    Int                      @default(0)
+  providerName       String?                  @db.VarChar(80)
+  providerMessageId  String?                  @db.VarChar(191)
+  lastSafeCode       String?                  @db.VarChar(80)
+  acceptedAt         DateTime?                @db.Timestamptz(6)
+  deliveredAt        DateTime?                @db.Timestamptz(6)
+  failedAt           DateTime?                @db.Timestamptz(6)
+  createdAt          DateTime                 @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime                 @updatedAt @db.Timestamptz(6)
+  outboundDelivery   OutboundDelivery         @relation(fields: [outboundDeliveryId], references: [id], onDelete: Restrict)
+  installation       PushInstallation         @relation(fields: [installationId], references: [id], onDelete: Restrict)
+  receipts           PushProviderReceipt[]
+
+  @@unique([outboundDeliveryId, installationId])
+  @@index([providerName, providerMessageId])
+  @@index([status, updatedAt, id])
+}
+
+model PushProviderReceipt {
+  id                 String              @id @default(uuid()) @db.Uuid
+  targetId           String?             @db.Uuid
+  provider           PushProvider
+  providerEventId    String              @db.VarChar(191)
+  status             PushReceiptStatus
+  safeCode           String              @db.VarChar(80)
+  requestHash        String              @db.VarChar(64)
+  providerOccurredAt DateTime            @db.Timestamptz(6)
+  receivedAt         DateTime            @default(now()) @db.Timestamptz(6)
+  target             PushDeliveryTarget? @relation(fields: [targetId], references: [id], onDelete: Restrict)
+
+  @@unique([provider, providerEventId])
+  @@index([targetId, receivedAt, id])
 }
 
 model Conversation {
@@ -3034,6 +3121,50 @@ enum OutboundAttemptOutcome {
   TRANSIENT_FAILURE
   PERMANENT_FAILURE
   NOT_CONFIGURED
+}
+
+enum PushPlatform {
+  IOS
+  ANDROID
+}
+
+enum PushProvider {
+  APNS
+  FCM
+}
+
+enum PushPermissionStatus {
+  GRANTED
+  PROVISIONAL
+}
+
+enum PushInstallationStatus {
+  ACTIVE
+  REVOKED
+  INVALIDATED
+}
+
+enum PushInstallationMutationAction {
+  REGISTER
+  REVOKE
+}
+
+enum PushDeliveryTargetStatus {
+  PENDING
+  SENDING
+  ACCEPTED
+  DELIVERED
+  RETRY_SCHEDULED
+  PERMANENT_FAILURE
+  INVALID_TOKEN
+  UNKNOWN
+}
+
+enum PushReceiptStatus {
+  DELIVERED
+  TRANSIENT_FAILURE
+  PERMANENT_FAILURE
+  INVALID_TOKEN
 }
 
 enum ConversationType {
