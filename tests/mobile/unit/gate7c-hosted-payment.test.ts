@@ -563,6 +563,73 @@ test("Gate 7C logout quiesces verification and preserves its recovery checkpoint
   assert.equal(harness.stored?.checkpoint, "VERIFYING_STATUS");
 });
 
+test("Gate 7C logout waits for a prior owner runner already quiescing during account switch", async () => {
+  const wait = deferred<void>();
+  const harness = coordinatorHarness({
+    initial: {
+      ...manifestForRecovery(),
+      checkpoint: "VERIFYING_STATUS" as const,
+      outcome: "success" as const,
+      returnReceivedAt: NOW + 1_000,
+    },
+    async consume() {
+      return payment("REQUIRES_ACTION");
+    },
+    async wait() {
+      await wait.promise;
+    },
+  });
+  const oldBootstrap = harness.coordinator.bootstrap(OWNER);
+  await until(() => harness.calls.wait === 1);
+
+  const newBootstrap = harness.coordinator.bootstrap(OTHER_OWNER);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  let logoutResolved = false;
+  const logout = harness.coordinator.deactivate(OTHER_OWNER).then(() => {
+    logoutResolved = true;
+  });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.equal(logoutResolved, false);
+  assert.equal(
+    await harness.coordinator.start(OTHER_OWNER, INTENT),
+    "ACTIVE",
+  );
+  wait.resolve();
+  await Promise.all([logout, oldBootstrap, newBootstrap]);
+  assert.equal(logoutResolved, true);
+  assert.equal(
+    harness.coordinator.getSnapshot(OTHER_OWNER).runnerId,
+    null,
+  );
+  assert.equal(harness.coordinator.getSnapshot(OTHER_OWNER).pending, false);
+});
+
+test("Gate 7C stale-owner logout cannot cancel the authoritative owner runner", async () => {
+  const create = deferred<MobileHostedPaymentHandoff>();
+  const signal = { current: null as AbortSignal | null };
+  const harness = coordinatorHarness({
+    async create(nextSignal) {
+      signal.current = nextSignal;
+      return rejectOnAbort(create, nextSignal);
+    },
+  });
+  harness.setSessionOwner(OTHER_OWNER);
+  await harness.coordinator.bootstrap(OTHER_OWNER);
+  const started = harness.coordinator.start(OTHER_OWNER, INTENT);
+  await until(() => harness.calls.create === 1);
+
+  await harness.coordinator.deactivate(OWNER);
+  assert.equal(signal.current?.aborted, false);
+  assert.equal(
+    harness.coordinator.getSnapshot(OTHER_OWNER).pending,
+    true,
+  );
+  create.resolve(hostedHandoff());
+  assert.equal(await started, "COMPLETED");
+  assert.equal(harness.coordinator.getSnapshot(OTHER_OWNER).runnerId, null);
+});
+
 test("Gate 7C expired recovery cleans SecureStore state and never resumes", async () => {
   const harness = coordinatorHarness({
     initial: {
@@ -612,6 +679,7 @@ function coordinatorHarness(options: {
   ) => Promise<MobileHostedPaymentHandoff>;
   get?: (signal: AbortSignal) => Promise<MobilePaymentIntent>;
   initial?: HostedPaymentRecoveryManifest | null;
+  wait?: () => Promise<void>;
 } = {}) {
   let uuidCounter = 10;
   const calls = {
@@ -697,6 +765,7 @@ function coordinatorHarness(options: {
     },
     async wait() {
       calls.wait += 1;
+      await options.wait?.();
     },
   };
   harness.coordinator = new HostedPaymentCoordinator(dependencies);

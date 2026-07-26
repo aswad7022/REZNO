@@ -136,7 +136,7 @@ export class HostedPaymentCoordinator {
     this.activeOwnerId = null;
     this.snapshot = EMPTY;
     const activeRunner = this.runner;
-    if (!activeRunner || activeRunner.ownerId !== ownerId) return;
+    if (!activeRunner) return;
     activeRunner.controller.abort();
     await activeRunner.done;
   }

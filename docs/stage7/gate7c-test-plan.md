@@ -25,6 +25,7 @@ The Gate 7C suite must complete without failure, skip, todo, or cancellation:
 - claim-time API-session capture across a cookie/account change;
 - account switch quiescing the old browser runner before new-owner recovery;
 - logout quiescing each active runner phase before clearing authentication;
+- logout during an account-switch handoff awaiting the prior runner's release;
 - opaque Better Auth owner identities with exact, case-sensitive isolation;
 - owner-scoped recovery records that cannot delete another account's pending return;
 - a dedicated hosted-handoff mutation action and intent-expiry-bounded handoffs;
@@ -65,6 +66,7 @@ The Gate 7C suite must complete without failure, skip, todo, or cancellation:
 | Manifest expires | Cleanup, no reopen/consume |
 | Account changes with browser open | Old runner aborts and releases before new-owner recovery |
 | Logout during prepare/browser/verification | The active runner aborts and quiesces before the session is cleared |
+| Logout while account B is awaiting account A's quiescence | Logout awaits the exact in-flight runner even though it belongs to A; no session clears early |
 | Account B loads while account A has recovery | B cannot read or delete A's owner-scoped record |
 | Better Auth emits an opaque user id | The exact bounded id is retained; casing is not normalized |
 | Intent expires before the action window | No handoff is created; otherwise the handoff expires at the earliest trusted boundary |
@@ -84,8 +86,8 @@ hidden failure is counted as success.
 
 | Check | Result |
 | --- | --- |
-| Gate 7C plus Gate 7A/7B regressions and release validator | `80/80` pass (`76 + 4`) |
-| Complete Unit suites | `540/540` pass (`336 + 204`) |
+| Gate 7C plus Gate 7A/7B regressions and release validator | `82/82` pass (`78 + 4`) |
+| Complete Unit suites | `542/542` pass (`338 + 204`) |
 | Complete PostgreSQL integration on a fresh 50/50 database | `426/426` pass |
 | Complete live HTTP/RSC/API suites on the production server | `132/132` pass (`6 + 121 + 5`) |
 | Root and Mobile TypeScript | PASS |
