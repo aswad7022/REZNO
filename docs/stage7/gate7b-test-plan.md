@@ -25,6 +25,9 @@ The Gate 7B suite must prove, with zero failure, skip, todo, or cancellation:
   unavailable;
 - stale/rejected runner cleanup cannot release or lower pending state for a
   newer owner generation;
+- cancellation during an already-started durable persist retains the runner,
+  `pending`, and cleanup authority until that write quiesces; the latest record
+  is then removed before a new operation may claim the slot;
 - process restart after target issuance, ambiguous upload, finalization, and
   attach;
 - preview failure after confirmed attach remains committed, cleans recovery
@@ -85,6 +88,7 @@ The Gate 7B suite must prove, with zero failure, skip, todo, or cancellation:
 | Locale change or component remount in any commit phase | Only rendered text/listener changes; runner ID, controller, checkpoint, commit phase, pending state, transport, and attach count remain owned by the coordinator |
 | Startup preview A settles while foreground B is active | Recovery observes B's owner and performs no controller/ref/state mutation, transfer, attach, or cleanup |
 | Stale runner `finally` settles after a newer generation starts | Owner-token mismatch blocks commit, pending, cancellation-ref, and release changes |
+| Cancel arrives while a checkpoint persist is unresolved | The owner remains `CANCELLING`; a duplicate/new run is rejected, the write settles, cleanup removes the latest record, and only then is the runner released |
 | Process restart before/after finalize | Stable idempotency resumes exact checkpoint |
 | Different user reopens app | Recovery rejected and local private state cleaned |
 | Container changed before attach | Old asset is not attached over newer content |
@@ -117,8 +121,8 @@ hidden failure is counted as success.
 
 | Check | Result |
 | --- | --- |
-| P2 focused Gate 7B + Gate 7A regression + release validator | `50/50` pass |
-| Complete Unit suites | `510/510` pass (`310 + 200`) |
+| P2 focused Gate 7B + Gate 7A regression + release validator | `51/51` pass |
+| Complete Unit suites | `511/511` pass (`311 + 200`) |
 | Complete PostgreSQL integration on disposable `49/49` database | `425/425` pass |
 | Complete live HTTP/RSC/API suites | `131/131` pass (`6 + 120 + 5`) |
 | Root and Mobile TypeScript | PASS |
@@ -139,8 +143,9 @@ An initial diagnostic run omitted that local signing environment and failed
 only cursor creation; the affected files then passed `30/30`, followed by the
 fresh full `425/425` run.
 
-The authoritative HTTP run used a separate newly migrated database and the
-Next.js production server. Two earlier diagnostics produced isolated failures
-after reused or transient suite state; each affected file passed alone
-(`10/10` and `6/6`). A third clean CI-shaped run retained the complete log and
-passed all `131/131`. Only that clean run is reported as closure evidence.
+The authoritative HTTP run used the newly migrated disposable database and a
+Next.js production server on an isolated local port. An initial diagnostic
+omitted `DATABASE_URL` from the direct route-handler test process and failed
+before the live-route matrix; the corrected CI-shaped run supplied every
+required database and base-URL variable and passed all `131/131`. Only that
+complete run is reported as closure evidence.

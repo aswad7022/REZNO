@@ -164,6 +164,14 @@ unavailable, the owner releases with `VERIFY_ATTACH`, a visible retryable
 state, and the durable restart/Retry path intact; there is no unowned hidden
 commit state.
 
+Pre-commit cancellation also remains owner-fenced through quiescence. A persist
+checks the exact runner before and after the underlying durable write. The
+coordinator aborts the transport, waits for the active execution (including an
+already-started SecureStore write) to settle, removes the latest checkpoint, and
+only then releases ownership. A duplicate or newer upload cannot enter that
+interval, so a late write from the cancelled generation cannot resurrect its
+record or overwrite a newer operation.
+
 Before commit, server abort failure cannot block local privacy cleanup; the
 owner-scoped session expires and existing storage automation handles provider
 orphan cleanup. Cleanup uses the stable abort key and is idempotent. If an old
