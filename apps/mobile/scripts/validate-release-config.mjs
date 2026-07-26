@@ -44,6 +44,11 @@ export function validateReleaseConfiguration(
     true,
     "expo-secure-store must remain registered for session recovery.",
   );
+  assert.equal(
+    plugins.includes("expo-web-browser"),
+    true,
+    "expo-web-browser must remain registered for hosted payment handoff.",
+  );
   const imagePicker = pluginOptions(plugins, "expo-image-picker");
   assert.equal(
     imagePicker.microphonePermission,
@@ -116,6 +121,7 @@ export function validateReleaseConfiguration(
   assert.equal(dependencies["expo-file-system"], "~57.0.1");
   assert.equal(dependencies["expo-image-manipulator"], "~57.0.6");
   assert.equal(dependencies["expo-image-picker"], "~57.0.6");
+  assert.equal(dependencies["expo-web-browser"], "~57.0.2");
   assert.equal(scripts.web, "expo start --web");
 
   return {

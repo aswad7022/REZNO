@@ -55,6 +55,7 @@ import {
 } from "./src/components/mobile-chrome";
 import { ActivityLauncher } from "./src/components/activity-launcher";
 import { CustomerAvatarManager } from "./src/components/customer-avatar-manager";
+import { HostedPaymentController } from "./src/components/hosted-payment-controller";
 import {
   SectionHeader,
   SummaryItem,
@@ -101,6 +102,7 @@ import {
 import { CustomerMessagingCenter } from "./src/screens/customer-messaging-center";
 import type { MobileMarketplaceBusiness } from "./src/types/marketplace";
 import type { CommerceNotification } from "./src/types/commerce";
+import { hostedPaymentCoordinator } from "./src/payments/hosted-payment-runtime";
 
 I18nManager.allowRTL(true);
 
@@ -633,6 +635,11 @@ export default function App() {
   const isRtl = getTextDirection(locale) === "rtl";
   const authSession = toMobileAuthSession(startupState);
   const authenticatedUserId = authSession.status === "authenticated" ? authSession.user.id : null;
+  const handleStartHostedPayment = useCallback((intentId: string) => {
+    if (authenticatedUserId) {
+      void hostedPaymentCoordinator.start(authenticatedUserId, intentId);
+    }
+  }, [authenticatedUserId]);
   const authSetupUser =
     startupState.kind === "AUTHENTICATED_PROFILE_INCOMPLETE"
       ? startupState.user
@@ -1163,6 +1170,7 @@ export default function App() {
             isRtl={isRtl}
             locale={locale}
             onOpenAccount={() => handleTabPress("account")}
+            onStartHostedPayment={handleStartHostedPayment}
             theme={theme}
           />
         ) : null}
@@ -1181,6 +1189,7 @@ export default function App() {
             isRtl={isRtl}
             locale={locale}
             onOpenAccount={() => handleTabPress("account")}
+            onStartHostedPayment={handleStartHostedPayment}
             theme={theme}
           />
         ) : null}
@@ -1210,6 +1219,7 @@ export default function App() {
             isRtl={isRtl}
             locale={locale}
             onOpenAccount={() => handleTabPress("account")}
+            onStartHostedPayment={handleStartHostedPayment}
             onExit={notificationOrderId ? () => {
               setNotificationOrderId(null);
               setActiveTab("messages");
@@ -1275,6 +1285,11 @@ export default function App() {
         </ScrollView>
       )}
 
+      <HostedPaymentController
+        locale={locale}
+        ownerId={authenticatedUserId}
+        theme={theme}
+      />
       <BottomTabBar
         activeTab={activeTab}
         activityMenuOpen={activityMenuOpen}

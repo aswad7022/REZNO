@@ -54,3 +54,16 @@ export type MobilePaymentPage = {
   pageSize: number;
   nextCursor: string | null;
 };
+
+export type MobileHostedPaymentHandoff = {
+  checkoutUrl: string;
+  expiresAt: string;
+  intentId: string;
+  kind: "HOSTED_PAYMENT_HANDOFF";
+  returnUrls: {
+    cancel: string;
+    failure: string;
+    success: string;
+  };
+  state: string;
+};

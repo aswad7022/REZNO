@@ -164,6 +164,37 @@ test("Gate 7A keeps Expo Web dependencies version-compatible", async () => {
   );
 });
 
+test("Gate 7C pins the native browser handoff dependency and plugin", async () => {
+  const { appConfig, easConfig, mobilePackage } =
+    await repositoryConfiguration();
+  assert.equal(
+    validateReleaseConfiguration(appConfig, easConfig, mobilePackage).status,
+    "valid",
+  );
+
+  const missingPlugin = structuredClone(appConfig);
+  missingPlugin.expo.plugins = missingPlugin.expo.plugins.filter(
+    (plugin) => plugin !== "expo-web-browser",
+  );
+  assert.throws(
+    () =>
+      validateReleaseConfiguration(missingPlugin, easConfig, mobilePackage),
+    /hosted payment handoff/,
+  );
+
+  const mismatchedDependency = structuredClone(mobilePackage);
+  mismatchedDependency.dependencies["expo-web-browser"] = "^1.0.0";
+  assert.throws(
+    () =>
+      validateReleaseConfiguration(
+        appConfig,
+        easConfig,
+        mismatchedDependency,
+      ),
+    /Expected values to be strictly equal/,
+  );
+});
+
 async function readJson<T>(filePath: string): Promise<T> {
   return JSON.parse(await readFile(filePath, "utf8")) as T;
 }

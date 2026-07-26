@@ -126,6 +126,7 @@ export function CommerceMarketScreen({
   isRtl,
   locale,
   onOpenAccount,
+  onStartHostedPayment,
   onExit,
   theme,
 }: {
@@ -134,6 +135,7 @@ export function CommerceMarketScreen({
   isRtl: boolean;
   locale: MobileLocale;
   onOpenAccount: () => void;
+  onStartHostedPayment: (intentId: string) => void;
   onExit?: () => void;
   theme: MobileTheme;
 }) {
@@ -493,6 +495,7 @@ export function CommerceMarketScreen({
     navigate,
     notice,
     onOpenAccount,
+    onStartHostedPayment,
     openProduct,
     openStore,
     refreshCart,
@@ -558,6 +561,7 @@ type CommonProps = {
   navigate: (route: Route) => void;
   notice: string | null;
   onOpenAccount: () => void;
+  onStartHostedPayment: (intentId: string) => void;
   openProduct: (storeSlug: string, productSlug: string) => Promise<void>;
   openStore: (storeSlug: string) => Promise<void>;
   refreshCart: () => Promise<void>;
@@ -935,7 +939,7 @@ function CheckoutScreen(props: CommonProps) {
 }
 
 function ReceiptScreen(props: CommonProps & { receipt: CommerceReceipt }) {
-  const { copy, handlePrivateError, isRtl, locale, navigate, onOpenAccount, receipt, sessionAvailable, theme } = props;
+  const { copy, handlePrivateError, isRtl, locale, navigate, onOpenAccount, onStartHostedPayment, receipt, sessionAvailable, theme } = props;
   const styles = useMemo(() => createStyles(theme), [theme]);
   const openOrder = async () => {
     try { navigate({ kind: "order", order: await commerceApi.getOrder(receipt.id) }); }
@@ -946,7 +950,14 @@ function ReceiptScreen(props: CommonProps & { receipt: CommerceReceipt }) {
     <CommerceHeader copy={copy} isRtl={isRtl} title={copy.receipt} theme={theme} />
     <CommerceState body={copy.successBody} theme={theme} title={copy.successTitle} />
     <View style={styles.panel}><Summary label={copy.orderNumber} value={receipt.orderNumber} isRtl={isRtl} styles={styles} /><Summary label={copy.status} value={commerceStatusLabel(receipt.status, locale)} isRtl={isRtl} styles={styles} /><Summary label={copy.fulfillment} value={commerceStatusLabel(receipt.fulfillmentStatus, locale)} isRtl={isRtl} styles={styles} /><Summary label={copy.payment} value={`${commercePaymentMethodLabel(receipt.paymentMethod, copy)} · ${commerceStatusLabel(receipt.paymentStatus, locale)}`} isRtl={isRtl} styles={styles} /><Summary label={copy.total} value={formatCommerceMoney(receipt.grandTotal, receipt.currency, locale)} isRtl={isRtl} styles={styles} /><Text style={styles.muted}>{formatCommerceDate(receipt.createdAt, locale)}</Text></View>
-    {receipt.onlinePayment?.action ? <CommerceState body={copy.paymentActionPending} theme={theme} title={copy.onlinePayment} /> : null}
+    {receipt.onlinePayment?.action ? <>
+      <CommerceState body={copy.paymentActionPending} theme={theme} title={copy.onlinePayment} />
+      <CommerceButton
+        label={copy.continueHostedPayment}
+        onPress={() => onStartHostedPayment(receipt.onlinePayment!.id)}
+        theme={theme}
+      />
+    </> : null}
     {receipt.items.map((item, index) => <View key={`${item.productName}-${index}`} style={styles.lineCard}><Text style={[styles.lineTitle, isRtl ? styles.rtl : styles.ltr]}>{item.productName}</Text><Text style={[styles.muted, isRtl ? styles.rtl : styles.ltr]}>{item.variantTitle} · {item.quantity}</Text><Text style={styles.goldText}>{formatCommerceMoney(item.lineTotal, item.currency, locale)}</Text></View>)}
     {receipt.address ? <View style={styles.panel}><Text style={[styles.sectionTitle, isRtl ? styles.rtl : styles.ltr]}>{copy.address}</Text><Text style={[styles.body, isRtl ? styles.rtl : styles.ltr]}>{receipt.address.recipientName} · {receipt.address.city} · {receipt.address.area} · {receipt.address.street}</Text></View> : null}
     <CommerceButton label={copy.viewOrder} onPress={() => void openOrder()} theme={theme} />
