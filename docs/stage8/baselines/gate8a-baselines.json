@@ -1,0 +1,48 @@
+{
+  "baseSha": "124c570b640a209fa4a04270e5e46a216077677b",
+  "capturedAt": "2026-07-27",
+  "capturePolicy": "Synthetic local fixtures only; no staging or production mutation.",
+  "captures": [
+    {
+      "file": "public-home-desktop-ar.png",
+      "locale": "ar",
+      "mode": "light",
+      "sha256": "f792df66ec473326472360b3dc39c72ed85a1d318bcc7a48efde4b4883e47a52",
+      "surface": "public",
+      "viewport": "1440x900"
+    },
+    {
+      "file": "auth-signin-desktop-ar.png",
+      "locale": "ar",
+      "mode": "light",
+      "sha256": "7c4975d2de68d2df13ca6de00189484bc68999c2c39f5caef595e7b76e0296e9",
+      "surface": "auth",
+      "viewport": "1440x900"
+    },
+    {
+      "file": "admin-overview-desktop-ar.png",
+      "locale": "ar",
+      "mode": "light",
+      "sha256": "c327b8688a8bd2a36292cd54ab82e98555a25912d923ff33dd5917ab53124318",
+      "surface": "dashboard",
+      "viewport": "1440x900"
+    },
+    {
+      "file": "public-marketplace-compact-ar-390x844.png",
+      "locale": "ar",
+      "mode": "light",
+      "sha256": "759f6fec6457e3b92faeebc6d6f20e3819db294e284d690f8d4ccf0f5fb520c8",
+      "surface": "public",
+      "viewport": "390x844"
+    },
+    {
+      "file": "mobile-auth-web-ar-390x844.png",
+      "locale": "ar",
+      "mode": "dark",
+      "note": "Fail-closed Expo session error for an origin outside the Gate 7A allowlist.",
+      "sha256": "f02cd927d986e9718a7eb563f93ae76f7b8032a83aa9c3fd716204655d5a3cd3",
+      "surface": "mobile",
+      "viewport": "390x844"
+    }
+  ]
+}
