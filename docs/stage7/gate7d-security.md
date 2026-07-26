@@ -1,6 +1,6 @@
 # Gate 7D Security Review
 
-Status: **AUTHOR REVIEW PENDING FINAL INDEPENDENT REVIEW**.
+Status: **PASS_CODE_REVIEW — EXTERNAL SECURITY VALIDATION DEFERRED BY OWNER**.
 
 ## Assets and trust boundaries
 
@@ -89,4 +89,7 @@ returns `NOT_CONFIGURED`; it never creates a synthetic acceptance or receipt.
   Gates 7B/7C.
 
 Until those checks pass, security closure is
-`EXTERNAL VALIDATION REQUIRED`, not Stage 7 PASS.
+`DEFERRED_BY_OWNER — CODE MERGED, EXTERNAL VALIDATION NOT COMPLETED`, not
+Stage 7 `CLOSED` or `PASS`. The independent repository review found zero
+P0/P1/P2 issues; that result does not prove any physical-device or provider
+row above.

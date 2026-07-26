@@ -1,6 +1,6 @@
 # Stage 7 — Release and Physical-Device Validation
 
-Status: **ACTIVE — GATES 7A/7B/7C CLOSED, GATE 7D AUTHOR IMPLEMENTATION / EXTERNAL VALIDATION REQUIRED**.
+Status: **DEFERRED_BY_OWNER — CODE MERGED, EXTERNAL VALIDATION NOT COMPLETED**.
 
 Canonical base: `origin/main` at
 `61bfa6088dc299ba3fa68e400e16d70e419e122f`, the merge commit of PR #131.
@@ -13,6 +13,30 @@ Stage 6 operational activation was explicitly deferred by the owner:
 
 No Stage 6 runtime control, schedule, GitHub runtime variable, staging database,
 Vercel environment, or provider configuration is changed by Stage 7.
+
+## Owner deferral decision — 2026-07-27
+
+Gate 7D repository code completed independent review with
+`PASS_CODE_REVIEW`, zero P0/P1/P2 findings, zero unresolved review threads,
+and green required repository checks. The owner authorized a code-only merge
+while explicitly deferring the mandatory physical-device and real-provider
+evidence.
+
+This decision does not convert Stage 7 into `CLOSED` or `PASS`:
+
+- Gate 7D code: `MERGED`;
+- Stage 7 external validation: `DEFERRED_BY_OWNER`;
+- Stage 7 formal closure: `NOT COMPLETED`.
+
+No physical iPhone or Android validation was performed. APNs/FCM token
+registration, delivery, invalid-token handling, notification open, and receipt
+truth were not proven against authorized provider systems. The Android
+Preview EAS build `332bbe3f-15ba-4e1b-aa7c-6ebb6a80623f` completed but was
+not installed on a physical phone. iOS Preview creation remains blocked by
+the absence of an Apple credential suitable for internal distribution.
+The complete evidence debt remains mandatory in
+`gate7d-device-evidence.md`; it is preserved, not waived or weakened.
+Its validation label remains `EXTERNAL VALIDATION REQUIRED`.
 
 ## Objective
 
@@ -44,9 +68,9 @@ read-only endpoint evidence; it does not imply physical-device proof.
 | Public staging API origin | `IMPLEMENTED_AND_PROVEN` | `https://rezno-staging.vercel.app` resolves to the same exact-main staging deployment as the protected team alias and returns the unauthenticated session API with HTTP 200. |
 | Release API-origin safety | `IMPLEMENTED_AND_PROVEN` | Non-development bundles accept only the exact source-controlled staging origin. Hostname shape is never treated as proof of safety; every special-use, DNS-to-private, or otherwise unapproved origin is rejected. |
 | EAS account/project access | `IMPLEMENTED_AND_PROVEN` | Read-only `whoami` and `project:info` succeeded on 2026-07-26. No credential material was read or printed. |
-| Current signed Development/Preview artifact | `IMPLEMENTED_NOT_PHYSICAL_PROVEN` | Configuration and runbook exist. Historical Android evidence is not evidence for this Stage 7 commit. |
+| Current signed Development/Preview artifact | `IMPLEMENTED_NOT_PHYSICAL_PROVEN` | Android Preview build `332bbe3f-15ba-4e1b-aa7c-6ebb6a80623f` completed for the reviewed Gate 7D head but was not installed on a physical device. iOS remains blocked by Apple internal-distribution credentials. |
 | Physical iPhone install/open | `BLOCKED_BY_EXTERNAL_CREDENTIAL` | Requires an authorized Apple team/signing path, registered device or TestFlight path, and a physical iPhone. |
-| Physical Android install/open | `IMPLEMENTED_NOT_PHYSICAL_PROVEN` | An internal APK path is defined, but no Stage 7 build was created or installed on a physical phone. |
+| Physical Android install/open | `IMPLEMENTED_NOT_PHYSICAL_PROVEN` | A signed internal Android Preview artifact exists, but it was not installed or exercised on a physical phone. |
 | `ar`/`en`/`ckb` and RTL/LTR | `IMPLEMENTED_NOT_PHYSICAL_PROVEN` | Current app source contains all three locales and direction handling; physical-device regression remains required. |
 | SecureStore session persistence | `IMPLEMENTED_NOT_PHYSICAL_PROVEN` | Better Auth cookies are normalized and stored in Expo SecureStore; cold-process behavior is not physically proven. |
 | Photo Library selection | `IMPLEMENTED_NOT_PHYSICAL_PROVEN` | Customer avatar uses `expo-image-picker`, asks for library permission, and accepts one image. |
@@ -66,8 +90,9 @@ read-only endpoint evidence; it does not imply physical-device proof.
 
 ## Proposed gate decomposition
 
-This is the canonical Stage 7 decomposition. Gates 7A–7C are closed. Gate 7D
-is the only active gate and remains externally blocked from formal closure.
+This is the canonical Stage 7 decomposition. Gates 7A–7C are closed and Gate
+7D code is merged. Gate 7D external validation is deferred by the owner, so
+Stage 7 remains formally open rather than `CLOSED` or `PASS`.
 
 ### Gate 7A — Release and Physical-Device Foundation
 

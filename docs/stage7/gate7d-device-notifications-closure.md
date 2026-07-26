@@ -1,6 +1,6 @@
 # Gate 7D — Device Notifications and Stage 7 Closure
 
-Status: **AUTHOR IMPLEMENTATION — EXTERNAL VALIDATION REQUIRED**.
+Status: **DEFERRED_BY_OWNER — CODE MERGED, EXTERNAL VALIDATION NOT COMPLETED**.
 
 Base: Gate 7C merge commit
 `61bfa6088dc299ba3fa68e400e16d70e419e122f`.
@@ -9,6 +9,12 @@ Gate 7D closes the remaining repository gap for native device tokens and
 provider receipt truth. It does not activate Stage 6, configure a real
 provider, change staging/production databases, submit a store build, or claim
 physical-device evidence.
+
+The final independent repository review returned `PASS_CODE_REVIEW` with zero
+P0/P1/P2 findings and zero unresolved threads. The owner authorized this code
+to merge without treating the missing external evidence as completed. Gate 7D
+code is therefore `MERGED`; Stage 7 external validation is
+`DEFERRED_BY_OWNER`; Stage 7 formal closure is `NOT COMPLETED`.
 
 ## Implemented contract
 
@@ -84,10 +90,17 @@ receipt bridge, or production/staging push encryption key is committed or
 configured by this gate. Provider execution remains `NOT_CONFIGURED` until a
 separately approved environment supplies every required value.
 
-## Closure boundary
+## Deferred external closure boundary
 
-The code PR can be independently reviewed while Draft. Gate 7D and Stage 7
-must remain open until the physical iPhone/Android, signed build, notification
-delivery/open, token rotation, receipt, media, weak-network, process-death,
-and hosted-payment return evidence in
-`gate7d-device-evidence.md` is completed using real authorized systems.
+No physical iPhone or Android test was performed. Android Preview build
+`332bbe3f-15ba-4e1b-aa7c-6ebb6a80623f` exists but was not installed on a
+physical device. iOS Preview remains blocked by missing Apple
+internal-distribution credentials. APNs/FCM registration, delivery, receipt,
+invalid-token, and notification-open behavior were not proven on a real
+provider.
+
+Gate 7D and Stage 7 must remain formally open until the physical
+iPhone/Android, notification delivery/open, token rotation, receipt, media,
+weak-network, process-death, and hosted-payment return evidence in
+`gate7d-device-evidence.md` is completed using real authorized systems. The
+owner deferral preserves every evidence requirement and does not waive one.

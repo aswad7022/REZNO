@@ -1,10 +1,16 @@
 # Gate 7D Physical Device and Provider Evidence
 
-Status: **EXTERNAL VALIDATION REQUIRED — NOT RUN**.
+Status: **DEFERRED_BY_OWNER — REQUIRED EXTERNAL VALIDATION NOT RUN**.
 
 No physical-device, Apple/Google credential, APNs/FCM delivery, store,
 payment-sandbox, or production result has been inferred from repository tests,
 simulators, Expo exports, or generated builds.
+
+The reviewed Android Preview build
+`332bbe3f-15ba-4e1b-aa7c-6ebb6a80623f` completed but was not installed or
+tested on a physical Android phone. iOS Preview creation stopped because an
+Apple credential suitable for internal distribution was unavailable. No
+physical-device or real APNs/FCM/receipt claim follows from either result.
 
 ## Required evidence matrix
 
@@ -60,4 +66,6 @@ URLs/state, customer contact data, device identifiers, or financial data.
    device return is to be exercised.
 6. Request a new independent review of the exact evidence-bearing PR head.
 
-Stage 7 remains open until this matrix is complete.
+Owner deferral does not remove, satisfy, or weaken any row in this matrix.
+Stage 7 formal closure remains `NOT COMPLETED` until this matrix is complete
+and independently reviewed.

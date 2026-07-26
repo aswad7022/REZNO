@@ -1,6 +1,6 @@
 # Gate 7D Test Plan
 
-Status: **LOCAL PASS — REMOTE CI AND DEVICE/PROVIDER EVIDENCE OPEN**.
+Status: **REPOSITORY PASS — EXTERNAL DEVICE/PROVIDER VALIDATION DEFERRED BY OWNER**.
 
 ## Author verification — 2026-07-26
 
@@ -22,6 +22,9 @@ Status: **LOCAL PASS — REMOTE CI AND DEVICE/PROVIDER EVIDENCE OPEN**.
 - production dependency audit and Mobile dependency audit: zero
   vulnerabilities;
 - changed-file secret scan and Gate 7D privacy-log scan: zero findings.
+- independent review: `PASS_CODE_REVIEW`, zero P0/P1/P2, zero unresolved
+  threads;
+- exact-head GitHub Actions and both Vercel projects: PASS.
 
 These results prove repository behavior only. They do not satisfy the physical
 device/provider matrix below.
@@ -107,3 +110,7 @@ process-death, poor network, or hosted-browser return on real hardware. Run
 the matrix in `gate7d-device-evidence.md` using signed Development/Preview
 artifacts and authorized sandbox providers. No store submit or production
 update is part of this plan.
+
+The owner deferred this matrix after approving the reviewed code-only merge.
+That decision records the repository result without changing any `NOT_RUN` or
+`BLOCKED` external row and without declaring Stage 7 `CLOSED` or `PASS`.
