@@ -14,6 +14,7 @@ export type MobileTheme = {
     disabledText: string;
     foreground: string;
     foregroundInverse: string;
+    focus: string;
     gold: string;
     goldSoft: string;
     hero: string;
@@ -22,6 +23,8 @@ export type MobileTheme = {
     mutedForeground: string;
     nav: string;
     overlay: string;
+    info: string;
+    infoSoft: string;
     shadow: string;
     success: string;
     successSoft: string;
@@ -40,6 +43,7 @@ export type MobileTheme = {
     md: number;
     sm: number;
     xl: number;
+    xxl: number;
     xs: number;
   };
 };
@@ -56,6 +60,7 @@ const shared = {
     md: 16,
     sm: 10,
     xl: 26,
+    xxl: 32,
     xs: 6,
   },
 };
@@ -77,6 +82,7 @@ export const darkMobileTheme: MobileTheme = {
     disabledText: "#7f8a97",
     foreground: "#ffffff",
     foregroundInverse: "#160d02",
+    focus: "#ffe097",
     gold: "#ffc13a",
     goldSoft: "#2b210f",
     hero: "#03070c",
@@ -85,6 +91,8 @@ export const darkMobileTheme: MobileTheme = {
     mutedForeground: "#b2bbc7",
     nav: "rgba(2, 6, 10, 0.98)",
     overlay: "rgba(0, 0, 0, 0.44)",
+    info: "#60a5fa",
+    infoSoft: "#10243a",
     shadow: "#000000",
     success: "#34d399",
     successSoft: "#0d2b24",
@@ -111,6 +119,7 @@ export const lightMobileTheme: MobileTheme = {
     disabledText: "#91826c",
     foreground: "#17140f",
     foregroundInverse: "#17140f",
+    focus: "#8f5f13",
     gold: "#c98a12",
     goldSoft: "#f5e4bd",
     hero: "#fff0cb",
@@ -119,6 +128,8 @@ export const lightMobileTheme: MobileTheme = {
     mutedForeground: "#675b4c",
     nav: "rgba(255, 248, 236, 0.96)",
     overlay: "rgba(80, 55, 9, 0.1)",
+    info: "#2563eb",
+    infoSoft: "#e7efff",
     shadow: "#5a3c09",
     success: "#059669",
     successSoft: "#e3f6ec",

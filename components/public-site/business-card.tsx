@@ -24,27 +24,28 @@ export async function BusinessCard({
   const restaurantExperience = isRestaurantVertical(business.vertical);
 
   return (
-    <Card className="group h-full overflow-hidden border-primary/10 bg-card/95 shadow-sm transition-all hover:-translate-y-1 hover:border-primary/20 hover:shadow-2xl hover:shadow-primary/10">
+    <Card className="group rezno-card-hover h-full overflow-hidden border-primary/10 bg-card/95 shadow-sm hover:border-primary/20 hover:shadow-2xl hover:shadow-primary/10 motion-reduce:transform-none">
       <div className="relative">
         <Link
           href={`/${business.slug}`}
+          aria-label={`${t("viewBusiness")}: ${business.name}`}
           className="block outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
         >
-        <div className="relative flex aspect-[16/7] items-center justify-center overflow-hidden bg-gradient-to-br from-blue-100 via-indigo-100 to-violet-100 dark:from-blue-950 dark:via-indigo-950 dark:to-violet-950">
-          {business.coverImageUrl ? (
-            <Image
-              src={business.coverImageUrl}
-              alt=""
-              fill
-              sizes="(max-width: 768px) 100vw, 33vw"
-              className="object-cover transition duration-500 group-hover:scale-105"
-            />
-          ) : null}
-          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/28 via-transparent to-transparent" />
-          {!business.coverImageUrl ? (
-            <ImageIcon className="size-7 text-primary/35" />
-          ) : null}
-        </div>
+          <div className="relative flex aspect-[16/7] items-center justify-center overflow-hidden bg-gradient-to-br from-secondary via-accent to-primary/20 dark:from-secondary dark:via-accent dark:to-primary/25">
+            {business.coverImageUrl ? (
+              <Image
+                src={business.coverImageUrl}
+                alt=""
+                fill
+                sizes="(max-width: 768px) 100vw, 33vw"
+                className="object-cover transition duration-(--motion-duration-slow) group-hover:scale-105 motion-reduce:transform-none"
+              />
+            ) : null}
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/28 via-transparent to-transparent" />
+            {!business.coverImageUrl ? (
+              <ImageIcon className="size-7 text-primary/35" />
+            ) : null}
+          </div>
         </Link>
         <div className="absolute end-3 top-3">
           <FavoriteBusinessButton

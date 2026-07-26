@@ -38,7 +38,7 @@ export async function PublicHeader() {
     <header className="sticky top-0 z-40 border-b border-border/70 bg-background/82 shadow-sm shadow-slate-950/[0.03] backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4 sm:px-6">
         <Link href="/" className="flex items-center gap-2 font-black tracking-tight">
-          <span className="grid size-10 place-items-center rounded-2xl bg-gradient-to-br from-primary to-violet-600 text-primary-foreground shadow-lg shadow-primary/20">
+          <span className="grid size-10 place-items-center rounded-2xl bg-gradient-to-br from-primary to-[color-mix(in_oklch,var(--primary),var(--warning)_24%)] text-primary-foreground shadow-lg shadow-primary/20">
             R
           </span>
           <span>REZNO</span>
