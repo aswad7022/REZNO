@@ -360,7 +360,7 @@ test("Gate 5C production routes are strict, scope-safe, truthful, and redacted",
     assert.equal(
       await prisma.paymentMutation.count({
         where: {
-          action: "RUN_RECONCILIATION",
+          action: "CREATE_HOSTED_HANDOFF",
           paymentIntentId: hostedIntent.id,
         },
       }),

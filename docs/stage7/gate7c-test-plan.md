@@ -24,6 +24,10 @@ The Gate 7C suite must complete without failure, skip, todo, or cancellation:
 - five-minute expiry cleanup;
 - claim-time API-session capture across a cookie/account change;
 - account switch quiescing the old browser runner before new-owner recovery;
+- logout quiescing each active runner phase before clearing authentication;
+- opaque Better Auth owner identities with exact, case-sensitive isolation;
+- owner-scoped recovery records that cannot delete another account's pending return;
+- a dedicated hosted-handoff mutation action and intent-expiry-bounded handoffs;
 - no sensitive logging or credential forwarding;
 - `ar`, `en`, and `ckb` state coverage;
 - Gate 7A release-origin and Gate 7B media regressions.
@@ -32,7 +36,7 @@ The Gate 7C suite must complete without failure, skip, todo, or cancellation:
 
 1. Focused Gate 7C and Gate 7A/7B regressions.
 2. All Unit suites.
-3. All PostgreSQL integration suites on a fresh disposable 49/49 database.
+3. All PostgreSQL integration suites on a fresh disposable 50/50 database.
 4. All HTTP/RSC/API suites against a production Next.js server.
 5. Root and Mobile TypeScript, ESLint, and `git diff --check`.
 6. Prisma format check, validation, and client generation.
@@ -60,6 +64,10 @@ The Gate 7C suite must complete without failure, skip, todo, or cancellation:
 | Network stays ambiguous | Bounded retry, then pending confirmation |
 | Manifest expires | Cleanup, no reopen/consume |
 | Account changes with browser open | Old runner aborts and releases before new-owner recovery |
+| Logout during prepare/browser/verification | The active runner aborts and quiesces before the session is cleared |
+| Account B loads while account A has recovery | B cannot read or delete A's owner-scoped record |
+| Better Auth emits an opaque user id | The exact bounded id is retained; casing is not normalized |
+| Intent expires before the action window | No handoff is created; otherwise the handoff expires at the earliest trusted boundary |
 
 ## Device evidence boundary
 
@@ -76,25 +84,25 @@ hidden failure is counted as success.
 
 | Check | Result |
 | --- | --- |
-| Gate 7C plus Gate 7A/7B regressions and release validator | `74/74` pass (`71 + 3`) |
-| Complete Unit suites | `534/534` pass (`331 + 203`) |
-| Complete PostgreSQL integration on a fresh 49/49 database | `426/426` pass |
+| Gate 7C plus Gate 7A/7B regressions and release validator | `80/80` pass (`76 + 4`) |
+| Complete Unit suites | `540/540` pass (`336 + 204`) |
+| Complete PostgreSQL integration on a fresh 50/50 database | `426/426` pass |
 | Complete live HTTP/RSC/API suites on the production server | `132/132` pass (`6 + 121 + 5`) |
 | Root and Mobile TypeScript | PASS |
 | Full ESLint and `git diff --check` | PASS, zero warning/error |
 | Prisma format/validate/generate | PASS, Prisma Client `7.8.0` |
 | Expo release config/install check/Doctor | PASS; dependencies current; `20/20` |
-| iOS Hermes export | PASS; 952 modules; 3.3 MB bundle |
-| Android Hermes export | PASS; 950 modules; 3.3 MB bundle |
-| Expo Web export | PASS; 684 modules; 2.0 MB bundle |
+| iOS Hermes export | PASS; 953 modules; 3.3 MB bundle |
+| Android Hermes export | PASS; 951 modules; 3.3 MB bundle |
+| Expo Web export | PASS; 680 modules; 2.0 MB bundle |
 | Next.js production build | PASS; compile/typecheck and `115/115` pages |
 | Root production dependency audit | PASS; 0 findings |
 | Mobile full dependency audit | PASS; 0 findings |
 | Scoped secret/privacy/payment/provider scan | PASS |
-| Migration chain and immutability | PASS; 49 directories, no schema/migration diff |
+| Migration chain and immutability | PASS; 50 directories, append-only Migration 50, no Migration 48/49 diff |
 
 The PostgreSQL run used a newly created local disposable
-`rezno_gate7c_test` database with every migration freshly deployed. The HTTP
+`rezno_gate7c_fix_test` database with every migration freshly deployed. The HTTP
 run used the same database and a newly built Next.js production server on an
 isolated loopback port. The hosted provider remains unconfigured, so the
 expected live behavior is a stable fail-closed result without a durable

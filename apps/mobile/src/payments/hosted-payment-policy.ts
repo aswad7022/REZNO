@@ -5,6 +5,7 @@ import type {
 
 const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const OWNER_ID = /^[A-Za-z0-9._~-]{1,128}$/;
 const STATE = /^[A-Za-z0-9_-]{32,2048}$/;
 
 // No real hosted-payment provider origin has been approved. Adding an origin
@@ -170,7 +171,7 @@ export function createHostedPaymentRecoveryManifest(input: {
   if (
     !UUID.test(input.idempotencyKey)
     || !UUID.test(input.operationId)
-    || !UUID.test(input.ownerId)
+    || !OWNER_ID.test(input.ownerId)
   ) {
     invalid("INVALID_RECOVERY");
   }
@@ -183,7 +184,7 @@ export function createHostedPaymentRecoveryManifest(input: {
     intentId: input.handoff.intentId.toLowerCase(),
     operationId: input.operationId.toLowerCase(),
     outcome: null,
-    ownerId: input.ownerId.toLowerCase(),
+    ownerId: input.ownerId,
     returnReceivedAt: null,
     returnUrl: "rezno://payments/return",
     state: input.handoff.state,
@@ -240,8 +241,8 @@ export function parseHostedPaymentRecoveryManifest(
     || typeof item.state !== "string"
     || !STATE.test(item.state)
     || typeof item.ownerId !== "string"
-    || !UUID.test(item.ownerId)
-    || item.ownerId.toLowerCase() !== input.ownerId.toLowerCase()
+    || !OWNER_ID.test(item.ownerId)
+    || item.ownerId !== input.ownerId
     || typeof item.intentId !== "string"
     || !UUID.test(item.intentId)
     || typeof item.operationId !== "string"

@@ -63,7 +63,7 @@ export async function createCustomerHostedPaymentHandoff(
     });
     if (replay) {
       if (
-        replay.action !== "RUN_RECONCILIATION"
+        replay.action !== "CREATE_HOSTED_HANDOFF"
         || replay.paymentIntentId !== paymentIntentId
         || replay.requestHash !== requestHash
         || replay.status !== "PROCESSING"
@@ -80,6 +80,8 @@ export async function createCustomerHostedPaymentHandoff(
     const now = new Date();
     if (
       intent.status !== "REQUIRES_ACTION"
+      || !intent.expiresAt
+      || intent.expiresAt <= now
       || !attempt
       || attempt.status !== "REQUIRES_ACTION"
       || !attempt.requiresAction
@@ -97,13 +99,14 @@ export async function createCustomerHostedPaymentHandoff(
     configuredHostedCheckoutPolicy(intent.provider);
     const expiresAt = new Date(
       Math.floor(Math.min(
+        intent.expiresAt.getTime(),
         attempt.actionExpiresAt.getTime(),
         now.getTime() + HANDOFF_TTL_MS,
       ) / 1_000) * 1_000,
     );
     const mutation = await transaction.paymentMutation.create({
       data: {
-        action: "RUN_RECONCILIATION",
+        action: "CREATE_HOSTED_HANDOFF",
         actorKey,
         actorPersonId: customerPersonId,
         actorType: "CUSTOMER",
@@ -186,7 +189,7 @@ export async function consumeCustomerHostedPaymentReturn(
       !attempt
       || !mutation
       || !stored
-      || mutation.action !== "RUN_RECONCILIATION"
+      || mutation.action !== "CREATE_HOSTED_HANDOFF"
       || mutation.actorType !== "CUSTOMER"
       || mutation.actorPersonId !== customerPersonId
       || mutation.actorKey !== hostedActorKey(customerPersonId)

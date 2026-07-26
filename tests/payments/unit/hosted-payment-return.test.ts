@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import {
@@ -169,6 +170,21 @@ test("Gate 7C bounds an undeclared streamed return body before JSON parsing", as
     () => parseHostedReturn(request),
     paymentCode("VALIDATION_ERROR"),
   );
+});
+
+test("Gate 7C Migration 50 adds only the canonical hosted handoff action", async () => {
+  const migration = await readFile(
+    new URL(
+      "../../../prisma/migrations/20260726173000_hosted_payment_handoff_action/migration.sql",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  assert.equal(
+    migration.trim(),
+    `ALTER TYPE "PaymentMutationAction" ADD VALUE 'CREATE_HOSTED_HANDOFF';`,
+  );
+  assert.doesNotMatch(migration, /CREATE TABLE|INSERT INTO|RUN_RECONCILIATION/u);
 });
 
 function encodedState() {

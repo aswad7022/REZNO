@@ -1,0 +1,1 @@
+ALTER TYPE "PaymentMutationAction" ADD VALUE 'CREATE_HOSTED_HANDOFF';

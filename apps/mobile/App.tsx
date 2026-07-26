@@ -884,8 +884,14 @@ export default function App() {
     setAuthActionError(null);
 
     try {
+      if (authenticatedUserId) {
+        await hostedPaymentCoordinator.deactivate(authenticatedUserId);
+      }
       const result = await signOutMobile();
       if (result.error) {
+        if (authenticatedUserId) {
+          await hostedPaymentCoordinator.bootstrap(authenticatedUserId);
+        }
         setAuthActionError(mobileAuthCopy[locale].authFailure);
         return;
       }
@@ -894,6 +900,10 @@ export default function App() {
       setAuthMode(null);
       setAuthSetupPending(false);
     } catch {
+      if (authenticatedUserId) {
+        await hostedPaymentCoordinator.bootstrap(authenticatedUserId)
+          .catch(() => undefined);
+      }
       setAuthActionError(mobileAuthCopy[locale].authFailure);
     } finally {
       setSignOutPending(false);

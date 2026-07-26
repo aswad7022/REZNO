@@ -111,5 +111,6 @@ reviewed and merged.
 - no production or store submission was executed;
 - no EAS build was created in Gate 7A;
 - no physical-device result is claimed;
-- no migration is required by the audited Gate 7C design; migrations 48 and 49
-  remain immutable.
+- Gate 7C uses append-only Migration 50 solely to add the dedicated
+  `CREATE_HOSTED_HANDOFF` payment mutation action; migrations 48 and 49 remain
+  immutable.

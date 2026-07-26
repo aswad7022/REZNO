@@ -10,18 +10,36 @@ import type {
 import { HostedPaymentCoordinator } from "./hosted-payment-coordinator";
 import {
   APPROVED_MOBILE_HOSTED_CHECKOUT_ORIGINS,
-  parseHostedPaymentRecoveryManifest,
   type HostedPaymentRecoveryManifest,
 } from "./hosted-payment-policy";
+import { HostedPaymentRecoveryStore } from "./hosted-payment-recovery-store";
 
 type Data<T> = { data: T };
 
-const MANIFEST_KEY = "rezno.payments.hosted-return.v1";
+const MANIFEST_KEY_PREFIX = "rezno.payments.hosted-return.v1";
 const secureStoreOptions = {
   keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
 };
 
 void WebBrowser.maybeCompleteAuthSession();
+
+const recoveryStore = new HostedPaymentRecoveryStore({
+  approvedOrigins: APPROVED_MOBILE_HOSTED_CHECKOUT_ORIGINS,
+  deleteItem: (key) =>
+    SecureStore.deleteItemAsync(key, secureStoreOptions),
+  getItem: (key) =>
+    SecureStore.getItemAsync(key, secureStoreOptions),
+  async keyForOwner(ownerId) {
+    const digest = await Crypto.digestStringAsync(
+      Crypto.CryptoDigestAlgorithm.SHA256,
+      ownerId,
+    );
+    return `${MANIFEST_KEY_PREFIX}.${digest}`;
+  },
+  now: Date.now,
+  setItem: (key, value) =>
+    SecureStore.setItemAsync(key, value, secureStoreOptions),
+});
 
 export const hostedPaymentCoordinator = new HostedPaymentCoordinator({
   approvedOrigins: APPROVED_MOBILE_HOSTED_CHECKOUT_ORIGINS,
@@ -62,41 +80,9 @@ export const hostedPaymentCoordinator = new HostedPaymentCoordinator({
       },
     };
   },
-  async cleanup(manifest) {
-    const raw = await SecureStore.getItemAsync(
-      MANIFEST_KEY,
-      secureStoreOptions,
-    );
-    if (!raw) return;
-    let operationId: unknown;
-    try {
-      operationId = (JSON.parse(raw) as { operationId?: unknown }).operationId;
-    } catch {
-      operationId = null;
-    }
-    if (operationId === manifest.operationId || operationId === null) {
-      await SecureStore.deleteItemAsync(MANIFEST_KEY, secureStoreOptions);
-    }
-  },
+  cleanup: (manifest) => recoveryStore.cleanup(manifest),
   createAbortController: () => new AbortController(),
-  async load(ownerId) {
-    const raw = await SecureStore.getItemAsync(
-      MANIFEST_KEY,
-      secureStoreOptions,
-    );
-    if (!raw) return null;
-    try {
-      return parseHostedPaymentRecoveryManifest(raw, {
-        allowExpired: true,
-        approvedOrigins: APPROVED_MOBILE_HOSTED_CHECKOUT_ORIGINS,
-        now: Date.now(),
-        ownerId,
-      });
-    } catch {
-      await SecureStore.deleteItemAsync(MANIFEST_KEY, secureStoreOptions);
-      return null;
-    }
-  },
+  load: (ownerId) => recoveryStore.load(ownerId),
   now: Date.now,
   async openBrowser(checkoutUrl, returnUrl, signal) {
     if (signal.aborted) throw abortError();
@@ -128,13 +114,8 @@ export const hostedPaymentCoordinator = new HostedPaymentCoordinator({
       signal.removeEventListener("abort", onAbort);
     }
   },
-  async persist(manifest: HostedPaymentRecoveryManifest) {
-    await SecureStore.setItemAsync(
-      MANIFEST_KEY,
-      JSON.stringify(manifest),
-      secureStoreOptions,
-    );
-  },
+  persist: (manifest: HostedPaymentRecoveryManifest) =>
+    recoveryStore.persist(manifest),
   uuid: Crypto.randomUUID,
   wait: (milliseconds) =>
     new Promise((resolve) => {

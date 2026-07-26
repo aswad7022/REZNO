@@ -131,6 +131,16 @@ export class HostedPaymentCoordinator {
     return () => this.subscribers.delete(subscriber);
   };
 
+  async deactivate(ownerId: string) {
+    if (this.activeOwnerId !== ownerId) return;
+    this.activeOwnerId = null;
+    this.snapshot = EMPTY;
+    const activeRunner = this.runner;
+    if (!activeRunner || activeRunner.ownerId !== ownerId) return;
+    activeRunner.controller.abort();
+    await activeRunner.done;
+  }
+
   async bootstrap(ownerId: string) {
     this.activeOwnerId = ownerId;
     const activeRunner = this.runner;

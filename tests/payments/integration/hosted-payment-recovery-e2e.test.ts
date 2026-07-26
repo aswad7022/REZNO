@@ -96,10 +96,79 @@ test(
         where: {
           actorPersonId: fixture.customer.person.id,
           paymentIntentId: payment.id,
-          action: "RUN_RECONCILIATION",
+          action: "CREATE_HOSTED_HANDOFF",
         },
       }),
       1,
+    );
+    assert.equal(
+      await prisma.paymentMutation.count({
+        where: {
+          actorPersonId: fixture.customer.person.id,
+          paymentIntentId: payment.id,
+          action: "RUN_RECONCILIATION",
+        },
+      }),
+      0,
+    );
+
+    const cappedOrder = await createPayableOrder({
+      customerId: fixture.customer.person.id,
+      storeId: fixture.store.id,
+    });
+    const cappedPayment = await createCustomerPaymentIntent(
+      fixture.customer.person.id,
+      {
+        idempotencyKey: randomUUID(),
+        targetId: cappedOrder.id,
+        targetType: "ORDER",
+      },
+    );
+    const intentExpiry = new Date(Date.now() + 90_000);
+    await prisma.paymentIntent.update({
+      where: { id: cappedPayment.id },
+      data: { expiresAt: intentExpiry },
+    });
+    const cappedHandoff = await createCustomerHostedPaymentHandoff(
+      fixture.customer.person.id,
+      cappedPayment.id,
+      randomUUID(),
+    );
+    assert.ok(Date.parse(cappedHandoff.expiresAt) <= intentExpiry.getTime());
+    assert.ok(Date.parse(cappedHandoff.expiresAt) > Date.now());
+
+    const expiredOrder = await createPayableOrder({
+      customerId: fixture.customer.person.id,
+      storeId: fixture.store.id,
+    });
+    const expiredPayment = await createCustomerPaymentIntent(
+      fixture.customer.person.id,
+      {
+        idempotencyKey: randomUUID(),
+        targetId: expiredOrder.id,
+        targetType: "ORDER",
+      },
+    );
+    await prisma.paymentIntent.update({
+      where: { id: expiredPayment.id },
+      data: { expiresAt: new Date(Date.now() - 1_000) },
+    });
+    await assert.rejects(
+      createCustomerHostedPaymentHandoff(
+        fixture.customer.person.id,
+        expiredPayment.id,
+        randomUUID(),
+      ),
+      paymentCode("PAYMENT_STATE_CONFLICT"),
+    );
+    assert.equal(
+      await prisma.paymentMutation.count({
+        where: {
+          action: "CREATE_HOSTED_HANDOFF",
+          paymentIntentId: expiredPayment.id,
+        },
+      }),
+      0,
     );
 
     await assert.rejects(
@@ -124,7 +193,7 @@ test(
           where: {
             actorPersonId: fixture.customer.person.id,
             paymentIntentId: payment.id,
-            action: "RUN_RECONCILIATION",
+            action: "CREATE_HOSTED_HANDOFF",
           },
         })
       ).status,
@@ -173,7 +242,7 @@ test(
       await prisma.paymentMutation.count({
         where: {
           paymentIntentId: otherPayment.id,
-          action: "RUN_RECONCILIATION",
+          action: "CREATE_HOSTED_HANDOFF",
         },
       }),
       0,

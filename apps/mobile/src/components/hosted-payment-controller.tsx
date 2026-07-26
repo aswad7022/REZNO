@@ -131,6 +131,7 @@ export function HostedPaymentController({
       active = false;
       unsubscribe();
       urlSubscription.remove();
+      void hostedPaymentCoordinator.deactivate(ownerId);
     };
   }, [ownerId]);
 

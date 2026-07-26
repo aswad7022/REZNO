@@ -6,6 +6,7 @@ import {
   HostedPaymentCoordinator,
   shouldHandleInitialHostedPaymentUrl,
 } from "../../../apps/mobile/src/payments/hosted-payment-coordinator";
+import { HostedPaymentRecoveryStore } from "../../../apps/mobile/src/payments/hosted-payment-recovery-store";
 import {
   assertApprovedHostedCheckoutUrl,
   createHostedPaymentRecoveryManifest,
@@ -166,6 +167,92 @@ test("Gate 7C validates all server handoff fields and recovery ownership", () =>
       code("INVALID_RECOVERY"),
     );
   }
+});
+
+test("Gate 7C accepts bounded opaque Better Auth owners without weakening recovery scope", () => {
+  const opaqueOwner = "better-auth-opaque-user-01";
+  const manifest = createHostedPaymentRecoveryManifest({
+    handoff: hostedHandoff(),
+    idempotencyKey: IDEMPOTENCY,
+    now: NOW,
+    operationId: OPERATION,
+    ownerId: opaqueOwner,
+  });
+  assert.equal(manifest.ownerId, opaqueOwner);
+  assert.deepEqual(
+    parseHostedPaymentRecoveryManifest(JSON.stringify(manifest), {
+      approvedOrigins: [CHECKOUT_ORIGIN],
+      now: NOW,
+      ownerId: opaqueOwner,
+    }),
+    manifest,
+  );
+  assert.throws(
+    () =>
+      parseHostedPaymentRecoveryManifest(JSON.stringify(manifest), {
+        approvedOrigins: [CHECKOUT_ORIGIN],
+        now: NOW,
+        ownerId: opaqueOwner.toUpperCase(),
+      }),
+    code("INVALID_RECOVERY"),
+  );
+  for (const ownerId of ["", "unsafe owner", "unsafe/owner", "x".repeat(129)]) {
+    assert.throws(
+      () =>
+        createHostedPaymentRecoveryManifest({
+          handoff: hostedHandoff(),
+          idempotencyKey: IDEMPOTENCY,
+          now: NOW,
+          operationId: OPERATION,
+          ownerId,
+        }),
+      code("INVALID_RECOVERY"),
+    );
+  }
+});
+
+test("Gate 7C recovery store preserves owner A across B login and exact cleanup", async () => {
+  const ownerA = "better-auth-owner-a";
+  const ownerB = "better-auth-owner-b";
+  const values = new Map<string, string>();
+  const store = new HostedPaymentRecoveryStore({
+    approvedOrigins: [CHECKOUT_ORIGIN],
+    async deleteItem(key) {
+      values.delete(key);
+    },
+    async getItem(key) {
+      return values.get(key) ?? null;
+    },
+    async keyForOwner(ownerId) {
+      return `owner-key:${ownerId}`;
+    },
+    now: () => NOW,
+    async setItem(key, value) {
+      values.set(key, value);
+    },
+  });
+  const manifestA = createHostedPaymentRecoveryManifest({
+    handoff: hostedHandoff(),
+    idempotencyKey: IDEMPOTENCY,
+    now: NOW,
+    operationId: OPERATION,
+    ownerId: ownerA,
+  });
+  const manifestB = createHostedPaymentRecoveryManifest({
+    handoff: hostedHandoff(),
+    idempotencyKey: "40000000-0000-4000-8000-000000000002",
+    now: NOW,
+    operationId: "30000000-0000-4000-8000-000000000002",
+    ownerId: ownerB,
+  });
+
+  await store.persist(manifestA);
+  assert.equal(await store.load(ownerB), null);
+  assert.deepEqual(await store.load(ownerA), manifestA);
+  await store.persist(manifestB);
+  await store.cleanup(manifestB);
+  assert.equal(await store.load(ownerB), null);
+  assert.deepEqual(await store.load(ownerA), manifestA);
 });
 
 test("Gate 7C warm return is single-flight, consumes once, and trusts server status over link outcome", async () => {
@@ -407,6 +494,75 @@ test("Gate 7C account switch quiesces the old browser runner before recovery", a
   assert.equal(harness.coordinator.getSnapshot(OWNER).runnerId, null);
 });
 
+test("Gate 7C logout quiesces a runner before handoff creation completes", async () => {
+  const create = deferred<MobileHostedPaymentHandoff>();
+  const signal = { current: null as AbortSignal | null };
+  const harness = coordinatorHarness({
+    async create(nextSignal) {
+      signal.current = nextSignal;
+      return rejectOnAbort(create, nextSignal);
+    },
+  });
+  await harness.coordinator.bootstrap(OWNER);
+  const started = harness.coordinator.start(OWNER, INTENT);
+  await until(() => harness.calls.create === 1);
+
+  await harness.coordinator.deactivate(OWNER);
+  assert.equal(signal.current?.aborted, true);
+  assert.equal(await started, "FAILED");
+  assert.equal(harness.coordinator.getSnapshot(OWNER).pending, false);
+  assert.equal(harness.coordinator.getSnapshot(OWNER).runnerId, null);
+  assert.equal(harness.calls.browser, 0);
+});
+
+test("Gate 7C logout dismisses and quiesces the active browser runner", async () => {
+  const signal = { current: null as AbortSignal | null };
+  const browser = deferred<{ type: string; url?: string }>();
+  const harness = coordinatorHarness({
+    async browser(nextSignal) {
+      signal.current = nextSignal;
+      return rejectOnAbort(browser, nextSignal);
+    },
+  });
+  await harness.coordinator.bootstrap(OWNER);
+  const started = harness.coordinator.start(OWNER, INTENT);
+  await until(() => harness.calls.browser === 1);
+
+  await harness.coordinator.deactivate(OWNER);
+  assert.equal(signal.current?.aborted, true);
+  assert.equal(await started, "FAILED");
+  assert.equal(harness.coordinator.getSnapshot(OWNER).pending, false);
+  assert.equal(harness.coordinator.getSnapshot(OWNER).runnerId, null);
+  assert.equal(harness.stored?.checkpoint, "WAITING_RETURN");
+});
+
+test("Gate 7C logout quiesces verification and preserves its recovery checkpoint", async () => {
+  const manifest = {
+    ...manifestForRecovery(),
+    checkpoint: "VERIFYING_STATUS" as const,
+    outcome: "success" as const,
+    returnReceivedAt: NOW + 1_000,
+  };
+  const consume = deferred<MobilePaymentIntent>();
+  const signal = { current: null as AbortSignal | null };
+  const harness = coordinatorHarness({
+    initial: manifest,
+    async consume(nextSignal) {
+      signal.current = nextSignal;
+      return rejectOnAbort(consume, nextSignal);
+    },
+  });
+  const bootstrapping = harness.coordinator.bootstrap(OWNER);
+  await until(() => harness.calls.consume === 1);
+
+  await harness.coordinator.deactivate(OWNER);
+  assert.equal(signal.current?.aborted, true);
+  await bootstrapping;
+  assert.equal(harness.coordinator.getSnapshot(OWNER).pending, false);
+  assert.equal(harness.coordinator.getSnapshot(OWNER).runnerId, null);
+  assert.equal(harness.stored?.checkpoint, "VERIFYING_STATUS");
+});
+
 test("Gate 7C expired recovery cleans SecureStore state and never resumes", async () => {
   const harness = coordinatorHarness({
     initial: {
@@ -434,6 +590,10 @@ test("Gate 7C source does not log checkout URLs, state, cookies, or payment clai
     ),
   ]);
   const combined = source.join("\n");
+  assert.match(source[1], /CryptoDigestAlgorithm\.SHA256/);
+  assert.match(source[1], /HostedPaymentRecoveryStore/);
+  assert.doesNotMatch(source[1], /const MANIFEST_KEY\s*=/);
+  assert.match(source[2], /deactivate\(ownerId\)/);
   assert.doesNotMatch(combined, /console\.(?:debug|error|info|log|warn)/);
   assert.doesNotMatch(combined, /credentials:\s*["']include["']/);
   assert.doesNotMatch(
@@ -446,8 +606,11 @@ function coordinatorHarness(options: {
   browser?: (
     signal: AbortSignal,
   ) => Promise<{ type: string; url?: string }>;
-  consume?: () => Promise<MobilePaymentIntent>;
-  get?: () => Promise<MobilePaymentIntent>;
+  consume?: (signal: AbortSignal) => Promise<MobilePaymentIntent>;
+  create?: (
+    signal: AbortSignal,
+  ) => Promise<MobileHostedPaymentHandoff>;
+  get?: (signal: AbortSignal) => Promise<MobilePaymentIntent>;
   initial?: HostedPaymentRecoveryManifest | null;
 } = {}) {
   let uuidCounter = 10;
@@ -491,20 +654,20 @@ function coordinatorHarness(options: {
     captureApiSession() {
       const capturedOwner = sessionOwner;
       return {
-        async consumeReturn() {
+        async consumeReturn(_intentId, _state, signal) {
           calls.consume += 1;
           harness.sessionActors.consume.push(capturedOwner);
-          return options.consume?.() ?? payment("CAPTURED");
+          return options.consume?.(signal) ?? payment("CAPTURED");
         },
-        async createHandoff() {
+        async createHandoff(_intentId, _idempotencyKey, signal) {
           calls.create += 1;
           harness.sessionActors.create.push(capturedOwner);
-          return hostedHandoff();
+          return options.create?.(signal) ?? hostedHandoff();
         },
-        async getIntent() {
+        async getIntent(_intentId, signal) {
           calls.get += 1;
           harness.sessionActors.get.push(capturedOwner);
-          return options.get?.() ?? payment("CAPTURED");
+          return options.get?.(signal) ?? payment("CAPTURED");
         },
       };
     },
@@ -609,6 +772,23 @@ function deferred<T>() {
     reject = rejectPromise;
   });
   return { promise, reject, resolve };
+}
+
+function rejectOnAbort<T>(
+  task: ReturnType<typeof deferred<T>>,
+  signal: AbortSignal,
+) {
+  if (signal.aborted) {
+    return Promise.reject(new DOMException("cancelled", "AbortError"));
+  }
+  const aborted = new Promise<never>((_resolve, reject) => {
+    signal.addEventListener(
+      "abort",
+      () => reject(new DOMException("cancelled", "AbortError")),
+      { once: true },
+    );
+  });
+  return Promise.race([task.promise, aborted]);
 }
 
 async function until(predicate: () => boolean) {
