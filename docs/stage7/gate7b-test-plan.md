@@ -28,6 +28,10 @@ The Gate 7B suite must prove, with zero failure, skip, todo, or cancellation:
 - cancellation during an already-started durable persist retains the runner,
   `pending`, and cleanup authority until that write quiesces; the latest record
   is then removed before a new operation may claim the slot;
+- account transition aborts and quiesces old pre-commit work before any new
+  account bootstrap, uses local-only operation-scoped cleanup, waits out an
+  old `COMMITTING` request without overlap, and ignores every stale old-owner
+  command after the switch;
 - process restart after target issuance, ambiguous upload, finalization, and
   attach;
 - preview failure after confirmed attach remains committed, cleans recovery
@@ -89,6 +93,9 @@ The Gate 7B suite must prove, with zero failure, skip, todo, or cancellation:
 | Startup preview A settles while foreground B is active | Recovery observes B's owner and performs no controller/ref/state mutation, transfer, attach, or cleanup |
 | Stale runner `finally` settles after a newer generation starts | Owner-token mismatch blocks commit, pending, cancellation-ref, and release changes |
 | Cancel arrives while a checkpoint persist is unresolved | The owner remains `CANCELLING`; a duplicate/new run is rejected, the write settles, cleanup removes the latest record, and only then is the runner released |
+| Account changes while old work is pre-commit | The old controller is aborted, normalization/transport and durable writes quiesce, local recovery is removed without an authenticated abort call, and only then does the new account bootstrap |
+| Account changes while old attach is `COMMITTING` | The exact old owner remains pending until server truth resolves; no second runner, verifier, preview, or new-account API work overlaps it |
+| Stale old-account action arrives after the new runner starts | It cannot abort, cancel, retry, remove, or change pending/commit state for the current account |
 | Process restart before/after finalize | Stable idempotency resumes exact checkpoint |
 | Different user reopens app | Recovery rejected and local private state cleaned |
 | Container changed before attach | Old asset is not attached over newer content |
@@ -121,8 +128,8 @@ hidden failure is counted as success.
 
 | Check | Result |
 | --- | --- |
-| P2 focused Gate 7B + Gate 7A regression + release validator | `51/51` pass |
-| Complete Unit suites | `511/511` pass (`311 + 200`) |
+| P2 focused Gate 7B + Gate 7A regression + release validator | `54/54` pass |
+| Complete Unit suites | `514/514` pass (`314 + 200`) |
 | Complete PostgreSQL integration on disposable `49/49` database | `425/425` pass |
 | Complete live HTTP/RSC/API suites | `131/131` pass (`6 + 120 + 5`) |
 | Root and Mobile TypeScript | PASS |

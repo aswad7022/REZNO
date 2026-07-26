@@ -78,6 +78,17 @@ pending state, or release the slot, so a rejected duplicate or stale
 `finally` cannot disturb a newer run. A remounted component subscribes to the
 same owner and completion rather than starting a replacement.
 
+The authenticated owner transition is also single-flight. A new account
+becomes the only UI command owner before transition starts. If the old runner
+is still pre-commit, the coordinator aborts it, waits for normalization,
+transport, and any durable write to quiesce, then removes only its local
+recovery artifacts; it never sends an old session-abort request with the new
+account cookie. If attach is already `COMMITTING`, the new account waits for
+the exact owned request to resolve and the old runner performs no automatic
+verification or preview request after the switch. A stale component from the
+old account cannot cancel, retry, remove, or start work against the current
+account runner.
+
 The normalized path must exactly match the app-owned directory and operation
 UUID. A different user, destination, path, checksum, size, schema, or expired
 manifest fails closed and is cleaned.
