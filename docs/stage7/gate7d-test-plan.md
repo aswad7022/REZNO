@@ -4,9 +4,9 @@ Status: **LOCAL PASS — REMOTE CI AND DEVICE/PROVIDER EVIDENCE OPEN**.
 
 ## Author verification — 2026-07-26
 
-- focused Gate 7D Unit: `96/96` (`87` Mobile/Gates 7A–7D plus `9`
+- focused Gate 7D Unit: `97/97` (`88` Mobile/Gates 7A–7D plus `9`
   server/provider), zero skipped/todo/cancelled;
-- complete Unit: `556/556` (`347` plus `209`), zero
+- complete Unit: `557/557` (`348` plus `209`), zero
   skipped/todo/cancelled;
 - fresh disposable PostgreSQL at Migration `51/51`: `430/430`, zero
   skipped/todo/cancelled;
