@@ -22,7 +22,10 @@ type ExpoConfig = {
   expo: {
     android: { package: string };
     extra: { eas: { projectId: string } };
-    ios: { bundleIdentifier: string };
+    ios: {
+      bundleIdentifier: string;
+      infoPlist: { ITSAppUsesNonExemptEncryption: boolean };
+    };
     name: string;
     owner: string;
     plugins: unknown[];
@@ -91,6 +94,31 @@ test("Gate 7A rejects a changed scheme, package identity, or EAS project", async
       /Expected values to be strictly equal/,
     );
   }
+});
+
+test("Gate 7A pins the iOS export-compliance declaration", async () => {
+  const { appConfig, easConfig, mobilePackage } =
+    await repositoryConfiguration();
+  assert.equal(
+    appConfig.expo.ios.infoPlist.ITSAppUsesNonExemptEncryption,
+    false,
+  );
+
+  const missingDeclaration = structuredClone(appConfig);
+  delete (
+    missingDeclaration.expo.ios.infoPlist as {
+      ITSAppUsesNonExemptEncryption?: boolean;
+    }
+  ).ITSAppUsesNonExemptEncryption;
+  assert.throws(
+    () =>
+      validateReleaseConfiguration(
+        missingDeclaration,
+        easConfig,
+        mobilePackage,
+      ),
+    /non-exempt encryption/,
+  );
 });
 
 test("Gate 7A rejects unsafe or cross-environment device profiles", async () => {

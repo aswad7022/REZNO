@@ -27,6 +27,7 @@ export function validateReleaseConfiguration(
   const app = record(appConfig, "app.json");
   const expo = record(app.expo, "app.json expo");
   const ios = record(expo.ios, "app.json expo.ios");
+  const iosInfoPlist = record(ios.infoPlist, "app.json expo.ios.infoPlist");
   const android = record(expo.android, "app.json expo.android");
   const extra = record(expo.extra, "app.json expo.extra");
   const easExtra = record(extra.eas, "app.json expo.extra.eas");
@@ -37,6 +38,11 @@ export function validateReleaseConfiguration(
   assert.equal(expo.slug, RELEASE_CONFIG_CONTRACT.slug);
   assert.equal(expo.scheme, RELEASE_CONFIG_CONTRACT.scheme);
   assert.equal(ios.bundleIdentifier, RELEASE_CONFIG_CONTRACT.iosBundleIdentifier);
+  assert.equal(
+    iosInfoPlist.ITSAppUsesNonExemptEncryption,
+    false,
+    "iOS must declare that the app uses no non-exempt encryption.",
+  );
   assert.equal(android.package, RELEASE_CONFIG_CONTRACT.androidPackage);
   assert.equal(easExtra.projectId, RELEASE_CONFIG_CONTRACT.easProjectId);
   assert.equal(
