@@ -17,6 +17,12 @@ The Gate 7B suite must prove, with zero failure, skip, todo, or cancellation:
 - atomic single-flight ownership before cancellation refs, commit phase, or
   pending state changes; startup recovery skips both the same active operation
   and a different active operation without starting transport twice;
+- stable coordinator ownership across repeated locale changes, callback
+  replacement, rerender, and unmount/remount before commit, during commit,
+  and after commit; React subscription cleanup cannot abort the runner;
+- one completion path across an ambiguous attach-to-verification handoff, or
+  an explicit retained `VERIFY_ATTACH` retry/startup path when verification is
+  unavailable;
 - stale/rejected runner cleanup cannot release or lower pending state for a
   newer owner generation;
 - process restart after target issuance, ambiguous upload, finalization, and
@@ -76,6 +82,7 @@ The Gate 7B suite must prove, with zero failure, skip, todo, or cancellation:
 | Transfer timeout/interruption | Retryable checkpoint retained; attempt counted once |
 | Ambiguous provider completion | Server finalization reconciles; absent object rotates generation |
 | Duplicate press/runtime call | Second call rejected; one provider upload |
+| Locale change or component remount in any commit phase | Only rendered text/listener changes; runner ID, controller, checkpoint, commit phase, pending state, transport, and attach count remain owned by the coordinator |
 | Startup preview A settles while foreground B is active | Recovery observes B's owner and performs no controller/ref/state mutation, transfer, attach, or cleanup |
 | Stale runner `finally` settles after a newer generation starts | Owner-token mismatch blocks commit, pending, cancellation-ref, and release changes |
 | Process restart before/after finalize | Stable idempotency resumes exact checkpoint |
@@ -110,17 +117,17 @@ hidden failure is counted as success.
 
 | Check | Result |
 | --- | --- |
-| P2 focused Gate 7B + Gate 7A regression + release validator | `42/42` pass |
-| Complete Unit suites | `502/502` pass (`302 + 200`) |
+| P2 focused Gate 7B + Gate 7A regression + release validator | `50/50` pass |
+| Complete Unit suites | `510/510` pass (`310 + 200`) |
 | Complete PostgreSQL integration on disposable `49/49` database | `425/425` pass |
 | Complete live HTTP/RSC/API suites | `131/131` pass (`6 + 120 + 5`) |
 | Root and Mobile TypeScript | PASS |
 | Full ESLint and `git diff --check` | PASS, zero warning/error |
 | Prisma format/validate/generate | PASS, Prisma Client `7.8.0` |
 | Expo config/install check/Doctor | PASS; dependencies current; `20/20` |
-| iOS Hermes export | PASS; 942 modules; 3.3 MB bundle |
-| Android Hermes export | PASS; 940 modules; 3.3 MB bundle |
-| Expo Web export | PASS; 673 modules; 1.9 MB bundle |
+| iOS Hermes export | PASS; 944 modules; 3.3 MB bundle |
+| Android Hermes export | PASS; 942 modules; 3.3 MB bundle |
+| Expo Web export | PASS; 675 modules; 1.9 MB bundle |
 | Next.js production build | PASS; compile/typecheck and `115/115` pages |
 | Root production dependency audit | PASS; 0 findings |
 | Mobile full dependency audit | PASS; 0 findings |

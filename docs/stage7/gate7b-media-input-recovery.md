@@ -62,14 +62,21 @@ The manifest is:
 - equipped with stable UUID idempotency keys per transition;
 - limited to three provider-upload attempts.
 
-Foreground upload and startup recovery also share one in-memory runner registry.
-The registry atomically claims the single slot before an abort controller,
-commit phase, cancellation handle, or pending UI state is changed. Its
-operation ID plus per-run UUID form the owner token. Startup skips recovery
-when either that operation or another operation already owns the slot. Only
-the matching owner may advance commit state, cancel, clear pending state, or
-release the slot, so a rejected duplicate or stale `finally` cannot disturb a
-newer run.
+Foreground upload and startup recovery share a module-owned coordinator that
+lives outside the React component lifecycle. The avatar component subscribes
+to immutable snapshots and translates status codes only when rendering; a
+locale change, callback replacement, rerender, or unmount/remount neither
+creates nor aborts transport. The coordinator owns the durable checkpoint,
+completion promise, and one in-memory runner registry.
+
+The coordinator atomically claims the single slot before preparation, an
+abort controller, commit phase, cancellation handle, or pending UI state is
+changed. Its operation ID plus per-run UUID form the owner token. Startup
+skips recovery when either that operation or another operation already owns
+the slot. Only the matching owner may advance commit state, cancel, clear
+pending state, or release the slot, so a rejected duplicate or stale
+`finally` cannot disturb a newer run. A remounted component subscribes to the
+same owner and completion rather than starting a replacement.
 
 The normalized path must exactly match the app-owned directory and operation
 UUID. A different user, destination, path, checksum, size, schema, or expired
@@ -148,6 +155,14 @@ Immediately before the attach request is sent, `VERIFY_ATTACH` is persisted.
 That checkpoint restores directly into `COMMITTING` after process death, even
 if provider capability is temporarily unavailable, so a restart cannot
 downgrade an ambiguous commit back into a cancellable operation.
+
+If the first runner loses the attach response, it releases only its fenced
+runner generation and hands the same durable operation to exactly one
+verification owner. Pending state and the original completion remain live
+through that handoff. If authoritative verification is temporarily
+unavailable, the owner releases with `VERIFY_ATTACH`, a visible retryable
+state, and the durable restart/Retry path intact; there is no unowned hidden
+commit state.
 
 Before commit, server abort failure cannot block local privacy cleanup; the
 owner-scoped session expires and existing storage automation handles provider
