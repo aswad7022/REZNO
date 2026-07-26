@@ -644,7 +644,7 @@ export default function App() {
       if (destination.kind === "CUSTOMER_COMMERCE_ORDER" && destination.targetId) {
         setNotificationOrderId(destination.targetId);
         setActiveTab("orders");
-      } else if (destination.kind === "CUSTOMER_MESSAGES" && destination.targetId) {
+      } else if (destination.kind === "CUSTOMER_MESSAGES") {
         setMessageConversationId(destination.targetId);
         setActiveTab("messages");
       } else if (

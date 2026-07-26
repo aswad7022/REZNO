@@ -1347,23 +1347,24 @@ model PushInstallationMutation {
 }
 
 model PushDeliveryTarget {
-  id                 String                   @id @default(uuid()) @db.Uuid
-  outboundDeliveryId String                   @db.Uuid
-  installationId     String                   @db.Uuid
-  status             PushDeliveryTargetStatus @default(PENDING)
-  attemptCount       Int                      @default(0)
-  claimGeneration    Int                      @default(0)
-  providerName       String?                  @db.VarChar(80)
-  providerMessageId  String?                  @db.VarChar(191)
-  lastSafeCode       String?                  @db.VarChar(80)
-  acceptedAt         DateTime?                @db.Timestamptz(6)
-  deliveredAt        DateTime?                @db.Timestamptz(6)
-  failedAt           DateTime?                @db.Timestamptz(6)
-  createdAt          DateTime                 @default(now()) @db.Timestamptz(6)
-  updatedAt          DateTime                 @updatedAt @db.Timestamptz(6)
-  outboundDelivery   OutboundDelivery         @relation(fields: [outboundDeliveryId], references: [id], onDelete: Restrict)
-  installation       PushInstallation         @relation(fields: [installationId], references: [id], onDelete: Restrict)
-  receipts           PushProviderReceipt[]
+  id                       String                   @id @default(uuid()) @db.Uuid
+  outboundDeliveryId       String                   @db.Uuid
+  installationId           String                   @db.Uuid
+  installationTokenVersion Int
+  status                   PushDeliveryTargetStatus @default(PENDING)
+  attemptCount             Int                      @default(0)
+  claimGeneration          Int                      @default(0)
+  providerName             String?                  @db.VarChar(80)
+  providerMessageId        String?                  @db.VarChar(191)
+  lastSafeCode             String?                  @db.VarChar(80)
+  acceptedAt               DateTime?                @db.Timestamptz(6)
+  deliveredAt              DateTime?                @db.Timestamptz(6)
+  failedAt                 DateTime?                @db.Timestamptz(6)
+  createdAt                DateTime                 @default(now()) @db.Timestamptz(6)
+  updatedAt                DateTime                 @updatedAt @db.Timestamptz(6)
+  outboundDelivery         OutboundDelivery         @relation(fields: [outboundDeliveryId], references: [id], onDelete: Restrict)
+  installation             PushInstallation         @relation(fields: [installationId], references: [id], onDelete: Restrict)
+  receipts                 PushProviderReceipt[]
 
   @@unique([outboundDeliveryId, installationId])
   @@index([providerName, providerMessageId])

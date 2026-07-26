@@ -3,6 +3,10 @@ import { randomUUID } from "node:crypto";
 import test from "node:test";
 
 import { resolvePersonEndpoint } from "../../../features/communications/services/endpoints";
+import {
+  processExactDeliveryForAutomation,
+  setDeliveryAutomationTestHook,
+} from "../../../features/communications/services/dispatcher";
 import { PushNotificationDomainError } from "../../../features/push-notifications/domain/errors";
 import {
   DevicePushProvider,
@@ -26,6 +30,7 @@ test("Gate 7D device registration, fanout and receipts are PostgreSQL exact", {
   const installationId = randomUUID();
   const secret = "A".repeat(43);
   const registrationKey = randomUUID();
+  let fanoutDeliveryId: string | null = null;
   const registration = input({
     idempotencyKey: registrationKey,
     installationId,
@@ -35,6 +40,7 @@ test("Gate 7D device registration, fanout and receipts are PostgreSQL exact", {
   });
 
   t.after(async () => {
+    setDeliveryAutomationTestHook(undefined);
     setPushTestNativeTransport(undefined);
     await reset();
     await prisma.$disconnect();
@@ -153,6 +159,7 @@ test("Gate 7D device registration, fanout and receipts are PostgreSQL exact", {
     assert.equal((endpoint.endpoint ?? "").includes("fcm-token"), false);
 
     const delivery = await createDelivery(ownerA, endpoint.fingerprint!);
+    fanoutDeliveryId = delivery.id;
     const sends: string[] = [];
     setPushTestNativeTransport(async (_provider, token, _payload, requestId) => {
       sends.push(token);
@@ -208,8 +215,226 @@ test("Gate 7D device registration, fanout and receipts are PostgreSQL exact", {
     });
   });
 
+  await t.test("stale invalid-token feedback cannot erase a rotated current token", async () => {
+    const owner = await identity("gate7d-stale-token-owner");
+    const staleInstallationId = randomUUID();
+    const staleSecret = "E".repeat(43);
+    await registerPushInstallation(owner, input({
+      installationId: staleInstallationId,
+      installationSecret: staleSecret,
+      operationGeneration: 1,
+      token: "fcm-token-stale-v1-12345678901234567890",
+    }));
+    await prisma.outboundPreference.create({
+      data: {
+        personId: owner.personId,
+        pushCategories: ["ACCOUNT"],
+      },
+    });
+    const endpointV1 = await prisma.$transaction((transaction) =>
+      resolvePersonEndpoint(transaction, owner.personId, "PUSH"));
+    const deliveryV1 = await createDelivery(owner, endpointV1.fingerprint!);
+    const transportStarted = deferred<void>();
+    const transportResult = deferred<{
+      invalidToken: boolean;
+      outcome: "PERMANENT_FAILURE";
+      providerMessageId: null;
+      retryable: false;
+      safeCode: string;
+    }>();
+    setPushTestNativeTransport(async () => {
+      transportStarted.resolve();
+      return transportResult.promise;
+    });
+    const oldSend = new DevicePushProvider().send(providerMessage({
+      deliveryId: deliveryV1.id,
+      endpoint: endpointV1.endpoint!,
+    }));
+    await transportStarted.promise;
+    const rotatedV2 = await registerPushInstallation(owner, input({
+      installationId: staleInstallationId,
+      installationSecret: staleSecret,
+      operationGeneration: 2,
+      token: "fcm-token-current-v2-12345678901234567890",
+    }));
+    assert.equal(rotatedV2.tokenVersion, 2);
+    transportResult.resolve({
+      invalidToken: true,
+      outcome: "PERMANENT_FAILURE",
+      providerMessageId: null,
+      retryable: false,
+      safeCode: "FCM_UNREGISTERED",
+    });
+    assert.equal((await oldSend).outcome, "PERMANENT_FAILURE");
+    const currentAfterDirect = await prisma.pushInstallation.findUniqueOrThrow({
+      where: { installationId: staleInstallationId },
+    });
+    assert.equal(currentAfterDirect.status, "ACTIVE");
+    assert.equal(currentAfterDirect.tokenVersion, 2);
+    assert.doesNotMatch(currentAfterDirect.tokenCiphertext, /^deleted\.v1\./);
+    const directTarget = await prisma.pushDeliveryTarget.findUniqueOrThrow({
+      where: {
+        outboundDeliveryId_installationId: {
+          installationId: currentAfterDirect.id,
+          outboundDeliveryId: deliveryV1.id,
+        },
+      },
+    });
+    assert.equal(directTarget.installationTokenVersion, 1);
+
+    const endpointV2 = await prisma.$transaction((transaction) =>
+      resolvePersonEndpoint(transaction, owner.personId, "PUSH"));
+    const deliveryV2 = await createDelivery(owner, endpointV2.fingerprint!);
+    setPushTestNativeTransport(async (_provider, _token, _payload, requestId) => ({
+      invalidToken: false,
+      outcome: "ACCEPTED",
+      providerMessageId: `message_${requestId}`,
+      retryable: false,
+      safeCode: "FCM_ACCEPTED",
+    }));
+    assert.equal(
+      (await new DevicePushProvider().send(providerMessage({
+        deliveryId: deliveryV2.id,
+        endpoint: endpointV2.endpoint!,
+      }))).outcome,
+      "ACCEPTED",
+    );
+    const receiptTarget = await prisma.pushDeliveryTarget.findUniqueOrThrow({
+      where: {
+        outboundDeliveryId_installationId: {
+          installationId: currentAfterDirect.id,
+          outboundDeliveryId: deliveryV2.id,
+        },
+      },
+    });
+    const rotatedV3 = await registerPushInstallation(owner, input({
+      installationId: staleInstallationId,
+      installationSecret: staleSecret,
+      operationGeneration: 3,
+      token: "fcm-token-current-v3-12345678901234567890",
+    }));
+    assert.equal(rotatedV3.tokenVersion, 3);
+    await ingestPushProviderReceipts("FCM", [{
+      eventId: "fcm-event-stale-invalid-token",
+      occurredAt: new Date("2026-07-26T14:00:00.000Z"),
+      providerMessageId: receiptTarget.providerMessageId!,
+      safeCode: "FCM_UNREGISTERED",
+      status: "INVALID_TOKEN",
+    }]);
+    const currentAfterReceipt = await prisma.pushInstallation.findUniqueOrThrow({
+      where: { installationId: staleInstallationId },
+    });
+    assert.equal(currentAfterReceipt.status, "ACTIVE");
+    assert.equal(currentAfterReceipt.tokenVersion, 3);
+    assert.doesNotMatch(currentAfterReceipt.tokenCiphertext, /^deleted\.v1\./);
+    assert.equal(
+      (await prisma.pushDeliveryTarget.findUniqueOrThrow({
+        where: { id: receiptTarget.id },
+      })).status,
+      "INVALID_TOKEN",
+    );
+  });
+
+  await t.test("message-hub payloads stay routeable without an invented target", async () => {
+    const owner = await identity("gate7d-message-hub-owner");
+    await registerPushInstallation(owner, input({
+      installationId: randomUUID(),
+      installationSecret: "F".repeat(43),
+      token: "fcm-token-message-hub-123456789012345",
+    }));
+    await prisma.outboundPreference.create({
+      data: {
+        personId: owner.personId,
+        pushCategories: ["MESSAGES"],
+      },
+    });
+    const endpoint = await prisma.$transaction((transaction) =>
+      resolvePersonEndpoint(transaction, owner.personId, "PUSH"));
+    const delivery = await createDelivery(owner, endpoint.fingerprint!, {
+      category: "MESSAGES",
+      destinationKind: "CUSTOMER_MESSAGES",
+    });
+    const payloads: Array<{ destinationKind: string; targetId: string | null }> = [];
+    setPushTestNativeTransport(async (_provider, _token, payload, requestId) => {
+      payloads.push(payload.data);
+      return {
+        invalidToken: false,
+        outcome: "ACCEPTED",
+        providerMessageId: `message_${requestId}`,
+        retryable: false,
+        safeCode: "FCM_ACCEPTED",
+      };
+    });
+    assert.equal(
+      (await new DevicePushProvider().send(providerMessage({
+        deliveryId: delivery.id,
+        endpoint: endpoint.endpoint!,
+        safePlatformHref: "https://rezno.app/customer/messages",
+      }))).outcome,
+      "ACCEPTED",
+    );
+    assert.deepEqual(payloads, [{
+      destinationKind: "CUSTOMER_MESSAGES",
+      targetId: null,
+    }]);
+  });
+
+  await t.test("Person deactivation in the provider window fails closed", async () => {
+    const owner = await identity("gate7d-provider-window-owner");
+    await registerPushInstallation(owner, input({
+      installationId: randomUUID(),
+      installationSecret: "G".repeat(43),
+      token: "fcm-token-provider-window-123456789012345",
+    }));
+    await prisma.outboundPreference.create({
+      data: {
+        personId: owner.personId,
+        pushCategories: ["ACCOUNT"],
+      },
+    });
+    const endpoint = await prisma.$transaction((transaction) =>
+      resolvePersonEndpoint(transaction, owner.personId, "PUSH"));
+    const delivery = await createDelivery(owner, endpoint.fingerprint!);
+    let sends = 0;
+    setPushTestNativeTransport(async (_provider, _token, _payload, requestId) => {
+      sends += 1;
+      return {
+        invalidToken: false,
+        outcome: "ACCEPTED",
+        providerMessageId: `message_${requestId}`,
+        retryable: false,
+        safeCode: "FCM_ACCEPTED",
+      };
+    });
+    setDeliveryAutomationTestHook(async ({ deliveryId, phase }) => {
+      if (
+        deliveryId === delivery.id
+        && phase === "AFTER_ATTEMPT_BEFORE_PROVIDER"
+      ) {
+        await prisma.person.update({
+          where: { id: owner.personId },
+          data: { status: "INACTIVE" },
+        });
+      }
+    });
+    const result = await processExactDeliveryForAutomation({
+      claimOwner: `gate7d-provider-window:${randomUUID()}`,
+      deliveryId: delivery.id,
+      executionGuard: async () => undefined,
+      expectedVersion: delivery.version,
+    });
+    assert.equal(sends, 0);
+    assert.deepEqual(result, {
+      outcome: "COMPLETED",
+      state: "PERMANENT_FAILURE",
+    });
+    setDeliveryAutomationTestHook(undefined);
+  });
+
   await t.test("concurrent receipt replay is atomic and invalid tokens are disabled", async () => {
+    assert.ok(fanoutDeliveryId);
     const targets = await prisma.pushDeliveryTarget.findMany({
+      where: { outboundDeliveryId: fanoutDeliveryId },
       include: { installation: true },
       orderBy: { id: "asc" },
     });
@@ -322,14 +547,18 @@ async function identity(label: string) {
 async function createDelivery(
   owner: { personId: string; userId: string },
   endpointFingerprint: string,
+  overrides: {
+    category?: "ACCOUNT" | "MESSAGES";
+    destinationKind?: "CUSTOMER_ACCOUNT" | "CUSTOMER_MESSAGES";
+  } = {},
 ) {
   const campaign = await prisma.communicationCampaign.create({
     data: {
       audience: "USER",
-      category: "ACCOUNT",
+      category: overrides.category ?? "ACCOUNT",
       channels: ["PUSH"],
       createdByAdminUserId: owner.userId,
-      destinationKind: "CUSTOMER_ACCOUNT",
+      destinationKind: overrides.destinationKind ?? "CUSTOMER_ACCOUNT",
       localizedContent: {
         AR: { push: { body: "تحديث", title: "ريزنو" } },
         CKB: { push: { body: "نوێکردنەوە", title: "ڕێزنۆ" } },
@@ -350,6 +579,32 @@ async function createDelivery(
       personId: owner.personId,
     },
   });
+}
+
+function providerMessage(input: {
+  deliveryId: string;
+  endpoint: string;
+  safePlatformHref?: string;
+}) {
+  return {
+    channel: "PUSH" as const,
+    deliveryId: input.deliveryId,
+    endpoint: input.endpoint,
+    locale: "EN" as const,
+    plainText: "Safe account update",
+    providerIdempotencyKey: `communication-delivery:${input.deliveryId}`,
+    safePlatformHref:
+      input.safePlatformHref ?? "https://rezno.app/customer/account",
+    subject: "REZNO",
+  };
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((nextResolve) => {
+    resolve = nextResolve;
+  });
+  return { promise, resolve };
 }
 
 async function reset() {

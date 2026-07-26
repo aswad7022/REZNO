@@ -83,6 +83,7 @@ CREATE TABLE "PushDeliveryTarget" (
   "id" UUID NOT NULL DEFAULT gen_random_uuid(),
   "outboundDeliveryId" UUID NOT NULL,
   "installationId" UUID NOT NULL,
+  "installationTokenVersion" INTEGER NOT NULL,
   "status" "PushDeliveryTargetStatus" NOT NULL DEFAULT 'PENDING',
   "attemptCount" INTEGER NOT NULL DEFAULT 0,
   "claimGeneration" INTEGER NOT NULL DEFAULT 0,
@@ -99,6 +100,8 @@ CREATE TABLE "PushDeliveryTarget" (
     CHECK ("attemptCount" BETWEEN 0 AND 3),
   CONSTRAINT "PushDeliveryTarget_claim_generation_check"
     CHECK ("claimGeneration" >= 0),
+  CONSTRAINT "PushDeliveryTarget_token_version_check"
+    CHECK ("installationTokenVersion" >= 1),
   CONSTRAINT "PushDeliveryTarget_provider_message_check"
     CHECK (
       ("providerName" IS NULL AND "providerMessageId" IS NULL)

@@ -238,6 +238,13 @@ test("Gate 7D notification route policy rejects tampering and accepts exact dest
     }),
     { kind: "NOTIFICATIONS", targetId: null },
   );
+  assert.deepEqual(
+    resolvePushNotificationDestination({
+      destinationKind: "CUSTOMER_MESSAGES",
+      targetId: null,
+    }),
+    { kind: "CUSTOMER_MESSAGES", targetId: null },
+  );
   for (const value of [
     { destinationKind: "CUSTOMER_BOOKING", targetId: null },
     { destinationKind: "CUSTOMER_BOOKING", targetId: "../foreign" },

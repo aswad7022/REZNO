@@ -13,6 +13,7 @@ const DESTINATIONS = new Set<MobileNotificationDestinationKind>([
 ]);
 const TARGET_OPTIONAL = new Set<MobileNotificationDestinationKind>([
   "CUSTOMER_ACCOUNT",
+  "CUSTOMER_MESSAGES",
   "NOTIFICATIONS",
 ]);
 

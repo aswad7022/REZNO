@@ -149,8 +149,12 @@ async function ingestOne(
         installationId: target.installation.installationId,
         provider: target.installation.provider,
       });
-      await transaction.pushInstallation.update({
-        where: { id: target.installation.id },
+      await transaction.pushInstallation.updateMany({
+        where: {
+          id: target.installation.id,
+          status: "ACTIVE",
+          tokenVersion: target.installationTokenVersion,
+        },
         data: {
           ...deleted,
           invalidatedAt: event.occurredAt,

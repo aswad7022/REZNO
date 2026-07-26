@@ -68,6 +68,11 @@ export class DevicePushProvider implements OutboundProvider {
       where: {
         permissionStatus: { in: ["GRANTED", "PROVISIONAL"] },
         personId,
+        person: {
+          deletedAt: null,
+          isOnboarded: true,
+          status: "ACTIVE",
+        },
         status: "ACTIVE",
       },
       orderBy: [{ tokenFingerprint: "asc" }, { id: "asc" }],
@@ -165,6 +170,7 @@ async function sendInstallationTarget(input: {
     installationId: string;
     provider: PushProvider;
     tokenCiphertext: string;
+    tokenVersion: number;
   };
   message: SafeProviderMessage;
   payload: NativePushPayload;
@@ -187,6 +193,7 @@ async function sendInstallationTarget(input: {
       target = await transaction.pushDeliveryTarget.create({
         data: {
           installationId: input.installation.id,
+          installationTokenVersion: input.installation.tokenVersion,
           outboundDeliveryId: input.message.deliveryId,
         },
       });
@@ -200,6 +207,14 @@ async function sendInstallationTarget(input: {
       || target.status === "UNKNOWN"
     ) {
       return { kind: "PERMANENT" as const, safeCode: target.lastSafeCode ?? "PUSH_TERMINAL" };
+    }
+    if (
+      target.installationTokenVersion !== input.installation.tokenVersion
+    ) {
+      return {
+        kind: "PERMANENT" as const,
+        safeCode: "PUSH_TOKEN_GENERATION_CHANGED",
+      };
     }
     const now = new Date();
     if (target.status === "SENDING") {
@@ -306,8 +321,12 @@ async function sendInstallationTarget(input: {
         installationId: input.installation.installationId,
         provider: input.installation.provider,
       });
-      await transaction.pushInstallation.update({
-        where: { id: input.installation.id },
+      await transaction.pushInstallation.updateMany({
+        where: {
+          id: input.installation.id,
+          status: "ACTIVE",
+          tokenVersion: target.installationTokenVersion,
+        },
         data: {
           ...deleted,
           invalidatedAt: now,
