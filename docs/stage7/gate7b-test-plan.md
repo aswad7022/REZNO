@@ -1,6 +1,6 @@
 # Gate 7B Test Plan
 
-Status: **AUTHOR P2 REMEDIATION VERIFIED — DRAFT RE-REVIEW PENDING**.
+Status: **AUTHOR REMEDIATION VERIFIED — DRAFT RE-REVIEW PENDING**.
 
 ## Focused contract matrix
 
@@ -32,6 +32,10 @@ The Gate 7B suite must prove, with zero failure, skip, todo, or cancellation:
   account bootstrap, uses local-only operation-scoped cleanup, waits out an
   old `COMMITTING` request without overlap, and ignores every stale old-owner
   command after the switch;
+- the runner captures its opaque API session at atomic claim, before
+  asynchronous preparation; a session switch while production-ordered
+  `VERIFY_ATTACH` persistence is pending cannot make the old attach use the
+  new account;
 - process restart after target issuance, ambiguous upload, finalization, and
   attach;
 - preview failure after confirmed attach remains committed, cleans recovery
@@ -95,6 +99,7 @@ The Gate 7B suite must prove, with zero failure, skip, todo, or cancellation:
 | Cancel arrives while a checkpoint persist is unresolved | The owner remains `CANCELLING`; a duplicate/new run is rejected, the write settles, cleanup removes the latest record, and only then is the runner released |
 | Account changes while old work is pre-commit | The old controller is aborted, normalization/transport and durable writes quiesce, local recovery is removed without an authenticated abort call, and only then does the new account bootstrap |
 | Account changes while old attach is `COMMITTING` | The exact old owner remains pending until server truth resolves; no second runner, verifier, preview, or new-account API work overlaps it |
+| Session changes while `VERIFY_ATTACH` persistence is pending | The real engine keeps attach on the runner's claim-time session; it never rereads or sends the new account cookie |
 | Stale old-account action arrives after the new runner starts | It cannot abort, cancel, retry, remove, or change pending/commit state for the current account |
 | Process restart before/after finalize | Stable idempotency resumes exact checkpoint |
 | Different user reopens app | Recovery rejected and local private state cleaned |
@@ -128,8 +133,8 @@ hidden failure is counted as success.
 
 | Check | Result |
 | --- | --- |
-| P2 focused Gate 7B + Gate 7A regression + release validator | `54/54` pass |
-| Complete Unit suites | `514/514` pass (`314 + 200`) |
+| P2 focused Gate 7B + Gate 7A regression + release validator | `55/55` pass |
+| Complete Unit suites | `515/515` pass (`315 + 200`) |
 | Complete PostgreSQL integration on disposable `49/49` database | `425/425` pass |
 | Complete live HTTP/RSC/API suites | `131/131` pass (`6 + 120 + 5`) |
 | Root and Mobile TypeScript | PASS |

@@ -89,6 +89,15 @@ verification or preview request after the switch. A stale component from the
 old account cannot cancel, retry, remove, or start work against the current
 account runner.
 
+Every runner also captures an opaque in-memory REZNO API-session requester
+when it claims the slot, before asynchronous normalization or pending-state
+publication. Create-session, target, finalize, container refresh, and attach
+therefore use the same session for the runner's complete lifetime. A later
+login cannot make an old `COMMITTING` operation read or send the new account's
+cookie after `VERIFY_ATTACH` persistence. The captured cookie is neither
+exposed by the snapshot nor stored in the recovery manifest, logged, or sent
+to the external provider.
+
 The normalized path must exactly match the app-owned directory and operation
 UUID. A different user, destination, path, checksum, size, schema, or expired
 manifest fails closed and is cleaned.
