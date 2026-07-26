@@ -10,7 +10,10 @@
     "userInterfaceStyle": "light",
     "ios": {
       "bundleIdentifier": "com.rezno.mobile",
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.rezno.mobile",
@@ -40,6 +43,13 @@
           "cameraPermission": "Allow REZNO to take an account photo.",
           "microphonePermission": false,
           "photosPermission": "Allow REZNO to choose an account photo."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "defaultChannel": "rezno-account",
+          "sounds": []
         }
       ],
       "expo-web-browser"

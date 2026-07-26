@@ -55,6 +55,7 @@ import {
 } from "./src/components/mobile-chrome";
 import { ActivityLauncher } from "./src/components/activity-launcher";
 import { CustomerAvatarManager } from "./src/components/customer-avatar-manager";
+import { DeviceNotificationController } from "./src/components/device-notification-controller";
 import { HostedPaymentController } from "./src/components/hosted-payment-controller";
 import {
   SectionHeader,
@@ -103,6 +104,7 @@ import { CustomerMessagingCenter } from "./src/screens/customer-messaging-center
 import type { MobileMarketplaceBusiness } from "./src/types/marketplace";
 import type { CommerceNotification } from "./src/types/commerce";
 import { hostedPaymentCoordinator } from "./src/payments/hosted-payment-runtime";
+import { mobilePushRegistrationCoordinator } from "./src/notifications/device-registration-runtime";
 
 I18nManager.allowRTL(true);
 
@@ -635,6 +637,29 @@ export default function App() {
   const isRtl = getTextDirection(locale) === "rtl";
   const authSession = toMobileAuthSession(startupState);
   const authenticatedUserId = authSession.status === "authenticated" ? authSession.user.id : null;
+  const handleNotificationDestination = useCallback(
+    (destination: MobileNotificationDestination) => {
+      setSelectedBusiness(null);
+      setBookingFlowStep(null);
+      if (destination.kind === "CUSTOMER_COMMERCE_ORDER" && destination.targetId) {
+        setNotificationOrderId(destination.targetId);
+        setActiveTab("orders");
+      } else if (destination.kind === "CUSTOMER_MESSAGES") {
+        setMessageConversationId(destination.targetId);
+        setActiveTab("messages");
+      } else if (
+        destination.kind === "CUSTOMER_BOOKING"
+        || destination.kind === "CUSTOMER_RESTAURANT"
+      ) {
+        setActiveTab("bookings");
+      } else if (destination.kind === "CUSTOMER_ACCOUNT") {
+        setActiveTab("account");
+      } else {
+        setActiveTab("messages");
+      }
+    },
+    [],
+  );
   const handleStartHostedPayment = useCallback((intentId: string) => {
     if (authenticatedUserId) {
       void hostedPaymentCoordinator.start(authenticatedUserId, intentId);
@@ -885,12 +910,14 @@ export default function App() {
 
     try {
       if (authenticatedUserId) {
+        await mobilePushRegistrationCoordinator.deactivate(authenticatedUserId);
         await hostedPaymentCoordinator.deactivate(authenticatedUserId);
       }
       const result = await signOutMobile();
       if (result.error) {
         if (authenticatedUserId) {
           await hostedPaymentCoordinator.bootstrap(authenticatedUserId);
+          await mobilePushRegistrationCoordinator.activate(authenticatedUserId);
         }
         setAuthActionError(mobileAuthCopy[locale].authFailure);
         return;
@@ -902,6 +929,8 @@ export default function App() {
     } catch {
       if (authenticatedUserId) {
         await hostedPaymentCoordinator.bootstrap(authenticatedUserId)
+          .catch(() => undefined);
+        await mobilePushRegistrationCoordinator.activate(authenticatedUserId)
           .catch(() => undefined);
       }
       setAuthActionError(mobileAuthCopy[locale].authFailure);
@@ -1243,21 +1272,7 @@ export default function App() {
             initialConversationId={messageConversationId}
             isRtl={isRtl}
             locale={locale}
-            onOpenNotificationDestination={(destination) => {
-              if (destination.kind === "CUSTOMER_COMMERCE_ORDER" && destination.targetId) {
-                setNotificationOrderId(destination.targetId);
-                setActiveTab("orders");
-              } else if (destination.kind === "CUSTOMER_MESSAGES" && destination.targetId) {
-                setMessageConversationId(destination.targetId);
-                setActiveTab("messages");
-              } else if (destination.kind === "CUSTOMER_BOOKING" || destination.kind === "CUSTOMER_RESTAURANT") {
-                setActiveTab("bookings");
-              } else if (destination.kind === "CUSTOMER_ACCOUNT") {
-                setActiveTab("account");
-              } else {
-                setActiveTab("messages");
-              }
-            }}
+            onOpenNotificationDestination={handleNotificationDestination}
             onOpenSource={() => {
               setMessageConversationId(null);
               setActiveTab("bookings");
@@ -1299,6 +1314,13 @@ export default function App() {
         locale={locale}
         ownerId={authenticatedUserId}
         theme={theme}
+      />
+      <DeviceNotificationController
+        locale={locale}
+        onOpenDestination={handleNotificationDestination}
+        ownerId={authenticatedUserId}
+        theme={theme}
+        visible={activeTab === "account"}
       />
       <BottomTabBar
         activeTab={activeTab}

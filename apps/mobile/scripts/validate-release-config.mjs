@@ -27,6 +27,7 @@ export function validateReleaseConfiguration(
   const app = record(appConfig, "app.json");
   const expo = record(app.expo, "app.json expo");
   const ios = record(expo.ios, "app.json expo.ios");
+  const iosInfoPlist = record(ios.infoPlist, "app.json expo.ios.infoPlist");
   const android = record(expo.android, "app.json expo.android");
   const extra = record(expo.extra, "app.json expo.extra");
   const easExtra = record(extra.eas, "app.json expo.extra.eas");
@@ -37,6 +38,11 @@ export function validateReleaseConfiguration(
   assert.equal(expo.slug, RELEASE_CONFIG_CONTRACT.slug);
   assert.equal(expo.scheme, RELEASE_CONFIG_CONTRACT.scheme);
   assert.equal(ios.bundleIdentifier, RELEASE_CONFIG_CONTRACT.iosBundleIdentifier);
+  assert.equal(
+    iosInfoPlist.ITSAppUsesNonExemptEncryption,
+    false,
+    "iOS must declare that the app uses no non-exempt encryption.",
+  );
   assert.equal(android.package, RELEASE_CONFIG_CONTRACT.androidPackage);
   assert.equal(easExtra.projectId, RELEASE_CONFIG_CONTRACT.easProjectId);
   assert.equal(
@@ -66,6 +72,17 @@ export function validateReleaseConfiguration(
       && imagePicker.photosPermission.length > 0,
     true,
     "Photo-library permission copy must be explicit.",
+  );
+  const notifications = pluginOptions(plugins, "expo-notifications");
+  assert.equal(
+    notifications.defaultChannel,
+    "rezno-account",
+    "Push notifications must use the canonical Android channel.",
+  );
+  assert.deepEqual(
+    notifications.sounds,
+    [],
+    "No custom notification sound may be added implicitly.",
   );
 
   const eas = record(easConfig, "eas.json");
@@ -121,6 +138,7 @@ export function validateReleaseConfiguration(
   assert.equal(dependencies["expo-file-system"], "~57.0.1");
   assert.equal(dependencies["expo-image-manipulator"], "~57.0.6");
   assert.equal(dependencies["expo-image-picker"], "~57.0.6");
+  assert.equal(dependencies["expo-notifications"], "~57.0.7");
   assert.equal(dependencies["expo-web-browser"], "~57.0.2");
   assert.equal(scripts.web, "expo start --web");
 

@@ -42,6 +42,11 @@ type EndpointRow = {
   phoneVerifiedAt: Date | null;
 };
 
+type PushEndpointRow = {
+  personId: string;
+  tokenFingerprint: string;
+};
+
 let testPushResolver: PushEndpointResolver | undefined;
 type EndpointDiagnosticsTestHook = (
   diagnostics: BulkEndpointResolution["diagnostics"],
@@ -119,10 +124,49 @@ export async function resolvePersonEndpointsBulk(
 
   let pushResolverCallCount = 0;
   if (selectedChannels.includes("PUSH")) {
-    const pushEndpoints = testPushResolver
-      ? normalizePushResult(await testPushResolver(uniquePersonIds))
-      : new Map<string, string | null>();
-    if (testPushResolver && uniquePersonIds.length > 0) pushResolverCallCount = 1;
+    let pushEndpoints: Map<string, string | null>;
+    if (testPushResolver) {
+      pushEndpoints = normalizePushResult(await testPushResolver(uniquePersonIds));
+      if (uniquePersonIds.length > 0) pushResolverCallCount = 1;
+    } else {
+      pushEndpoints = new Map();
+      const fingerprintsByPerson = new Map<string, string[]>();
+      for (const personIdChunk of chunks(uniquePersonIds, ENDPOINT_RESOLUTION_CHUNK_SIZE)) {
+        if (personIdChunk.length === 0) continue;
+        queryChunkCount += 1;
+        endpointQueryCount += 1;
+        const rows = await transaction.$queryRaw<PushEndpointRow[]>(Prisma.sql`
+          SELECT installation."personId",
+                 installation."tokenFingerprint"
+          FROM "PushInstallation" AS installation
+          INNER JOIN "Person" AS person
+            ON person."id" = installation."personId"
+          WHERE installation."status" = 'ACTIVE'
+            AND installation."permissionStatus" IN ('GRANTED', 'PROVISIONAL')
+            AND person."status" = 'ACTIVE'
+            AND person."deletedAt" IS NULL
+            AND person."isOnboarded" = TRUE
+            AND installation."personId" IN (${Prisma.join(
+              personIdChunk.map((personId) => Prisma.sql`${personId}::uuid`),
+            )})
+          ORDER BY installation."personId", installation."tokenFingerprint", installation."id"
+        `);
+        for (const row of rows) {
+          const current = fingerprintsByPerson.get(row.personId) ?? [];
+          current.push(row.tokenFingerprint);
+          fingerprintsByPerson.set(row.personId, current);
+        }
+      }
+      for (const personId of uniquePersonIds) {
+        const fingerprints = fingerprintsByPerson.get(personId);
+        pushEndpoints.set(
+          personId,
+          fingerprints?.length
+            ? pushEndpointReference(personId, fingerprints)
+            : null,
+        );
+      }
+    }
     for (const personId of uniquePersonIds) {
       const endpoint = pushEndpoints.get(personId) ?? null;
       byPerson.get(personId)!.PUSH = endpoint
@@ -140,6 +184,16 @@ export async function resolvePersonEndpointsBulk(
   };
   await endpointDiagnosticsTestHook?.(diagnostics);
   return { byPerson, diagnostics };
+}
+
+export function pushEndpointReference(
+  personId: string,
+  tokenFingerprints: readonly string[],
+) {
+  const digest = createHash("sha256")
+    .update([...tokenFingerprints].sort().join(":"), "utf8")
+    .digest("hex");
+  return `push-person:${personId}:${digest}`;
 }
 
 export function publicEndpointEligibility(endpoint: ResolvedEndpoint): EndpointEligibility {

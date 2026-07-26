@@ -22,7 +22,10 @@ type ExpoConfig = {
   expo: {
     android: { package: string };
     extra: { eas: { projectId: string } };
-    ios: { bundleIdentifier: string };
+    ios: {
+      bundleIdentifier: string;
+      infoPlist: { ITSAppUsesNonExemptEncryption: boolean };
+    };
     name: string;
     owner: string;
     plugins: unknown[];
@@ -34,6 +37,11 @@ type ExpoConfig = {
 type MobilePackage = {
   dependencies: Record<string, string>;
   scripts: Record<string, string>;
+};
+
+type NextBuildTsConfig = {
+  exclude: string[];
+  include: string[];
 };
 
 async function repositoryConfiguration() {
@@ -91,6 +99,47 @@ test("Gate 7A rejects a changed scheme, package identity, or EAS project", async
       /Expected values to be strictly equal/,
     );
   }
+});
+
+test("Gate 7A pins the iOS export-compliance declaration", async () => {
+  const { appConfig, easConfig, mobilePackage } =
+    await repositoryConfiguration();
+  assert.equal(
+    appConfig.expo.ios.infoPlist.ITSAppUsesNonExemptEncryption,
+    false,
+  );
+
+  const missingDeclaration = structuredClone(appConfig);
+  delete (
+    missingDeclaration.expo.ios.infoPlist as {
+      ITSAppUsesNonExemptEncryption?: boolean;
+    }
+  ).ITSAppUsesNonExemptEncryption;
+  assert.throws(
+    () =>
+      validateReleaseConfiguration(
+        missingDeclaration,
+        easConfig,
+        mobilePackage,
+      ),
+    /non-exempt encryption/,
+  );
+});
+
+test("The Next production type graph excludes native-only Mobile sources", async () => {
+  const [nextConfigSource, nextBuildTsConfig] = await Promise.all([
+    readFile("next.config.ts", "utf8"),
+    readJson<NextBuildTsConfig>("tsconfig.next.json"),
+  ]);
+  assert.match(
+    nextConfigSource,
+    /tsconfigPath:\s*"tsconfig\.next\.json"/,
+  );
+  assert.equal(nextBuildTsConfig.include.includes("app/**/*.ts"), true);
+  assert.equal(nextBuildTsConfig.include.includes("features/**/*.ts"), true);
+  assert.equal(nextBuildTsConfig.include.includes("**/*.ts"), false);
+  assert.equal(nextBuildTsConfig.exclude.includes("apps/mobile/**"), true);
+  assert.equal(nextBuildTsConfig.exclude.includes("tests/**"), true);
 });
 
 test("Gate 7A rejects unsafe or cross-environment device profiles", async () => {

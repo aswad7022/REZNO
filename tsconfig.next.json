@@ -1,0 +1,39 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": ".next/cache/tsconfig.next.tsbuildinfo"
+  },
+  "include": [
+    "next-env.d.ts",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts",
+    "app/**/*.ts",
+    "app/**/*.tsx",
+    "components/**/*.ts",
+    "components/**/*.tsx",
+    "domains/**/*.ts",
+    "domains/**/*.tsx",
+    "features/**/*.ts",
+    "features/**/*.tsx",
+    "i18n/**/*.ts",
+    "i18n/**/*.tsx",
+    "lib/**/*.ts",
+    "lib/**/*.tsx",
+    "providers/**/*.ts",
+    "providers/**/*.tsx",
+    "types/**/*.ts",
+    "types/**/*.tsx",
+    "proxy.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "apps/mobile",
+    "apps/mobile/**",
+    "tests",
+    "tests/**",
+    "scripts",
+    "scripts/**",
+    "tools",
+    "tools/**"
+  ]
+}

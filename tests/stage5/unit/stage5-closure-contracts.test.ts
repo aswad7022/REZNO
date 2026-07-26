@@ -133,7 +133,7 @@ test("payment handoffs preserve the official Stage 6, 7, 8, and AI ownership", (
   ]);
 });
 
-test("Stage 6 preserves Gate 5D through the additive Gate 6A through Gate 6D migrations", async () => {
+test("Stage 6 remains preserved through the later append-only Stage 7 migrations", async () => {
   const migrations = (
     await readdir(new URL("../../../prisma/migrations/", import.meta.url), {
       withFileTypes: true,
@@ -142,7 +142,7 @@ test("Stage 6 preserves Gate 5D through the additive Gate 6A through Gate 6D mig
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
     .sort();
-  assert.equal(migrations.length, 50);
+  assert.equal(migrations.length, 51);
   assert.equal(
     migrations.includes("20260720140000_payments_financial_integrity_foundation"),
     true,
@@ -157,6 +157,10 @@ test("Stage 6 preserves Gate 5D through the additive Gate 6A through Gate 6D mig
   );
   assert.equal(
     migrations.includes("20260722090000_platform_worker_operation_recovery"),
+    true,
+  );
+  assert.equal(
+    migrations.includes("20260726203000_device_push_notifications"),
     true,
   );
   assert.equal(
@@ -179,7 +183,12 @@ test("Stage 6 preserves Gate 5D through the additive Gate 6A through Gate 6D mig
     migrations.includes("20260724180000_platform_operations_closure"),
     true,
   );
-  assert.equal(migrations.filter((name) => name > "20260721130000_payment_financial_integrity_closure").length, 8);
+  assert.equal(
+    migrations.filter(
+      (name) => name > "20260721130000_payment_financial_integrity_closure",
+    ).length,
+    9,
+  );
 });
 
 test("Gate 5C staging fixture keeps its remote seed transaction bounded above the Prisma default", async () => {

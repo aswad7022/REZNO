@@ -5,6 +5,12 @@ const nextConfig: NextConfig = {
   experimental: {
     authInterrupts: true,
   },
+  typescript: {
+    // The root tsconfig intentionally covers repository tests, including the
+    // separately installed Expo application. Production builds validate the
+    // Next.js application graph without requiring native-only dependencies.
+    tsconfigPath: "tsconfig.next.json",
+  },
   async headers() {
     return [
       {
