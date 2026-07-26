@@ -1,6 +1,9 @@
 import type { FinancialJournalSource, FinancialJournalStatus, PaymentIntentStatus, PaymentRefundReason, PaymentRefundStatus, SettlementBatchStatus } from "@prisma/client";
 
-import { paymentError } from "@/features/payments/domain/errors";
+import {
+  PaymentDomainError,
+  paymentError,
+} from "@/features/payments/domain/errors";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const INTENT_STATUSES = ["CREATED", "REQUIRES_ACTION", "PROCESSING", "AUTHORIZED", "PARTIALLY_CAPTURED", "CAPTURED", "PARTIALLY_REFUNDED", "REFUNDED", "FAILED", "CANCELLED", "EXPIRED"] as const;
@@ -10,6 +13,7 @@ const SETTLEMENT_STATUSES = ["DRAFT", "FINALIZED", "VOID"] as const;
 const JOURNAL_STATUSES = ["DRAFT", "POSTED", "REVERSED"] as const;
 const JOURNAL_SOURCES = ["CAPTURE", "REFUND", "SETTLEMENT", "REVERSAL", "RECONCILIATION"] as const;
 export const PAYMENT_WEBHOOK_MAXIMUM_BYTES = 64 * 1024;
+const PAYMENT_JSON_MAXIMUM_BYTES = 16 * 1024;
 
 export function paymentId(value: string, field = "id"): string {
   if (!UUID.test(value)) paymentError("VALIDATION_ERROR", field + " must be a UUID.");
@@ -61,6 +65,55 @@ export async function parseVersionedMutation(request: Request) {
     paymentError("VALIDATION_ERROR", "expectedVersion must be a positive safe integer.");
   }
   return { expectedVersion: body.expectedVersion as number };
+}
+
+export async function parseHostedReturn(request: Request) {
+  const body = await readJson(request, ["state"]);
+  if (
+    typeof body.state !== "string"
+    || body.state.length < 32
+    || body.state.length > 2_048
+    || !/^[A-Za-z0-9_-]+$/.test(body.state)
+  ) {
+    paymentError("VALIDATION_ERROR", "Hosted payment state is invalid.");
+  }
+  return { state: body.state };
+}
+
+export function assertNoPaymentQuery(url: URL) {
+  assertQuery(url.searchParams, []);
+}
+
+export async function assertNoPaymentRequestBody(request: Request) {
+  const declared = request.headers.get("content-length");
+  if (declared !== null && declared !== "0") {
+    paymentError(
+      "VALIDATION_ERROR",
+      "Hosted payment handoff does not accept a request body.",
+    );
+  }
+  const reader = request.body?.getReader();
+  if (!reader) return;
+  try {
+    while (true) {
+      const next = await reader.read();
+      if (next.done) return;
+      if (next.value.byteLength > 0) {
+        await reader.cancel().catch(() => undefined);
+        paymentError(
+          "VALIDATION_ERROR",
+          "Hosted payment handoff does not accept a request body.",
+        );
+      }
+    }
+  } catch (error) {
+    if (error instanceof Error && error.name === "PaymentDomainError") {
+      throw error;
+    }
+    paymentError("VALIDATION_ERROR", "Request body could not be read.");
+  } finally {
+    reader.releaseLock();
+  }
 }
 
 export async function parseSettlementPreview(request: Request) {
@@ -241,21 +294,57 @@ async function readJson(request: Request, allowed: readonly string[]) {
   const contentType = request.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase();
   if (contentType !== "application/json") paymentError("VALIDATION_ERROR", "Content-Type must be application/json.");
   const declared = request.headers.get("content-length");
-  if (declared && (!/^[0-9]+$/.test(declared) || Number(declared) > 16 * 1024)) {
+  if (
+    declared
+    && (
+      !/^[0-9]+$/.test(declared)
+      || Number(declared) > PAYMENT_JSON_MAXIMUM_BYTES
+    )
+  ) {
     paymentError("VALIDATION_ERROR", "Request body is too large.");
   }
   let value: unknown;
   try {
-    const body = new Uint8Array(await request.arrayBuffer());
-    if (body.byteLength === 0 || body.byteLength > 16 * 1024) paymentError("VALIDATION_ERROR", "Request body is invalid.");
+    const body = await readBoundedJsonBody(request);
     value = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(body));
-  } catch {
+  } catch (error) {
+    if (error instanceof PaymentDomainError) throw error;
     paymentError("VALIDATION_ERROR", "Request body must be JSON.");
   }
   if (!value || typeof value !== "object" || Array.isArray(value)) paymentError("VALIDATION_ERROR", "Request body must be an object.");
   const body = value as Record<string, unknown>;
   if (Object.keys(body).some((key) => !allowed.includes(key))) paymentError("VALIDATION_ERROR", "Request body contains unknown fields.");
   return body;
+}
+
+async function readBoundedJsonBody(request: Request): Promise<Uint8Array> {
+  const reader = request.body?.getReader();
+  if (!reader) paymentError("VALIDATION_ERROR", "Request body is invalid.");
+  const retained = new Uint8Array(PAYMENT_JSON_MAXIMUM_BYTES);
+  let byteLength = 0;
+  try {
+    while (true) {
+      let next: ReadableStreamReadResult<Uint8Array>;
+      try {
+        next = await reader.read();
+      } catch {
+        await cancelPaymentWebhookReader(reader);
+        paymentError("VALIDATION_ERROR", "Request body could not be read.");
+      }
+      if (next.done) break;
+      if (next.value.byteLength === 0) continue;
+      if (next.value.byteLength > PAYMENT_JSON_MAXIMUM_BYTES - byteLength) {
+        await cancelPaymentWebhookReader(reader);
+        paymentError("VALIDATION_ERROR", "Request body is too large.");
+      }
+      retained.set(next.value, byteLength);
+      byteLength += next.value.byteLength;
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  if (byteLength === 0) paymentError("VALIDATION_ERROR", "Request body is invalid.");
+  return retained.slice(0, byteLength);
 }
 
 function queryLimit(value: string | null): number | undefined {

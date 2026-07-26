@@ -1,9 +1,9 @@
 # Stage 7 — Release and Physical-Device Validation
 
-Status: **ACTIVE — GATE 7A CLOSED, GATE 7B AUTHOR COMPLETE/DRAFT REVIEW PENDING**.
+Status: **ACTIVE — GATES 7A/7B CLOSED, GATE 7C AUTHOR VERIFIED/INDEPENDENT REVIEW PENDING**.
 
 Canonical base: `origin/main` at
-`0149ca6165e6117cf2f7d8d1a7dda49cfd1b0333`, the merge commit of PR #129.
+`1cf1b9e15de17e49bef3f469b8d99ea498212821`, the merge commit of PR #130.
 PR #100 remains an untouched Open Draft reference at
 `e46454df993ecccb06180060dda4353ec88e2641`.
 
@@ -55,8 +55,8 @@ read-only endpoint evidence; it does not imply physical-device proof.
 | Upload retry/resume/cancel | `IMPLEMENTED_NOT_PHYSICAL_PROVEN` | Gate 7B adds a lifecycle-independent coordinator, progress, pre-commit cancellation, bounded attempts, write-once target reconciliation, durable checkpoints, stable idempotency keys, fenced attach verification handoff, and cleanup. Native upload tasks do not claim byte-range resume across process death. |
 | Poor-network recovery | `IMPLEMENTED_NOT_PHYSICAL_PROVEN` | Offline, timeout, ambiguous completion, retry, and maximum-attempt states are explicit. The operation remains recoverable without false success. |
 | Process-death recovery | `IMPLEMENTED_NOT_PHYSICAL_PROVEN` | A short-lived SecureStore manifest plus a normalized app-private file restores the exact owner and destination through session, target, upload, finalize, and attach checkpoints. |
-| Hosted payment handoff | `NOT_IMPLEMENTED` | Mobile receives a safe provider action classification/reference only; it has no hosted browser handoff. |
-| Deep-link return | `PARTIAL` | Native scheme exists, but no warm/cold URL handler, allowlist, replay protection, or server-status reconciliation exists. |
+| Hosted payment handoff | `IMPLEMENTED_NOT_PROVIDER_PROVEN` | Gate 7C adds an exact-origin, ephemeral hosted-browser handoff with a bounded durable recovery record. Both server and Mobile provider-origin allowlists remain empty, so the runtime fails closed until a provider adapter and exact origin are separately approved. |
+| Deep-link return | `IMPLEMENTED_NOT_PHYSICAL_PROVEN` | The exact `rezno://payments/return` shape supports warm/cold return, signed owner/intent binding, one-time server consumption, bounded process-death reconciliation, and server-authoritative status. Physical-device proof remains Gate 7D work. |
 | Device-token lifecycle | `NOT_IMPLEMENTED` | No device-token model or mobile registration lifecycle exists. |
 | APNs/FCM integration | `NOT_IMPLEMENTED` | No production adapter, credential configuration, or device endpoint exists. |
 | Real provider receipts | `BLOCKED_BY_EXTERNAL_CREDENTIAL` | Provider adapters and credentials are not configured; Stage 7 must not fabricate receipt success. |
@@ -66,8 +66,8 @@ read-only endpoint evidence; it does not imply physical-device proof.
 
 ## Proposed gate decomposition
 
-This is the canonical Stage 7 decomposition. Gate 7A is closed and only Gate
-7B is active in the current work.
+This is the canonical Stage 7 decomposition. Gates 7A and 7B are closed and
+only Gate 7C is active in the current work.
 
 ### Gate 7A — Release and Physical-Device Foundation
 
@@ -101,8 +101,9 @@ This is the canonical Stage 7 decomposition. Gate 7A is closed and only Gate
   and independent review.
 
 Gate 7B began only after Gate 7A was independently reviewed and merged through
-PR #129. Gate 7C must not begin until Gate 7B is independently reviewed and
-merged. The same ordering applies to Gate 7D.
+PR #129. Gate 7C began only after Gate 7B was independently reviewed and
+merged through PR #130. Gate 7D must not begin until Gate 7C is independently
+reviewed and merged.
 
 ## Provider and release truth
 
@@ -110,5 +111,6 @@ merged. The same ordering applies to Gate 7D.
 - no production or store submission was executed;
 - no EAS build was created in Gate 7A;
 - no physical-device result is claimed;
-- no migration is required by the audited Gate 7B design; migrations 48 and 49
-  remain immutable.
+- Gate 7C uses append-only Migration 50 solely to add the dedicated
+  `CREATE_HOSTED_HANDOFF` payment mutation action; migrations 48 and 49 remain
+  immutable.

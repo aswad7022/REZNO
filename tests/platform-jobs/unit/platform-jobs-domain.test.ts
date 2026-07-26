@@ -253,7 +253,7 @@ test("health handler succeeds with bounded metadata and converts raw exceptions 
   setPlatformJobHandlerForTests("PLATFORM_HEALTH_PROBE");
 });
 
-test("production-only guards and additive migrations 43-49 are explicit in source", async () => {
+test("production-only guards and the additive migration boundary are explicit in source", async () => {
   const [cursorSource, handlerSource, workerSource, migrations] = await Promise.all([
     readFile(new URL("../../../features/platform-jobs/domain/cursor-signing.ts", import.meta.url), "utf8"),
     readFile(new URL("../../../features/platform-jobs/services/handlers.ts", import.meta.url), "utf8"),
@@ -264,14 +264,15 @@ test("production-only guards and additive migrations 43-49 are explicit in sourc
   assert.match(handlerSource, /NODE_ENV === "production"/);
   assert.match(workerSource, /NODE_ENV === "production"/);
   const names = migrations.filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort();
-  assert.equal(names.length, 49);
-  assert.equal(names.at(-7), "20260721160000_platform_jobs_foundation");
-  assert.equal(names.at(-6), "20260722090000_platform_worker_operation_recovery");
-  assert.equal(names.at(-5), "20260722150000_storage_media_automation");
-  assert.equal(names.at(-4), "20260723120000_media_rendition_claim_integrity");
-  assert.equal(names.at(-3), "20260723150000_gate6a_gate6b_constraint_truth_tables");
-  assert.equal(names.at(-2), "20260723180000_communications_payment_automation");
-  assert.equal(names.at(-1), "20260724180000_platform_operations_closure");
+  assert.equal(names.length, 50);
+  assert.equal(names.at(-8), "20260721160000_platform_jobs_foundation");
+  assert.equal(names.at(-7), "20260722090000_platform_worker_operation_recovery");
+  assert.equal(names.at(-6), "20260722150000_storage_media_automation");
+  assert.equal(names.at(-5), "20260723120000_media_rendition_claim_integrity");
+  assert.equal(names.at(-4), "20260723150000_gate6a_gate6b_constraint_truth_tables");
+  assert.equal(names.at(-3), "20260723180000_communications_payment_automation");
+  assert.equal(names.at(-2), "20260724180000_platform_operations_closure");
+  assert.equal(names.at(-1), "20260726173000_hosted_payment_handoff_action");
 });
 
 test("production runtime refuses cursor-secret and handler test overrides", () => {

@@ -1,6 +1,6 @@
 # Gate 7B — Camera, Library, HEIC and Network Recovery
 
-Status: **AUTHOR REMEDIATION COMPLETE — DRAFT RE-REVIEW PENDING — PHYSICAL DEVICE NOT RUN**.
+Status: **CLOSED THROUGH PR #130 — PHYSICAL DEVICE QA DEFERRED TO GATE 7D**.
 
 Base: `0149ca6165e6117cf2f7d8d1a7dda49cfd1b0333`, the merge commit of PR #129.
 

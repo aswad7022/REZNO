@@ -133,7 +133,7 @@ test.after(async () => {
   await prisma.$disconnect();
 });
 
-test("Migration 49 is healthy and creates no Gate 6D operational rows", async () => {
+test("Migration 49 remains healthy in the 50-migration chain and creates no Gate 6D operational rows", async () => {
   const [health] = await prisma.$queryRaw<Array<{
     applied: bigint;
     failed: bigint;
@@ -151,7 +151,7 @@ test("Migration 49 is healthy and creates no Gate 6D operational rows", async ()
   `);
   assert.deepEqual(
     health,
-    { applied: BigInt(49), failed: BigInt(0), total: BigInt(49) },
+    { applied: BigInt(50), failed: BigInt(0), total: BigInt(50) },
   );
   assert.equal(await prisma.distributedRateLimitBucket.count(), 0);
   assert.equal(await prisma.platformRuntimeControl.count(), 0);

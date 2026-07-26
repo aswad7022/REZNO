@@ -84,7 +84,7 @@ test("Gate 6B storage and media automation is durable, fenced, and exact", { con
       FROM "_prisma_migrations"
     `);
     assert.deepEqual(migration, {
-      applied: BigInt(49), failed: BigInt(0), rolledBack: BigInt(0), total: BigInt(49),
+      applied: BigInt(50), failed: BigInt(0), rolledBack: BigInt(0), total: BigInt(50),
     });
     assert.equal(await prisma.platformJob.count(), 0);
     assert.equal(await prisma.platformJobSchedule.count(), 0);
