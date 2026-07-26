@@ -1,6 +1,6 @@
 # Gate 7B Test Plan
 
-Status: **AUTHOR REMEDIATION VERIFIED — DRAFT RE-REVIEW PENDING**.
+Status: **CLOSED THROUGH PR #130**.
 
 ## Focused contract matrix
 

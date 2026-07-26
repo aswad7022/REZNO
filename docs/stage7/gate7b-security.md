@@ -1,6 +1,6 @@
 # Gate 7B Security Review
 
-Status: **AUTHOR REMEDIATION REVIEW COMPLETE — DRAFT RE-REVIEW PENDING**.
+Status: **CLOSED THROUGH PR #130**.
 
 ## Threat and control matrix
 
