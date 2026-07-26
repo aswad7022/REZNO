@@ -67,6 +67,17 @@ export function validateReleaseConfiguration(
     true,
     "Photo-library permission copy must be explicit.",
   );
+  const notifications = pluginOptions(plugins, "expo-notifications");
+  assert.equal(
+    notifications.defaultChannel,
+    "rezno-account",
+    "Push notifications must use the canonical Android channel.",
+  );
+  assert.deepEqual(
+    notifications.sounds,
+    [],
+    "No custom notification sound may be added implicitly.",
+  );
 
   const eas = record(easConfig, "eas.json");
   const builds = record(eas.build, "eas.json build");
@@ -121,6 +132,7 @@ export function validateReleaseConfiguration(
   assert.equal(dependencies["expo-file-system"], "~57.0.1");
   assert.equal(dependencies["expo-image-manipulator"], "~57.0.6");
   assert.equal(dependencies["expo-image-picker"], "~57.0.6");
+  assert.equal(dependencies["expo-notifications"], "~57.0.7");
   assert.equal(dependencies["expo-web-browser"], "~57.0.2");
   assert.equal(scripts.web, "expo start --web");
 

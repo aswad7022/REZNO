@@ -5,6 +5,12 @@ import type {
   MobileOutboundPreferences,
   MobileNotificationPreferences,
 } from "../types/notifications";
+import type {
+  MobilePushInstallation,
+  MobilePushRegistrationInput,
+  MobilePushRevocationInput,
+} from "../notifications/device-registration";
+import type { MobileApiSessionSnapshot } from "./client";
 
 type Data<T> = { data: T };
 
@@ -46,6 +52,36 @@ export const notificationApi = {
     { action, expectedVersion: notification.stateVersion }, { "Idempotency-Key": idempotencyKey },
   ),
 };
+
+export function capturePushNotificationApi(session: MobileApiSessionSnapshot) {
+  return {
+    register(input: MobilePushRegistrationInput, idempotencyKey: string) {
+      return session.request<Data<MobilePushInstallation>>(
+        "/api/mobile/notifications/device",
+        {
+          body: input,
+          headers: { "Idempotency-Key": idempotencyKey },
+          method: "PUT",
+        },
+      ).then((result) => result.data);
+    },
+    revoke(input: MobilePushRevocationInput, idempotencyKey: string) {
+      return session.request<Data<{
+        installationId: string;
+        kind: "PUSH_INSTALLATION_REVOKED";
+        replayed: boolean;
+        revoked: boolean;
+      }>>(
+        "/api/mobile/notifications/device",
+        {
+          body: input,
+          headers: { "Idempotency-Key": idempotencyKey },
+          method: "DELETE",
+        },
+      ).then((result) => result.data);
+    },
+  };
+}
 
 async function authenticated<T>(
   path: string,

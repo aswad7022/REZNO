@@ -42,6 +42,13 @@
           "photosPermission": "Allow REZNO to choose an account photo."
         }
       ],
+      [
+        "expo-notifications",
+        {
+          "defaultChannel": "rezno-account",
+          "sounds": []
+        }
+      ],
       "expo-web-browser"
     ]
   }
