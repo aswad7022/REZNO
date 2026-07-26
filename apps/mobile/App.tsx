@@ -3776,7 +3776,10 @@ function AccountScreen({
           {accountDescription}
         </Text>
         {authenticatedUser ? (
-          <CustomerAvatarManager locale={locale} />
+          <CustomerAvatarManager
+            locale={locale}
+            ownerId={authenticatedUser.id}
+          />
         ) : null}
         {authenticatedUser ? (
           <View style={styles.profileStatsGrid}>

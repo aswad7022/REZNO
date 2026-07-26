@@ -33,7 +33,15 @@
     "plugins": [
       "expo-font",
       "expo-secure-store",
-      "expo-status-bar"
+      "expo-status-bar",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Allow REZNO to take an account photo.",
+          "microphonePermission": false,
+          "photosPermission": "Allow REZNO to choose an account photo."
+        }
+      ]
     ]
   }
 }

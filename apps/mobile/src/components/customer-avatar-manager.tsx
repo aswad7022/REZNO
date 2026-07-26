@@ -1,254 +1,459 @@
-import * as Crypto from "expo-crypto";
 import * as ImagePicker from "expo-image-picker";
 import { useEffect, useState } from "react";
-import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  Image,
+  Linking,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
-import { mobileApiRequest, MobileApiRequestError } from "../api/client";
 import type { MobileLocale } from "../i18n/labels";
-
-type Data<T> = { data: T };
-type Container = {
-  bindings: Array<{
-    id: string;
-    media: { assetId: string | null } | null;
-    slot: string;
-  }>;
-  version: number;
-};
+import type {
+  CustomerAvatarCoordinatorStatus,
+} from "../media/upload-coordinator";
+import {
+  customerAvatarUploadCoordinator,
+} from "../media/upload-coordinator-runtime";
+import {
+  firstSelectedImage,
+  mediaPermissionDisposition,
+} from "../media/upload-policy";
 
 const copy = {
   ar: {
-    add: "اختيار صورة",
+    addCamera: "التقاط صورة",
+    addLibrary: "اختيار من المكتبة",
     avatarLabel: "صورة الحساب",
-    attaching: "جارٍ ربط الصورة بالحساب…",
+    cancelOperation: "إلغاء الرفع",
+    cancelled: "أُلغيت عملية الصورة ونُظفت الملفات المؤقتة.",
+    cancelling: "جارٍ إلغاء الرفع وتنظيف الملفات…",
+    cameraPermission: "يلزم السماح باستخدام الكاميرا لالتقاط صورة.",
+    cleanupFailed: "تعذر تنظيف بيانات الصورة الخاصة بالكامل. أعد المحاولة لإكمال التنظيف بأمان.",
+    commitUnconfirmed: "قد يكون تحديث الصورة اكتمل. تعذر التحقق الآن، فبقيت العملية محفوظة للتحقق لاحقًا.",
     deleting: "جارٍ إزالة الصورة…",
-    fileTooLarge: "حجم الصورة أكبر من الحد المسموح.",
-    finalizing: "جارٍ فحص الصورة وإنهاء الرفع…",
-    unavailable: "رفع الصورة غير متاح لأن التخزين المُدار غير مهيأ.",
-    loading: "جارٍ تحميل صورة الحساب…",
-    uploading: "جارٍ رفع الصورة وفحصها…",
-    uploadTarget: "جارٍ إعداد مسار الرفع الآمن…",
-    quota: "تم بلوغ حد تخزين صور الحساب.",
-    rejected: "رُفضت الصورة لأسباب أمنية.",
-    replace: "استبدال الصورة",
-    remove: "إزالة الصورة",
-    retry: "حدّث البيانات ثم حاول مجددًا.",
-    selecting: "جارٍ اختيار الصورة…",
-    stale: "تغيّرت الصورة في جلسة أخرى. حدّث البيانات وحاول مجددًا.",
-    quarantined: "الصورة قيد الحجر الأمني ولا يمكن استخدامها.",
-    unsupported: "اختر صورة JPEG أو PNG أو WebP.",
+    destinationChanged: "تغيّرت صورة الحساب أثناء الاستعادة، لذلك لم تُستبدل.",
+    duplicate: "عملية رفع الصورة نفسها قيد التنفيذ بالفعل.",
     error: "تعذر إكمال عملية الصورة بأمان.",
-    permission: "يلزم السماح بالوصول إلى مكتبة الصور.",
+    expired: "انتهت صلاحية عملية الرفع القديمة ونُظفت بأمان.",
+    fileTooLarge: "حجم الصورة أكبر من الحد المسموح.",
+    loading: "جارٍ تحميل صورة الحساب…",
+    maxRetries: "توقفت المحاولات بعد بلوغ الحد الآمن. يمكنك إلغاء العملية.",
+    normalizing: "جارٍ فحص الصورة وإزالة بيانات الموقع وتهيئتها…",
+    offline: "لا يوجد اتصال. بقيت العملية محفوظة ويمكن استئنافها.",
+    openSettings: "فتح الإعدادات",
+    permissionBlocked: "الصلاحية مرفوضة نهائيًا. فعّلها من إعدادات الجهاز.",
+    pickerCancelled: "لم تُختر صورة.",
+    processingRecovered: "جارٍ استعادة الصورة التي أعاد Android تسليمها…",
+    progress: "تقدم الرفع",
+    previewUnavailable: "تم تحديث صورة الحساب، لكن تعذر تحميل المعاينة الآن. يمكنك إعادة تحميلها دون رفع الصورة مجددًا.",
+    quota: "تم بلوغ حد تخزين صور الحساب.",
+    quarantined: "الصورة قيد الحجر الأمني ولا يمكن استخدامها.",
+    rejected: "رُفضت الصورة لأسباب أمنية.",
+    remove: "إزالة الصورة",
+    refreshPreview: "إعادة تحميل المعاينة",
+    refreshingPreview: "جارٍ إعادة تحميل معاينة الصورة…",
+    retry: "إعادة المحاولة",
+    retryable: "تعذر الرفع مؤقتًا. بقيت العملية محفوظة لإعادة المحاولة.",
+    stale: "تغيّرت الصورة في جلسة أخرى. لم يُستبدل المحتوى الأحدث.",
+    success: "تم تحديث صورة الحساب بنجاح.",
+    timeout: "انتهت مهلة الشبكة. بقيت العملية محفوظة لإعادة المحاولة.",
+    unavailable: "رفع الصورة غير متاح لأن التخزين المُدار غير مهيأ.",
+    unsafeFile: "محتوى الملف لا يطابق صورة معتمدة.",
+    unsupported: "اختر صورة JPEG أو PNG أو WebP أو HEIC/HEIF.",
+    uploading: "جارٍ رفع الصورة وفحصها…",
+    verifyingCommit: "أُرسل ربط الصورة بالفعل. جارٍ التحقق من النتيجة بدل ادعاء الإلغاء…",
+    libraryPermission: "يلزم السماح بالوصول إلى مكتبة الصور.",
   },
   en: {
-    add: "Choose image",
+    addCamera: "Take photo",
+    addLibrary: "Choose from library",
     avatarLabel: "Account avatar",
-    attaching: "Attaching the avatar to your account…",
+    cancelOperation: "Cancel upload",
+    cancelled: "The image operation was cancelled and temporary files were cleaned.",
+    cancelling: "Cancelling the upload and cleaning temporary files…",
+    cameraPermission: "Camera access is required to take a photo.",
+    cleanupFailed: "Private image state could not be fully cleaned. Retry to finish cleanup safely.",
+    commitUnconfirmed: "The avatar update may have completed. It could not be verified now, so the operation remains saved for later verification.",
     deleting: "Removing the avatar…",
-    fileTooLarge: "The selected image exceeds the allowed size.",
-    finalizing: "Inspecting and finalizing the upload…",
-    unavailable: "Avatar upload is unavailable because managed storage is not configured.",
-    loading: "Loading account avatar…",
-    uploading: "Uploading and checking the image…",
-    uploadTarget: "Preparing a secure upload target…",
-    quota: "The account-avatar storage limit has been reached.",
-    rejected: "The image was rejected for security reasons.",
-    replace: "Replace image",
-    remove: "Remove image",
-    retry: "Refresh the data and try again.",
-    selecting: "Selecting an image…",
-    stale: "The avatar changed in another session. Refresh and try again.",
-    quarantined: "The image is quarantined and cannot be used.",
-    unsupported: "Choose a JPEG, PNG, or WebP image.",
+    destinationChanged: "The account avatar changed during recovery, so it was not replaced.",
+    duplicate: "This image upload is already running.",
     error: "The avatar operation could not be completed safely.",
-    permission: "Photo-library access is required.",
+    expired: "The old upload expired and was cleaned safely.",
+    fileTooLarge: "The selected image exceeds the allowed size.",
+    loading: "Loading account avatar…",
+    maxRetries: "Retries stopped at the safe limit. You can cancel the operation.",
+    normalizing: "Checking the image, removing location metadata, and preparing it…",
+    offline: "You are offline. The operation is saved and can be resumed.",
+    openSettings: "Open settings",
+    permissionBlocked: "Permission is blocked. Enable it in device settings.",
+    pickerCancelled: "No image was selected.",
+    processingRecovered: "Recovering the image returned by Android…",
+    progress: "Upload progress",
+    previewUnavailable: "The account avatar was updated, but its preview is temporarily unavailable. Reload it without uploading again.",
+    quota: "The account-avatar storage limit has been reached.",
+    quarantined: "The image is quarantined and cannot be used.",
+    rejected: "The image was rejected for security reasons.",
+    remove: "Remove image",
+    refreshPreview: "Reload preview",
+    refreshingPreview: "Reloading the avatar preview…",
+    retry: "Retry",
+    retryable: "The upload failed temporarily. It remains saved for a safe retry.",
+    stale: "The avatar changed in another session. Newer content was not replaced.",
+    success: "The account avatar was updated successfully.",
+    timeout: "The network timed out. The operation remains saved for a retry.",
+    unavailable: "Avatar upload is unavailable because managed storage is not configured.",
+    unsafeFile: "The file content is not a supported image.",
+    unsupported: "Choose a JPEG, PNG, WebP, or HEIC/HEIF image.",
+    uploading: "Uploading and checking the image…",
+    verifyingCommit: "The avatar attach was already sent. Verifying its result instead of claiming cancellation…",
+    libraryPermission: "Photo-library access is required.",
   },
   ckb: {
-    add: "وێنە هەڵبژێرە",
+    addCamera: "وێنە بگرە",
+    addLibrary: "لە کتێبخانە هەڵبژێرە",
     avatarLabel: "وێنەی هەژمار",
-    attaching: "وێنەکە بە هەژمارەکەتەوە دەبەسترێت…",
+    cancelOperation: "هەڵوەشاندنەوەی بارکردن",
+    cancelled: "کرداری وێنە هەڵوەشایەوە و فایلە کاتییەکان پاککرانەوە.",
+    cancelling: "بارکردن هەڵدەوەشێتەوە و فایلە کاتییەکان پاکدەکرێنەوە…",
+    cameraPermission: "بۆ وێنەگرتن ڕێگەدان بە کامێرا پێویستە.",
+    cleanupFailed: "دۆخی تایبەتی وێنەکە بە تەواوی پاک نەکرایەوە. بۆ پاککردنەوەی پارێزراو دووبارە هەوڵبدە.",
+    commitUnconfirmed: "لەوانەیە نوێکردنەوەی وێنەکە تەواوبووبێت. ئێستا پشتڕاست نەکرایەوە، بۆیە کردارەکە بۆ پشکنینی دواتر هەڵگیراوە.",
     deleting: "وێنەکە لادەبرێت…",
-    fileTooLarge: "قەبارەی وێنەکە لە سنووری ڕێگەپێدراو زیاترە.",
-    finalizing: "وێنەکە پشکنین و بارکردنەکە تەواو دەکرێت…",
-    unavailable: "بارکردنی وێنە بەردەست نییە چونکە هەڵگرتن ڕێک نەخراوە.",
-    loading: "وێنەی هەژمار بار دەکرێت…",
-    uploading: "وێنەکە باردەکرێت و پشکنین دەکرێت…",
-    uploadTarget: "ڕێگایەکی پارێزراوی بارکردن ئامادە دەکرێت…",
-    quota: "سنووری هەڵگرتنی وێنەی هەژمار پڕ بووە.",
-    rejected: "وێنەکە بەهۆی هۆکاری ئاسایشی ڕەتکرایەوە.",
-    replace: "گۆڕینی وێنە",
-    remove: "لابردنی وێنە",
-    retry: "داتاکان نوێ بکەرەوە و دووبارە هەوڵ بدە.",
-    selecting: "وێنە هەڵدەبژێردرێت…",
-    stale: "وێنەکە لە دانیشتنێکی تر گۆڕاوە. نوێ بکەرەوە و دووبارە هەوڵ بدە.",
-    quarantined: "وێنەکە لە قرنطینەدایە و ناتوانرێت بەکاربهێنرێت.",
-    unsupported: "وێنەی JPEG یان PNG یان WebP هەڵبژێرە.",
+    destinationChanged: "وێنەی هەژمار لە کاتی گەڕاندنەوەدا گۆڕا، بۆیە جێگۆڕکێی پێ نەکرا.",
+    duplicate: "هەمان کرداری بارکردنی وێنە ئێستا بەردەوامە.",
     error: "کرداری وێنە بە سەلامەتی تەواو نەبوو.",
-    permission: "ڕێگەدان بە گەیشتن بە کتێبخانەی وێنە پێویستە.",
+    expired: "ماوەی بارکردنە کۆنەکە تەواو بوو و بە سەلامەتی پاککرایەوە.",
+    fileTooLarge: "قەبارەی وێنەکە لە سنووری ڕێگەپێدراو زیاترە.",
+    loading: "وێنەی هەژمار بار دەکرێت…",
+    maxRetries: "هەوڵەکان لە سنووری پارێزراودا وەستان. دەتوانیت کردارەکە هەڵبوەشێنیتەوە.",
+    normalizing: "وێنەکە پشکنین دەکرێت و زانیاری شوێن پاکدەکرێتەوە…",
+    offline: "ئینتەرنێت نییە. کردارەکە پارێزراوە و دەتوانرێت بەردەوام بکرێت.",
+    openSettings: "کردنەوەی ڕێکخستنەکان",
+    permissionBlocked: "ڕێگەدان داخراوە. لە ڕێکخستنەکانی ئامێر چالاکی بکە.",
+    pickerCancelled: "هیچ وێنەیەک هەڵنەبژێردرا.",
+    processingRecovered: "وێنەی گەڕێندراوەی Android ئامادە دەکرێت…",
+    progress: "پێشکەوتنی بارکردن",
+    previewUnavailable: "وێنەی هەژمار نوێکرایەوە، بەڵام پێشبینینەکە ئێستا بەردەست نییە. بەبێ بارکردنەوەی دووبارە نوێی بکەرەوە.",
+    quota: "سنووری هەڵگرتنی وێنەی هەژمار پڕ بووە.",
+    quarantined: "وێنەکە لە قرنطینەدایە و ناتوانرێت بەکاربهێنرێت.",
+    rejected: "وێنەکە بەهۆی هۆکاری ئاسایشی ڕەتکرایەوە.",
+    remove: "لابردنی وێنە",
+    refreshPreview: "نوێکردنەوەی پێشبینین",
+    refreshingPreview: "پێشبینینی وێنەکە نوێدەکرێتەوە…",
+    retry: "دووبارە هەوڵبدە",
+    retryable: "بارکردن کاتییەکە سەرکەوتوو نەبوو. بۆ هەوڵێکی پارێزراو هەڵگیراوە.",
+    stale: "وێنەکە لە دانیشتنێکی تر گۆڕاوە و ناوەڕۆکی نوێ جێگۆڕکێی پێ نەکرا.",
+    success: "وێنەی هەژمار بە سەرکەوتوویی نوێکرایەوە.",
+    timeout: "کاتی تۆڕ تەواو بوو. کردارەکە بۆ هەوڵدانەوە هەڵگیراوە.",
+    unavailable: "بارکردنی وێنە بەردەست نییە چونکە هەڵگرتن ڕێک نەخراوە.",
+    unsafeFile: "ناوەڕۆکی فایلەکە وێنەیەکی پشتپێبەستراو نییە.",
+    unsupported: "وێنەی JPEG یان PNG یان WebP یان HEIC/HEIF هەڵبژێرە.",
+    uploading: "وێنەکە باردەکرێت و پشکنین دەکرێت…",
+    verifyingCommit: "داواکاری بەستنەوەی وێنەکە نێردراوە. لەبری بانگەشەی هەڵوەشاندنەوە، ئەنجامەکە پشتڕاست دەکرێتەوە…",
+    libraryPermission: "ڕێگەدان بە گەیشتن بە کتێبخانەی وێنە پێویستە.",
   },
 } as const;
 
-export function CustomerAvatarManager({ locale }: { locale: MobileLocale }) {
+type Labels = (typeof copy)[MobileLocale];
+
+export function CustomerAvatarManager({
+  locale,
+  ownerId,
+}: {
+  locale: MobileLocale;
+  ownerId: string;
+}) {
   const labels = copy[locale];
-  const [container, setContainer] = useState<Container | null>(null);
-  const [providerConfigured, setProviderConfigured] = useState<boolean | null>(null);
-  const [maximumBytes, setMaximumBytes] = useState<number | null>(null);
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
-  const [message, setMessage] = useState<string>(labels.loading);
-  const binding = container?.bindings.find((item) => item.slot === "CUSTOMER_AVATAR") ?? null;
+  const [snapshot, setSnapshot] = useState(
+    () => customerAvatarUploadCoordinator.getSnapshot(ownerId),
+  );
+  const [settingsRequired, setSettingsRequired] = useState(false);
 
   useEffect(() => {
-    let live = true;
-    Promise.all([
-      mobileApiRequest<Data<Container>>("/api/media/customer/profile", { authenticated: true }),
-      mobileApiRequest<Data<{ maximumSizeByPurpose: Record<string, number>; providerConfigured: boolean }>>("/api/media/capabilities"),
-    ]).then(async ([media, capabilities]) => {
-      if (!live) return;
-      setContainer(media.data);
-      setProviderConfigured(capabilities.data.providerConfigured);
-      setMaximumBytes(capabilities.data.maximumSizeByPurpose.CUSTOMER_AVATAR ?? null);
-      const current = media.data.bindings.find((item) => item.slot === "CUSTOMER_AVATAR");
-      const assetId = current?.media?.assetId;
-      if (assetId) {
-        const download = await mobileApiRequest<Data<{ url: string }>>(
-          `/api/storage/customer/assets/${encodeURIComponent(assetId)}/download`,
-          { authenticated: true },
+    const unsubscribe = customerAvatarUploadCoordinator.subscribe(
+      ownerId,
+      setSnapshot,
+    );
+    void customerAvatarUploadCoordinator.bootstrap(ownerId);
+    return unsubscribe;
+  }, [ownerId]);
+
+  const current = snapshot.ownerId === ownerId
+    ? snapshot
+    : customerAvatarUploadCoordinator.getSnapshot(ownerId);
+  const binding =
+    current.container?.bindings.find(
+      (item) => item.slot === "CUSTOMER_AVATAR",
+    ) ?? null;
+
+  async function choose(source: "CAMERA" | "LIBRARY") {
+    if (
+      !current.container
+      || current.providerConfigured !== true
+      || !current.maximumBytes
+      || current.pending
+      || current.manifest
+    ) {
+      return;
+    }
+    setSettingsRequired(false);
+    try {
+      const permission =
+        source === "CAMERA"
+          ? await ImagePicker.requestCameraPermissionsAsync()
+          : await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const permissionState = mediaPermissionDisposition(permission);
+      if (permissionState !== "GRANTED") {
+        const blocked = permissionState === "DENIED_BLOCKED";
+        setSettingsRequired(blocked);
+        customerAvatarUploadCoordinator.reportStatus(
+          ownerId,
+          blocked
+            ? "PERMISSION_BLOCKED"
+            : source === "CAMERA"
+              ? "CAMERA_PERMISSION"
+              : "LIBRARY_PERMISSION",
         );
-        if (live) setAvatarUrl(download.data.url);
+        return;
       }
-      if (live) setMessage(capabilities.data.providerConfigured ? "" : labels.unavailable);
-    }).catch(() => live && setMessage(labels.error));
-    return () => { live = false; };
-  }, [labels.error, labels.unavailable]);
-
-  async function chooseAndUpload() {
-    if (!container || !providerConfigured) return;
-    setMessage(labels.selecting);
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      setMessage(labels.permission);
-      return;
-    }
-    const selection = await ImagePicker.launchImageLibraryAsync({
-      allowsEditing: true,
-      mediaTypes: ["images"],
-      quality: 1,
-      selectionLimit: 1,
-    });
-    if (selection.canceled || !selection.assets[0]) return;
-    const selected = selection.assets[0];
-    const mimeType = selected.mimeType;
-    const size = selected.fileSize;
-    if (!mimeType || !["image/jpeg", "image/png", "image/webp"].includes(mimeType) || !size) {
-      setMessage(labels.unsupported);
-      return;
-    }
-    if (maximumBytes && size > maximumBytes) {
-      setMessage(labels.fileTooLarge);
-      return;
-    }
-    setPending(true);
-    setMessage(labels.uploadTarget);
-    try {
-      const session = await mutate<{ id: string; version: number }>("/api/storage/customer/sessions", "POST", {
-        displayName: selected.fileName ?? "avatar",
-        expectedMimeType: mimeType,
-        expectedSizeBytes: size,
-        purpose: "CUSTOMER_AVATAR",
+      const options: ImagePicker.ImagePickerOptions = {
+        allowsEditing: false,
+        base64: false,
+        exif: false,
+        mediaTypes: ["images"],
+        quality: 1,
+        selectionLimit: 1,
+      };
+      const selection =
+        source === "CAMERA"
+          ? await ImagePicker.launchCameraAsync({
+              ...options,
+              cameraType: ImagePicker.CameraType.back,
+            })
+          : await ImagePicker.launchImageLibraryAsync(options);
+      const selectedAsset =
+        firstSelectedImage<ImagePicker.ImagePickerAsset>(selection);
+      if (!selectedAsset) {
+        customerAvatarUploadCoordinator.reportStatus(
+          ownerId,
+          "PICKER_CANCELLED",
+        );
+        return;
+      }
+      await customerAvatarUploadCoordinator.prepareAndStart({
+        asset: selectedAsset,
+        ownerId,
+        source,
       });
-      const target = await mutate<{ headers: Record<string, string>; method: "PUT"; sessionVersion: number; url: string }>(
-        `/api/storage/customer/sessions/${session.id}/target`, "POST", { expectedVersion: session.version },
-      );
-      setMessage(labels.uploading);
-      const blob = await (await fetch(selected.uri)).blob();
-      const uploaded = await fetch(target.url, { body: blob, headers: target.headers, method: target.method });
-      if (!uploaded.ok) throw new Error("UPLOAD_FAILED");
-      setMessage(labels.finalizing);
-      const finalized = await mutate<{ asset: { id: string; state: string } }>(
-        `/api/storage/customer/sessions/${session.id}/finalize`, "POST", { expectedVersion: target.sessionVersion },
-      );
-      if (finalized.asset.state !== "READY") throw new MobileApiRequestError(finalized.asset.state, 409, finalized.asset.state);
-      setMessage(labels.attaching);
-      const next = await mutate<Container>("/api/media/customer/profile", binding ? "PUT" : "POST", {
-        altText: null,
-        assetId: finalized.asset.id,
-        expectedVersion: container.version,
-        productVariantId: null,
-        slot: "CUSTOMER_AVATAR",
-      });
-      setContainer(next);
-      const download = await mobileApiRequest<Data<{ url: string }>>(
-        `/api/storage/customer/assets/${encodeURIComponent(finalized.asset.id)}/download`,
-        { authenticated: true },
-      );
-      setAvatarUrl(download.data.url);
-      setMessage("");
     } catch (error) {
-      setMessage(mobileErrorMessage(error, labels));
-    } finally { setPending(false); }
+      customerAvatarUploadCoordinator.reportError(ownerId, error);
+    }
   }
 
-  async function remove() {
-    if (!container || !binding) return;
-    setPending(true);
-    setMessage(labels.deleting);
-    try {
-      const next = await mutate<Container>(`/api/media/customer/profile/bindings/${binding.id}`, "DELETE", {
-        expectedVersion: container.version,
-        slot: "CUSTOMER_AVATAR",
-      });
-      setContainer(next);
-      setAvatarUrl(null);
-      setMessage("");
-    } catch { setMessage(labels.error); }
-    finally { setPending(false); }
-  }
-
-  return <View style={styles.card} accessibilityLiveRegion="polite">
-    {avatarUrl ? <Image accessibilityLabel={labels.avatarLabel} alt={labels.avatarLabel} source={{ uri: avatarUrl }} style={styles.avatar} /> : null}
-    <View style={styles.actions}>
-      <Pressable accessibilityRole="button" accessibilityState={{ busy: pending, disabled: pending || !providerConfigured }} disabled={pending || !providerConfigured} onPress={() => void chooseAndUpload()} style={styles.primary}>
-        <Text style={styles.primaryText}>{binding ? labels.replace : labels.add}</Text>
-      </Pressable>
-      {binding ? <Pressable accessibilityRole="button" accessibilityState={{ busy: pending, disabled: pending }} disabled={pending} onPress={() => void remove()} style={styles.secondary}>
-        <Text style={styles.secondaryText}>{labels.remove}</Text>
-      </Pressable> : null}
+  const newUploadDisabled =
+    current.pending
+    || Boolean(current.manifest)
+    || current.providerConfigured !== true;
+  const message = statusMessage(current.status, labels);
+  return (
+    <View style={styles.card} accessibilityLiveRegion="polite">
+      {current.avatarUrl ? (
+        <Image
+          accessibilityLabel={labels.avatarLabel}
+          alt={labels.avatarLabel}
+          source={{ uri: current.avatarUrl }}
+          style={styles.avatar}
+        />
+      ) : null}
+      <View style={styles.actions}>
+        <ActionButton
+          disabled={newUploadDisabled}
+          label={labels.addCamera}
+          onPress={() => void choose("CAMERA")}
+          primary
+        />
+        <ActionButton
+          disabled={newUploadDisabled}
+          label={labels.addLibrary}
+          onPress={() => void choose("LIBRARY")}
+          primary
+        />
+        {current.retryable && current.manifest ? (
+          <ActionButton
+            disabled={current.pending}
+            label={labels.retry}
+            onPress={() => void customerAvatarUploadCoordinator.retry(ownerId)}
+            primary
+          />
+        ) : null}
+        {current.manifest ? (
+          <ActionButton
+            disabled={false}
+            label={labels.cancelOperation}
+            onPress={() => void customerAvatarUploadCoordinator.cancel(ownerId)}
+          />
+        ) : null}
+        {current.previewAssetId ? (
+          <ActionButton
+            disabled={current.pending}
+            label={labels.refreshPreview}
+            onPress={() =>
+              void customerAvatarUploadCoordinator.retryPreview(ownerId)}
+          />
+        ) : null}
+        {binding ? (
+          <ActionButton
+            disabled={current.pending || Boolean(current.manifest)}
+            label={labels.remove}
+            onPress={() => void customerAvatarUploadCoordinator.remove(ownerId)}
+          />
+        ) : null}
+        {settingsRequired ? (
+          <ActionButton
+            disabled={false}
+            label={labels.openSettings}
+            onPress={() => void Linking.openSettings()}
+          />
+        ) : null}
+      </View>
+      {current.manifest || current.pending ? (
+        <View
+          accessibilityLabel={`${labels.progress}: ${Math.round(current.progress * 100)}%`}
+          accessibilityRole="progressbar"
+          accessibilityValue={{
+            max: 100,
+            min: 0,
+            now: Math.round(current.progress * 100),
+          }}
+          style={styles.progressTrack}
+        >
+          <View
+            style={[
+              styles.progressFill,
+              { width: `${Math.round(current.progress * 100)}%` },
+            ]}
+          />
+        </View>
+      ) : null}
+      {message ? <Text style={styles.message}>{message}</Text> : null}
     </View>
-    {message ? <Text style={styles.message}>{message}</Text> : null}
-  </View>;
+  );
 }
 
-async function mutate<T>(path: string, method: "DELETE" | "POST" | "PUT", body: unknown) {
-  const response = await mobileApiRequest<Data<T>>(path, {
-    authenticated: true,
-    body,
-    headers: { "Idempotency-Key": Crypto.randomUUID() },
-    method,
-  });
-  return response.data;
+function statusMessage(
+  status: CustomerAvatarCoordinatorStatus,
+  labels: Labels,
+) {
+  const keys: Record<
+    Exclude<CustomerAvatarCoordinatorStatus, "IDLE">,
+    keyof Labels
+  > = {
+    CAMERA_PERMISSION: "cameraPermission",
+    CANCELLED: "cancelled",
+    CANCELLING: "cancelling",
+    CLEANUP_FAILED: "cleanupFailed",
+    COMMIT_UNCONFIRMED: "commitUnconfirmed",
+    DELETING: "deleting",
+    DESTINATION_CHANGED: "destinationChanged",
+    DUPLICATE: "duplicate",
+    ERROR: "error",
+    EXPIRED: "expired",
+    FILE_TOO_LARGE: "fileTooLarge",
+    LIBRARY_PERMISSION: "libraryPermission",
+    LOADING: "loading",
+    MAX_RETRIES: "maxRetries",
+    NORMALIZING: "normalizing",
+    OFFLINE: "offline",
+    PERMISSION_BLOCKED: "permissionBlocked",
+    PICKER_CANCELLED: "pickerCancelled",
+    PREVIEW_UNAVAILABLE: "previewUnavailable",
+    PROCESSING_RECOVERED: "processingRecovered",
+    QUARANTINED: "quarantined",
+    QUOTA: "quota",
+    REFRESHING_PREVIEW: "refreshingPreview",
+    REJECTED: "rejected",
+    RETRYABLE: "retryable",
+    STALE: "stale",
+    SUCCESS: "success",
+    TIMEOUT: "timeout",
+    UNAVAILABLE: "unavailable",
+    UNSAFE_FILE: "unsafeFile",
+    UNSUPPORTED: "unsupported",
+    UPLOADING: "uploading",
+    VERIFYING_COMMIT: "verifyingCommit",
+  };
+  return status === "IDLE" ? "" : labels[keys[status]];
 }
 
-function mobileErrorMessage(error: unknown, labels: typeof copy[MobileLocale]) {
-  if (!(error instanceof MobileApiRequestError)) return labels.error;
-  if (error.code === "STORAGE_PROVIDER_NOT_CONFIGURED") return labels.unavailable;
-  if (error.code === "STORAGE_QUOTA_EXCEEDED") return labels.quota;
-  if (error.code === "UNSUPPORTED_MEDIA_TYPE") return labels.unsupported;
-  if (error.code === "FILE_TOO_LARGE") return labels.fileTooLarge;
-  if (error.code === "REJECTED") return labels.rejected;
-  if (error.code === "QUARANTINED") return labels.quarantined;
-  if (error.code === "STALE_VERSION") return labels.stale;
-  if (error.code === "RATE_LIMITED") return labels.retry;
-  return labels.error;
+function ActionButton({
+  disabled,
+  label,
+  onPress,
+  primary = false,
+}: {
+  disabled: boolean;
+  label: string;
+  onPress: () => void;
+  primary?: boolean;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      style={[
+        primary ? styles.primary : styles.secondary,
+        disabled && styles.disabled,
+      ]}
+    >
+      <Text style={primary ? styles.primaryText : styles.secondaryText}>
+        {label}
+      </Text>
+    </Pressable>
+  );
 }
 
 const styles = StyleSheet.create({
   actions: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   avatar: { borderRadius: 48, height: 96, width: 96 },
-  card: { borderColor: "rgba(120,120,120,0.25)", borderRadius: 18, borderWidth: 1, gap: 12, marginTop: 16, padding: 14 },
+  card: {
+    borderColor: "rgba(120,120,120,0.25)",
+    borderRadius: 18,
+    borderWidth: 1,
+    gap: 12,
+    marginTop: 16,
+    padding: 14,
+  },
+  disabled: { opacity: 0.45 },
   message: { color: "#6b7280", fontSize: 13, lineHeight: 20 },
-  primary: { backgroundColor: "#7c3aed", borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10 },
+  primary: {
+    backgroundColor: "#7c3aed",
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
   primaryText: { color: "#ffffff", fontWeight: "700" },
-  secondary: { borderColor: "#ef4444", borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10 },
+  progressFill: {
+    backgroundColor: "#7c3aed",
+    borderRadius: 999,
+    height: "100%",
+  },
+  progressTrack: {
+    backgroundColor: "rgba(124,58,237,0.16)",
+    borderRadius: 999,
+    height: 8,
+    overflow: "hidden",
+    width: "100%",
+  },
+  secondary: {
+    borderColor: "#ef4444",
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
   secondaryText: { color: "#ef4444", fontWeight: "700" },
 });

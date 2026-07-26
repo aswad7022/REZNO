@@ -44,6 +44,24 @@ export function validateReleaseConfiguration(
     true,
     "expo-secure-store must remain registered for session recovery.",
   );
+  const imagePicker = pluginOptions(plugins, "expo-image-picker");
+  assert.equal(
+    imagePicker.microphonePermission,
+    false,
+    "Image-only capture must not request microphone permission.",
+  );
+  assert.equal(
+    typeof imagePicker.cameraPermission === "string"
+      && imagePicker.cameraPermission.length > 0,
+    true,
+    "Camera permission copy must be explicit.",
+  );
+  assert.equal(
+    typeof imagePicker.photosPermission === "string"
+      && imagePicker.photosPermission.length > 0,
+    true,
+    "Photo-library permission copy must be explicit.",
+  );
 
   const eas = record(easConfig, "eas.json");
   const builds = record(eas.build, "eas.json build");
@@ -95,6 +113,9 @@ export function validateReleaseConfiguration(
     "React DOM must exactly match React for Expo Web.",
   );
   assert.equal(dependencies["react-native-web"], "^0.21.2");
+  assert.equal(dependencies["expo-file-system"], "~57.0.1");
+  assert.equal(dependencies["expo-image-manipulator"], "~57.0.6");
+  assert.equal(dependencies["expo-image-picker"], "~57.0.6");
   assert.equal(scripts.web, "expo start --web");
 
   return {
@@ -166,6 +187,22 @@ function optionalRecord(value, name) {
 function array(value, name) {
   assert.equal(Array.isArray(value), true, `${name} must be an array.`);
   return /** @type {unknown[]} */ (value);
+}
+
+/**
+ * @param {unknown[]} plugins
+ * @param {string} name
+ */
+function pluginOptions(plugins, name) {
+  const configured = plugins.find(
+    (plugin) => Array.isArray(plugin) && plugin[0] === name,
+  );
+  assert.equal(
+    Array.isArray(configured) && configured.length === 2,
+    true,
+    `${name} must be configured explicitly.`,
+  );
+  return record(configured[1], `${name} options`);
 }
 
 async function main() {
