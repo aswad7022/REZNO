@@ -544,7 +544,7 @@ test("The full HTTP runner isolates server-only tests without replacing standard
   assert.match(commands?.[2] ?? "", /tests\/notifications\/http\/\*\.test\.ts/u);
 });
 
-test("Migration 50 is additive and Migrations 48-49 remain byte-identical", async () => {
+test("Migration 51 is additive and Migrations 48-49 remain byte-identical", async () => {
   const [migrations, marketplaceWorkflow] = await Promise.all([
     readdir(new URL("../../../prisma/migrations", import.meta.url), {
       withFileTypes: true,
@@ -560,9 +560,9 @@ test("Migration 50 is additive and Migrations 48-49 remain byte-identical", asyn
   const migrationDirectories = migrations.filter((entry) =>
     entry.isDirectory()
   );
-  assert.equal(migrationDirectories.length, 50);
-  assert.match(marketplaceWorkflow, /migration_count" != "50"/u);
-  assert.match(marketplaceWorkflow, /Expected 50 migrations/u);
+  assert.equal(migrationDirectories.length, 51);
+  assert.match(marketplaceWorkflow, /migration_count" != "51"/u);
+  assert.match(marketplaceWorkflow, /Expected 51 migrations/u);
   assert.match(
     marketplaceWorkflow,
     /PLATFORM_OPERATIONS_HTTP_BASE_URL: http:\/\/127\.0\.0\.1:3000/u,

@@ -19,6 +19,11 @@ env:
   DATABASE_URL: postgresql://rezno_ci:rezno_ci_password@127.0.0.1:5432/rezno_marketplace_ci_test?schema=public
   BETTER_AUTH_SECRET: rezno-ci-only-not-a-production-secret
   BETTER_AUTH_URL: http://127.0.0.1:3000
+  REZNO_ENV: local-test
+  REZNO_PUSH_ENVIRONMENT: staging
+  REZNO_PUSH_RECEIPT_HMAC_SECRET: rezno-ci-only-push-receipt-secret-not-production
+  REZNO_PUSH_RECEIPT_PROVIDERS: FCM
+  REZNO_PUSH_TOKEN_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
 
 jobs:
   static:
@@ -102,8 +107,8 @@ jobs:
         run: |
           node -e 'const name = new URL(process.env.DATABASE_URL).pathname.slice(1); if (!/(?:_test|test_)/.test(name)) throw new Error(`Refusing non-test database: ${name}`)'
           migration_count="$(find prisma/migrations -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')"
-          if [[ "$migration_count" != "50" ]]; then
-            echo "Expected 50 migrations, found $migration_count" >&2
+          if [[ "$migration_count" != "51" ]]; then
+            echo "Expected 51 migrations, found $migration_count" >&2
             exit 1
           fi
 
@@ -140,7 +145,7 @@ jobs:
       - name: Run focused Stage 6 durable jobs and automation PostgreSQL integrity
         run: npm run test:platform-jobs:postgres
 
-      - name: Run complete PostgreSQL regressions through Gate 6C
+      - name: Run complete PostgreSQL regressions through Gate 7D
         run: npm run test:integration
 
       - name: Confirm database validation did not modify tracked files
@@ -189,7 +194,7 @@ jobs:
       - name: Build Next.js production application
         run: npm run build
 
-      - name: Run complete HTTP suite through Gate 6D
+      - name: Run complete HTTP suite through Gate 7D
         shell: bash
         env:
           COMMERCE_HTTP_BASE_URL: http://127.0.0.1:3000
@@ -197,6 +202,7 @@ jobs:
           PAYMENT_HTTP_BASE_URL: http://127.0.0.1:3000
           PLATFORM_JOBS_HTTP_BASE_URL: http://127.0.0.1:3000
           PLATFORM_OPERATIONS_HTTP_BASE_URL: http://127.0.0.1:3000
+          PUSH_HTTP_BASE_URL: http://127.0.0.1:3000
           STAGE5_HTTP_BASE_URL: http://127.0.0.1:3000
           STORAGE_HTTP_BASE_URL: http://127.0.0.1:3000
         run: |

@@ -65,7 +65,7 @@ function activeCookie(sessionCookie: string, organizationId: string) {
 async function fetchWithTimeout(input: string, init: RequestInit) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10_000);
-  timeout.unref();
+  (timeout as unknown as { unref?: () => void }).unref?.();
   try {
     return await fetch(input, { ...init, signal: controller.signal });
   } finally {
