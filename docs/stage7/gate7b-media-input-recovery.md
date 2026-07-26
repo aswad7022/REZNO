@@ -62,6 +62,15 @@ The manifest is:
 - equipped with stable UUID idempotency keys per transition;
 - limited to three provider-upload attempts.
 
+Foreground upload and startup recovery also share one in-memory runner registry.
+The registry atomically claims the single slot before an abort controller,
+commit phase, cancellation handle, or pending UI state is changed. Its
+operation ID plus per-run UUID form the owner token. Startup skips recovery
+when either that operation or another operation already owns the slot. Only
+the matching owner may advance commit state, cancel, clear pending state, or
+release the slot, so a rejected duplicate or stale `finally` cannot disturb a
+newer run.
+
 The normalized path must exactly match the app-owned directory and operation
 UUID. A different user, destination, path, checksum, size, schema, or expired
 manifest fails closed and is cleaned.
@@ -125,7 +134,8 @@ customer avatar.
 ## Cancellation and cleanup
 
 The in-memory state machine exposes `CANCELLABLE`, `COMMITTING`, and
-`COMMITTED`. Cancellation stops the live native task and performs the
+`COMMITTED` inside the runner-owned record. Cancellation targets only the
+current matching owner, stops its live native task, and performs the
 idempotent abort/local cleanup only while the operation is `CANCELLABLE`,
 before attach is sent. Once attach enters `COMMITTING`, Cancel changes the UI
 to verification rather than aborting the request or deleting the manifest.

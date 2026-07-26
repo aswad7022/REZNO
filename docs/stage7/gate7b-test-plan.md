@@ -14,7 +14,11 @@ The Gate 7B suite must prove, with zero failure, skip, todo, or cancellation:
 - exact HTTPS provider target and explicit cookie/authorization rejection;
 - upload progress clamping and explicit success/failure/cancel states;
 - offline preservation, slow-network timeout, bounded retry, and max attempts;
-- duplicate in-memory submission rejection;
+- atomic single-flight ownership before cancellation refs, commit phase, or
+  pending state changes; startup recovery skips both the same active operation
+  and a different active operation without starting transport twice;
+- stale/rejected runner cleanup cannot release or lower pending state for a
+  newer owner generation;
 - process restart after target issuance, ambiguous upload, finalization, and
   attach;
 - preview failure after confirmed attach remains committed, cleans recovery
@@ -72,6 +76,8 @@ The Gate 7B suite must prove, with zero failure, skip, todo, or cancellation:
 | Transfer timeout/interruption | Retryable checkpoint retained; attempt counted once |
 | Ambiguous provider completion | Server finalization reconciles; absent object rotates generation |
 | Duplicate press/runtime call | Second call rejected; one provider upload |
+| Startup preview A settles while foreground B is active | Recovery observes B's owner and performs no controller/ref/state mutation, transfer, attach, or cleanup |
+| Stale runner `finally` settles after a newer generation starts | Owner-token mismatch blocks commit, pending, cancellation-ref, and release changes |
 | Process restart before/after finalize | Stable idempotency resumes exact checkpoint |
 | Different user reopens app | Recovery rejected and local private state cleaned |
 | Container changed before attach | Old asset is not attached over newer content |
@@ -99,13 +105,13 @@ Camera, HEIC, poor-network, or process-death behavior.
 ## Author results
 
 The P2-focused regression run and complete closure matrix below were produced
-from the remediation source state on 2026-07-25. No skipped, cancelled, or
+from the remediation source state on 2026-07-26. No skipped, cancelled, or
 hidden failure is counted as success.
 
 | Check | Result |
 | --- | --- |
-| P2 focused Gate 7B + Gate 7A regression + release validator | `37/37` pass |
-| Complete Unit suites | `497/497` pass (`297 + 200`) |
+| P2 focused Gate 7B + Gate 7A regression + release validator | `42/42` pass |
+| Complete Unit suites | `502/502` pass (`302 + 200`) |
 | Complete PostgreSQL integration on disposable `49/49` database | `425/425` pass |
 | Complete live HTTP/RSC/API suites | `131/131` pass (`6 + 120 + 5`) |
 | Root and Mobile TypeScript | PASS |

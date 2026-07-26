@@ -22,6 +22,21 @@ export type CustomerAvatarCommitPhase =
   | "COMMITTING"
   | "COMMITTED";
 
+export type CustomerAvatarRunnerOwner = {
+  readonly abortController: AbortController;
+  activeCancel: (() => void) | null;
+  cancelRequested: boolean;
+  cleanupAbortController: AbortController | null;
+  commitPhase: CustomerAvatarCommitPhase;
+  readonly operationId: string;
+  readonly runnerId: string;
+  verificationRequested: boolean;
+};
+
+export type CustomerAvatarRunnerRegistry = {
+  current: CustomerAvatarRunnerOwner | null;
+};
+
 export type CustomerAvatarUploadEngineDependencies = {
   attach(input: {
     assetId: string;
@@ -81,6 +96,83 @@ export class MediaUploadEngineError extends Error {
 }
 
 const runningOperations = new Set<string>();
+
+export function createCustomerAvatarRunnerRegistry():
+  CustomerAvatarRunnerRegistry {
+  return { current: null };
+}
+
+export function acquireCustomerAvatarRunner(
+  registry: CustomerAvatarRunnerRegistry,
+  input: {
+    createAbortController(): AbortController;
+    createRunnerId(): string;
+    operationId: string;
+  },
+) {
+  const active = registry.current;
+  if (active) {
+    return {
+      activeOperationId: active.operationId,
+      status:
+        active.operationId === input.operationId
+          ? "ACTIVE_SAME_OPERATION"
+          : "ACTIVE_DIFFERENT_OPERATION",
+    } as const;
+  }
+  const owner: CustomerAvatarRunnerOwner = {
+    abortController: input.createAbortController(),
+    activeCancel: null,
+    cancelRequested: false,
+    cleanupAbortController: null,
+    commitPhase: "CANCELLABLE",
+    operationId: input.operationId,
+    runnerId: input.createRunnerId(),
+    verificationRequested: false,
+  };
+  registry.current = owner;
+  return { owner, status: "ACQUIRED" } as const;
+}
+
+export function isCustomerAvatarRunnerOwner(
+  registry: CustomerAvatarRunnerRegistry,
+  owner: CustomerAvatarRunnerOwner,
+) {
+  const active = registry.current;
+  return (
+    active === owner
+    && active.operationId === owner.operationId
+    && active.runnerId === owner.runnerId
+  );
+}
+
+export function updateCustomerAvatarRunner(
+  registry: CustomerAvatarRunnerRegistry,
+  owner: CustomerAvatarRunnerOwner,
+  patch: Partial<
+    Pick<
+      CustomerAvatarRunnerOwner,
+      | "activeCancel"
+      | "cancelRequested"
+      | "cleanupAbortController"
+      | "commitPhase"
+      | "verificationRequested"
+    >
+  >,
+) {
+  if (!isCustomerAvatarRunnerOwner(registry, owner)) return false;
+  Object.assign(owner, patch);
+  return true;
+}
+
+export function releaseCustomerAvatarRunner(
+  registry: CustomerAvatarRunnerRegistry,
+  owner: CustomerAvatarRunnerOwner,
+) {
+  if (!isCustomerAvatarRunnerOwner(registry, owner)) return false;
+  registry.current = null;
+  return true;
+}
 
 export function customerAvatarCancellationDisposition(
   phase: CustomerAvatarCommitPhase,

@@ -3,10 +3,15 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import {
+  acquireCustomerAvatarRunner,
+  createCustomerAvatarRunnerRegistry,
   customerAvatarCancellationDisposition,
+  isCustomerAvatarRunnerOwner,
   MediaUploadEngineError,
+  releaseCustomerAvatarRunner,
   resolveAssetBoundAvatarPreview,
   runCustomerAvatarUpload,
+  updateCustomerAvatarRunner,
   type CustomerAvatarUploadEngineDependencies,
 } from "../../../apps/mobile/src/media/upload-engine";
 import {
@@ -486,6 +491,273 @@ test("Gate 7B rejects duplicate in-memory submission of the same operation", asy
   );
 });
 
+test("Gate 7B startup recovery cannot adopt or disturb the active pre-commit runner", async () => {
+  const startupPreview = deferred<{ url: string }>();
+  const currentAssetId: string | null = "asset-a";
+  const startupPreviewResult = resolveAssetBoundAvatarPreview({
+    assetId: "asset-a",
+    currentAssetId: () => currentAssetId,
+    loadPreview: () => startupPreview.promise,
+  });
+
+  const registry = createCustomerAvatarRunnerRegistry();
+  let controllerCreations = 0;
+  const manifest = uploadCheckpoint(manifestFor());
+  const acquisition = acquireCustomerAvatarRunner(registry, {
+    createAbortController() {
+      controllerCreations += 1;
+      return new AbortController();
+    },
+    createRunnerId: () => "foreground-runner",
+    operationId: manifest.operationId,
+  });
+  assert.equal(acquisition.status, "ACQUIRED");
+  if (acquisition.status !== "ACQUIRED") return;
+  const owner = acquisition.owner;
+  const originalAbortController = owner.abortController;
+  const originalCancel = () => {};
+  assert.equal(
+    updateCustomerAvatarRunner(registry, owner, {
+      activeCancel: originalCancel,
+    }),
+    true,
+  );
+
+  const uploadStarted = deferred<void>();
+  const releaseUpload = deferred<void>();
+  const harness = engineHarness({
+    async upload() {
+      uploadStarted.resolve();
+      await releaseUpload.promise;
+      return { status: 200 };
+    },
+  });
+  harness.dependencies.signal = owner.abortController.signal;
+  harness.dependencies.onCommitPhaseChange = (phase) => {
+    updateCustomerAvatarRunner(registry, owner, { commitPhase: phase });
+  };
+  let pending = true;
+  const running = runCustomerAvatarUpload(manifest, harness.dependencies);
+  await uploadStarted.promise;
+
+  startupPreview.resolve({ url: "https://preview.example/avatar-a" });
+  assert.equal((await startupPreviewResult).status, "READY");
+  const startupAdoption = acquireCustomerAvatarRunner(registry, {
+    createAbortController() {
+      controllerCreations += 1;
+      return new AbortController();
+    },
+    createRunnerId: () => "startup-recovery",
+    operationId: manifest.operationId,
+  });
+  assert.deepEqual(startupAdoption, {
+    activeOperationId: manifest.operationId,
+    status: "ACTIVE_SAME_OPERATION",
+  });
+  assert.equal(controllerCreations, 1);
+  assert.equal(registry.current, owner);
+  assert.equal(owner.runnerId, "foreground-runner");
+  assert.equal(owner.abortController, originalAbortController);
+  assert.equal(owner.activeCancel, originalCancel);
+  assert.equal(owner.commitPhase, "CANCELLABLE");
+  assert.equal(pending, true);
+  assert.equal(
+    harness.calls.filter((call) => call.startsWith("upload:")).length,
+    1,
+  );
+  assert.equal(
+    harness.calls.filter((call) => call.startsWith("attach:")).length,
+    0,
+  );
+
+  assert.equal(
+    updateCustomerAvatarRunner(registry, owner, {
+      cancelRequested: true,
+    }),
+    true,
+  );
+  owner.activeCancel?.();
+  owner.abortController.abort();
+  releaseUpload.resolve();
+  await assert.rejects(running, hasEngineCode("CANCELLED", false));
+  assert.equal(
+    harness.calls.filter((call) => call.startsWith("upload:")).length,
+    1,
+  );
+  assert.equal(
+    harness.calls.filter((call) => call.startsWith("attach:")).length,
+    0,
+  );
+  assert.equal(pending, true, "only the owner cleanup may lower pending");
+  assert.equal(releaseCustomerAvatarRunner(registry, owner), true);
+  pending = false;
+  assert.equal(pending, false);
+});
+
+test("Gate 7B duplicate startup cannot claim a different active operation", () => {
+  const registry = createCustomerAvatarRunnerRegistry();
+  let controllerCreations = 0;
+  const acquisition = acquireCustomerAvatarRunner(registry, {
+    createAbortController() {
+      controllerCreations += 1;
+      return new AbortController();
+    },
+    createRunnerId: () => "foreground-runner",
+    operationId: "operation-b",
+  });
+  assert.equal(acquisition.status, "ACQUIRED");
+  const duplicate = acquireCustomerAvatarRunner(registry, {
+    createAbortController() {
+      controllerCreations += 1;
+      return new AbortController();
+    },
+    createRunnerId: () => "startup-recovery",
+    operationId: "operation-from-recovery",
+  });
+  assert.deepEqual(duplicate, {
+    activeOperationId: "operation-b",
+    status: "ACTIVE_DIFFERENT_OPERATION",
+  });
+  assert.equal(controllerCreations, 1);
+  assert.equal(registry.current?.runnerId, "foreground-runner");
+});
+
+test("Gate 7B cancellation during an owned commit preserves verification truth", async () => {
+  const registry = createCustomerAvatarRunnerRegistry();
+  const manifest: CustomerAvatarUploadManifest = {
+    ...uploadCheckpoint(manifestFor()),
+    assetId: ASSET_ID,
+    checkpoint: "ATTACH",
+  };
+  const acquisition = acquireCustomerAvatarRunner(registry, {
+    createAbortController: () => new AbortController(),
+    createRunnerId: () => "foreground-runner",
+    operationId: manifest.operationId,
+  });
+  assert.equal(acquisition.status, "ACQUIRED");
+  if (acquisition.status !== "ACQUIRED") return;
+  const owner = acquisition.owner;
+  const verificationPersistStarted = deferred<void>();
+  const releaseVerificationPersist = deferred<void>();
+  const harness = engineHarness({
+    async persist(nextManifest) {
+      if (nextManifest.checkpoint === "VERIFY_ATTACH") {
+        verificationPersistStarted.resolve();
+        await releaseVerificationPersist.promise;
+      }
+    },
+  });
+  harness.dependencies.signal = owner.abortController.signal;
+  harness.dependencies.onCommitPhaseChange = (phase) => {
+    updateCustomerAvatarRunner(registry, owner, { commitPhase: phase });
+  };
+  let pending = true;
+  const running = runCustomerAvatarUpload(manifest, harness.dependencies);
+  await verificationPersistStarted.promise;
+  assert.equal(owner.commitPhase, "COMMITTING");
+
+  const duplicate = acquireCustomerAvatarRunner(registry, {
+    createAbortController: () => {
+      throw new Error("duplicate must not create cancellation state");
+    },
+    createRunnerId: () => {
+      throw new Error("duplicate must not create an owner token");
+    },
+    operationId: manifest.operationId,
+  });
+  assert.equal(duplicate.status, "ACTIVE_SAME_OPERATION");
+  assert.equal(registry.current, owner);
+  assert.equal(owner.runnerId, "foreground-runner");
+  assert.equal(
+    customerAvatarCancellationDisposition(owner.commitPhase),
+    "VERIFY",
+  );
+  assert.equal(
+    updateCustomerAvatarRunner(registry, owner, {
+      verificationRequested: true,
+    }),
+    true,
+  );
+  assert.equal(owner.abortController.signal.aborted, false);
+  assert.equal(pending, true);
+
+  releaseVerificationPersist.resolve();
+  const result = await running;
+  assert.equal(result.assetId, ASSET_ID);
+  assert.equal(owner.commitPhase, "COMMITTED");
+  assert.equal(owner.verificationRequested, true);
+  assert.equal(
+    harness.calls.filter((call) => call.startsWith("attach:")).length,
+    1,
+  );
+  assert.equal(releaseCustomerAvatarRunner(registry, owner), true);
+  pending = false;
+  assert.equal(pending, false);
+});
+
+test("Gate 7B stale finally cannot release or mutate a newer runner generation", () => {
+  const registry = createCustomerAvatarRunnerRegistry();
+  const first = acquireCustomerAvatarRunner(registry, {
+    createAbortController: () => new AbortController(),
+    createRunnerId: () => "runner-1",
+    operationId: "operation",
+  });
+  assert.equal(first.status, "ACQUIRED");
+  if (first.status !== "ACQUIRED") return;
+  assert.equal(releaseCustomerAvatarRunner(registry, first.owner), true);
+
+  const second = acquireCustomerAvatarRunner(registry, {
+    createAbortController: () => new AbortController(),
+    createRunnerId: () => "runner-2",
+    operationId: "operation",
+  });
+  assert.equal(second.status, "ACQUIRED");
+  if (second.status !== "ACQUIRED") return;
+  let pending = true;
+  assert.equal(
+    updateCustomerAvatarRunner(registry, first.owner, {
+      activeCancel: null,
+      commitPhase: "COMMITTED",
+    }),
+    false,
+  );
+  if (releaseCustomerAvatarRunner(registry, first.owner)) pending = false;
+  assert.equal(pending, true);
+  assert.equal(registry.current, second.owner);
+  assert.equal(second.owner.commitPhase, "CANCELLABLE");
+  assert.equal(isCustomerAvatarRunnerOwner(registry, second.owner), true);
+  assert.equal(releaseCustomerAvatarRunner(registry, second.owner), true);
+});
+
+test("Gate 7B starts ordinary recovery when no in-memory runner owns the slot", async () => {
+  const registry = createCustomerAvatarRunnerRegistry();
+  const manifest: CustomerAvatarUploadManifest = {
+    ...uploadCheckpoint(manifestFor()),
+    assetId: ASSET_ID,
+    checkpoint: "ATTACH",
+  };
+  const acquisition = acquireCustomerAvatarRunner(registry, {
+    createAbortController: () => new AbortController(),
+    createRunnerId: () => "startup-recovery",
+    operationId: manifest.operationId,
+  });
+  assert.equal(acquisition.status, "ACQUIRED");
+  if (acquisition.status !== "ACQUIRED") return;
+  const harness = engineHarness();
+  harness.dependencies.signal = acquisition.owner.abortController.signal;
+  const result = await runCustomerAvatarUpload(manifest, harness.dependencies);
+  assert.equal(result.assetId, ASSET_ID);
+  assert.equal(
+    harness.calls.filter((call) => call.startsWith("attach:")).length,
+    1,
+  );
+  assert.equal(
+    releaseCustomerAvatarRunner(registry, acquisition.owner),
+    true,
+  );
+  assert.equal(registry.current, null);
+});
+
 test("Gate 7B cancels directly only before the server commit boundary", async () => {
   assert.equal(
     customerAvatarCancellationDisposition("CANCELLABLE"),
@@ -782,6 +1054,24 @@ test("Gate 7B UI and native config cover camera, library, cancellation, and ar/e
   assert.match(component, /requestMediaLibraryPermissionsAsync/);
   assert.match(component, /getPendingResultAsync/);
   assert.match(component, /cancelCustomerAvatarUpload/);
+  const runnerClaim = component.indexOf("acquireCustomerAvatarRunner(registry");
+  const runnerStateChange = component.indexOf(
+    "setManifest(pendingManifest)",
+    runnerClaim,
+  );
+  assert.ok(runnerClaim >= 0);
+  assert.ok(
+    runnerStateChange > runnerClaim,
+    "runner ownership must precede upload refs and UI state",
+  );
+  assert.match(
+    component,
+    /if \(runnerRegistry\.current\) return;[\s\S]*await runUpload\(recovered\)/,
+  );
+  assert.match(
+    component,
+    /releaseCustomerAvatarRunner\(registry, owner\)[\s\S]*setPending\(false\)/,
+  );
   for (const locale of ["ar", "en", "ckb"]) {
     assert.match(component, new RegExp(`\\n  ${locale}: \\{`));
   }

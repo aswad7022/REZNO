@@ -11,7 +11,7 @@ Status: **AUTHOR P2 REMEDIATION REVIEW COMPLETE — DRAFT RE-REVIEW PENDING**.
 | Decompression or storage exhaustion | Source is capped at 20 MiB/40 megapixels, longest edge at 2048, normalized avatar at 5 MiB, provider attempts at three, API at 20 seconds, transfer at 60 seconds, and operation age at 15 minutes. |
 | Session cookie leaks to provider origin | REZNO API calls alone use the authenticated client. Provider transfer uses FileSystem with only the three validated write-once headers. Cookie and authorization headers are rejected. |
 | Malicious or compromised upload target | Client revalidates HTTPS, no credentials/fragment, exact method, exact length/type, and exact header allowlist before native transfer. Server also validates provider targets. |
-| Duplicate tap, retry, or relaunch creates duplicate data | One in-memory operation lock, one durable manifest, stable per-transition UUID idempotency keys, provider write-once condition, and server mutation replay. |
+| Duplicate tap, retry, or relaunch creates duplicate data | One atomically claimed in-memory runner slot, one durable manifest, stable per-transition UUID idempotency keys, provider write-once condition, and server mutation replay. The owner is fenced by operation ID plus per-run UUID before controller/ref/UI mutation; startup duplicates and stale `finally` blocks have no authority over the current owner. |
 | Process death loses user intent | Every server transition is checkpointed in SecureStore and replayable. Android picker pending result is recovered before accepting new input. |
 | Old operation uploads to another user or domain target | Manifest owner and exact `CUSTOMER_PROFILE/CUSTOMER_AVATAR` destination are validated against the current authenticated user before recovery. Other destination kinds are invalid. |
 | Recovery overwrites a newer avatar | Attach first refreshes the current container. A different container version fails closed unless the exact finalized asset is already attached. |
@@ -65,8 +65,8 @@ to Gate 7B. PR #100 remains an untouched deferred Draft reference.
 
 ## Author remediation review result
 
-The remediation diff is limited to the Mobile avatar commit/cancel/preview
-state machine, ordered recovery cleanup, direct Gate 7B regression tests, and
+The remediation diff is limited to the Mobile avatar runner ownership and
+commit/cancel/preview state machine, direct Gate 7B regression tests, and
 Stage 7 documentation. The scoped secret scan found no credential,
 database URL, private key, access token, or authorization value. The privacy
 scan found no image-content, token, presigned-target, original-path, or EXIF

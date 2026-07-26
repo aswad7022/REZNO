@@ -18,11 +18,15 @@ import {
 import { mobileApiRequest, MobileApiRequestError } from "../api/client";
 import type { MobileLocale } from "../i18n/labels";
 import {
+  acquireCustomerAvatarRunner,
+  createCustomerAvatarRunnerRegistry,
   customerAvatarCancellationDisposition,
+  isCustomerAvatarRunnerOwner,
   MediaUploadEngineError,
+  releaseCustomerAvatarRunner,
   resolveAssetBoundAvatarPreview,
   runCustomerAvatarUpload,
-  type CustomerAvatarCommitPhase,
+  updateCustomerAvatarRunner,
 } from "../media/upload-engine";
 import {
   cancelCustomerAvatarUpload,
@@ -207,13 +211,8 @@ export function CustomerAvatarManager({
   const [progress, setProgress] = useState(0);
   const [settingsRequired, setSettingsRequired] = useState(false);
   const [message, setMessage] = useState<string>(labels.loading);
-  const activeCancelRef = useRef<(() => void) | null>(null);
   const activeAvatarAssetIdRef = useRef<string | null>(null);
-  const commitPhaseRef =
-    useRef<CustomerAvatarCommitPhase>("CANCELLABLE");
-  const runAbortRef = useRef<AbortController | null>(null);
-  const cancelRequestedRef = useRef(false);
-  const verificationRequestedRef = useRef(false);
+  const runnerRegistryRef = useRef(createCustomerAvatarRunnerRegistry());
   const mountedRef = useRef(true);
   const binding =
     container?.bindings.find((item) => item.slot === "CUSTOMER_AVATAR")
@@ -221,13 +220,20 @@ export function CustomerAvatarManager({
 
   const runUpload = useCallback(
     async (pendingManifest: CustomerAvatarUploadManifest) => {
-      const controller = new AbortController();
-      runAbortRef.current = controller;
-      commitPhaseRef.current =
-        pendingManifest.checkpoint === "VERIFY_ATTACH"
-          ? "COMMITTING"
-          : "CANCELLABLE";
-      verificationRequestedRef.current = false;
+      const registry = runnerRegistryRef.current;
+      const acquisition = acquireCustomerAvatarRunner(registry, {
+        createAbortController: () => new AbortController(),
+        createRunnerId: () => Crypto.randomUUID(),
+        operationId: pendingManifest.operationId,
+      });
+      if (acquisition.status !== "ACQUIRED") return acquisition.status;
+      const owner = acquisition.owner;
+      if (pendingManifest.checkpoint === "VERIFY_ATTACH") {
+        updateCustomerAvatarRunner(registry, owner, {
+          commitPhase: "COMMITTING",
+        });
+      }
+      setManifest(pendingManifest);
       setPending(true);
       setRetryable(false);
       setProgress(0);
@@ -237,16 +243,29 @@ export function CustomerAvatarManager({
           pendingManifest,
           createCustomerAvatarUploadDependencies({
             onCommitPhaseChange(phase) {
-              commitPhaseRef.current = phase;
+              updateCustomerAvatarRunner(registry, owner, {
+                commitPhase: phase,
+              });
             },
             onActiveCancel(cancel) {
-              activeCancelRef.current = cancel;
+              updateCustomerAvatarRunner(registry, owner, {
+                activeCancel: cancel,
+              });
             },
-            onProgress: setProgress,
-            signal: controller.signal,
+            onProgress(progressFraction) {
+              if (isCustomerAvatarRunnerOwner(registry, owner)) {
+                setProgress(progressFraction);
+              }
+            },
+            signal: owner.abortController.signal,
           }),
         );
-        if (!mountedRef.current) return;
+        if (
+          !mountedRef.current
+          || !isCustomerAvatarRunnerOwner(registry, owner)
+        ) {
+          return;
+        }
         const previousAssetId = activeAvatarAssetIdRef.current;
         activeAvatarAssetIdRef.current = result.assetId;
         setContainer(result.container);
@@ -254,17 +273,28 @@ export function CustomerAvatarManager({
         setManifest(null);
         setProgress(1);
         setMessage(labels.success);
-        verificationRequestedRef.current = false;
+        updateCustomerAvatarRunner(registry, owner, {
+          verificationRequested: false,
+        });
         const preview = await resolveAssetBoundAvatarPreview({
           assetId: result.assetId,
           currentAssetId: () => activeAvatarAssetIdRef.current,
           loadPreview: () =>
             mobileApiRequest<Data<{ url: string }>>(
               `/api/storage/customer/assets/${encodeURIComponent(result.assetId)}/download`,
-              { authenticated: true, signal: controller.signal },
+              {
+                authenticated: true,
+                signal: owner.abortController.signal,
+              },
             ),
         });
-        if (!mountedRef.current || preview.status === "STALE") return;
+        if (
+          !mountedRef.current
+          || !isCustomerAvatarRunnerOwner(registry, owner)
+          || preview.status === "STALE"
+        ) {
+          return;
+        }
         if (preview.status === "READY") {
           setAvatarUrl(preview.value.data.url);
           setPreviewAssetId(null);
@@ -274,16 +304,25 @@ export function CustomerAvatarManager({
           setMessage(labels.previewUnavailable);
         }
       } catch (error) {
-        if (!mountedRef.current || cancelRequestedRef.current) return;
+        if (
+          !mountedRef.current
+          || !isCustomerAvatarRunnerOwner(registry, owner)
+          || owner.cancelRequested
+        ) {
+          return;
+        }
         const next = await loadCustomerAvatarUpload(ownerId).catch(() => null);
-        if (!mountedRef.current) return;
+        if (
+          !mountedRef.current
+          || !isCustomerAvatarRunnerOwner(registry, owner)
+        ) {
+          return;
+        }
         setManifest(next);
         const resolution = mediaErrorMessage(error, labels);
-        const commitPhase =
-          commitPhaseRef.current as CustomerAvatarCommitPhase;
         const commitUnconfirmed =
-          verificationRequestedRef.current
-          && commitPhase === "COMMITTING"
+          owner.verificationRequested
+          && owner.commitPhase === "COMMITTING"
           && resolution.retryable
           && Boolean(next);
         setRetryable(Boolean(next) && (commitUnconfirmed || resolution.retryable));
@@ -291,10 +330,16 @@ export function CustomerAvatarManager({
           commitUnconfirmed ? labels.commitUnconfirmed : resolution.message,
         );
       } finally {
-        activeCancelRef.current = null;
-        if (runAbortRef.current === controller) runAbortRef.current = null;
-        if (mountedRef.current) setPending(false);
+        updateCustomerAvatarRunner(registry, owner, { activeCancel: null });
+        if (
+          !owner.cancelRequested
+          && releaseCustomerAvatarRunner(registry, owner)
+          && mountedRef.current
+        ) {
+          setPending(false);
+        }
       }
+      return "COMPLETED";
     },
     [labels, ownerId],
   );
@@ -323,14 +368,13 @@ export function CustomerAvatarManager({
           source,
         });
         if (!mountedRef.current) return;
-        setManifest(prepared);
         await runUpload(prepared);
       } catch (error) {
         if (!mountedRef.current) return;
         const resolution = mediaErrorMessage(error, labels);
         setRetryable(false);
         setMessage(resolution.message);
-        setPending(false);
+        if (!runnerRegistryRef.current.current) setPending(false);
       }
     },
     [labels, ownerId, runUpload],
@@ -339,6 +383,7 @@ export function CustomerAvatarManager({
   useEffect(() => {
     mountedRef.current = true;
     const controller = new AbortController();
+    const runnerRegistry = runnerRegistryRef.current;
     async function load() {
       try {
         const [media, capabilities] = await Promise.all([
@@ -394,24 +439,16 @@ export function CustomerAvatarManager({
         const recovered = await loadCustomerAvatarUpload(ownerId);
         if (!mountedRef.current) return;
         if (recovered) {
-          setManifest(recovered);
-          commitPhaseRef.current =
-            recovered.checkpoint === "VERIFY_ATTACH"
-              ? "COMMITTING"
-              : "CANCELLABLE";
-          if (Date.now() >= recovered.expiresAt) {
-            await cancelCustomerAvatarUpload(recovered, controller.signal);
-            if (mountedRef.current) {
-              setManifest(null);
-              setMessage(labels.expired);
-            }
-          } else if (
-            capabilities.data.providerConfigured
+          if (runnerRegistry.current) return;
+          if (
+            Date.now() >= recovered.expiresAt
+            || capabilities.data.providerConfigured
             || recovered.checkpoint === "ATTACH"
             || recovered.checkpoint === "VERIFY_ATTACH"
           ) {
             await runUpload(recovered);
           } else {
+            setManifest(recovered);
             setMessage(labels.unavailable);
           }
           return;
@@ -456,8 +493,10 @@ export function CustomerAvatarManager({
     return () => {
       mountedRef.current = false;
       controller.abort();
-      runAbortRef.current?.abort();
-      activeCancelRef.current?.();
+      const owner = runnerRegistry.current;
+      owner?.activeCancel?.();
+      owner?.abortController.abort();
+      owner?.cleanupAbortController?.abort();
     };
   }, [labels, ownerId, prepareAndRun, runUpload]);
 
@@ -541,45 +580,96 @@ export function CustomerAvatarManager({
       setMessage(labels.expired);
       return;
     }
-    setManifest(recovered);
     await runUpload(recovered);
   }
 
   async function cancel() {
     if (!manifest) return;
+    const registry = runnerRegistryRef.current;
+    const activeOwner = registry.current;
+    if (activeOwner && activeOwner.operationId !== manifest.operationId) return;
+    const commitPhase =
+      activeOwner?.commitPhase
+      ?? (manifest.checkpoint === "VERIFY_ATTACH"
+        ? "COMMITTING"
+        : "CANCELLABLE");
     if (
-      customerAvatarCancellationDisposition(commitPhaseRef.current)
+      customerAvatarCancellationDisposition(commitPhase)
       === "VERIFY"
     ) {
-      verificationRequestedRef.current = true;
+      if (activeOwner) {
+        updateCustomerAvatarRunner(registry, activeOwner, {
+          verificationRequested: true,
+        });
+      }
       setRetryable(false);
       setMessage(labels.verifyingCommit);
       return;
     }
-    if (cancelRequestedRef.current) return;
-    cancelRequestedRef.current = true;
+    const acquisition =
+      activeOwner
+        ? { owner: activeOwner, status: "ACQUIRED" as const }
+        : acquireCustomerAvatarRunner(registry, {
+            createAbortController: () => new AbortController(),
+            createRunnerId: () => Crypto.randomUUID(),
+            operationId: manifest.operationId,
+          });
+    if (acquisition.status !== "ACQUIRED") return;
+    const owner = acquisition.owner;
+    if (owner.cancelRequested) return;
+    if (
+      !updateCustomerAvatarRunner(registry, owner, {
+        cancelRequested: true,
+      })
+    ) {
+      return;
+    }
     setPending(true);
     setRetryable(false);
     setMessage(labels.cancelling);
-    activeCancelRef.current?.();
-    runAbortRef.current?.abort();
-    const controller = new AbortController();
+    owner.activeCancel?.();
+    owner.abortController.abort();
+    const cleanupController = new AbortController();
+    if (
+      !updateCustomerAvatarRunner(registry, owner, {
+        cleanupAbortController: cleanupController,
+      })
+    ) {
+      return;
+    }
     try {
       const latest =
         await loadCustomerAvatarUpload(ownerId).catch(() => manifest);
-      await cancelCustomerAvatarUpload(latest ?? manifest, controller.signal);
-      if (!mountedRef.current) return;
+      await cancelCustomerAvatarUpload(
+        latest ?? manifest,
+        cleanupController.signal,
+      );
+      if (
+        !mountedRef.current
+        || !isCustomerAvatarRunnerOwner(registry, owner)
+      ) {
+        return;
+      }
       setManifest(null);
-      commitPhaseRef.current = "CANCELLABLE";
       setProgress(0);
       setMessage(labels.cancelled);
     } catch (error) {
-      if (mountedRef.current) {
+      if (
+        mountedRef.current
+        && isCustomerAvatarRunnerOwner(registry, owner)
+      ) {
         setMessage(mediaErrorMessage(error, labels).message);
       }
     } finally {
-      cancelRequestedRef.current = false;
-      if (mountedRef.current) setPending(false);
+      updateCustomerAvatarRunner(registry, owner, {
+        cleanupAbortController: null,
+      });
+      if (
+        releaseCustomerAvatarRunner(registry, owner)
+        && mountedRef.current
+      ) {
+        setPending(false);
+      }
     }
   }
 
