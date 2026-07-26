@@ -136,6 +136,7 @@ type RunnerContext = {
   ownerId: string;
   ownerTransitionRequested: boolean;
   resolveCompletion(): void;
+  runDependencies: CustomerAvatarUploadEngineDependencies | null;
 };
 
 const EMPTY_SNAPSHOT: CustomerAvatarCoordinatorSnapshot = {
@@ -526,43 +527,10 @@ export class CustomerAvatarUploadCoordinator {
       | { assetId: string; container: CustomerMediaContainer }
       | null = null;
     try {
-      const dependencies = this.dependencies.createRunDependencies({
-        onActiveCancel: (cancel) => {
-          updateCustomerAvatarRunner(this.registry, context.owner, {
-            activeCancel: cancel,
-          });
-        },
-        onCommitPhaseChange: (phase) => {
-          if (
-            updateCustomerAvatarRunner(this.registry, context.owner, {
-              commitPhase: phase,
-            })
-          ) {
-            this.publishFor(context.ownerId, { phase });
-          }
-        },
-        onProgress: (progress) => {
-          if (this.isOwner(context)) {
-            this.publishFor(context.ownerId, { progress });
-          }
-        },
-        signal: context.owner.abortController.signal,
-      });
-      const persist = dependencies.persist;
-      dependencies.persist = async (manifest) => {
-        if (!this.isOwner(context) || context.owner.cancelRequested) {
-          throw new MediaUploadEngineError("CANCELLED", false);
-        }
-        await persist(manifest);
-        if (!this.isOwner(context) || context.owner.cancelRequested) {
-          throw new MediaUploadEngineError("CANCELLED", false);
-        }
-        context.checkpoint = manifest.checkpoint;
-        this.publishFor(context.ownerId, {
-          checkpoint: manifest.checkpoint,
-          manifest,
-        });
-      };
+      const dependencies = context.runDependencies;
+      if (!dependencies) {
+        throw new MediaUploadEngineError("RUNNER_NOT_INITIALIZED", false);
+      }
 
       committed = await this.dependencies.run(initial, dependencies);
       if (!this.isOwner(context)) return;
@@ -709,8 +677,17 @@ export class CustomerAvatarUploadCoordinator {
       ownerId: input.ownerId,
       ownerTransitionRequested: false,
       resolveCompletion,
+      runDependencies: null,
     };
     this.runner = context;
+    try {
+      context.runDependencies = this.createOwnedRunDependencies(context);
+    } catch (error) {
+      this.runner = null;
+      releaseCustomerAvatarRunner(this.registry, context.owner);
+      context.resolveCompletion();
+      throw error;
+    }
     this.publishFor(input.ownerId, {
       checkpoint: input.checkpoint,
       pending: true,
@@ -721,6 +698,47 @@ export class CustomerAvatarUploadCoordinator {
       status: input.status,
     });
     return context;
+  }
+
+  private createOwnedRunDependencies(context: RunnerContext) {
+    const dependencies = this.dependencies.createRunDependencies({
+      onActiveCancel: (cancel) => {
+        updateCustomerAvatarRunner(this.registry, context.owner, {
+          activeCancel: cancel,
+        });
+      },
+      onCommitPhaseChange: (phase) => {
+        if (
+          updateCustomerAvatarRunner(this.registry, context.owner, {
+            commitPhase: phase,
+          })
+        ) {
+          this.publishFor(context.ownerId, { phase });
+        }
+      },
+      onProgress: (progress) => {
+        if (this.isOwner(context)) {
+          this.publishFor(context.ownerId, { progress });
+        }
+      },
+      signal: context.owner.abortController.signal,
+    });
+    const persist = dependencies.persist;
+    dependencies.persist = async (manifest) => {
+      if (!this.isOwner(context) || context.owner.cancelRequested) {
+        throw new MediaUploadEngineError("CANCELLED", false);
+      }
+      await persist(manifest);
+      if (!this.isOwner(context) || context.owner.cancelRequested) {
+        throw new MediaUploadEngineError("CANCELLED", false);
+      }
+      context.checkpoint = manifest.checkpoint;
+      this.publishFor(context.ownerId, {
+        checkpoint: manifest.checkpoint,
+        manifest,
+      });
+    };
+    return dependencies;
   }
 
   private release(

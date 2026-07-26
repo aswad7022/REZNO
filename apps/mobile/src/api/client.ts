@@ -16,6 +16,38 @@ export class MobileApiRequestError extends Error {
   }
 }
 
+export type MobileApiRequestOptions = {
+  authenticated?: boolean;
+  body?: unknown;
+  headers?: Record<string, string>;
+  method?: "DELETE" | "GET" | "PATCH" | "POST" | "PUT";
+  params?: Record<string, boolean | string | number | undefined>;
+  signal?: AbortSignal;
+};
+
+export type MobileApiSessionSnapshot = {
+  request<T>(
+    path: string,
+    options?: Omit<MobileApiRequestOptions, "authenticated">,
+  ): Promise<T>;
+};
+
+export function captureMobileApiSession(): MobileApiSessionSnapshot {
+  const cookie = readMobileSessionCookie();
+  return {
+    request<T>(
+      path: string,
+      options: Omit<MobileApiRequestOptions, "authenticated"> = {},
+    ) {
+      return executeMobileApiRequest<T>(
+        path,
+        { ...options, authenticated: true },
+        cookie,
+      );
+    },
+  };
+}
+
 export async function mobileApiGet<T>(
   path: string,
   params?: Record<string, string | number | undefined>,
@@ -25,22 +57,22 @@ export async function mobileApiGet<T>(
 
 export async function mobileApiRequest<T>(
   path: string,
-  options: {
-    authenticated?: boolean;
-    body?: unknown;
-    headers?: Record<string, string>;
-    method?: "DELETE" | "GET" | "PATCH" | "POST" | "PUT";
-    params?: Record<string, boolean | string | number | undefined>;
-    signal?: AbortSignal;
-  } = {},
+  options: MobileApiRequestOptions = {},
 ): Promise<T> {
+  const cookie = options.authenticated ? readMobileSessionCookie() : "";
+  return executeMobileApiRequest(path, options, cookie);
+}
+
+async function executeMobileApiRequest<T>(
+  path: string,
+  options: MobileApiRequestOptions,
+  cookie: string,
+) {
   const url = new URL(path, ensureTrailingSlash(API_BASE_URL));
 
   for (const [key, value] of Object.entries(options.params ?? {})) {
     if (value !== undefined) url.searchParams.set(key, String(value));
   }
-
-  const cookie = options.authenticated ? await readMobileSessionCookie() : "";
 
   const response = await fetch(url.toString(), {
     body: options.body === undefined ? undefined : JSON.stringify(options.body),

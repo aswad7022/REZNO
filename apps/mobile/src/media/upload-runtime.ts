@@ -15,7 +15,9 @@ import * as Network from "expo-network";
 import * as SecureStore from "expo-secure-store";
 
 import {
+  captureMobileApiSession,
   mobileApiRequest,
+  type MobileApiSessionSnapshot,
   MobileApiRequestError,
 } from "../api/client";
 import {
@@ -293,6 +295,7 @@ export function createCustomerAvatarUploadDependencies(input: {
   onProgress(fraction: number): void;
   signal: AbortSignal;
 }): CustomerAvatarUploadEngineDependencies {
+  const apiSession = captureMobileApiSession();
   return {
     async attach({
       assetId,
@@ -302,6 +305,7 @@ export function createCustomerAvatarUploadDependencies(input: {
       signal,
     }) {
       return requestData<CustomerMediaContainer>(
+        apiSession,
         "/api/media/customer/profile",
         {
           body: {
@@ -326,6 +330,7 @@ export function createCustomerAvatarUploadDependencies(input: {
       sizeBytes,
     }) {
       return requestData<{ id: string; version: number }>(
+        apiSession,
         "/api/storage/customer/sessions",
         {
           body: {
@@ -343,6 +348,7 @@ export function createCustomerAvatarUploadDependencies(input: {
     },
     async finalize({ idempotencyKey, sessionId, signal, version }) {
       return requestData<{ asset: { id: string; state: string } }>(
+        apiSession,
         `/api/storage/customer/sessions/${encodeURIComponent(sessionId)}/finalize`,
         {
           body: { expectedVersion: version },
@@ -354,6 +360,7 @@ export function createCustomerAvatarUploadDependencies(input: {
     },
     getContainer(signal) {
       return requestData<CustomerMediaContainer>(
+        apiSession,
         "/api/media/customer/profile",
         { signal },
       );
@@ -371,6 +378,7 @@ export function createCustomerAvatarUploadDependencies(input: {
       version,
     }) {
       const target = await requestData<unknown>(
+        apiSession,
         `/api/storage/customer/sessions/${encodeURIComponent(sessionId)}/target`,
         {
           body: { expectedVersion: version },
@@ -426,6 +434,7 @@ export function createCustomerAvatarUploadDependencies(input: {
 }
 
 async function requestData<T>(
+  apiSession: MobileApiSessionSnapshot,
   path: string,
   options: {
     body?: unknown;
@@ -436,8 +445,7 @@ async function requestData<T>(
 ) {
   return requestWithTimeout(
     async (signal) => {
-      const response = await mobileApiRequest<Data<T>>(path, {
-        authenticated: true,
+      const response = await apiSession.request<Data<T>>(path, {
         body: options.body,
         headers: options.headers,
         method: options.method,

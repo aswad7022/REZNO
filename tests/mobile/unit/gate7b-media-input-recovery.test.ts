@@ -1040,13 +1040,22 @@ test("Gate 7B cleanup is idempotent for missing artifacts and preserves recovery
 });
 
 test("Gate 7B UI and native config cover camera, library, cancellation, and ar/en/ckb", async () => {
-  const [component, coordinator, runtime, appConfigText] = await Promise.all([
+  const [
+    component,
+    coordinator,
+    runtime,
+    apiClient,
+    uploadRuntime,
+    appConfigText,
+  ] = await Promise.all([
     readFile(
       "apps/mobile/src/components/customer-avatar-manager.tsx",
       "utf8",
     ),
     readFile("apps/mobile/src/media/upload-coordinator.ts", "utf8"),
     readFile("apps/mobile/src/media/upload-coordinator-runtime.ts", "utf8"),
+    readFile("apps/mobile/src/api/client.ts", "utf8"),
+    readFile("apps/mobile/src/media/upload-runtime.ts", "utf8"),
     readFile("apps/mobile/app.json", "utf8"),
   ]);
   const appConfig = JSON.parse(appConfigText) as {
@@ -1077,6 +1086,28 @@ test("Gate 7B UI and native config cover camera, library, cancellation, and ar/e
     coordinator,
     /if \(!this\.isOwner\(context\)\) return false;[\s\S]*releaseCustomerAvatarRunner/,
   );
+  const claimDependencies = coordinator.indexOf(
+    "context.runDependencies = this.createOwnedRunDependencies(context)",
+  );
+  const publishClaim = coordinator.indexOf(
+    "this.publishFor(input.ownerId",
+    claimDependencies,
+  );
+  assert.ok(claimDependencies >= 0);
+  assert.ok(
+    publishClaim > claimDependencies,
+    "the API session snapshot must be owned before pending state is published",
+  );
+  assert.match(apiClient, /export function captureMobileApiSession/);
+  assert.match(
+    apiClient,
+    /const cookie = readMobileSessionCookie\(\);[\s\S]*executeMobileApiRequest<T>[\s\S]*cookie/,
+  );
+  assert.match(
+    uploadRuntime,
+    /const apiSession = captureMobileApiSession\(\);/,
+  );
+  assert.match(uploadRuntime, /apiSession\.request<Data<T>>/);
   for (const locale of ["ar", "en", "ckb"]) {
     assert.match(component, new RegExp(`\\n  ${locale}: \\{`));
   }

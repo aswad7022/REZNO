@@ -5,9 +5,10 @@ import {
   CustomerAvatarUploadCoordinator,
   type CustomerAvatarCoordinatorDependencies,
 } from "../../../apps/mobile/src/media/upload-coordinator";
-import type {
-  CustomerAvatarUploadEngineDependencies,
-  CustomerMediaContainer,
+import {
+  runCustomerAvatarUpload,
+  type CustomerAvatarUploadEngineDependencies,
+  type CustomerMediaContainer,
 } from "../../../apps/mobile/src/media/upload-engine";
 import {
   createCustomerAvatarUploadManifest,
@@ -356,6 +357,71 @@ test("Gate 7B account switch waits for an owned commit without new-owner overlap
   assert.equal(harness.coordinator.getSnapshot(OTHER_OWNER).pending, false);
 });
 
+test("Gate 7B claimed runner keeps its original API session through commit", async () => {
+  const prepareStarted = deferred<void>();
+  const releasePrepare = deferred<void>();
+  const persistStarted = deferred<void>();
+  const releasePersist = deferred<void>();
+  let sessionOwner = OWNER;
+  const harness = coordinatorHarness({
+    async attach(capturedSessionOwner) {
+      harness.attachedSessionOwners.push(capturedSessionOwner);
+      return containerFor(ASSET_B, 2);
+    },
+    async beforePrepare() {
+      prepareStarted.resolve();
+      await releasePrepare.promise;
+    },
+    currentSessionOwner: () => sessionOwner,
+    async persist(manifest) {
+      if (manifest.checkpoint === "VERIFY_ATTACH") {
+        persistStarted.resolve();
+        await releasePersist.promise;
+      }
+    },
+    async run(manifest, dependencies) {
+      const attachManifest: CustomerAvatarUploadManifest = {
+        ...manifest,
+        assetId: ASSET_B,
+        checkpoint: "ATTACH",
+        session: {
+          id: "00000000-0000-4000-8000-000000000301",
+          targetExpiresAt: null,
+          targetRequestVersion: 1,
+          version: 1,
+        },
+      };
+      harness.stored = attachManifest;
+      return runCustomerAvatarUpload(attachManifest, dependencies);
+    },
+  });
+  await harness.coordinator.bootstrap(OWNER);
+  const running = harness.coordinator.prepareAndStart({
+    asset: inputAsset(),
+    ownerId: OWNER,
+    source: "LIBRARY",
+  });
+  await prepareStarted.promise;
+  assert.deepEqual(harness.capturedSessionOwners, [OWNER]);
+
+  releasePrepare.resolve();
+  await persistStarted.promise;
+  assert.equal(harness.coordinator.getSnapshot(OWNER).phase, "COMMITTING");
+  sessionOwner = OTHER_OWNER;
+  const switchOwner = harness.coordinator.bootstrap(OTHER_OWNER);
+  await flush();
+  assert.equal(harness.calls.attach, 0);
+  assert.equal(harness.calls.bootstrap, 1);
+  assert.equal(harness.coordinator.getSnapshot(OWNER).pending, true);
+
+  releasePersist.resolve();
+  await Promise.all([running, switchOwner]);
+  assert.equal(harness.calls.attach, 1);
+  assert.deepEqual(harness.attachedSessionOwners, [OWNER]);
+  assert.equal(harness.calls.bootstrap, 2);
+  assert.equal(harness.coordinator.getSnapshot(OTHER_OWNER).status, "IDLE");
+});
+
 test("Gate 7B stale owner actions cannot cancel the current account runner", async () => {
   const runStarted = deferred<void>();
   const releaseRun = deferred<void>();
@@ -578,9 +644,13 @@ test("Gate 7B stale preview responses never replace a newer or removed avatar", 
 });
 
 function coordinatorHarness(options: {
+  attach?(
+    capturedSessionOwner: string,
+  ): Promise<CustomerMediaContainer>;
   beforePrepare?(
     input: Parameters<CustomerAvatarCoordinatorDependencies["prepare"]>[0],
   ): Promise<void>;
+  currentSessionOwner?(): string;
   initialAssetId?: string | null;
   initialManifest?: CustomerAvatarUploadManifest | null;
   loadPreview?(assetId: string): Promise<string>;
@@ -606,7 +676,9 @@ function coordinatorHarness(options: {
   const commitStarted = deferred<void>();
   let uuidCounter = 1;
   const harness: {
+    attachedSessionOwners: string[];
     calls: typeof calls;
+    capturedSessionOwners: string[];
     commitStarted: ReturnType<typeof deferred<void>>;
     controllers: AbortController[];
     coordinator: CustomerAvatarUploadCoordinator;
@@ -614,7 +686,9 @@ function coordinatorHarness(options: {
     runStarted: ReturnType<typeof deferred<void>>;
     stored: CustomerAvatarUploadManifest | null;
   } = {
+    attachedSessionOwners: [],
     calls,
+    capturedSessionOwners: [],
     commitStarted,
     controllers,
     coordinator: null as unknown as CustomerAvatarUploadCoordinator,
@@ -641,11 +715,19 @@ function coordinatorHarness(options: {
       return controller;
     },
     createRunDependencies(input) {
+      const capturedSessionOwner = options.currentSessionOwner?.() ?? OWNER;
+      harness.capturedSessionOwners.push(capturedSessionOwner);
       const dependencies: CustomerAvatarUploadEngineDependencies = {
         async attach() {
-          throw new Error("engine adapter is not used by coordinator tests");
+          calls.attach += 1;
+          return options.attach?.(capturedSessionOwner)
+            ?? containerFor(ASSET_B, 2);
         },
-        async cleanupLocal() {},
+        async cleanupLocal(manifest) {
+          if (harness.stored?.operationId === manifest.operationId) {
+            harness.stored = null;
+          }
+        },
         async createSession() {
           throw new Error("engine adapter is not used by coordinator tests");
         },
