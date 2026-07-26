@@ -15,6 +15,8 @@ The Gate 7C suite must complete without failure, skip, todo, or cancellation:
 - no financial state mutation from the return endpoint;
 - warm-link single-flight and duplicate-link suppression;
 - cold-start/process-death recovery without reopening checkout;
+- cold-start initial-link replay preserving an already recovered
+  authoritative result;
 - lost consume-response recovery through read-only authoritative status;
 - server status overriding success, failure, and cancel link hints;
 - browser closure preserving a recoverable operation;
@@ -50,6 +52,7 @@ The Gate 7C suite must complete without failure, skip, todo, or cancellation:
 | Same link arrives again | No duplicate server work; replay remains explicit |
 | Wrong intent/state/owner | Rejected before authoritative status work |
 | App restarts after return was persisted | Bounded verification resumes; browser does not reopen |
+| Startup retains the same initial link after recovery | The recovered authoritative result remains unchanged and no second consume occurs |
 | Consume succeeded but response was lost | Replay conflict followed by read-only intent status |
 | Link says success while server says failed | UI is declined |
 | Link says failure while server says captured | UI is confirmed |
@@ -73,8 +76,8 @@ hidden failure is counted as success.
 
 | Check | Result |
 | --- | --- |
-| Gate 7C plus Gate 7A/7B regressions and release validator | `72/72` pass (`69 + 3`) |
-| Complete Unit suites | `532/532` pass (`329 + 203`) |
+| Gate 7C plus Gate 7A/7B regressions and release validator | `74/74` pass (`71 + 3`) |
+| Complete Unit suites | `534/534` pass (`331 + 203`) |
 | Complete PostgreSQL integration on a fresh 49/49 database | `426/426` pass |
 | Complete live HTTP/RSC/API suites on the production server | `132/132` pass (`6 + 121 + 5`) |
 | Root and Mobile TypeScript | PASS |

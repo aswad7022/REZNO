@@ -10,6 +10,7 @@ Status: **AUTHOR REVIEW COMPLETE — INDEPENDENT REVIEW PENDING**.
 | Open redirect or crafted return link | The server creates fixed `rezno://payments/return` URLs. Mobile requires the exact scheme, host, path, no credentials/port/fragment, and exactly one allowed value for each of three parameters. |
 | State tampering or cross-user/order reuse | HMAC state is purpose-keyed and binds Person, intent, attempt, handoff, nonce, version, and expiry. Database bindings are rechecked under the intent lock. |
 | Return replay | The exact PaymentMutation transitions atomically from `PROCESSING` to `COMPLETED`; subsequent consumption receives a stable conflict. Mobile records return receipt before sending it. |
+| Startup initial URL overwrites recovered truth | Mobile handles an initial URL only while its manifest is still awaiting a return. A late duplicate for the same terminal intent is ignored and cannot replace the authoritative result. |
 | Link outcome creates false financial success | The link outcome is only a UI hint. `CONFIRMED` and `DECLINED` derive exclusively from a freshly authenticated server PaymentIntent. |
 | Lost response after state consumption | A replay conflict permits only a read-only PaymentIntent fetch. It cannot repeat a financial/provider mutation. |
 | Infinite retry or polling | Three automatic checks, five total checks, bounded 500/1500 ms waits, a five-minute manifest TTL, and explicit user retry. |

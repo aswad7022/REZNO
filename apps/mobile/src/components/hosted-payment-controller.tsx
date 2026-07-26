@@ -12,6 +12,7 @@ import type {
   HostedPaymentSnapshot,
   HostedPaymentStatus,
 } from "../payments/hosted-payment-coordinator";
+import { shouldHandleInitialHostedPaymentUrl } from "../payments/hosted-payment-coordinator";
 import { hostedPaymentCoordinator } from "../payments/hosted-payment-runtime";
 import type { MobileTheme } from "../theme/tokens";
 
@@ -115,7 +116,13 @@ export function HostedPaymentController({
       await hostedPaymentCoordinator.bootstrap(ownerId);
       if (!active) return;
       const initialUrl = await Linking.getInitialURL();
-      if (active && initialUrl) {
+      if (
+        active
+        && initialUrl
+        && shouldHandleInitialHostedPaymentUrl(
+          hostedPaymentCoordinator.getSnapshot(ownerId),
+        )
+      ) {
         await hostedPaymentCoordinator.handleUrl(ownerId, initialUrl);
       }
     };

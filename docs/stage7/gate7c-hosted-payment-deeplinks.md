@@ -52,6 +52,9 @@ owns one operation at a time:
 - the return shape has exactly one `intentId`, `outcome`, and signed `state`;
 - warm links share the current runner and one return-consumption promise;
 - cold links load an owner-bound SecureStore manifest;
+- an initial URL is consumed only while its manifest is still awaiting a
+  return; an already recovered authoritative result cannot be overwritten by
+  the same startup URL;
 - a return is durably marked received before server consumption;
 - a lost consumption response falls back only to read-only PaymentIntent
   status after the server reports the state already consumed;

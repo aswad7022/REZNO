@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-import { HostedPaymentCoordinator } from "../../../apps/mobile/src/payments/hosted-payment-coordinator";
+import {
+  HostedPaymentCoordinator,
+  shouldHandleInitialHostedPaymentUrl,
+} from "../../../apps/mobile/src/payments/hosted-payment-coordinator";
 import {
   assertApprovedHostedCheckoutUrl,
   createHostedPaymentRecoveryManifest,
@@ -295,6 +298,60 @@ test("Gate 7C restart recovers a lost consume response through read-only authori
   assert.equal(harness.calls.get, 1);
   assert.equal(harness.coordinator.getSnapshot(OWNER).status, "CONFIRMED");
   assert.equal(harness.stored, null);
+});
+
+test("Gate 7C cold-start initial link cannot overwrite recovered authoritative status", async () => {
+  const manifest = {
+    ...manifestForRecovery(),
+    checkpoint: "VERIFYING_STATUS" as const,
+    outcome: "success" as const,
+    returnReceivedAt: NOW + 1_000,
+  };
+  const harness = coordinatorHarness({
+    initial: manifest,
+    consume: async () => payment("CAPTURED"),
+  });
+
+  await harness.coordinator.bootstrap(OWNER);
+  const recovered = harness.coordinator.getSnapshot(OWNER);
+  assert.equal(recovered.status, "CONFIRMED");
+  assert.equal(recovered.manifest, null);
+  assert.equal(shouldHandleInitialHostedPaymentUrl(recovered), false);
+
+  if (shouldHandleInitialHostedPaymentUrl(recovered)) {
+    await harness.coordinator.handleUrl(
+      OWNER,
+      returnUrl(INTENT, "success"),
+    );
+  }
+  assert.equal(harness.coordinator.getSnapshot(OWNER).status, "CONFIRMED");
+  assert.equal(harness.calls.consume, 1);
+
+  await harness.coordinator.handleUrl(
+    OWNER,
+    returnUrl(INTENT, "success"),
+  );
+  assert.equal(harness.coordinator.getSnapshot(OWNER).status, "CONFIRMED");
+  assert.equal(harness.calls.consume, 1);
+});
+
+test("Gate 7C cold-start handles only a return that is still awaiting consumption", async () => {
+  const harness = coordinatorHarness({
+    initial: manifestForRecovery(),
+    consume: async () => payment("CAPTURED"),
+  });
+
+  await harness.coordinator.bootstrap(OWNER);
+  const waiting = harness.coordinator.getSnapshot(OWNER);
+  assert.equal(waiting.status, "WAITING_RETURN");
+  assert.equal(shouldHandleInitialHostedPaymentUrl(waiting), true);
+
+  await harness.coordinator.handleUrl(
+    OWNER,
+    returnUrl(INTENT, "success"),
+  );
+  assert.equal(harness.coordinator.getSnapshot(OWNER).status, "CONFIRMED");
+  assert.equal(harness.calls.consume, 1);
 });
 
 test("Gate 7C browser cancellation keeps a recoverable one-operation manifest", async () => {

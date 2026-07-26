@@ -70,6 +70,15 @@ export type HostedPaymentApiSession = {
   ): Promise<MobilePaymentIntent>;
 };
 
+export function shouldHandleInitialHostedPaymentUrl(
+  snapshot: HostedPaymentSnapshot,
+) {
+  return (
+    snapshot.manifest?.checkpoint === "WAITING_RETURN"
+    || (snapshot.manifest === null && snapshot.status === "IDLE")
+  );
+}
+
 type Runner = {
   api: HostedPaymentApiSession;
   controller: AbortController;
@@ -288,6 +297,18 @@ export class HostedPaymentCoordinator {
     }
     const manifest = await this.dependencies.load(ownerId).catch(() => null);
     if (!manifest) {
+      const snapshot = this.getSnapshot(ownerId);
+      if (
+        snapshot.intentId === parsed.intentId
+        && snapshot.manifest === null
+        && (
+          snapshot.status === "CONFIRMED"
+          || snapshot.status === "DECLINED"
+          || snapshot.status === "EXPIRED"
+        )
+      ) {
+        return;
+      }
       this.publish(ownerId, {
         pending: false,
         status: "INVALID_LINK",
