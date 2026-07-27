@@ -2,6 +2,10 @@
 
 import type { ReactNode } from "react";
 import { motion, useReducedMotion } from "framer-motion";
+import { reznoBrandFoundation } from "@/design-system/brand-foundation";
+
+const motionDuration =
+  reznoBrandFoundation.motion.duration.normal / 1_000;
 
 export function PublicProfilePageMotion({ children }: { children: ReactNode }) {
   const reducedMotion = useReducedMotion();
@@ -9,7 +13,10 @@ export function PublicProfilePageMotion({ children }: { children: ReactNode }) {
     <motion.div
       initial={reducedMotion ? false : { opacity: 0 }}
       animate={{ opacity: 1 }}
-      transition={{ duration: 0.35 }}
+      transition={{
+        duration: reducedMotion ? 0 : motionDuration,
+        ease: reznoBrandFoundation.motion.easing.enter,
+      }}
     >
       {children}
     </motion.div>
@@ -26,10 +33,17 @@ export function PublicProfileSection({
   const reducedMotion = useReducedMotion();
   return (
     <motion.section
-      initial={reducedMotion ? false : { opacity: 0, y: 18 }}
+      initial={
+        reducedMotion
+          ? false
+          : { opacity: 0, y: reznoBrandFoundation.motion.offset.page }
+      }
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-60px" }}
-      transition={{ duration: 0.4, ease: "easeOut" }}
+      transition={{
+        duration: reducedMotion ? 0 : motionDuration,
+        ease: reznoBrandFoundation.motion.easing.enter,
+      }}
       className={className}
     >
       {children}
@@ -42,7 +56,10 @@ export function PublicProfileCardMotion({ children }: { children: ReactNode }) {
   return (
     <motion.div
       whileHover={reducedMotion ? undefined : { y: -4 }}
-      transition={{ duration: 0.2 }}
+      transition={{
+        duration: reducedMotion ? 0 : motionDuration,
+        ease: reznoBrandFoundation.motion.easing.standard,
+      }}
       className="h-full"
     >
       {children}

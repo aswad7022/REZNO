@@ -3,6 +3,9 @@
     "title": "ڕێزنو",
     "description": "حجزەکانت بەڕێوەببە و بازرگانییەکەت لەگەڵ ڕێزنو گەشە پێبدە."
   },
+  "Accessibility": {
+    "skipToContent": "بازبدە بۆ ناوەڕۆکی سەرەکی"
+  },
   "Common": {
     "language": "زمان",
     "languages": {
@@ -1205,6 +1208,7 @@
     "hintClose": "Esc بۆ داخستن"
   },
   "Dashboard": {
+    "activeBusiness": "بازرگانی چالاک",
     "navigation": {
       "label": "ڕێنیشاندانی داشبۆرد",
       "groups": {

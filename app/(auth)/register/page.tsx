@@ -52,7 +52,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <main className="grid min-h-screen place-items-center bg-muted/30 p-4">
+    <main id="main-content" className="grid min-h-screen place-items-center bg-muted/30 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <Link

@@ -28,7 +28,7 @@ export default async function AddBusinessPage() {
   }
 
   return (
-    <main className="grid min-h-screen place-items-center bg-muted/30 p-4 sm:p-6">
+    <main id="main-content" className="grid min-h-screen place-items-center bg-muted/30 p-4 sm:p-6">
       <Card className="w-full max-w-2xl">
         <CardHeader>
           <CardTitle className="text-2xl">{t("addBusinessTitle")}</CardTitle>

@@ -62,7 +62,7 @@ export default async function PublicProfessionalRoute({
     <PublicProfilePageMotion>
       <div className="min-h-screen bg-background">
         <PublicHeader />
-        <main>
+        <main id="main-content">
           <section className="border-b bg-gradient-to-b from-primary/10 via-background to-background">
             <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:py-14">
               <Button asChild variant="ghost" className="mb-6">

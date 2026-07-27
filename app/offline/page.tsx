@@ -12,6 +12,7 @@ export default async function OfflinePage() {
     <div className="min-h-screen">
       <PublicHeader />
       <main
+        id="main-content"
         className="rezno-premium-surface mx-auto grid min-h-[70vh] w-full min-w-0 max-w-3xl place-items-center px-4 py-12"
         data-customer-surface="offline"
       >

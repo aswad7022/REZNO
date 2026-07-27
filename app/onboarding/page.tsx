@@ -53,7 +53,7 @@ export default async function OnboardingPage({
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-muted/30 p-4 sm:p-6">
+    <main id="main-content" className="flex min-h-screen items-center justify-center bg-muted/30 p-4 sm:p-6">
       <div className="w-full max-w-4xl">
         <div className="mb-8 text-center">
           <span className="mx-auto mb-4 grid size-12 place-items-center rounded-2xl bg-primary text-lg font-bold text-primary-foreground">

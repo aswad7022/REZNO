@@ -28,7 +28,7 @@ export default async function SelectBusinessPage({
   const next = getSafeBusinessReturnPath(params.next);
 
   return (
-    <main className="grid min-h-screen place-items-center bg-muted/30 p-4">
+    <main id="main-content" className="grid min-h-screen place-items-center bg-muted/30 p-4">
       <Card className="w-full max-w-lg">
         <CardHeader>
           <CardTitle className="text-2xl">اختر النشاط النشط</CardTitle>

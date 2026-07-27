@@ -117,7 +117,7 @@ export function DashboardSidebar({
   return (
     <aside
       className={cn(
-        "fixed inset-y-0 start-0 z-40 hidden border-e border-white/10 bg-sidebar text-sidebar-foreground shadow-2xl shadow-slate-950/10 transition-[width] duration-200 ease-out lg:flex lg:flex-col",
+        "fixed inset-y-0 start-0 z-40 hidden border-e border-white/10 bg-sidebar text-sidebar-foreground shadow-2xl shadow-slate-950/10 transition-[width] duration-(--motion-duration-normal) ease-(--motion-ease-enter) motion-reduce:transition-none lg:flex lg:flex-col",
         collapsed ? "w-18" : "w-64",
       )}
     >

@@ -48,8 +48,11 @@ responsive/RTL/accessibility polish. Not started by Gate 8A.
 ### Gate 8D — Motion, Visual QA and Stage Closure
 
 Final motion, browser/device-size coverage, visual regression, accessibility,
-visual performance, independent review, and Stage 8 closure. Not started by
-Gate 8A.
+visual performance, independent review, and Stage 8 closure.
+
+Gate 8D is the active closure gate. Its author evidence must be captured from an
+owned production build/server and independently reviewed before the gate or
+Stage 8 can close.
 
 ## Non-negotiable exclusions
 
@@ -61,7 +64,7 @@ Gate 8A.
 - No Stage 6 runtime activation or secret rotation.
 - No Stage 7 external-provider/device validation.
 - No change to PR #100.
-- No Gate 8B, 8C, or 8D implementation inside Gate 8A.
+- No artificial-intelligence implementation before Stage 8 is formally closed.
 
 ## Gate 8A exit contract
 

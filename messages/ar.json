@@ -3,6 +3,9 @@
     "title": "ريزنو",
     "description": "أدر حجوزاتك وطوّر أعمالك مع ريزنو."
   },
+  "Accessibility": {
+    "skipToContent": "تخطَّ إلى المحتوى الرئيسي"
+  },
   "Common": {
     "language": "اللغة",
     "languages": {
@@ -1216,6 +1219,7 @@
     "hintClose": "Esc للإغلاق"
   },
   "Dashboard": {
+    "activeBusiness": "النشاط النشط",
     "navigation": {
       "label": "تنقل لوحة التحكم",
       "groups": {

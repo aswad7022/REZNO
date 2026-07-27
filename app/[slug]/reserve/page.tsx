@@ -87,7 +87,7 @@ export default async function RestaurantReservationRoute({
   return (
     <div className="min-h-screen bg-background">
       <PublicHeader />
-      <main className="mx-auto grid max-w-7xl gap-8 px-4 py-8 sm:px-6 lg:grid-cols-[minmax(0,1fr)_24rem]">
+      <main id="main-content" className="mx-auto grid max-w-7xl gap-8 px-4 py-8 sm:px-6 lg:grid-cols-[minmax(0,1fr)_24rem]">
         <section className="space-y-6">
           <div className="overflow-hidden rounded-[2rem] border border-primary/10 bg-card shadow-xl shadow-primary/5">
             <div className="bg-gradient-to-l from-primary via-[color-mix(in_oklch,var(--primary),var(--warning)_18%)] to-[color-mix(in_oklch,var(--primary),var(--foreground)_18%)] p-6 text-primary-foreground sm:p-8">

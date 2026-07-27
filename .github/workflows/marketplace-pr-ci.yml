@@ -59,6 +59,9 @@ jobs:
       - name: Run mobile TypeScript validation
         run: npm run typecheck --prefix apps/mobile
 
+      - name: Run Stage 8 visual closure contracts
+        run: npm run test:stage8d
+
       - name: Validate Prisma schema
         run: npx --no-install prisma validate
 

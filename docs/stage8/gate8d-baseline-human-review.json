@@ -1,0 +1,153 @@
+{
+  "schemaVersion": 1,
+  "reviewer": "Independent Gate 8D visual-review subagent",
+  "independentFromCapture": true,
+  "reviewedHeadSha": "ad2f4d03a968f56064b97c3fe8f5d68b6ad6c7a9",
+  "reviewedAt": "2026-07-28T02:08:00Z",
+  "captures": [
+    {
+      "file": "docs/stage8/baselines/gate8d/chromium-mobile-compact-admin-overview-compact-ar-dark.png",
+      "decision": "PASS",
+      "notes": "Arabic RTL compact overview is readable, width-correct, dark-themed, and free of clipping, collapse, overlays, or sensitive data.",
+      "sha256": "b3ccd795842fe46b5d1ca031345697d87083132bec2e91bc33d2ad8cb45c554c"
+    },
+    {
+      "file": "docs/stage8/baselines/gate8d/chromium-mobile-large-admin-navigation-dialog-compact-en-dark.png",
+      "decision": "PASS",
+      "notes": "English LTR navigation dialog opens from the correct edge with complete links, stable dimming, and no overflow.",
+      "sha256": "614a5a8f84464e73808a9a41c8996ce08acfb212dd138e0266b41c33adce860a"
+    },
+    {
+      "file": "docs/stage8/baselines/gate8d/chromium-tablet-portrait-business-dashboard-desktop-ckb-light.png",
+      "decision": "PASS",
+      "notes": "Kurdish RTL Business dashboard uses the tablet width cleanly with correct light theme and no repeated or cropped regions.",
+      "sha256": "c11028adff5cbe9f326dbc57bc347147e892d1f2223f82e4611cd72d2f0f6cba"
+    },
+    {
+      "file": "docs/stage8/baselines/gate8d/chromium-tablet-landscape-admin-communications-empty-desktop-ar-light.png",
+      "decision": "PASS",
+      "notes": "Arabic communications page shows a genuine final empty state without forms, rows, loading skeletons, or overlays.",
+      "sha256": "384172377ed95ca7c2ba3d227d1f163939a178e15ca71d6cfbdaf640c3868f69"
+    },
+    {
+      "file": "docs/stage8/baselines/gate8d/chromium-desktop-admin-platform-operations-desktop-ar-light.png",
+      "decision": "PASS",
+      "notes": "Arabic Platform Operations clearly states the inactive Stage 6 runtime truth and renders its metrics without layout defects.",
+      "sha256": "1a04d91ff051aa08a8b78e0e5b77c998ad4f2526831c434a5cde45e744fd20bf"
+    },
+    {
+      "file": "docs/stage8/baselines/gate8d/chromium-wide-desktop-admin-overview-desktop-en-light.png",
+      "decision": "PASS",
+      "notes": "English wide Admin overview is balanced and complete with deterministic fixture data and no sensitive values.",
+      "sha256": "9ec4c550479fea63d551ec27c7ef1ef3d3728e345d1f23072adaa38767834796"
+    },
+    {
+      "file": "docs/stage8/baselines/gate8d/chromium-zoom-200-admin-access-form-desktop-ar-light.png",
+      "decision": "PASS",
+      "notes": "Arabic permission controls remain legible at 200-percent reflow with no horizontal overflow or loading state.",
+      "sha256": "e41d0afded1edce6bcc7ef6a7b2673c948c6099a81396d0b4468bed97b4aeff4"
+    },
+    {
+      "file": "docs/stage8/baselines/gate8d/chromium-desktop-business-notification-preferences-table-desktop-en-light.png",
+      "decision": "PASS",
+      "notes": "Outbound preference heading and complete table are fully visible with no sticky-header crop, overflow, or duplication.",
+      "sha256": "13a0f0fd8da0f637ac31f8fbe1044f62d507c19a5727736d1e6555d76ec9eb10"
+    },
+    {
+      "file": "docs/stage8/baselines/gate8d/firefox-mobile-compact-admin-overview-compact-ar-dark.png",
+      "decision": "PASS",
+      "notes": "Firefox preserves the Arabic RTL hierarchy, full-width cards, dark semantic colors, and clean horizontal boundaries.",
+      "sha256": "83569a17f3aee2207a0b8ad218de5ca861d89ab2e9f680cef7713a69208c7abc"
+    },
+    {
+      "file": "docs/stage8/baselines/gate8d/firefox-mobile-large-admin-navigation-dialog-compact-en-dark.png",
+      "decision": "PASS",
+      "notes": "Firefox renders the English LTR navigation dialog with correct placement, readable controls, and no collapse.",
+      "sha256": "e6c9409fcfe745637714b6b3b2fa07cc092c2b5c65a9fdf2b3087f0edf517b39"
+    },
+    {
+      "file": "docs/stage8/baselines/gate8d/firefox-tablet-portrait-business-dashboard-desktop-ckb-light.png",
+      "decision": "PASS",
+      "notes": "Firefox Kurdish dashboard is correctly directed and readable with no clipping, repetition, overlays, or overflow.",
+      "sha256": "68b8a3a0afa1c1dbfe222842c24dd5f0980439ccb12b1ab87b7751f4cd7c214a"
+    },
+    {
+      "file": "docs/stage8/baselines/gate8d/firefox-tablet-landscape-admin-communications-empty-desktop-ar-light.png",
+      "decision": "PASS",
+      "notes": "Firefox displays the intended Arabic empty communications state without forms, rows, skeletons, or error overlays.",
+      "sha256": "fad26535f8a8c9ed725734b2025a3fa889ae9b6861ca6d06031283de03fd5bb5"
+    },
+    {
+      "file": "docs/stage8/baselines/gate8d/firefox-desktop-admin-platform-operations-desktop-ar-light.png",
+      "decision": "PASS",
+      "notes": "Firefox presents the Arabic inactive-runtime notice clearly with stable metric cards and no crop or development chrome.",
+      "sha256": "a16b816cb7531ca417d11ffeae85f9bb299ac2cfc017fd15f514d3be7090c0a8"
+    },
+    {
+      "file": "docs/stage8/baselines/gate8d/firefox-wide-desktop-admin-overview-desktop-en-light.png",
+      "decision": "PASS",
+      "notes": "Firefox wide English overview matches the expected final state with complete fixtures and balanced spacing.",
+      "sha256": "1b1b0949d50b4d120626612b77b1dbae5ced3e8f58755901bb6aaa6e97eac30f"
+    },
+    {
+      "file": "docs/stage8/baselines/gate8d/firefox-zoom-200-admin-access-form-desktop-ar-light.png",
+      "decision": "PASS",
+      "notes": "Firefox exposes the final Arabic grant form safely at reflow scale without horizontal clipping or loading artifacts.",
+      "sha256": "0f7dd2b7749f57917eb0d00ca2210ba8dabcbd3f03b7e4f1980ddeb549468895"
+    },
+    {
+      "file": "docs/stage8/baselines/gate8d/firefox-desktop-business-notification-preferences-table-desktop-en-light.png",
+      "decision": "PASS",
+      "notes": "Firefox shows the full outbound preference heading and complete table without the previous sticky-header clipping.",
+      "sha256": "9446ca46e57837dbf631a374e54012568ce1b5c46fb7e2d8b39416d849036467"
+    },
+    {
+      "file": "docs/stage8/baselines/gate8d/webkit-mobile-compact-admin-overview-compact-ar-dark.png",
+      "decision": "PASS",
+      "notes": "WebKit preserves the Arabic RTL compact layout, readable metrics, correct dark theme, and clean viewport width.",
+      "sha256": "13af2bf2c34b2bedbe6839f757f30042d26425796fc4919fb59bfe18e98720a5"
+    },
+    {
+      "file": "docs/stage8/baselines/gate8d/webkit-mobile-large-admin-navigation-dialog-compact-en-dark.png",
+      "decision": "PASS",
+      "notes": "WebKit renders the English navigation dialog from the LTR start edge with complete links and no overflow.",
+      "sha256": "7a17a75b9b31bdb9630958352e2755b45b1d6556c69dc9a070ddfd40f4c48924"
+    },
+    {
+      "file": "docs/stage8/baselines/gate8d/webkit-tablet-portrait-business-dashboard-desktop-ckb-light.png",
+      "decision": "PASS",
+      "notes": "WebKit Kurdish tablet dashboard remains correctly directed and free of cropping, overlays, or repeated regions.",
+      "sha256": "86b3166026f6bc716f9e38c0acb34f0d8f479e673c3cc31cc86675d08de8ef74"
+    },
+    {
+      "file": "docs/stage8/baselines/gate8d/webkit-tablet-landscape-admin-communications-empty-desktop-ar-light.png",
+      "decision": "PASS",
+      "notes": "WebKit shows the correct Arabic communications empty state without loading artifacts or unintended content.",
+      "sha256": "486ed4e355cab43ddcf45637fee2bfb07bc29a6f1a27f27ef275aa52a9aea3f3"
+    },
+    {
+      "file": "docs/stage8/baselines/gate8d/webkit-desktop-admin-platform-operations-desktop-ar-light.png",
+      "decision": "PASS",
+      "notes": "WebKit clearly displays the Arabic inactive-runtime notice and stable platform metric grid without clipping.",
+      "sha256": "13d3978a74a9cc9020f929dee41231c1432217af6f87d01dd2fb8ccff4b8eb79"
+    },
+    {
+      "file": "docs/stage8/baselines/gate8d/webkit-wide-desktop-admin-overview-desktop-en-light.png",
+      "decision": "PASS",
+      "notes": "WebKit English wide overview is complete and proportionate with deterministic fixture information.",
+      "sha256": "46b90275dc32264c4e19fc9d6bfdd4496619c331b0bb0235183e984012cb1f0b"
+    },
+    {
+      "file": "docs/stage8/baselines/gate8d/webkit-zoom-200-admin-access-form-desktop-ar-light.png",
+      "decision": "PASS",
+      "notes": "WebKit displays the Arabic grant form and synthetic identity at reflow scale without overflow or real PII.",
+      "sha256": "22b6e1fea585964cd4b9432b738b53d48d4cd81a4bf10f89f05e9fbf00c2058e"
+    },
+    {
+      "file": "docs/stage8/baselines/gate8d/webkit-desktop-business-notification-preferences-table-desktop-en-light.png",
+      "decision": "PASS",
+      "notes": "WebKit renders the full outbound preference heading and complete readable table without crop or repetition.",
+      "sha256": "bb5a41f27ea2f3752f1134030bc519164c7a7b9188d57078ea8cbc6ddc3b23c1"
+    }
+  ]
+}

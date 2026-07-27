@@ -1,0 +1,2162 @@
+{
+  "schemaVersion": 1,
+  "gate": "8D",
+  "environment": "owned Next.js production build/server",
+  "sourceSha": "ad2f4d03a968f56064b97c3fe8f5d68b6ad6c7a9",
+  "productionAttestation": {
+    "schemaVersion": 1,
+    "gitSha": "ad2f4d03a968f56064b97c3fe8f5d68b6ad6c7a9",
+    "buildId": "WXfhmPeBENrQAxQrXgZSz",
+    "nodeEnv": "production",
+    "hostname": "127.0.0.1",
+    "port": 53998,
+    "pid": 28413,
+    "ownedByHarness": true,
+    "buildCommand": [
+      "npm",
+      "run",
+      "build"
+    ],
+    "startCommand": [
+      "/Users/user/.nvm/versions/node/v24.18.0/bin/node",
+      "/Users/user/Documents/REZNO/REZNO/rezno-stage8-gate8d/node_modules/next/dist/bin/next",
+      "start",
+      "--hostname",
+      "127.0.0.1",
+      "--port",
+      "53998"
+    ],
+    "captureScriptSha256": "c980016bcf3e35d3e7d94fd4f589f03a388526ea1d8b947a5d5383bc2c7ccbc3",
+    "harnessScriptSha256": "c02030062940fdb3198a5d6680ae7f88cd66c3fedaa8bcadf80b21aeaf585c61",
+    "buildManifestSha256": "88a983693e9e4f6c7e2fe3e7cba308dfde75598f691ba31c1522a27778c45d56"
+  },
+  "capturePolicy": {
+    "reducedMotion": "reduce",
+    "animationPolicy": "no running non-progress animation at capture",
+    "sensitiveData": "deterministic fixtures.example identities with null phones",
+    "zoomEquivalence": "half CSS viewport dimensions with 2x reflow contract"
+  },
+  "determinism": {
+    "passes": 2,
+    "identicalCaptureCount": 24,
+    "fixtureFingerprint": "7047d8ded2878edad6c7ae25de5ac434449a8a2d4ecb32a886823bcf9ea024f5"
+  },
+  "captures": [
+    {
+      "file": "docs/stage8/baselines/gate8d/chromium-mobile-compact-admin-overview-compact-ar-dark.png",
+      "route": "/admin",
+      "browser": "chromium",
+      "browserVersion": "151.0.7922.34",
+      "viewport": "mobile-compact",
+      "viewportWidth": 360,
+      "viewportHeight": 640,
+      "zoom": 1,
+      "locale": "ar",
+      "direction": "rtl",
+      "theme": "dark",
+      "role": "root-super-admin",
+      "expectedState": "final",
+      "families": [
+        "dense-data"
+      ],
+      "dom": {
+        "urlPath": "/admin",
+        "locale": "ar",
+        "direction": "rtl",
+        "theme": "dark",
+        "expectedState": "final",
+        "stateMarkerCount": 1,
+        "requiredLandmarkCounts": {
+          "[data-business-admin-surface=\"admin\"]": 1,
+          "main#main-content": 1,
+          "h1": 1,
+          "button[aria-label=\"فتح قائمة الإدارة\"]": 1
+        },
+        "forbiddenStateCounts": {
+          "[aria-busy=\"true\"]": 0,
+          "[data-slot=\"skeleton\"]": 0,
+          "nextjs-portal": 0,
+          "[data-nextjs-dialog-overlay]": 0,
+          "[data-next-badge-root]": 0
+        },
+        "requiredTextCounts": {
+          "body::مركز تحكم المنصة": 1,
+          "body::إجمالي الأنشطة": 1
+        },
+        "forbiddenTextCounts": {
+          "body::Platform control center": 0
+        },
+        "horizontalOverflow": 0,
+        "runningAnimations": 0,
+        "consoleErrors": [],
+        "pageErrors": [],
+        "failedResources": []
+      },
+      "accessibility": {
+        "mainLandmarks": 1,
+        "headingOnes": 1,
+        "unnamedInteractiveControls": 0,
+        "undersizedTouchTargets": 0,
+        "undersizedTouchTargetSamples": [],
+        "duplicateIds": 0,
+        "skipLinkTargetExists": true,
+        "focusVisibleSupported": true,
+        "reducedMotionRunningAnimations": 0
+      },
+      "performance": {
+        "cls": 0,
+        "fcpMs": 420,
+        "lcpMs": 420,
+        "loadMs": 158,
+        "longTasks": 0,
+        "budgets": {
+          "clsMax": 0.1,
+          "fcpMaxMs": 3000,
+          "lcpMaxMs": 4000,
+          "loadMaxMs": 5000,
+          "longTasksMax": 5
+        }
+      },
+      "image": {
+        "format": "png",
+        "width": 360,
+        "height": 640,
+        "sha256": "b3ccd795842fe46b5d1ca031345697d87083132bec2e91bc33d2ad8cb45c554c",
+        "entropy": 3.8448227767657954,
+        "channels": 3,
+        "metadataFields": []
+      },
+      "semanticDigest": "cf6280eba3093a4684c25a8fed80e060b64b913587582f593ae774b70f2166c0",
+      "reviewPrompt": "Verify the Arabic compact overview title, metrics, RTL width, and actions. Confirm chromium at mobile-compact."
+    },
+    {
+      "file": "docs/stage8/baselines/gate8d/chromium-mobile-large-admin-navigation-dialog-compact-en-dark.png",
+      "route": "/admin",
+      "browser": "chromium",
+      "browserVersion": "151.0.7922.34",
+      "viewport": "mobile-large",
+      "viewportWidth": 430,
+      "viewportHeight": 932,
+      "zoom": 1,
+      "locale": "en",
+      "direction": "ltr",
+      "theme": "dark",
+      "role": "root-super-admin",
+      "expectedState": "dialog-open",
+      "families": [
+        "dialog"
+      ],
+      "dom": {
+        "urlPath": "/admin",
+        "locale": "en",
+        "direction": "ltr",
+        "theme": "dark",
+        "expectedState": "dialog-open",
+        "stateMarkerCount": 1,
+        "requiredLandmarkCounts": {
+          "[data-business-admin-surface=\"admin\"]": 1,
+          "main#main-content": 1,
+          "h1": 1,
+          "[role=\"dialog\"]": 1,
+          "nav[aria-label=\"Admin dashboard navigation\"]": 1
+        },
+        "forbiddenStateCounts": {
+          "[aria-busy=\"true\"]": 0,
+          "[data-slot=\"skeleton\"]": 0,
+          "nextjs-portal": 0,
+          "[data-nextjs-dialog-overlay]": 0,
+          "[data-next-badge-root]": 0
+        },
+        "requiredTextCounts": {
+          "body::Admin workspaces": 1,
+          "body::Overview": 1
+        },
+        "forbiddenTextCounts": {
+          "body::مساحات الإدارة": 0
+        },
+        "horizontalOverflow": 0,
+        "runningAnimations": 0,
+        "consoleErrors": [],
+        "pageErrors": [],
+        "failedResources": []
+      },
+      "accessibility": {
+        "mainLandmarks": 1,
+        "headingOnes": 1,
+        "unnamedInteractiveControls": 0,
+        "undersizedTouchTargets": 0,
+        "undersizedTouchTargetSamples": [],
+        "duplicateIds": 0,
+        "skipLinkTargetExists": true,
+        "focusVisibleSupported": true,
+        "reducedMotionRunningAnimations": 0
+      },
+      "performance": {
+        "cls": 0,
+        "fcpMs": 376,
+        "lcpMs": 376,
+        "loadMs": 66,
+        "longTasks": 0,
+        "budgets": {
+          "clsMax": 0.1,
+          "fcpMaxMs": 3000,
+          "lcpMaxMs": 4000,
+          "loadMaxMs": 5000,
+          "longTasksMax": 5
+        }
+      },
+      "image": {
+        "format": "png",
+        "width": 430,
+        "height": 932,
+        "sha256": "614a5a8f84464e73808a9a41c8996ce08acfb212dd138e0266b41c33adce860a",
+        "entropy": 2.054422976267233,
+        "channels": 3,
+        "metadataFields": []
+      },
+      "semanticDigest": "f22c59f8e5521484118829f97eaccadd3aec87bc0bdd1ccc3c2aed062c1d0d62",
+      "reviewPrompt": "Verify the English compact navigation dialog opens from the LTR start side. Confirm chromium at mobile-large."
+    },
+    {
+      "file": "docs/stage8/baselines/gate8d/chromium-tablet-portrait-business-dashboard-desktop-ckb-light.png",
+      "route": "/business",
+      "browser": "chromium",
+      "browserVersion": "151.0.7922.34",
+      "viewport": "tablet-portrait",
+      "viewportWidth": 768,
+      "viewportHeight": 1024,
+      "zoom": 1,
+      "locale": "ckb",
+      "direction": "rtl",
+      "theme": "light",
+      "role": "business-owner",
+      "expectedState": "final",
+      "families": [
+        "dense-data"
+      ],
+      "dom": {
+        "urlPath": "/business",
+        "locale": "ckb",
+        "direction": "rtl",
+        "theme": "light",
+        "expectedState": "final",
+        "stateMarkerCount": 1,
+        "requiredLandmarkCounts": {
+          "[data-business-admin-surface=\"business\"]": 1,
+          "main#main-content": 1,
+          "h1": 1
+        },
+        "forbiddenStateCounts": {
+          "[aria-busy=\"true\"]": 0,
+          "[data-slot=\"skeleton\"]": 0,
+          "nextjs-portal": 0,
+          "[data-nextjs-dialog-overlay]": 0,
+          "[data-next-badge-root]": 0
+        },
+        "requiredTextCounts": {
+          "body::بەخێربێیتەوە": 1,
+          "body::نزیکترین حجزەکان": 1
+        },
+        "forbiddenTextCounts": {
+          "body::Nearest bookings": 0
+        },
+        "horizontalOverflow": 0,
+        "runningAnimations": 0,
+        "consoleErrors": [],
+        "pageErrors": [],
+        "failedResources": []
+      },
+      "accessibility": {
+        "mainLandmarks": 1,
+        "headingOnes": 1,
+        "unnamedInteractiveControls": 0,
+        "undersizedTouchTargets": 0,
+        "undersizedTouchTargetSamples": [],
+        "duplicateIds": 0,
+        "skipLinkTargetExists": true,
+        "focusVisibleSupported": true,
+        "reducedMotionRunningAnimations": 0
+      },
+      "performance": {
+        "cls": 0,
+        "fcpMs": 408,
+        "lcpMs": 468,
+        "loadMs": 154,
+        "longTasks": 0,
+        "budgets": {
+          "clsMax": 0.1,
+          "fcpMaxMs": 3000,
+          "lcpMaxMs": 4000,
+          "loadMaxMs": 5000,
+          "longTasksMax": 5
+        }
+      },
+      "image": {
+        "format": "png",
+        "width": 768,
+        "height": 1024,
+        "sha256": "c11028adff5cbe9f326dbc57bc347147e892d1f2223f82e4611cd72d2f0f6cba",
+        "entropy": 4.9796185212471755,
+        "channels": 3,
+        "metadataFields": []
+      },
+      "semanticDigest": "6b2488e2cfbbc46ccdcbaaf2b035d53da7a3513f459fed1507855e0c184cf189",
+      "reviewPrompt": "Verify the Kurdish light desktop Business dashboard and semantic contrast. Confirm chromium at tablet-portrait."
+    },
+    {
+      "file": "docs/stage8/baselines/gate8d/chromium-tablet-landscape-admin-communications-empty-desktop-ar-light.png",
+      "route": "/admin/communications",
+      "browser": "chromium",
+      "browserVersion": "151.0.7922.34",
+      "viewport": "tablet-landscape",
+      "viewportWidth": 1024,
+      "viewportHeight": 768,
+      "zoom": 1,
+      "locale": "ar",
+      "direction": "rtl",
+      "theme": "light",
+      "role": "communications-viewer",
+      "expectedState": "empty",
+      "families": [
+        "communications",
+        "empty"
+      ],
+      "dom": {
+        "urlPath": "/admin/communications",
+        "locale": "ar",
+        "direction": "rtl",
+        "theme": "light",
+        "expectedState": "empty",
+        "stateMarkerCount": 1,
+        "requiredLandmarkCounts": {
+          "[data-business-admin-surface=\"admin\"]": 1,
+          "main#main-content": 1,
+          "h1": 1,
+          "[data-stage4-communications-state=\"empty\"]": 1
+        },
+        "forbiddenStateCounts": {
+          "[aria-busy=\"true\"]": 0,
+          "[data-slot=\"skeleton\"]": 0,
+          "nextjs-portal": 0,
+          "[data-nextjs-dialog-overlay]": 0,
+          "[data-next-badge-root]": 0,
+          "[data-stage4-communications-state=\"campaign\"]": 0,
+          "[data-stage4-communications-create-form=\"true\"]": 0
+        },
+        "requiredTextCounts": {
+          "body::سجل الحملات": 1,
+          "body::لا توجد حملات بعد.": 1
+        },
+        "forbiddenTextCounts": {
+          "body::No campaigns yet.": 0
+        },
+        "horizontalOverflow": 0,
+        "runningAnimations": 0,
+        "consoleErrors": [],
+        "pageErrors": [],
+        "failedResources": []
+      },
+      "accessibility": {
+        "mainLandmarks": 1,
+        "headingOnes": 1,
+        "unnamedInteractiveControls": 0,
+        "undersizedTouchTargets": 0,
+        "undersizedTouchTargetSamples": [],
+        "duplicateIds": 0,
+        "skipLinkTargetExists": true,
+        "focusVisibleSupported": true,
+        "reducedMotionRunningAnimations": 0
+      },
+      "performance": {
+        "cls": 0,
+        "fcpMs": 388,
+        "lcpMs": 388,
+        "loadMs": 68,
+        "longTasks": 0,
+        "budgets": {
+          "clsMax": 0.1,
+          "fcpMaxMs": 3000,
+          "lcpMaxMs": 4000,
+          "loadMaxMs": 5000,
+          "longTasksMax": 5
+        }
+      },
+      "image": {
+        "format": "png",
+        "width": 1024,
+        "height": 768,
+        "sha256": "384172377ed95ca7c2ba3d227d1f163939a178e15ca71d6cfbdaf640c3868f69",
+        "entropy": 3.202565600069647,
+        "channels": 3,
+        "metadataFields": []
+      },
+      "semanticDigest": "e543de501688cb423f3c544dc39d546aab368c364261b6f0f7079e88c0c303ac",
+      "reviewPrompt": "Verify the Arabic campaign history empty state is visibly centered and no create form is in the viewport. Confirm chromium at tablet-landscape."
+    },
+    {
+      "file": "docs/stage8/baselines/gate8d/chromium-desktop-admin-platform-operations-desktop-ar-light.png",
+      "route": "/admin/platform-operations",
+      "browser": "chromium",
+      "browserVersion": "151.0.7922.34",
+      "viewport": "desktop",
+      "viewportWidth": 1440,
+      "viewportHeight": 900,
+      "zoom": 1,
+      "locale": "ar",
+      "direction": "rtl",
+      "theme": "light",
+      "role": "root-super-admin",
+      "expectedState": "final",
+      "families": [
+        "platform"
+      ],
+      "dom": {
+        "urlPath": "/admin/platform-operations",
+        "locale": "ar",
+        "direction": "rtl",
+        "theme": "light",
+        "expectedState": "final",
+        "stateMarkerCount": 3,
+        "requiredLandmarkCounts": {
+          "[data-business-admin-surface=\"admin\"]": 1,
+          "main#main-content": 1,
+          "h1": 1,
+          "[role=\"status\"]": 3
+        },
+        "forbiddenStateCounts": {
+          "[aria-busy=\"true\"]": 0,
+          "[data-slot=\"skeleton\"]": 0,
+          "nextjs-portal": 0,
+          "[data-nextjs-dialog-overlay]": 0,
+          "[data-next-badge-root]": 0
+        },
+        "requiredTextCounts": {
+          "body::عمليات المنصة": 1,
+          "body::وقت تشغيل المرحلة السادسة غير مفعّل": 1
+        },
+        "forbiddenTextCounts": {
+          "body::Platform operations": 0
+        },
+        "horizontalOverflow": 0,
+        "runningAnimations": 0,
+        "consoleErrors": [],
+        "pageErrors": [],
+        "failedResources": []
+      },
+      "accessibility": {
+        "mainLandmarks": 1,
+        "headingOnes": 1,
+        "unnamedInteractiveControls": 0,
+        "undersizedTouchTargets": 0,
+        "undersizedTouchTargetSamples": [],
+        "duplicateIds": 0,
+        "skipLinkTargetExists": true,
+        "focusVisibleSupported": true,
+        "reducedMotionRunningAnimations": 0
+      },
+      "performance": {
+        "cls": 0,
+        "fcpMs": 396,
+        "lcpMs": 396,
+        "loadMs": 64,
+        "longTasks": 0,
+        "budgets": {
+          "clsMax": 0.1,
+          "fcpMaxMs": 3000,
+          "lcpMaxMs": 4000,
+          "loadMaxMs": 5000,
+          "longTasksMax": 5
+        }
+      },
+      "image": {
+        "format": "png",
+        "width": 1440,
+        "height": 900,
+        "sha256": "1a04d91ff051aa08a8b78e0e5b77c998ad4f2526831c434a5cde45e744fd20bf",
+        "entropy": 3.188974212473113,
+        "channels": 3,
+        "metadataFields": []
+      },
+      "semanticDigest": "d9fdeb0ed5d74ba75a705251287453802ad0e27016715cde669a5bfce2166b3d",
+      "reviewPrompt": "Verify Arabic Platform Operations explicitly presents inactive runtime truth. Confirm chromium at desktop."
+    },
+    {
+      "file": "docs/stage8/baselines/gate8d/chromium-wide-desktop-admin-overview-desktop-en-light.png",
+      "route": "/admin",
+      "browser": "chromium",
+      "browserVersion": "151.0.7922.34",
+      "viewport": "wide-desktop",
+      "viewportWidth": 1920,
+      "viewportHeight": 1080,
+      "zoom": 1,
+      "locale": "en",
+      "direction": "ltr",
+      "theme": "light",
+      "role": "root-super-admin",
+      "expectedState": "final",
+      "families": [
+        "dense-data"
+      ],
+      "dom": {
+        "urlPath": "/admin",
+        "locale": "en",
+        "direction": "ltr",
+        "theme": "light",
+        "expectedState": "final",
+        "stateMarkerCount": 1,
+        "requiredLandmarkCounts": {
+          "[data-business-admin-surface=\"admin\"]": 1,
+          "main#main-content": 1,
+          "h1": 1,
+          "nav[aria-label=\"Admin dashboard navigation\"]": 1
+        },
+        "forbiddenStateCounts": {
+          "[aria-busy=\"true\"]": 0,
+          "[data-slot=\"skeleton\"]": 0,
+          "nextjs-portal": 0,
+          "[data-nextjs-dialog-overlay]": 0,
+          "[data-next-badge-root]": 0
+        },
+        "requiredTextCounts": {
+          "body::Platform control center": 1,
+          "body::Recent businesses": 1
+        },
+        "forbiddenTextCounts": {
+          "body::مركز تحكم المنصة": 0
+        },
+        "horizontalOverflow": 0,
+        "runningAnimations": 0,
+        "consoleErrors": [],
+        "pageErrors": [],
+        "failedResources": []
+      },
+      "accessibility": {
+        "mainLandmarks": 1,
+        "headingOnes": 1,
+        "unnamedInteractiveControls": 0,
+        "undersizedTouchTargets": 0,
+        "undersizedTouchTargetSamples": [],
+        "duplicateIds": 0,
+        "skipLinkTargetExists": true,
+        "focusVisibleSupported": true,
+        "reducedMotionRunningAnimations": 0
+      },
+      "performance": {
+        "cls": 0,
+        "fcpMs": 64,
+        "lcpMs": 376,
+        "loadMs": 61,
+        "longTasks": 0,
+        "budgets": {
+          "clsMax": 0.1,
+          "fcpMaxMs": 3000,
+          "lcpMaxMs": 4000,
+          "loadMaxMs": 5000,
+          "longTasksMax": 5
+        }
+      },
+      "image": {
+        "format": "png",
+        "width": 1920,
+        "height": 1080,
+        "sha256": "9ec4c550479fea63d551ec27c7ef1ef3d3728e345d1f23072adaa38767834796",
+        "entropy": 2.762597162211023,
+        "channels": 3,
+        "metadataFields": []
+      },
+      "semanticDigest": "fd430a8ef0e9c63f17dc58ee7173de4238bdce6275e913bcff96c995b1818af2",
+      "reviewPrompt": "Verify the English desktop overview title, metrics, and LTR layout. Confirm chromium at wide-desktop."
+    },
+    {
+      "file": "docs/stage8/baselines/gate8d/chromium-zoom-200-admin-access-form-desktop-ar-light.png",
+      "route": "/admin/access?mode=add&q=visual-fixture-candidate%40fixtures.example&userId=gate8c-visual-candidate-user#grant-admin",
+      "browser": "chromium",
+      "browserVersion": "151.0.7922.34",
+      "viewport": "zoom-200",
+      "viewportWidth": 720,
+      "viewportHeight": 500,
+      "zoom": 2,
+      "locale": "ar",
+      "direction": "rtl",
+      "theme": "light",
+      "role": "root-super-admin",
+      "expectedState": "final",
+      "families": [
+        "form",
+        "permission"
+      ],
+      "dom": {
+        "urlPath": "/admin/access?mode=add&q=visual-fixture-candidate%40fixtures.example&userId=gate8c-visual-candidate-user#grant-admin",
+        "locale": "ar",
+        "direction": "rtl",
+        "theme": "light",
+        "expectedState": "final",
+        "stateMarkerCount": 1,
+        "requiredLandmarkCounts": {
+          "[data-business-admin-surface=\"admin\"]": 1,
+          "main#main-content": 1,
+          "h1": 1,
+          "#grant-admin": 1,
+          "input[name=\"userId\"]": 1,
+          "input[name=\"permissions\"]": 64
+        },
+        "forbiddenStateCounts": {
+          "[aria-busy=\"true\"]": 0,
+          "[data-slot=\"skeleton\"]": 0,
+          "nextjs-portal": 0,
+          "[data-nextjs-dialog-overlay]": 0,
+          "[data-next-badge-root]": 0
+        },
+        "requiredTextCounts": {
+          "body::إضافة أدمن جديد": 1,
+          "body::منح وصول أدمن": 1
+        },
+        "forbiddenTextCounts": {
+          "body::Add new admin": 0
+        },
+        "horizontalOverflow": 0,
+        "runningAnimations": 0,
+        "consoleErrors": [],
+        "pageErrors": [],
+        "failedResources": []
+      },
+      "accessibility": {
+        "mainLandmarks": 1,
+        "headingOnes": 1,
+        "unnamedInteractiveControls": 0,
+        "undersizedTouchTargets": 0,
+        "undersizedTouchTargetSamples": [],
+        "duplicateIds": 0,
+        "skipLinkTargetExists": true,
+        "focusVisibleSupported": true,
+        "reducedMotionRunningAnimations": 0
+      },
+      "performance": {
+        "cls": 0,
+        "fcpMs": 380,
+        "lcpMs": 380,
+        "loadMs": 65,
+        "longTasks": 0,
+        "budgets": {
+          "clsMax": 0.1,
+          "fcpMaxMs": 3000,
+          "lcpMaxMs": 4000,
+          "loadMaxMs": 5000,
+          "longTasksMax": 5
+        }
+      },
+      "image": {
+        "format": "png",
+        "width": 720,
+        "height": 500,
+        "sha256": "e41d0afded1edce6bcc7ef6a7b2673c948c6099a81396d0b4468bed97b4aeff4",
+        "entropy": 1.6747112996636133,
+        "channels": 3,
+        "metadataFields": []
+      },
+      "semanticDigest": "f0a424891416fc376d20096181cc5d644d8a148e18c497515cb13a3dfb33f9cc",
+      "reviewPrompt": "Verify the Arabic grant form, permission controls, and final non-loading state. Confirm chromium at zoom-200 with 200% reflow equivalence."
+    },
+    {
+      "file": "docs/stage8/baselines/gate8d/chromium-desktop-business-notification-preferences-table-desktop-en-light.png",
+      "route": "/business/notifications",
+      "browser": "chromium",
+      "browserVersion": "151.0.7922.34",
+      "viewport": "desktop",
+      "viewportWidth": 1280,
+      "viewportHeight": 900,
+      "zoom": 1,
+      "locale": "en",
+      "direction": "ltr",
+      "theme": "light",
+      "role": "business-owner",
+      "expectedState": "final",
+      "families": [
+        "communications",
+        "form",
+        "table"
+      ],
+      "dom": {
+        "urlPath": "/business/notifications",
+        "locale": "en",
+        "direction": "ltr",
+        "theme": "light",
+        "expectedState": "final",
+        "stateMarkerCount": 1,
+        "requiredLandmarkCounts": {
+          "[data-business-admin-surface=\"business\"]": 1,
+          "main#main-content": 1,
+          "h1": 1,
+          "table": 1
+        },
+        "forbiddenStateCounts": {
+          "[aria-busy=\"true\"]": 0,
+          "[data-slot=\"skeleton\"]": 0,
+          "nextjs-portal": 0,
+          "[data-nextjs-dialog-overlay]": 0,
+          "[data-next-badge-root]": 0
+        },
+        "requiredTextCounts": {
+          "body::Outbound channel preferences": 1,
+          "body::Category": 1
+        },
+        "forbiddenTextCounts": {
+          "body::تفضيلات قنوات الإرسال": 0
+        },
+        "horizontalOverflow": 0,
+        "runningAnimations": 0,
+        "consoleErrors": [],
+        "pageErrors": [],
+        "failedResources": []
+      },
+      "accessibility": {
+        "mainLandmarks": 1,
+        "headingOnes": 1,
+        "unnamedInteractiveControls": 0,
+        "undersizedTouchTargets": 0,
+        "undersizedTouchTargetSamples": [],
+        "duplicateIds": 0,
+        "skipLinkTargetExists": true,
+        "focusVisibleSupported": true,
+        "reducedMotionRunningAnimations": 0
+      },
+      "performance": {
+        "cls": 0,
+        "fcpMs": 440,
+        "lcpMs": 528,
+        "loadMs": 72,
+        "longTasks": 1,
+        "budgets": {
+          "clsMax": 0.1,
+          "fcpMaxMs": 3000,
+          "lcpMaxMs": 4000,
+          "loadMaxMs": 5000,
+          "longTasksMax": 5
+        }
+      },
+      "image": {
+        "format": "png",
+        "width": 1280,
+        "height": 900,
+        "sha256": "13a0f0fd8da0f637ac31f8fbe1044f62d507c19a5727736d1e6555d76ec9eb10",
+        "entropy": 3.271404031154816,
+        "channels": 3,
+        "metadataFields": []
+      },
+      "semanticDigest": "3e671a8a56c4213c3a10e3a4e9d19b34e649e8a23674498a770c190678957af8",
+      "reviewPrompt": "Verify the English outbound preference table is readable and locally scrollable. Confirm chromium at desktop."
+    },
+    {
+      "file": "docs/stage8/baselines/gate8d/firefox-mobile-compact-admin-overview-compact-ar-dark.png",
+      "route": "/admin",
+      "browser": "firefox",
+      "browserVersion": "153.0",
+      "viewport": "mobile-compact",
+      "viewportWidth": 360,
+      "viewportHeight": 640,
+      "zoom": 1,
+      "locale": "ar",
+      "direction": "rtl",
+      "theme": "dark",
+      "role": "root-super-admin",
+      "expectedState": "final",
+      "families": [
+        "dense-data"
+      ],
+      "dom": {
+        "urlPath": "/admin",
+        "locale": "ar",
+        "direction": "rtl",
+        "theme": "dark",
+        "expectedState": "final",
+        "stateMarkerCount": 1,
+        "requiredLandmarkCounts": {
+          "[data-business-admin-surface=\"admin\"]": 1,
+          "main#main-content": 1,
+          "h1": 1,
+          "button[aria-label=\"فتح قائمة الإدارة\"]": 1
+        },
+        "forbiddenStateCounts": {
+          "[aria-busy=\"true\"]": 0,
+          "[data-slot=\"skeleton\"]": 0,
+          "nextjs-portal": 0,
+          "[data-nextjs-dialog-overlay]": 0,
+          "[data-next-badge-root]": 0
+        },
+        "requiredTextCounts": {
+          "body::مركز تحكم المنصة": 1,
+          "body::إجمالي الأنشطة": 1
+        },
+        "forbiddenTextCounts": {
+          "body::Platform control center": 0
+        },
+        "horizontalOverflow": 0,
+        "runningAnimations": 0,
+        "consoleErrors": [],
+        "pageErrors": [],
+        "failedResources": []
+      },
+      "accessibility": {
+        "mainLandmarks": 1,
+        "headingOnes": 1,
+        "unnamedInteractiveControls": 0,
+        "undersizedTouchTargets": 0,
+        "undersizedTouchTargetSamples": [],
+        "duplicateIds": 0,
+        "skipLinkTargetExists": true,
+        "focusVisibleSupported": true,
+        "reducedMotionRunningAnimations": 0
+      },
+      "performance": {
+        "cls": 0,
+        "fcpMs": 159,
+        "lcpMs": 159,
+        "loadMs": 178,
+        "longTasks": 0,
+        "budgets": {
+          "clsMax": 0.1,
+          "fcpMaxMs": 3000,
+          "lcpMaxMs": 4000,
+          "loadMaxMs": 5000,
+          "longTasksMax": 5
+        }
+      },
+      "image": {
+        "format": "png",
+        "width": 360,
+        "height": 640,
+        "sha256": "83569a17f3aee2207a0b8ad218de5ca861d89ab2e9f680cef7713a69208c7abc",
+        "entropy": 3.4920973288826644,
+        "channels": 4,
+        "metadataFields": []
+      },
+      "semanticDigest": "19d137470ee803009453a1b5d85e0cafe5e01d2ca11c6f23efa331dd0e23df8d",
+      "reviewPrompt": "Verify the Arabic compact overview title, metrics, RTL width, and actions. Confirm firefox at mobile-compact."
+    },
+    {
+      "file": "docs/stage8/baselines/gate8d/firefox-mobile-large-admin-navigation-dialog-compact-en-dark.png",
+      "route": "/admin",
+      "browser": "firefox",
+      "browserVersion": "153.0",
+      "viewport": "mobile-large",
+      "viewportWidth": 430,
+      "viewportHeight": 932,
+      "zoom": 1,
+      "locale": "en",
+      "direction": "ltr",
+      "theme": "dark",
+      "role": "root-super-admin",
+      "expectedState": "dialog-open",
+      "families": [
+        "dialog"
+      ],
+      "dom": {
+        "urlPath": "/admin",
+        "locale": "en",
+        "direction": "ltr",
+        "theme": "dark",
+        "expectedState": "dialog-open",
+        "stateMarkerCount": 1,
+        "requiredLandmarkCounts": {
+          "[data-business-admin-surface=\"admin\"]": 1,
+          "main#main-content": 1,
+          "h1": 1,
+          "[role=\"dialog\"]": 1,
+          "nav[aria-label=\"Admin dashboard navigation\"]": 1
+        },
+        "forbiddenStateCounts": {
+          "[aria-busy=\"true\"]": 0,
+          "[data-slot=\"skeleton\"]": 0,
+          "nextjs-portal": 0,
+          "[data-nextjs-dialog-overlay]": 0,
+          "[data-next-badge-root]": 0
+        },
+        "requiredTextCounts": {
+          "body::Admin workspaces": 1,
+          "body::Overview": 1
+        },
+        "forbiddenTextCounts": {
+          "body::مساحات الإدارة": 0
+        },
+        "horizontalOverflow": 0,
+        "runningAnimations": 0,
+        "consoleErrors": [],
+        "pageErrors": [],
+        "failedResources": []
+      },
+      "accessibility": {
+        "mainLandmarks": 1,
+        "headingOnes": 1,
+        "unnamedInteractiveControls": 0,
+        "undersizedTouchTargets": 0,
+        "undersizedTouchTargetSamples": [],
+        "duplicateIds": 0,
+        "skipLinkTargetExists": true,
+        "focusVisibleSupported": true,
+        "reducedMotionRunningAnimations": 0
+      },
+      "performance": {
+        "cls": 0,
+        "fcpMs": 59,
+        "lcpMs": 59,
+        "loadMs": 66,
+        "longTasks": 0,
+        "budgets": {
+          "clsMax": 0.1,
+          "fcpMaxMs": 3000,
+          "lcpMaxMs": 4000,
+          "loadMaxMs": 5000,
+          "longTasksMax": 5
+        }
+      },
+      "image": {
+        "format": "png",
+        "width": 430,
+        "height": 932,
+        "sha256": "e6c9409fcfe745637714b6b3b2fa07cc092c2b5c65a9fdf2b3087f0edf517b39",
+        "entropy": 2.0675537615752546,
+        "channels": 4,
+        "metadataFields": []
+      },
+      "semanticDigest": "f51e5310970d90eaf5ff686513715a444a5e27b458e7f59c709f41be4ea76b7e",
+      "reviewPrompt": "Verify the English compact navigation dialog opens from the LTR start side. Confirm firefox at mobile-large."
+    },
+    {
+      "file": "docs/stage8/baselines/gate8d/firefox-tablet-portrait-business-dashboard-desktop-ckb-light.png",
+      "route": "/business",
+      "browser": "firefox",
+      "browserVersion": "153.0",
+      "viewport": "tablet-portrait",
+      "viewportWidth": 768,
+      "viewportHeight": 1024,
+      "zoom": 1,
+      "locale": "ckb",
+      "direction": "rtl",
+      "theme": "light",
+      "role": "business-owner",
+      "expectedState": "final",
+      "families": [
+        "dense-data"
+      ],
+      "dom": {
+        "urlPath": "/business",
+        "locale": "ckb",
+        "direction": "rtl",
+        "theme": "light",
+        "expectedState": "final",
+        "stateMarkerCount": 1,
+        "requiredLandmarkCounts": {
+          "[data-business-admin-surface=\"business\"]": 1,
+          "main#main-content": 1,
+          "h1": 1
+        },
+        "forbiddenStateCounts": {
+          "[aria-busy=\"true\"]": 0,
+          "[data-slot=\"skeleton\"]": 0,
+          "nextjs-portal": 0,
+          "[data-nextjs-dialog-overlay]": 0,
+          "[data-next-badge-root]": 0
+        },
+        "requiredTextCounts": {
+          "body::بەخێربێیتەوە": 1,
+          "body::نزیکترین حجزەکان": 1
+        },
+        "forbiddenTextCounts": {
+          "body::Nearest bookings": 0
+        },
+        "horizontalOverflow": 0,
+        "runningAnimations": 0,
+        "consoleErrors": [],
+        "pageErrors": [],
+        "failedResources": []
+      },
+      "accessibility": {
+        "mainLandmarks": 1,
+        "headingOnes": 1,
+        "unnamedInteractiveControls": 0,
+        "undersizedTouchTargets": 0,
+        "undersizedTouchTargetSamples": [],
+        "duplicateIds": 0,
+        "skipLinkTargetExists": true,
+        "focusVisibleSupported": true,
+        "reducedMotionRunningAnimations": 0
+      },
+      "performance": {
+        "cls": 0,
+        "fcpMs": 380,
+        "lcpMs": 380,
+        "loadMs": 77,
+        "longTasks": 0,
+        "budgets": {
+          "clsMax": 0.1,
+          "fcpMaxMs": 3000,
+          "lcpMaxMs": 4000,
+          "loadMaxMs": 5000,
+          "longTasksMax": 5
+        }
+      },
+      "image": {
+        "format": "png",
+        "width": 768,
+        "height": 1024,
+        "sha256": "68b8a3a0afa1c1dbfe222842c24dd5f0980439ccb12b1ab87b7751f4cd7c214a",
+        "entropy": 4.8965140831132885,
+        "channels": 4,
+        "metadataFields": []
+      },
+      "semanticDigest": "54ae33db15bdbeee32fed847a4c5f47b7f23e6b8bc61d2ac86fc15781b2daddd",
+      "reviewPrompt": "Verify the Kurdish light desktop Business dashboard and semantic contrast. Confirm firefox at tablet-portrait."
+    },
+    {
+      "file": "docs/stage8/baselines/gate8d/firefox-tablet-landscape-admin-communications-empty-desktop-ar-light.png",
+      "route": "/admin/communications",
+      "browser": "firefox",
+      "browserVersion": "153.0",
+      "viewport": "tablet-landscape",
+      "viewportWidth": 1024,
+      "viewportHeight": 768,
+      "zoom": 1,
+      "locale": "ar",
+      "direction": "rtl",
+      "theme": "light",
+      "role": "communications-viewer",
+      "expectedState": "empty",
+      "families": [
+        "communications",
+        "empty"
+      ],
+      "dom": {
+        "urlPath": "/admin/communications",
+        "locale": "ar",
+        "direction": "rtl",
+        "theme": "light",
+        "expectedState": "empty",
+        "stateMarkerCount": 1,
+        "requiredLandmarkCounts": {
+          "[data-business-admin-surface=\"admin\"]": 1,
+          "main#main-content": 1,
+          "h1": 1,
+          "[data-stage4-communications-state=\"empty\"]": 1
+        },
+        "forbiddenStateCounts": {
+          "[aria-busy=\"true\"]": 0,
+          "[data-slot=\"skeleton\"]": 0,
+          "nextjs-portal": 0,
+          "[data-nextjs-dialog-overlay]": 0,
+          "[data-next-badge-root]": 0,
+          "[data-stage4-communications-state=\"campaign\"]": 0,
+          "[data-stage4-communications-create-form=\"true\"]": 0
+        },
+        "requiredTextCounts": {
+          "body::سجل الحملات": 1,
+          "body::لا توجد حملات بعد.": 1
+        },
+        "forbiddenTextCounts": {
+          "body::No campaigns yet.": 0
+        },
+        "horizontalOverflow": 0,
+        "runningAnimations": 0,
+        "consoleErrors": [],
+        "pageErrors": [],
+        "failedResources": []
+      },
+      "accessibility": {
+        "mainLandmarks": 1,
+        "headingOnes": 1,
+        "unnamedInteractiveControls": 0,
+        "undersizedTouchTargets": 0,
+        "undersizedTouchTargetSamples": [],
+        "duplicateIds": 0,
+        "skipLinkTargetExists": true,
+        "focusVisibleSupported": true,
+        "reducedMotionRunningAnimations": 0
+      },
+      "performance": {
+        "cls": 0,
+        "fcpMs": 66,
+        "lcpMs": 66,
+        "loadMs": 78,
+        "longTasks": 0,
+        "budgets": {
+          "clsMax": 0.1,
+          "fcpMaxMs": 3000,
+          "lcpMaxMs": 4000,
+          "loadMaxMs": 5000,
+          "longTasksMax": 5
+        }
+      },
+      "image": {
+        "format": "png",
+        "width": 1024,
+        "height": 768,
+        "sha256": "fad26535f8a8c9ed725734b2025a3fa889ae9b6861ca6d06031283de03fd5bb5",
+        "entropy": 2.872368341042602,
+        "channels": 4,
+        "metadataFields": []
+      },
+      "semanticDigest": "ce9f67586d08f377a8981fd05b358b244ed1b9c7dbdb13bda90dd15db3b70419",
+      "reviewPrompt": "Verify the Arabic campaign history empty state is visibly centered and no create form is in the viewport. Confirm firefox at tablet-landscape."
+    },
+    {
+      "file": "docs/stage8/baselines/gate8d/firefox-desktop-admin-platform-operations-desktop-ar-light.png",
+      "route": "/admin/platform-operations",
+      "browser": "firefox",
+      "browserVersion": "153.0",
+      "viewport": "desktop",
+      "viewportWidth": 1440,
+      "viewportHeight": 900,
+      "zoom": 1,
+      "locale": "ar",
+      "direction": "rtl",
+      "theme": "light",
+      "role": "root-super-admin",
+      "expectedState": "final",
+      "families": [
+        "platform"
+      ],
+      "dom": {
+        "urlPath": "/admin/platform-operations",
+        "locale": "ar",
+        "direction": "rtl",
+        "theme": "light",
+        "expectedState": "final",
+        "stateMarkerCount": 3,
+        "requiredLandmarkCounts": {
+          "[data-business-admin-surface=\"admin\"]": 1,
+          "main#main-content": 1,
+          "h1": 1,
+          "[role=\"status\"]": 3
+        },
+        "forbiddenStateCounts": {
+          "[aria-busy=\"true\"]": 0,
+          "[data-slot=\"skeleton\"]": 0,
+          "nextjs-portal": 0,
+          "[data-nextjs-dialog-overlay]": 0,
+          "[data-next-badge-root]": 0
+        },
+        "requiredTextCounts": {
+          "body::عمليات المنصة": 1,
+          "body::وقت تشغيل المرحلة السادسة غير مفعّل": 1
+        },
+        "forbiddenTextCounts": {
+          "body::Platform operations": 0
+        },
+        "horizontalOverflow": 0,
+        "runningAnimations": 0,
+        "consoleErrors": [],
+        "pageErrors": [],
+        "failedResources": []
+      },
+      "accessibility": {
+        "mainLandmarks": 1,
+        "headingOnes": 1,
+        "unnamedInteractiveControls": 0,
+        "undersizedTouchTargets": 0,
+        "undersizedTouchTargetSamples": [],
+        "duplicateIds": 0,
+        "skipLinkTargetExists": true,
+        "focusVisibleSupported": true,
+        "reducedMotionRunningAnimations": 0
+      },
+      "performance": {
+        "cls": 0,
+        "fcpMs": 62,
+        "lcpMs": 354,
+        "loadMs": 68,
+        "longTasks": 0,
+        "budgets": {
+          "clsMax": 0.1,
+          "fcpMaxMs": 3000,
+          "lcpMaxMs": 4000,
+          "loadMaxMs": 5000,
+          "longTasksMax": 5
+        }
+      },
+      "image": {
+        "format": "png",
+        "width": 1440,
+        "height": 900,
+        "sha256": "a16b816cb7531ca417d11ffeae85f9bb299ac2cfc017fd15f514d3be7090c0a8",
+        "entropy": 3.0530090981992544,
+        "channels": 4,
+        "metadataFields": []
+      },
+      "semanticDigest": "f3a5f064cc91f19768026e3741a3929d65eefbfeb4963bdf0d66d3c163869276",
+      "reviewPrompt": "Verify Arabic Platform Operations explicitly presents inactive runtime truth. Confirm firefox at desktop."
+    },
+    {
+      "file": "docs/stage8/baselines/gate8d/firefox-wide-desktop-admin-overview-desktop-en-light.png",
+      "route": "/admin",
+      "browser": "firefox",
+      "browserVersion": "153.0",
+      "viewport": "wide-desktop",
+      "viewportWidth": 1920,
+      "viewportHeight": 1080,
+      "zoom": 1,
+      "locale": "en",
+      "direction": "ltr",
+      "theme": "light",
+      "role": "root-super-admin",
+      "expectedState": "final",
+      "families": [
+        "dense-data"
+      ],
+      "dom": {
+        "urlPath": "/admin",
+        "locale": "en",
+        "direction": "ltr",
+        "theme": "light",
+        "expectedState": "final",
+        "stateMarkerCount": 1,
+        "requiredLandmarkCounts": {
+          "[data-business-admin-surface=\"admin\"]": 1,
+          "main#main-content": 1,
+          "h1": 1,
+          "nav[aria-label=\"Admin dashboard navigation\"]": 1
+        },
+        "forbiddenStateCounts": {
+          "[aria-busy=\"true\"]": 0,
+          "[data-slot=\"skeleton\"]": 0,
+          "nextjs-portal": 0,
+          "[data-nextjs-dialog-overlay]": 0,
+          "[data-next-badge-root]": 0
+        },
+        "requiredTextCounts": {
+          "body::Platform control center": 1,
+          "body::Recent businesses": 1
+        },
+        "forbiddenTextCounts": {
+          "body::مركز تحكم المنصة": 0
+        },
+        "horizontalOverflow": 0,
+        "runningAnimations": 0,
+        "consoleErrors": [],
+        "pageErrors": [],
+        "failedResources": []
+      },
+      "accessibility": {
+        "mainLandmarks": 1,
+        "headingOnes": 1,
+        "unnamedInteractiveControls": 0,
+        "undersizedTouchTargets": 0,
+        "undersizedTouchTargetSamples": [],
+        "duplicateIds": 0,
+        "skipLinkTargetExists": true,
+        "focusVisibleSupported": true,
+        "reducedMotionRunningAnimations": 0
+      },
+      "performance": {
+        "cls": 0,
+        "fcpMs": 67,
+        "lcpMs": 67,
+        "loadMs": 81,
+        "longTasks": 0,
+        "budgets": {
+          "clsMax": 0.1,
+          "fcpMaxMs": 3000,
+          "lcpMaxMs": 4000,
+          "loadMaxMs": 5000,
+          "longTasksMax": 5
+        }
+      },
+      "image": {
+        "format": "png",
+        "width": 1920,
+        "height": 1080,
+        "sha256": "1b1b0949d50b4d120626612b77b1dbae5ced3e8f58755901bb6aaa6e97eac30f",
+        "entropy": 2.3978705600384274,
+        "channels": 4,
+        "metadataFields": []
+      },
+      "semanticDigest": "e6d9cdaa7ce7ee3550355c5e49640b7a99960fd23307fe8ceb449bab4b174a63",
+      "reviewPrompt": "Verify the English desktop overview title, metrics, and LTR layout. Confirm firefox at wide-desktop."
+    },
+    {
+      "file": "docs/stage8/baselines/gate8d/firefox-zoom-200-admin-access-form-desktop-ar-light.png",
+      "route": "/admin/access?mode=add&q=visual-fixture-candidate%40fixtures.example&userId=gate8c-visual-candidate-user#grant-admin",
+      "browser": "firefox",
+      "browserVersion": "153.0",
+      "viewport": "zoom-200",
+      "viewportWidth": 720,
+      "viewportHeight": 500,
+      "zoom": 2,
+      "locale": "ar",
+      "direction": "rtl",
+      "theme": "light",
+      "role": "root-super-admin",
+      "expectedState": "final",
+      "families": [
+        "form",
+        "permission"
+      ],
+      "dom": {
+        "urlPath": "/admin/access?mode=add&q=visual-fixture-candidate%40fixtures.example&userId=gate8c-visual-candidate-user#grant-admin",
+        "locale": "ar",
+        "direction": "rtl",
+        "theme": "light",
+        "expectedState": "final",
+        "stateMarkerCount": 1,
+        "requiredLandmarkCounts": {
+          "[data-business-admin-surface=\"admin\"]": 1,
+          "main#main-content": 1,
+          "h1": 1,
+          "#grant-admin": 1,
+          "input[name=\"userId\"]": 1,
+          "input[name=\"permissions\"]": 64
+        },
+        "forbiddenStateCounts": {
+          "[aria-busy=\"true\"]": 0,
+          "[data-slot=\"skeleton\"]": 0,
+          "nextjs-portal": 0,
+          "[data-nextjs-dialog-overlay]": 0,
+          "[data-next-badge-root]": 0
+        },
+        "requiredTextCounts": {
+          "body::إضافة أدمن جديد": 1,
+          "body::منح وصول أدمن": 1
+        },
+        "forbiddenTextCounts": {
+          "body::Add new admin": 0
+        },
+        "horizontalOverflow": 0,
+        "runningAnimations": 0,
+        "consoleErrors": [],
+        "pageErrors": [],
+        "failedResources": []
+      },
+      "accessibility": {
+        "mainLandmarks": 1,
+        "headingOnes": 1,
+        "unnamedInteractiveControls": 0,
+        "undersizedTouchTargets": 0,
+        "undersizedTouchTargetSamples": [],
+        "duplicateIds": 0,
+        "skipLinkTargetExists": true,
+        "focusVisibleSupported": true,
+        "reducedMotionRunningAnimations": 0
+      },
+      "performance": {
+        "cls": 0,
+        "fcpMs": 78,
+        "lcpMs": null,
+        "loadMs": 78,
+        "longTasks": 0,
+        "budgets": {
+          "clsMax": 0.1,
+          "fcpMaxMs": 3000,
+          "lcpMaxMs": 4000,
+          "loadMaxMs": 5000,
+          "longTasksMax": 5
+        }
+      },
+      "image": {
+        "format": "png",
+        "width": 720,
+        "height": 500,
+        "sha256": "0f7dd2b7749f57917eb0d00ca2210ba8dabcbd3f03b7e4f1980ddeb549468895",
+        "entropy": 2.5514524412428727,
+        "channels": 4,
+        "metadataFields": []
+      },
+      "semanticDigest": "e1ab14f0a4aaa9dfbefb9ea0c0b0004751311e85da06f1b805db2848c74f1672",
+      "reviewPrompt": "Verify the Arabic grant form, permission controls, and final non-loading state. Confirm firefox at zoom-200 with 200% reflow equivalence."
+    },
+    {
+      "file": "docs/stage8/baselines/gate8d/firefox-desktop-business-notification-preferences-table-desktop-en-light.png",
+      "route": "/business/notifications",
+      "browser": "firefox",
+      "browserVersion": "153.0",
+      "viewport": "desktop",
+      "viewportWidth": 1280,
+      "viewportHeight": 900,
+      "zoom": 1,
+      "locale": "en",
+      "direction": "ltr",
+      "theme": "light",
+      "role": "business-owner",
+      "expectedState": "final",
+      "families": [
+        "communications",
+        "form",
+        "table"
+      ],
+      "dom": {
+        "urlPath": "/business/notifications",
+        "locale": "en",
+        "direction": "ltr",
+        "theme": "light",
+        "expectedState": "final",
+        "stateMarkerCount": 1,
+        "requiredLandmarkCounts": {
+          "[data-business-admin-surface=\"business\"]": 1,
+          "main#main-content": 1,
+          "h1": 1,
+          "table": 1
+        },
+        "forbiddenStateCounts": {
+          "[aria-busy=\"true\"]": 0,
+          "[data-slot=\"skeleton\"]": 0,
+          "nextjs-portal": 0,
+          "[data-nextjs-dialog-overlay]": 0,
+          "[data-next-badge-root]": 0
+        },
+        "requiredTextCounts": {
+          "body::Outbound channel preferences": 1,
+          "body::Category": 1
+        },
+        "forbiddenTextCounts": {
+          "body::تفضيلات قنوات الإرسال": 0
+        },
+        "horizontalOverflow": 0,
+        "runningAnimations": 0,
+        "consoleErrors": [],
+        "pageErrors": [],
+        "failedResources": []
+      },
+      "accessibility": {
+        "mainLandmarks": 1,
+        "headingOnes": 1,
+        "unnamedInteractiveControls": 0,
+        "undersizedTouchTargets": 0,
+        "undersizedTouchTargetSamples": [],
+        "duplicateIds": 0,
+        "skipLinkTargetExists": true,
+        "focusVisibleSupported": true,
+        "reducedMotionRunningAnimations": 0
+      },
+      "performance": {
+        "cls": 0,
+        "fcpMs": 378,
+        "lcpMs": 378,
+        "loadMs": 64,
+        "longTasks": 0,
+        "budgets": {
+          "clsMax": 0.1,
+          "fcpMaxMs": 3000,
+          "lcpMaxMs": 4000,
+          "loadMaxMs": 5000,
+          "longTasksMax": 5
+        }
+      },
+      "image": {
+        "format": "png",
+        "width": 1280,
+        "height": 900,
+        "sha256": "9446ca46e57837dbf631a374e54012568ce1b5c46fb7e2d8b39416d849036467",
+        "entropy": 3.2900699749952764,
+        "channels": 4,
+        "metadataFields": []
+      },
+      "semanticDigest": "a409eaeb16b0f85f6acbcca252a34c4c8dab84b47b19654b0932120705e772a3",
+      "reviewPrompt": "Verify the English outbound preference table is readable and locally scrollable. Confirm firefox at desktop."
+    },
+    {
+      "file": "docs/stage8/baselines/gate8d/webkit-mobile-compact-admin-overview-compact-ar-dark.png",
+      "route": "/admin",
+      "browser": "webkit",
+      "browserVersion": "26.5",
+      "viewport": "mobile-compact",
+      "viewportWidth": 360,
+      "viewportHeight": 640,
+      "zoom": 1,
+      "locale": "ar",
+      "direction": "rtl",
+      "theme": "dark",
+      "role": "root-super-admin",
+      "expectedState": "final",
+      "families": [
+        "dense-data"
+      ],
+      "dom": {
+        "urlPath": "/admin",
+        "locale": "ar",
+        "direction": "rtl",
+        "theme": "dark",
+        "expectedState": "final",
+        "stateMarkerCount": 1,
+        "requiredLandmarkCounts": {
+          "[data-business-admin-surface=\"admin\"]": 1,
+          "main#main-content": 1,
+          "h1": 1,
+          "button[aria-label=\"فتح قائمة الإدارة\"]": 1
+        },
+        "forbiddenStateCounts": {
+          "[aria-busy=\"true\"]": 0,
+          "[data-slot=\"skeleton\"]": 0,
+          "nextjs-portal": 0,
+          "[data-nextjs-dialog-overlay]": 0,
+          "[data-next-badge-root]": 0
+        },
+        "requiredTextCounts": {
+          "body::مركز تحكم المنصة": 1,
+          "body::إجمالي الأنشطة": 1
+        },
+        "forbiddenTextCounts": {
+          "body::Platform control center": 0
+        },
+        "horizontalOverflow": 0,
+        "runningAnimations": 0,
+        "consoleErrors": [],
+        "pageErrors": [],
+        "failedResources": []
+      },
+      "accessibility": {
+        "mainLandmarks": 1,
+        "headingOnes": 1,
+        "unnamedInteractiveControls": 0,
+        "undersizedTouchTargets": 0,
+        "undersizedTouchTargetSamples": [],
+        "duplicateIds": 0,
+        "skipLinkTargetExists": true,
+        "focusVisibleSupported": true,
+        "reducedMotionRunningAnimations": 0
+      },
+      "performance": {
+        "cls": 0,
+        "fcpMs": 116,
+        "lcpMs": 116,
+        "loadMs": 119,
+        "longTasks": 0,
+        "budgets": {
+          "clsMax": 0.1,
+          "fcpMaxMs": 3000,
+          "lcpMaxMs": 4000,
+          "loadMaxMs": 5000,
+          "longTasksMax": 5
+        }
+      },
+      "image": {
+        "format": "png",
+        "width": 360,
+        "height": 640,
+        "sha256": "13af2bf2c34b2bedbe6839f757f30042d26425796fc4919fb59bfe18e98720a5",
+        "entropy": 3.9154100643645506,
+        "channels": 4,
+        "metadataFields": []
+      },
+      "semanticDigest": "ad295f6aef8d2055e8d83d06ce43e8cacaf8785a0532af3403375c3e52cf2f35",
+      "reviewPrompt": "Verify the Arabic compact overview title, metrics, RTL width, and actions. Confirm webkit at mobile-compact."
+    },
+    {
+      "file": "docs/stage8/baselines/gate8d/webkit-mobile-large-admin-navigation-dialog-compact-en-dark.png",
+      "route": "/admin",
+      "browser": "webkit",
+      "browserVersion": "26.5",
+      "viewport": "mobile-large",
+      "viewportWidth": 430,
+      "viewportHeight": 932,
+      "zoom": 1,
+      "locale": "en",
+      "direction": "ltr",
+      "theme": "dark",
+      "role": "root-super-admin",
+      "expectedState": "dialog-open",
+      "families": [
+        "dialog"
+      ],
+      "dom": {
+        "urlPath": "/admin",
+        "locale": "en",
+        "direction": "ltr",
+        "theme": "dark",
+        "expectedState": "dialog-open",
+        "stateMarkerCount": 1,
+        "requiredLandmarkCounts": {
+          "[data-business-admin-surface=\"admin\"]": 1,
+          "main#main-content": 1,
+          "h1": 1,
+          "[role=\"dialog\"]": 1,
+          "nav[aria-label=\"Admin dashboard navigation\"]": 1
+        },
+        "forbiddenStateCounts": {
+          "[aria-busy=\"true\"]": 0,
+          "[data-slot=\"skeleton\"]": 0,
+          "nextjs-portal": 0,
+          "[data-nextjs-dialog-overlay]": 0,
+          "[data-next-badge-root]": 0
+        },
+        "requiredTextCounts": {
+          "body::Admin workspaces": 1,
+          "body::Overview": 1
+        },
+        "forbiddenTextCounts": {
+          "body::مساحات الإدارة": 0
+        },
+        "horizontalOverflow": 0,
+        "runningAnimations": 0,
+        "consoleErrors": [],
+        "pageErrors": [],
+        "failedResources": []
+      },
+      "accessibility": {
+        "mainLandmarks": 1,
+        "headingOnes": 1,
+        "unnamedInteractiveControls": 0,
+        "undersizedTouchTargets": 0,
+        "undersizedTouchTargetSamples": [],
+        "duplicateIds": 0,
+        "skipLinkTargetExists": true,
+        "focusVisibleSupported": true,
+        "reducedMotionRunningAnimations": 0
+      },
+      "performance": {
+        "cls": 0,
+        "fcpMs": 58,
+        "lcpMs": 58,
+        "loadMs": 82,
+        "longTasks": 0,
+        "budgets": {
+          "clsMax": 0.1,
+          "fcpMaxMs": 3000,
+          "lcpMaxMs": 4000,
+          "loadMaxMs": 5000,
+          "longTasksMax": 5
+        }
+      },
+      "image": {
+        "format": "png",
+        "width": 430,
+        "height": 932,
+        "sha256": "7a17a75b9b31bdb9630958352e2755b45b1d6556c69dc9a070ddfd40f4c48924",
+        "entropy": 2.081654169174726,
+        "channels": 4,
+        "metadataFields": []
+      },
+      "semanticDigest": "3d98f870db53d8b6f3584f3c054e638ec3abe85db7e8ec905e8c43611ddf894b",
+      "reviewPrompt": "Verify the English compact navigation dialog opens from the LTR start side. Confirm webkit at mobile-large."
+    },
+    {
+      "file": "docs/stage8/baselines/gate8d/webkit-tablet-portrait-business-dashboard-desktop-ckb-light.png",
+      "route": "/business",
+      "browser": "webkit",
+      "browserVersion": "26.5",
+      "viewport": "tablet-portrait",
+      "viewportWidth": 768,
+      "viewportHeight": 1024,
+      "zoom": 1,
+      "locale": "ckb",
+      "direction": "rtl",
+      "theme": "light",
+      "role": "business-owner",
+      "expectedState": "final",
+      "families": [
+        "dense-data"
+      ],
+      "dom": {
+        "urlPath": "/business",
+        "locale": "ckb",
+        "direction": "rtl",
+        "theme": "light",
+        "expectedState": "final",
+        "stateMarkerCount": 1,
+        "requiredLandmarkCounts": {
+          "[data-business-admin-surface=\"business\"]": 1,
+          "main#main-content": 1,
+          "h1": 1
+        },
+        "forbiddenStateCounts": {
+          "[aria-busy=\"true\"]": 0,
+          "[data-slot=\"skeleton\"]": 0,
+          "nextjs-portal": 0,
+          "[data-nextjs-dialog-overlay]": 0,
+          "[data-next-badge-root]": 0
+        },
+        "requiredTextCounts": {
+          "body::بەخێربێیتەوە": 1,
+          "body::نزیکترین حجزەکان": 1
+        },
+        "forbiddenTextCounts": {
+          "body::Nearest bookings": 0
+        },
+        "horizontalOverflow": 0,
+        "runningAnimations": 0,
+        "consoleErrors": [],
+        "pageErrors": [],
+        "failedResources": []
+      },
+      "accessibility": {
+        "mainLandmarks": 1,
+        "headingOnes": 1,
+        "unnamedInteractiveControls": 0,
+        "undersizedTouchTargets": 0,
+        "undersizedTouchTargetSamples": [],
+        "duplicateIds": 0,
+        "skipLinkTargetExists": true,
+        "focusVisibleSupported": true,
+        "reducedMotionRunningAnimations": 0
+      },
+      "performance": {
+        "cls": 0,
+        "fcpMs": 98,
+        "lcpMs": 393,
+        "loadMs": 149,
+        "longTasks": 0,
+        "budgets": {
+          "clsMax": 0.1,
+          "fcpMaxMs": 3000,
+          "lcpMaxMs": 4000,
+          "loadMaxMs": 5000,
+          "longTasksMax": 5
+        }
+      },
+      "image": {
+        "format": "png",
+        "width": 768,
+        "height": 1024,
+        "sha256": "86b3166026f6bc716f9e38c0acb34f0d8f479e673c3cc31cc86675d08de8ef74",
+        "entropy": 4.993051723286044,
+        "channels": 4,
+        "metadataFields": []
+      },
+      "semanticDigest": "7d87635b3ba1681b67d37aa1b2bb63dddff5f0dbece8b33b747e3eba7c7672b3",
+      "reviewPrompt": "Verify the Kurdish light desktop Business dashboard and semantic contrast. Confirm webkit at tablet-portrait."
+    },
+    {
+      "file": "docs/stage8/baselines/gate8d/webkit-tablet-landscape-admin-communications-empty-desktop-ar-light.png",
+      "route": "/admin/communications",
+      "browser": "webkit",
+      "browserVersion": "26.5",
+      "viewport": "tablet-landscape",
+      "viewportWidth": 1024,
+      "viewportHeight": 768,
+      "zoom": 1,
+      "locale": "ar",
+      "direction": "rtl",
+      "theme": "light",
+      "role": "communications-viewer",
+      "expectedState": "empty",
+      "families": [
+        "communications",
+        "empty"
+      ],
+      "dom": {
+        "urlPath": "/admin/communications",
+        "locale": "ar",
+        "direction": "rtl",
+        "theme": "light",
+        "expectedState": "empty",
+        "stateMarkerCount": 1,
+        "requiredLandmarkCounts": {
+          "[data-business-admin-surface=\"admin\"]": 1,
+          "main#main-content": 1,
+          "h1": 1,
+          "[data-stage4-communications-state=\"empty\"]": 1
+        },
+        "forbiddenStateCounts": {
+          "[aria-busy=\"true\"]": 0,
+          "[data-slot=\"skeleton\"]": 0,
+          "nextjs-portal": 0,
+          "[data-nextjs-dialog-overlay]": 0,
+          "[data-next-badge-root]": 0,
+          "[data-stage4-communications-state=\"campaign\"]": 0,
+          "[data-stage4-communications-create-form=\"true\"]": 0
+        },
+        "requiredTextCounts": {
+          "body::سجل الحملات": 1,
+          "body::لا توجد حملات بعد.": 1
+        },
+        "forbiddenTextCounts": {
+          "body::No campaigns yet.": 0
+        },
+        "horizontalOverflow": 0,
+        "runningAnimations": 0,
+        "consoleErrors": [],
+        "pageErrors": [],
+        "failedResources": []
+      },
+      "accessibility": {
+        "mainLandmarks": 1,
+        "headingOnes": 1,
+        "unnamedInteractiveControls": 0,
+        "undersizedTouchTargets": 0,
+        "undersizedTouchTargetSamples": [],
+        "duplicateIds": 0,
+        "skipLinkTargetExists": true,
+        "focusVisibleSupported": true,
+        "reducedMotionRunningAnimations": 0
+      },
+      "performance": {
+        "cls": 0,
+        "fcpMs": 45,
+        "lcpMs": 45,
+        "loadMs": 71,
+        "longTasks": 0,
+        "budgets": {
+          "clsMax": 0.1,
+          "fcpMaxMs": 3000,
+          "lcpMaxMs": 4000,
+          "loadMaxMs": 5000,
+          "longTasksMax": 5
+        }
+      },
+      "image": {
+        "format": "png",
+        "width": 1024,
+        "height": 768,
+        "sha256": "486ed4e355cab43ddcf45637fee2bfb07bc29a6f1a27f27ef275aa52a9aea3f3",
+        "entropy": 3.1788386961743527,
+        "channels": 4,
+        "metadataFields": []
+      },
+      "semanticDigest": "cb8772498e5c31a00f2592c281bbb9b2be9e00d542037ceb72b6fbf0bd77b0f4",
+      "reviewPrompt": "Verify the Arabic campaign history empty state is visibly centered and no create form is in the viewport. Confirm webkit at tablet-landscape."
+    },
+    {
+      "file": "docs/stage8/baselines/gate8d/webkit-desktop-admin-platform-operations-desktop-ar-light.png",
+      "route": "/admin/platform-operations",
+      "browser": "webkit",
+      "browserVersion": "26.5",
+      "viewport": "desktop",
+      "viewportWidth": 1440,
+      "viewportHeight": 900,
+      "zoom": 1,
+      "locale": "ar",
+      "direction": "rtl",
+      "theme": "light",
+      "role": "root-super-admin",
+      "expectedState": "final",
+      "families": [
+        "platform"
+      ],
+      "dom": {
+        "urlPath": "/admin/platform-operations",
+        "locale": "ar",
+        "direction": "rtl",
+        "theme": "light",
+        "expectedState": "final",
+        "stateMarkerCount": 3,
+        "requiredLandmarkCounts": {
+          "[data-business-admin-surface=\"admin\"]": 1,
+          "main#main-content": 1,
+          "h1": 1,
+          "[role=\"status\"]": 3
+        },
+        "forbiddenStateCounts": {
+          "[aria-busy=\"true\"]": 0,
+          "[data-slot=\"skeleton\"]": 0,
+          "nextjs-portal": 0,
+          "[data-nextjs-dialog-overlay]": 0,
+          "[data-next-badge-root]": 0
+        },
+        "requiredTextCounts": {
+          "body::عمليات المنصة": 1,
+          "body::وقت تشغيل المرحلة السادسة غير مفعّل": 1
+        },
+        "forbiddenTextCounts": {
+          "body::Platform operations": 0
+        },
+        "horizontalOverflow": 0,
+        "runningAnimations": 0,
+        "consoleErrors": [],
+        "pageErrors": [],
+        "failedResources": []
+      },
+      "accessibility": {
+        "mainLandmarks": 1,
+        "headingOnes": 1,
+        "unnamedInteractiveControls": 0,
+        "undersizedTouchTargets": 0,
+        "undersizedTouchTargetSamples": [],
+        "duplicateIds": 0,
+        "skipLinkTargetExists": true,
+        "focusVisibleSupported": true,
+        "reducedMotionRunningAnimations": 0
+      },
+      "performance": {
+        "cls": 0,
+        "fcpMs": 81,
+        "lcpMs": 81,
+        "loadMs": 84,
+        "longTasks": 0,
+        "budgets": {
+          "clsMax": 0.1,
+          "fcpMaxMs": 3000,
+          "lcpMaxMs": 4000,
+          "loadMaxMs": 5000,
+          "longTasksMax": 5
+        }
+      },
+      "image": {
+        "format": "png",
+        "width": 1440,
+        "height": 900,
+        "sha256": "13d3978a74a9cc9020f929dee41231c1432217af6f87d01dd2fb8ccff4b8eb79",
+        "entropy": 3.1554701835375454,
+        "channels": 4,
+        "metadataFields": []
+      },
+      "semanticDigest": "bc52f7540aeaec2be235c8f1e94858143b71a2ceaf5f60e7e705b9c2d6b9a68a",
+      "reviewPrompt": "Verify Arabic Platform Operations explicitly presents inactive runtime truth. Confirm webkit at desktop."
+    },
+    {
+      "file": "docs/stage8/baselines/gate8d/webkit-wide-desktop-admin-overview-desktop-en-light.png",
+      "route": "/admin",
+      "browser": "webkit",
+      "browserVersion": "26.5",
+      "viewport": "wide-desktop",
+      "viewportWidth": 1920,
+      "viewportHeight": 1080,
+      "zoom": 1,
+      "locale": "en",
+      "direction": "ltr",
+      "theme": "light",
+      "role": "root-super-admin",
+      "expectedState": "final",
+      "families": [
+        "dense-data"
+      ],
+      "dom": {
+        "urlPath": "/admin",
+        "locale": "en",
+        "direction": "ltr",
+        "theme": "light",
+        "expectedState": "final",
+        "stateMarkerCount": 1,
+        "requiredLandmarkCounts": {
+          "[data-business-admin-surface=\"admin\"]": 1,
+          "main#main-content": 1,
+          "h1": 1,
+          "nav[aria-label=\"Admin dashboard navigation\"]": 1
+        },
+        "forbiddenStateCounts": {
+          "[aria-busy=\"true\"]": 0,
+          "[data-slot=\"skeleton\"]": 0,
+          "nextjs-portal": 0,
+          "[data-nextjs-dialog-overlay]": 0,
+          "[data-next-badge-root]": 0
+        },
+        "requiredTextCounts": {
+          "body::Platform control center": 1,
+          "body::Recent businesses": 1
+        },
+        "forbiddenTextCounts": {
+          "body::مركز تحكم المنصة": 0
+        },
+        "horizontalOverflow": 0,
+        "runningAnimations": 0,
+        "consoleErrors": [],
+        "pageErrors": [],
+        "failedResources": []
+      },
+      "accessibility": {
+        "mainLandmarks": 1,
+        "headingOnes": 1,
+        "unnamedInteractiveControls": 0,
+        "undersizedTouchTargets": 0,
+        "undersizedTouchTargetSamples": [],
+        "duplicateIds": 0,
+        "skipLinkTargetExists": true,
+        "focusVisibleSupported": true,
+        "reducedMotionRunningAnimations": 0
+      },
+      "performance": {
+        "cls": 0,
+        "fcpMs": 46,
+        "lcpMs": 46,
+        "loadMs": 76,
+        "longTasks": 0,
+        "budgets": {
+          "clsMax": 0.1,
+          "fcpMaxMs": 3000,
+          "lcpMaxMs": 4000,
+          "loadMaxMs": 5000,
+          "longTasksMax": 5
+        }
+      },
+      "image": {
+        "format": "png",
+        "width": 1920,
+        "height": 1080,
+        "sha256": "46b90275dc32264c4e19fc9d6bfdd4496619c331b0bb0235183e984012cb1f0b",
+        "entropy": 2.7406751922753756,
+        "channels": 4,
+        "metadataFields": []
+      },
+      "semanticDigest": "1371ef31fe7e9e8505c6d27125382cbd64365689b4d4571a00c83b390b1f601b",
+      "reviewPrompt": "Verify the English desktop overview title, metrics, and LTR layout. Confirm webkit at wide-desktop."
+    },
+    {
+      "file": "docs/stage8/baselines/gate8d/webkit-zoom-200-admin-access-form-desktop-ar-light.png",
+      "route": "/admin/access?mode=add&q=visual-fixture-candidate%40fixtures.example&userId=gate8c-visual-candidate-user#grant-admin",
+      "browser": "webkit",
+      "browserVersion": "26.5",
+      "viewport": "zoom-200",
+      "viewportWidth": 720,
+      "viewportHeight": 500,
+      "zoom": 2,
+      "locale": "ar",
+      "direction": "rtl",
+      "theme": "light",
+      "role": "root-super-admin",
+      "expectedState": "final",
+      "families": [
+        "form",
+        "permission"
+      ],
+      "dom": {
+        "urlPath": "/admin/access?mode=add&q=visual-fixture-candidate%40fixtures.example&userId=gate8c-visual-candidate-user#grant-admin",
+        "locale": "ar",
+        "direction": "rtl",
+        "theme": "light",
+        "expectedState": "final",
+        "stateMarkerCount": 1,
+        "requiredLandmarkCounts": {
+          "[data-business-admin-surface=\"admin\"]": 1,
+          "main#main-content": 1,
+          "h1": 1,
+          "#grant-admin": 1,
+          "input[name=\"userId\"]": 1,
+          "input[name=\"permissions\"]": 64
+        },
+        "forbiddenStateCounts": {
+          "[aria-busy=\"true\"]": 0,
+          "[data-slot=\"skeleton\"]": 0,
+          "nextjs-portal": 0,
+          "[data-nextjs-dialog-overlay]": 0,
+          "[data-next-badge-root]": 0
+        },
+        "requiredTextCounts": {
+          "body::إضافة أدمن جديد": 1,
+          "body::منح وصول أدمن": 1
+        },
+        "forbiddenTextCounts": {
+          "body::Add new admin": 0
+        },
+        "horizontalOverflow": 0,
+        "runningAnimations": 0,
+        "consoleErrors": [],
+        "pageErrors": [],
+        "failedResources": []
+      },
+      "accessibility": {
+        "mainLandmarks": 1,
+        "headingOnes": 1,
+        "unnamedInteractiveControls": 0,
+        "undersizedTouchTargets": 0,
+        "undersizedTouchTargetSamples": [],
+        "duplicateIds": 0,
+        "skipLinkTargetExists": true,
+        "focusVisibleSupported": true,
+        "reducedMotionRunningAnimations": 0
+      },
+      "performance": {
+        "cls": 0,
+        "fcpMs": 88,
+        "lcpMs": 88,
+        "loadMs": 92,
+        "longTasks": 0,
+        "budgets": {
+          "clsMax": 0.1,
+          "fcpMaxMs": 3000,
+          "lcpMaxMs": 4000,
+          "loadMaxMs": 5000,
+          "longTasksMax": 5
+        }
+      },
+      "image": {
+        "format": "png",
+        "width": 720,
+        "height": 500,
+        "sha256": "22b6e1fea585964cd4b9432b738b53d48d4cd81a4bf10f89f05e9fbf00c2058e",
+        "entropy": 2.496938074909849,
+        "channels": 4,
+        "metadataFields": []
+      },
+      "semanticDigest": "32ca3dca6649ff782b3335a1bbe1faf3f8e50913f62a239707531f82fd10813a",
+      "reviewPrompt": "Verify the Arabic grant form, permission controls, and final non-loading state. Confirm webkit at zoom-200 with 200% reflow equivalence."
+    },
+    {
+      "file": "docs/stage8/baselines/gate8d/webkit-desktop-business-notification-preferences-table-desktop-en-light.png",
+      "route": "/business/notifications",
+      "browser": "webkit",
+      "browserVersion": "26.5",
+      "viewport": "desktop",
+      "viewportWidth": 1280,
+      "viewportHeight": 900,
+      "zoom": 1,
+      "locale": "en",
+      "direction": "ltr",
+      "theme": "light",
+      "role": "business-owner",
+      "expectedState": "final",
+      "families": [
+        "communications",
+        "form",
+        "table"
+      ],
+      "dom": {
+        "urlPath": "/business/notifications",
+        "locale": "en",
+        "direction": "ltr",
+        "theme": "light",
+        "expectedState": "final",
+        "stateMarkerCount": 1,
+        "requiredLandmarkCounts": {
+          "[data-business-admin-surface=\"business\"]": 1,
+          "main#main-content": 1,
+          "h1": 1,
+          "table": 1
+        },
+        "forbiddenStateCounts": {
+          "[aria-busy=\"true\"]": 0,
+          "[data-slot=\"skeleton\"]": 0,
+          "nextjs-portal": 0,
+          "[data-nextjs-dialog-overlay]": 0,
+          "[data-next-badge-root]": 0
+        },
+        "requiredTextCounts": {
+          "body::Outbound channel preferences": 1,
+          "body::Category": 1
+        },
+        "forbiddenTextCounts": {
+          "body::تفضيلات قنوات الإرسال": 0
+        },
+        "horizontalOverflow": 0,
+        "runningAnimations": 0,
+        "consoleErrors": [],
+        "pageErrors": [],
+        "failedResources": []
+      },
+      "accessibility": {
+        "mainLandmarks": 1,
+        "headingOnes": 1,
+        "unnamedInteractiveControls": 0,
+        "undersizedTouchTargets": 0,
+        "undersizedTouchTargetSamples": [],
+        "duplicateIds": 0,
+        "skipLinkTargetExists": true,
+        "focusVisibleSupported": true,
+        "reducedMotionRunningAnimations": 0
+      },
+      "performance": {
+        "cls": 0,
+        "fcpMs": 65,
+        "lcpMs": 366,
+        "loadMs": 104,
+        "longTasks": 0,
+        "budgets": {
+          "clsMax": 0.1,
+          "fcpMaxMs": 3000,
+          "lcpMaxMs": 4000,
+          "loadMaxMs": 5000,
+          "longTasksMax": 5
+        }
+      },
+      "image": {
+        "format": "png",
+        "width": 1280,
+        "height": 900,
+        "sha256": "bb5a41f27ea2f3752f1134030bc519164c7a7b9188d57078ea8cbc6ddc3b23c1",
+        "entropy": 3.2680962376252864,
+        "channels": 4,
+        "metadataFields": []
+      },
+      "semanticDigest": "a2dfb924d3b50964645ad26f141dd71e71039be96af057897cd6cf4c07d0c17a",
+      "reviewPrompt": "Verify the English outbound preference table is readable and locally scrollable. Confirm webkit at desktop."
+    }
+  ],
+  "humanReview": {
+    "status": "PASS",
+    "record": "docs/stage8/gate8d-baseline-human-review.json"
+  }
+}

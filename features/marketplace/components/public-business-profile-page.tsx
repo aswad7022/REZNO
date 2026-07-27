@@ -80,7 +80,7 @@ export async function PublicBusinessProfilePage({ slug }: { slug: string }) {
     <PublicProfilePageMotion>
       <div className="min-h-screen bg-background pb-20 md:pb-0">
         <PublicHeader />
-        <main>
+        <main id="main-content">
           <section className="relative overflow-hidden border-b border-border/70 bg-background">
             <div className="pointer-events-none absolute inset-x-0 top-0 h-80 bg-[radial-gradient(circle_at_top_right,color-mix(in_oklch,var(--primary)_16%,transparent),transparent_32rem)]" />
             <div className="mx-auto max-w-7xl px-0 sm:px-6 sm:pt-6">
