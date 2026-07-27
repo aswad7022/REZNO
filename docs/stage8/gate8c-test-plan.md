@@ -38,8 +38,9 @@ The final authoritative runs on the Gate 8C branch completed as follows:
 
 | Check | Result |
 | --- | --- |
-| Gate 8C plus inherited Gate 8B/8A/Stage 7D chain | 135 passed; 0 failed/skipped/todo/cancelled |
-| Complete Unit suite | 595 passed; 0 failed/skipped/todo/cancelled |
+| Gate 8C plus inherited Gate 8B/8A/Stage 7D chain | 156 passed; 0 failed/skipped/todo/cancelled |
+| Visual evidence validator, including negative fixtures | 31 passed; 0 failed/skipped/todo/cancelled |
+| Complete Unit suite | 616 passed; 0 failed/skipped/todo/cancelled |
 | Complete PostgreSQL integration suite on a fresh 51-migration database | 433 passed; 0 failed/skipped/todo/cancelled |
 | Complete production-server HTTP/RSC/API suite | 133 passed; 0 failed/skipped/todo/cancelled |
 | Next.js production build | 115/115 static pages generated |
