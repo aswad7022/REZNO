@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "reviewer": "Independent Gate 8D visual-review subagent",
   "independentFromCapture": true,
-  "reviewedHeadSha": "8e931e1888b189b75a1239a73207025b93437075",
-  "reviewedAt": "2026-07-27T21:19:39Z",
+  "reviewedHeadSha": "03f3ab16bf8bc0d6b11376c24be885586c18037f",
+  "reviewedAt": "2026-07-28T00:12:00Z",
   "captures": [
     {
       "file": "docs/stage8/baselines/gate8d/chromium-mobile-compact-admin-overview-compact-ar-dark.png",
