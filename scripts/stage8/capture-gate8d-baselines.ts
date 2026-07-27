@@ -304,7 +304,7 @@ async function collectAccessibility(
   return await page.evaluate(() => {
     const controls = Array.from(
       document.querySelectorAll(
-        'button,input:not([type="hidden"]),select,textarea,[role="button"]',
+        'button,input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]),select,textarea,[role="button"],label:has(input[type="checkbox"]),label:has(input[type="radio"])',
       ),
     ).filter((element) => {
       const rect = element.getBoundingClientRect();
