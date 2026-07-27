@@ -33,6 +33,13 @@ payment, restaurant, review, team, and settings surfaces retain their service
 and authorization contracts. Touched feedback roles use the Gate 8A semantic
 success, warning, error, and information tokens.
 
+The compact Business header now constrains the active-business selector and
+uses the bottom application navigation as the compact messages entry point.
+This keeps the menu, selector, notifications, locale, theme, and account
+controls inside the physical viewport without changing their authorization or
+workflow contracts. Admin restaurant results now include a localized final
+empty state instead of rendering an unexplained blank region.
+
 ## Admin workspace
 
 - Replaced the fixed Arabic-only wrapping header with a permission-filtered
@@ -63,3 +70,18 @@ No business logic, API contract, authentication, authorization, permission,
 provider, schema, migration, Stage 6 runtime, Stage 7 external validation,
 staging, or production state changed. Customer surfaces are not redesigned by
 this gate.
+
+## Visual-evidence integrity
+
+Gate 8C baselines are generated only from a local `next build` plus `next
+start` production server connected to a disposable 51-migration database.
+Fixtures use synthetic `@rezno.invalid` identities and deterministic,
+non-sensitive product data. Capture uses a fixed Chromium version, exact
+viewport dimensions, reduced motion, settled fonts, final-state selectors, and
+viewport screenshots rather than stitched full-page screenshots.
+
+The manifest binds route, viewport, locale, direction, theme, role, expected
+state, required landmarks, forbidden states, decoded PNG format, actual
+dimensions, SHA-256, pre-capture page measurements, visual metrics, and a
+per-capture human review record. The validator rejects mismatched or unusable
+evidence rather than treating a self-recorded hash as semantic proof.

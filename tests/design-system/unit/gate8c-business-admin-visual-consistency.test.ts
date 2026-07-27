@@ -4,6 +4,11 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
 
+import {
+  validateGate8cCapture,
+  type Gate8cCaptureEvidence,
+} from "../../../scripts/stage8/gate8c-visual-evidence";
+
 const repoRoot = path.resolve(import.meta.dirname, "../../..");
 const readRepoFile = (relativePath: string) =>
   readFileSync(path.join(repoRoot, relativePath), "utf8");
@@ -65,6 +70,10 @@ test("Admin navigation is localized, responsive, permission-filtered, and direct
 
 test("Business and Admin shells share scoped semantic presentation contracts", () => {
   const dashboard = readRepoFile("components/dashboard/dashboard-layout.tsx");
+  const header = readRepoFile("components/dashboard/dashboard-header.tsx");
+  const switcher = readRepoFile(
+    "components/dashboard/dashboard-business-switcher.tsx",
+  );
   const css = readRepoFile("app/globals.css");
 
   assert.match(
@@ -77,6 +86,10 @@ test("Business and Admin shells share scoped semantic presentation contracts", (
   assert.match(css, /text-align: start/);
   assert.match(css, /inset-block-start/);
   assert.match(css, /prefers-reduced-motion: reduce/);
+  assert.match(header, /h-\[4\.25rem\] min-w-0/);
+  assert.match(header, /hidden sm:block/);
+  assert.match(switcher, /w-28 min-w-0 shrink sm:w-48/);
+  assert.match(switcher, /w-full min-w-0 max-w-full/);
 });
 
 test("Operational states and wide data regions remain accessible", () => {
@@ -85,6 +98,7 @@ test("Operational states and wide data regions remain accessible", () => {
   );
   const loading = readRepoFile("app/admin/loading.tsx");
   const error = readRepoFile("app/admin/error.tsx");
+  const restaurants = readRepoFile("app/admin/restaurants/page.tsx");
 
   assert.match(surfaces, /role=\{tone === "error" \? "alert" : "status"\}/);
   assert.match(surfaces, /role="region"/);
@@ -94,6 +108,26 @@ test("Operational states and wide data regions remain accessible", () => {
   assert.match(loading, /aria-busy="true"/);
   assert.match(error, /tone="error"/);
   assert.match(error, /unstable_retry/);
+  assert.match(restaurants, /restaurants\.length === 0/);
+  assert.match(restaurants, /title=\{t\("restaurantsTitle"\)\}/);
+  assert.match(restaurants, /t\("restaurantsStats"/);
+  assert.match(restaurants, /restaurantsEmptyTitle/);
+  for (const locale of ["ar", "ckb", "en"]) {
+    const messages = JSON.parse(readRepoFile(`messages/${locale}.json`)) as {
+      Admin: {
+        restaurantsDescription: string;
+        restaurantsEmptyDescription: string;
+        restaurantsEmptyTitle: string;
+        restaurantsStats: string;
+        restaurantsTitle: string;
+      };
+    };
+    assert.ok(messages.Admin.restaurantsTitle);
+    assert.ok(messages.Admin.restaurantsDescription);
+    assert.ok(messages.Admin.restaurantsStats);
+    assert.ok(messages.Admin.restaurantsEmptyTitle);
+    assert.ok(messages.Admin.restaurantsEmptyDescription);
+  }
 });
 
 test("Platform operations never infer runtime activation from stored records", () => {
@@ -132,20 +166,23 @@ test("Scoped Business and Admin presentation uses semantic status colors", () =>
   }
 });
 
-test("Gate 8C visual evidence is complete and byte-authenticated", () => {
+test("Gate 8C visual evidence is format, page-state, metric, and byte authenticated", async () => {
   const manifest = JSON.parse(
     readRepoFile("docs/stage8/baselines/gate8c-baselines.json"),
   ) as {
-    captures: Array<{
-      file: string;
-      locale: string;
-      theme: string;
-      viewport: string;
-      sha256: string;
-      families: string[];
-    }>;
+    environment: string;
+    capturePolicy: {
+      screenshotScope: string;
+      sensitiveData: string;
+      humanReview: string;
+    };
+    captures: Gate8cCaptureEvidence[];
   };
 
+  assert.match(manifest.environment, /production build\/server/);
+  assert.equal(manifest.capturePolicy.screenshotScope.includes("viewport"), true);
+  assert.match(manifest.capturePolicy.sensitiveData, /synthetic fixtures/);
+  assert.match(manifest.capturePolicy.humanReview, /reviewed individually/);
   assert.ok(manifest.captures.length >= 16);
   assert.ok(manifest.captures.some((entry) => entry.viewport === "desktop"));
   assert.ok(manifest.captures.some((entry) => entry.viewport === "compact"));
@@ -180,8 +217,7 @@ test("Gate 8C visual evidence is complete and byte-authenticated", () => {
     const absolutePath = path.join(repoRoot, capture.file);
     assert.ok(existsSync(absolutePath), capture.file);
     const bytes = readFileSync(absolutePath);
-    assert.ok(bytes.length > 1_000, capture.file);
-    assert.equal(createHash("sha256").update(bytes).digest("hex"), capture.sha256);
+    await validateGate8cCapture(capture, bytes);
   }
 });
 

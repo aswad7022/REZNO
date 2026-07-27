@@ -17,6 +17,10 @@
 - Motion continues to honor `prefers-reduced-motion`.
 - Dialog and Sheet content stays within the dynamic viewport and scrolls
   internally when required.
+- Compact Business header controls use bounded widths; the root page has zero
+  horizontal overflow in Arabic and Kurdish RTL as well as English LTR.
+- Empty restaurant administration results expose a localized live status
+  instead of a blank visual region.
 
 ## Security and privacy
 
@@ -30,6 +34,12 @@
 - No token, cookie, provider payload, financial secret, connection string,
   personal contact value, or runtime credential is added to source, logs, or
   visual evidence.
+- Production baseline preflight rejects credential-shaped text and any
+  non-synthetic email address. Capture reports store paths and status classes,
+  never session-cookie values.
+- Every baseline uses disposable synthetic `@rezno.invalid` accounts, and the
+  fixture script removes its users, domain records, and rate-limit buckets
+  after capture.
 - No authorization, API, action, persistence, provider, or runtime code changes.
 
 ## Runtime truth
