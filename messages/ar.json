@@ -1277,6 +1277,65 @@
     "lightTheme": "استخدام المظهر الفاتح",
     "darkTheme": "استخدام المظهر الداكن"
   },
+  "CustomerPayments": {
+    "title": "المدفوعات",
+    "description": "تابع حالة الدفع والتحصيل والاسترداد التي تحقق منها الخادم.",
+    "emptyTitle": "لا توجد مدفوعات إلكترونية بعد",
+    "emptyDescription": "ستظهر هنا المدفوعات التي تبدأ من حجز أو طلب مؤهل بعد إنشائها على الخادم.",
+    "explore": "استكشاف السوق",
+    "viewPayment": "عرض الدفع",
+    "next": "الصفحة التالية",
+    "detailTitle": "حالة الدفع",
+    "detailDescription": "تأتي هذه الحالة من الخادم وأحداث المزوّد المتحقق منها.",
+    "allPayments": "كل المدفوعات",
+    "total": "الإجمالي",
+    "captured": "المحصّل",
+    "refunded": "المسترد",
+    "refundable": "القابل للاسترداد",
+    "providerActionTitle": "إجراء مطلوب لدى مزوّد الدفع",
+    "providerActionDescription": "استخدم مسار المزوّد الآمن الذي يفتحه ريزنو فقط. لا يعتبر تحويل المتصفح الدفع ناجحًا.",
+    "expires": "تنتهي الصلاحية في {value}",
+    "attempts": "المحاولات",
+    "refunds": "الاستردادات",
+    "noAttempts": "لا توجد محاولات لدى المزوّد بعد.",
+    "noRefunds": "لا توجد استردادات.",
+    "attempt": "المحاولة {number}",
+    "target": {
+      "BOOKING": "حجز",
+      "ORDER": "طلب"
+    },
+    "status": {
+      "CREATED": "أُنشئت",
+      "REQUIRES_ACTION": "تحتاج إجراءً",
+      "PROCESSING": "قيد المعالجة",
+      "AUTHORIZED": "مفوّضة",
+      "PARTIALLY_CAPTURED": "محصّلة جزئيًا",
+      "CAPTURED": "محصّلة",
+      "PARTIALLY_REFUNDED": "مستردة جزئيًا",
+      "REFUNDED": "مستردة",
+      "FAILED": "فشلت",
+      "CANCELLED": "ملغاة",
+      "EXPIRED": "منتهية"
+    },
+    "attemptStatus": {
+      "CREATED": "أُنشئت",
+      "CLAIMED": "في قائمة المعالجة الآمنة",
+      "PROCESSING": "قيد المعالجة",
+      "REQUIRES_ACTION": "تحتاج إجراءً",
+      "AUTHORIZED": "مفوّضة",
+      "CAPTURED": "محصّلة",
+      "FAILED": "فشلت",
+      "CANCELLED": "ملغاة",
+      "EXPIRED": "منتهية"
+    },
+    "refundStatus": {
+      "REQUESTED": "مطلوبة",
+      "PROCESSING": "قيد المعالجة",
+      "SUCCEEDED": "مستردة",
+      "FAILED": "فشلت",
+      "CANCELLED": "ملغاة"
+    }
+  },
   "Pwa": {
     "offlineTitle": "أنت غير متصل الآن",
     "offlineDescription": "تحقق من اتصال الإنترنت ثم حاول مرة أخرى.",

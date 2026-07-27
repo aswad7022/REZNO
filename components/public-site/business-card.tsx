@@ -108,8 +108,11 @@ export async function BusinessCard({
               </p>
             ) : null}
             {business.reviewCount > 0 && business.averageRating !== null ? (
-              <p className="mt-1 flex items-center gap-1 text-xs font-medium text-amber-600">
-                <Star className="size-3 fill-amber-400 text-amber-400" aria-hidden="true" />
+              <p className="mt-1 flex items-center gap-1 text-xs font-medium text-warning-text">
+                <Star
+                  className="size-3 fill-warning text-warning"
+                  aria-hidden="true"
+                />
                 {t("ratingSummary", {
                   rating: format.number(business.averageRating, {
                     maximumFractionDigits: 1,

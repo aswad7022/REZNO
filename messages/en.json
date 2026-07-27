@@ -1354,6 +1354,65 @@
     "lightTheme": "Use light theme",
     "darkTheme": "Use dark theme"
   },
+  "CustomerPayments": {
+    "title": "Payments",
+    "description": "Track server-verified payment, capture, and refund status.",
+    "emptyTitle": "No online payments yet",
+    "emptyDescription": "Payments started from an eligible booking or order will appear here after the server creates them.",
+    "explore": "Explore marketplace",
+    "viewPayment": "View payment",
+    "next": "Next page",
+    "detailTitle": "Payment status",
+    "detailDescription": "This status comes from the server and verified provider events.",
+    "allPayments": "All payments",
+    "total": "Total",
+    "captured": "Captured",
+    "refunded": "Refunded",
+    "refundable": "Refundable",
+    "providerActionTitle": "Provider action required",
+    "providerActionDescription": "Use only the secure provider flow opened by REZNO. A browser redirect never marks a payment as paid.",
+    "expires": "Expires {value}",
+    "attempts": "Attempts",
+    "refunds": "Refunds",
+    "noAttempts": "No provider attempts yet.",
+    "noRefunds": "No refunds.",
+    "attempt": "Attempt {number}",
+    "target": {
+      "BOOKING": "Booking",
+      "ORDER": "Order"
+    },
+    "status": {
+      "CREATED": "Created",
+      "REQUIRES_ACTION": "Action required",
+      "PROCESSING": "Processing",
+      "AUTHORIZED": "Authorized",
+      "PARTIALLY_CAPTURED": "Partially captured",
+      "CAPTURED": "Captured",
+      "PARTIALLY_REFUNDED": "Partially refunded",
+      "REFUNDED": "Refunded",
+      "FAILED": "Failed",
+      "CANCELLED": "Cancelled",
+      "EXPIRED": "Expired"
+    },
+    "attemptStatus": {
+      "CREATED": "Created",
+      "CLAIMED": "Queued securely",
+      "PROCESSING": "Processing",
+      "REQUIRES_ACTION": "Action required",
+      "AUTHORIZED": "Authorized",
+      "CAPTURED": "Captured",
+      "FAILED": "Failed",
+      "CANCELLED": "Cancelled",
+      "EXPIRED": "Expired"
+    },
+    "refundStatus": {
+      "REQUESTED": "Requested",
+      "PROCESSING": "Processing",
+      "SUCCEEDED": "Refunded",
+      "FAILED": "Failed",
+      "CANCELLED": "Cancelled"
+    }
+  },
   "Pwa": {
     "offlineTitle": "You're offline",
     "offlineDescription": "Check your internet connection and try again.",

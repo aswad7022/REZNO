@@ -38,19 +38,21 @@ export default async function CustomerDashboardLayout({
   ]);
 
   return (
-    <DashboardLayout
-      role="customer"
-      user={toDashboardUser(session.user)}
-      notifications={notificationSummary.items}
-      unreadNotifications={notificationSummary.unreadCount}
-      messagesHref={canViewAdminMessages ? "/admin/messages" : "/customer/messages"}
-      unreadMessages={unreadMessages}
-      messagePreviews={messagePreviews}
-      isSuperAdmin={Boolean(adminAccess?.isSuperAdmin)}
-      canAccessAdmin={canAccessAdmin}
-      canAccessBusinessDashboard={Boolean(businessMembership)}
-    >
-      {children}
-    </DashboardLayout>
+    <div className="contents" data-customer-surface="dashboard">
+      <DashboardLayout
+        role="customer"
+        user={toDashboardUser(session.user)}
+        notifications={notificationSummary.items}
+        unreadNotifications={notificationSummary.unreadCount}
+        messagesHref={canViewAdminMessages ? "/admin/messages" : "/customer/messages"}
+        unreadMessages={unreadMessages}
+        messagePreviews={messagePreviews}
+        isSuperAdmin={Boolean(adminAccess?.isSuperAdmin)}
+        canAccessAdmin={canAccessAdmin}
+        canAccessBusinessDashboard={Boolean(businessMembership)}
+      >
+        {children}
+      </DashboardLayout>
+    </div>
   );
 }

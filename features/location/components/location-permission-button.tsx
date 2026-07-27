@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { LocateFixed } from "lucide-react";
+import { LoaderCircle, LocateFixed } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 
@@ -26,6 +26,13 @@ export function LocationPermissionButton({
   return (
     <div className="flex flex-col items-center gap-2">
       <Button
+        aria-describedby={
+          status === "denied" || status === "unavailable"
+            ? "marketplace-location-status"
+            : undefined
+        }
+        aria-busy={status === "loading"}
+        disabled={status === "loading"}
         type="button"
         variant={hasLocation ? "default" : "outline"}
         onClick={() => {
@@ -47,13 +54,23 @@ export function LocationPermissionButton({
             { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 },
           );
         }}
-        aria-live="polite"
       >
-        <LocateFixed />
+        {status === "loading" ? (
+          <LoaderCircle
+            aria-hidden="true"
+            className="animate-spin motion-reduce:animate-none"
+          />
+        ) : (
+          <LocateFixed aria-hidden="true" />
+        )}
         {labels[status]}
       </Button>
       {status === "denied" || status === "unavailable" ? (
-        <p className="text-center text-xs text-muted-foreground">
+        <p
+          className="rezno-status-warning max-w-sm rounded-xl border px-3 py-2 text-center text-xs"
+          id="marketplace-location-status"
+          role="status"
+        >
           {labels[status]}
         </p>
       ) : null}

@@ -157,6 +157,7 @@ export function HostedPaymentController({
         <Pressable
           accessibilityRole="button"
           disabled={snapshot.pending}
+          hitSlop={8}
           onPress={() => void hostedPaymentCoordinator.retry(ownerId)}
           style={[styles.button, snapshot.pending && styles.disabled]}
         >
@@ -182,8 +183,11 @@ function createStyles(theme: MobileTheme) {
       alignSelf: "flex-start",
       backgroundColor: theme.colors.gold,
       borderRadius: 999,
+      justifyContent: "center",
+      minHeight: 44,
+      minWidth: 44,
       paddingHorizontal: 12,
-      paddingVertical: 7,
+      paddingVertical: 9,
     },
     buttonText: {
       color: theme.colors.foregroundInverse,

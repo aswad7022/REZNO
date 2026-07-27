@@ -1,5 +1,5 @@
 import * as ImagePicker from "expo-image-picker";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Image,
   Linking,
@@ -10,6 +10,7 @@ import {
 } from "react-native";
 
 import type { MobileLocale } from "../i18n/labels";
+import type { MobileTheme } from "../theme/tokens";
 import type {
   CustomerAvatarCoordinatorStatus,
 } from "../media/upload-coordinator";
@@ -159,12 +160,17 @@ const copy = {
 type Labels = (typeof copy)[MobileLocale];
 
 export function CustomerAvatarManager({
+  isRtl,
   locale,
   ownerId,
+  theme,
 }: {
+  isRtl: boolean;
   locale: MobileLocale;
   ownerId: string;
+  theme: MobileTheme;
 }) {
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const labels = copy[locale];
   const [snapshot, setSnapshot] = useState(
     () => customerAvatarUploadCoordinator.getSnapshot(ownerId),
@@ -257,8 +263,13 @@ export function CustomerAvatarManager({
     || Boolean(current.manifest)
     || current.providerConfigured !== true;
   const message = statusMessage(current.status, labels);
+  const messageTone = statusTone(current.status);
   return (
-    <View style={styles.card} accessibilityLiveRegion="polite">
+    <View
+      accessibilityLabel={labels.avatarLabel}
+      accessibilityLiveRegion={messageTone === "danger" ? "assertive" : "polite"}
+      style={styles.card}
+    >
       {current.avatarUrl ? (
         <Image
           accessibilityLabel={labels.avatarLabel}
@@ -273,12 +284,14 @@ export function CustomerAvatarManager({
           label={labels.addCamera}
           onPress={() => void choose("CAMERA")}
           primary
+          styles={styles}
         />
         <ActionButton
           disabled={newUploadDisabled}
           label={labels.addLibrary}
           onPress={() => void choose("LIBRARY")}
           primary
+          styles={styles}
         />
         {current.retryable && current.manifest ? (
           <ActionButton
@@ -286,13 +299,16 @@ export function CustomerAvatarManager({
             label={labels.retry}
             onPress={() => void customerAvatarUploadCoordinator.retry(ownerId)}
             primary
+            styles={styles}
           />
         ) : null}
         {current.manifest ? (
           <ActionButton
             disabled={false}
+            destructive
             label={labels.cancelOperation}
             onPress={() => void customerAvatarUploadCoordinator.cancel(ownerId)}
+            styles={styles}
           />
         ) : null}
         {current.previewAssetId ? (
@@ -301,13 +317,16 @@ export function CustomerAvatarManager({
             label={labels.refreshPreview}
             onPress={() =>
               void customerAvatarUploadCoordinator.retryPreview(ownerId)}
+            styles={styles}
           />
         ) : null}
         {binding ? (
           <ActionButton
             disabled={current.pending || Boolean(current.manifest)}
+            destructive
             label={labels.remove}
             onPress={() => void customerAvatarUploadCoordinator.remove(ownerId)}
+            styles={styles}
           />
         ) : null}
         {settingsRequired ? (
@@ -315,6 +334,7 @@ export function CustomerAvatarManager({
             disabled={false}
             label={labels.openSettings}
             onPress={() => void Linking.openSettings()}
+            styles={styles}
           />
         ) : null}
       </View>
@@ -337,7 +357,19 @@ export function CustomerAvatarManager({
           />
         </View>
       ) : null}
-      {message ? <Text style={styles.message}>{message}</Text> : null}
+      {message ? (
+        <Text
+          style={[
+            styles.message,
+            isRtl ? styles.rtlText : styles.ltrText,
+            messageTone === "danger" && styles.messageDanger,
+            messageTone === "success" && styles.messageSuccess,
+            messageTone === "warning" && styles.messageWarning,
+          ]}
+        >
+          {message}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -388,72 +420,166 @@ function statusMessage(
 }
 
 function ActionButton({
+  destructive = false,
   disabled,
   label,
   onPress,
   primary = false,
+  styles,
 }: {
+  destructive?: boolean;
   disabled: boolean;
   label: string;
   onPress: () => void;
   primary?: boolean;
+  styles: ReturnType<typeof createStyles>;
 }) {
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ disabled }}
       disabled={disabled}
+      hitSlop={8}
       onPress={onPress}
       style={[
-        primary ? styles.primary : styles.secondary,
+        primary
+          ? styles.primary
+          : destructive
+            ? styles.destructive
+            : styles.secondary,
         disabled && styles.disabled,
       ]}
     >
-      <Text style={primary ? styles.primaryText : styles.secondaryText}>
+      <Text
+        style={
+          primary
+            ? styles.primaryText
+            : destructive
+              ? styles.destructiveText
+              : styles.secondaryText
+        }
+      >
         {label}
       </Text>
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
-  actions: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  avatar: { borderRadius: 48, height: 96, width: 96 },
-  card: {
-    borderColor: "rgba(120,120,120,0.25)",
-    borderRadius: 18,
-    borderWidth: 1,
-    gap: 12,
-    marginTop: 16,
-    padding: 14,
-  },
-  disabled: { opacity: 0.45 },
-  message: { color: "#6b7280", fontSize: 13, lineHeight: 20 },
-  primary: {
-    backgroundColor: "#7c3aed",
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  primaryText: { color: "#ffffff", fontWeight: "700" },
-  progressFill: {
-    backgroundColor: "#7c3aed",
-    borderRadius: 999,
-    height: "100%",
-  },
-  progressTrack: {
-    backgroundColor: "rgba(124,58,237,0.16)",
-    borderRadius: 999,
-    height: 8,
-    overflow: "hidden",
-    width: "100%",
-  },
-  secondary: {
-    borderColor: "#ef4444",
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  secondaryText: { color: "#ef4444", fontWeight: "700" },
-});
+function statusTone(
+  status: CustomerAvatarCoordinatorStatus,
+): "danger" | "default" | "success" | "warning" {
+  if (status === "SUCCESS") {
+    return "success";
+  }
+  if (
+    status === "ERROR"
+    || status === "REJECTED"
+    || status === "UNSAFE_FILE"
+    || status === "CLEANUP_FAILED"
+    || status === "FILE_TOO_LARGE"
+    || status === "QUARANTINED"
+    || status === "UNSUPPORTED"
+  ) {
+    return "danger";
+  }
+  if (
+    status === "OFFLINE"
+    || status === "TIMEOUT"
+    || status === "RETRYABLE"
+    || status === "COMMIT_UNCONFIRMED"
+    || status === "PREVIEW_UNAVAILABLE"
+    || status === "DESTINATION_CHANGED"
+    || status === "EXPIRED"
+    || status === "MAX_RETRIES"
+    || status === "PERMISSION_BLOCKED"
+    || status === "QUOTA"
+    || status === "STALE"
+  ) {
+    return "warning";
+  }
+  return "default";
+}
+
+function createStyles(theme: MobileTheme) {
+  return StyleSheet.create({
+    actions: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+    avatar: {
+      borderColor: theme.colors.border,
+      borderRadius: 48,
+      borderWidth: 2,
+      height: 96,
+      width: 96,
+    },
+    card: {
+      backgroundColor: theme.colors.card,
+      borderColor: theme.colors.border,
+      borderRadius: theme.radii.card,
+      borderWidth: 1,
+      gap: 12,
+      marginTop: theme.spacing.md,
+      padding: theme.spacing.md,
+    },
+    disabled: { opacity: 0.45 },
+    destructive: {
+      alignItems: "center",
+      borderColor: theme.colors.danger,
+      borderRadius: theme.radii.control,
+      borderWidth: 1,
+      justifyContent: "center",
+      minHeight: 44,
+      minWidth: 44,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+    },
+    destructiveText: { color: theme.colors.danger, fontWeight: "700" },
+    ltrText: { textAlign: "left", writingDirection: "ltr" },
+    message: {
+      color: theme.colors.mutedForeground,
+      fontSize: 13,
+      lineHeight: 20,
+    },
+    messageDanger: { color: theme.colors.danger },
+    messageSuccess: { color: theme.colors.success },
+    messageWarning: { color: theme.colors.warning },
+    primary: {
+      alignItems: "center",
+      backgroundColor: theme.colors.accent,
+      borderRadius: theme.radii.control,
+      justifyContent: "center",
+      minHeight: 44,
+      minWidth: 44,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+    },
+    primaryText: {
+      color: theme.colors.foregroundInverse,
+      fontWeight: "700",
+    },
+    progressFill: {
+      backgroundColor: theme.colors.accent,
+      borderRadius: theme.radii.pill,
+      height: "100%",
+    },
+    progressTrack: {
+      backgroundColor: theme.colors.accentMuted,
+      borderRadius: theme.radii.pill,
+      height: 8,
+      overflow: "hidden",
+      width: "100%",
+    },
+    rtlText: { textAlign: "right", writingDirection: "rtl" },
+    secondary: {
+      alignItems: "center",
+      backgroundColor: theme.colors.muted,
+      borderColor: theme.colors.border,
+      borderRadius: theme.radii.control,
+      borderWidth: 1,
+      justifyContent: "center",
+      minHeight: 44,
+      minWidth: 44,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+    },
+    secondaryText: { color: theme.colors.foreground, fontWeight: "700" },
+  });
+}

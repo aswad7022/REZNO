@@ -1059,16 +1059,21 @@ export default function App() {
     return (
       <SafeAreaView style={styles.shell}>
         <StatusBar style={theme.isDark ? "light" : "dark"} />
-        <View style={styles.startupErrorScreen}>
-          <Text style={styles.startupErrorText}>
+        <View
+          accessibilityLiveRegion="assertive"
+          accessibilityRole="alert"
+          style={styles.startupErrorScreen}
+        >
+          <Text style={[styles.startupErrorText, isRtl && styles.rtlText]}>
             {mobileAuthCopy[locale].sessionError}
           </Text>
           <Pressable
             accessibilityRole="button"
+            hitSlop={TOUCH_HIT_SLOP}
             onPress={() => void restoreStartup()}
             style={styles.startupRetryButton}
           >
-            <Text style={styles.startupRetryText}>إعادة المحاولة</Text>
+            <Text style={styles.startupRetryText}>{text.marketplaceRetry}</Text>
           </Pressable>
         </View>
       </SafeAreaView>
@@ -1304,6 +1309,7 @@ export default function App() {
             signOutPending={signOutPending}
             styles={styles}
             text={text}
+            theme={theme}
             themeMode={themeMode}
           />
         ) : null}
@@ -3755,6 +3761,7 @@ function AccountScreen({
   signOutPending,
   styles,
   text,
+  theme,
   themeMode,
 }: {
   authActionError: string | null;
@@ -3771,6 +3778,7 @@ function AccountScreen({
   signOutPending: boolean;
   styles: MobileStyles;
   text: (typeof labels)[MobileLocale];
+  theme: MobileTheme;
   themeMode: MobileThemeMode;
 }) {
   const copy = mobileAuthCopy[locale];
@@ -3824,8 +3832,10 @@ function AccountScreen({
         </Text>
         {authenticatedUser ? (
           <CustomerAvatarManager
+            isRtl={isRtl}
             locale={locale}
             ownerId={authenticatedUser.id}
+            theme={theme}
           />
         ) : null}
         {authenticatedUser ? (
@@ -4738,7 +4748,6 @@ const createStyles = (theme: MobileTheme) =>
     },
     bookingCardDetails: {
       alignItems: "flex-end",
-      direction: "rtl",
       flex: 1,
       minWidth: 0,
       width: "100%",
@@ -4752,7 +4761,6 @@ const createStyles = (theme: MobileTheme) =>
     },
     bookingCardPhysicalRow: {
       alignItems: "stretch",
-      direction: "ltr",
       flexDirection: "row",
       gap: 11,
       width: "100%",
@@ -4768,14 +4776,12 @@ const createStyles = (theme: MobileTheme) =>
     },
     bookingCardTitleRow: {
       alignItems: "flex-start",
-      direction: "ltr",
       flexDirection: "row-reverse",
       gap: 5,
       width: "100%",
     },
     bookingDateText: {
       color: "#a9aaae",
-      direction: "rtl",
       flex: 1,
       fontFamily: mobileTypography.uiRegular,
       fontSize: 12,
@@ -4786,7 +4792,6 @@ const createStyles = (theme: MobileTheme) =>
     },
     bookingDateTimeRow: {
       alignItems: "center",
-      direction: "ltr",
       flexDirection: "row",
       gap: 7,
       marginTop: 10,
@@ -4794,7 +4799,6 @@ const createStyles = (theme: MobileTheme) =>
     },
     bookingMetadataRow: {
       alignItems: "center",
-      direction: "ltr",
       flexDirection: "row-reverse",
       gap: 7,
       justifyContent: "flex-start",
@@ -4804,7 +4808,6 @@ const createStyles = (theme: MobileTheme) =>
     },
     bookingMetadataText: {
       color: "#c4c4c1",
-      direction: "rtl",
       flexShrink: 1,
       fontFamily: mobileTypography.uiRegular,
       fontSize: 12,
@@ -4814,7 +4817,6 @@ const createStyles = (theme: MobileTheme) =>
     },
     bookingMetadataTextFull: {
       alignSelf: "stretch",
-      direction: "ltr",
       flex: 1,
       textAlign: "right",
       width: "100%",
@@ -4892,7 +4894,6 @@ const createStyles = (theme: MobileTheme) =>
     },
     bookingSectionHeader: {
       alignItems: "center",
-      direction: "ltr",
       flexDirection: "row",
       width: "100%",
     },
@@ -5017,7 +5018,6 @@ const createStyles = (theme: MobileTheme) =>
     },
     bookingsHeader: {
       alignItems: "center",
-      direction: "ltr",
       flexDirection: "row",
       justifyContent: "space-between",
       width: "100%",
@@ -5131,7 +5131,6 @@ const createStyles = (theme: MobileTheme) =>
       borderColor: "rgba(202, 151, 58, 0.42)",
       borderRadius: 18,
       borderWidth: 1,
-      direction: "ltr",
       flexDirection: "row-reverse",
       gap: 2,
       padding: 4,
@@ -5154,7 +5153,6 @@ const createStyles = (theme: MobileTheme) =>
       textAlign: "center",
     },
     managedBookingActions: {
-      direction: "ltr",
       flexDirection: "row-reverse",
       gap: 10,
       marginTop: 10,
@@ -5203,7 +5201,6 @@ const createStyles = (theme: MobileTheme) =>
     managedBookingMeta: {
       alignSelf: "stretch",
       color: "#a9aaad",
-      direction: "ltr",
       fontFamily: mobileTypography.uiRegular,
       fontSize: 12.5,
       lineHeight: 19,
@@ -7547,7 +7544,6 @@ const createStyles = (theme: MobileTheme) =>
     },
     onboardingHighlights: {
       alignSelf: "center",
-      direction: "ltr",
       flexDirection: "row-reverse",
       gap: 10,
       marginTop: 26,
@@ -7596,7 +7592,6 @@ const createStyles = (theme: MobileTheme) =>
     },
     onboardingFooterBrand: {
       alignItems: "center",
-      direction: "ltr",
       flexDirection: "row",
       gap: 9,
       marginTop: 20,
@@ -10018,7 +10013,6 @@ const createStyles = (theme: MobileTheme) =>
         : "rgba(184, 117, 11, 0.22)",
       borderRadius: 20,
       borderWidth: 1,
-      direction: "ltr",
       elevation: 18,
       flexDirection: "row",
       flexShrink: 0,
