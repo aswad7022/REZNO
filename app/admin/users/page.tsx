@@ -5,6 +5,7 @@ import { getAdminUsers } from "@/features/admin/services/admin-dashboard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { WorkspaceState } from "@/components/operations/workspace-surface";
 
 export default async function AdminUsersPage() {
   const users = await getAdminUsers();
@@ -48,6 +49,12 @@ export default async function AdminUsersPage() {
             </CardContent>
           </Card>
         ))}
+        {users.length === 0 ? (
+          <WorkspaceState
+            title="لا يوجد مستخدمون"
+            description="لم تُرجع مساحة الإدارة أي مستخدم مسموح بعرضه."
+          />
+        ) : null}
       </div>
     </>
   );

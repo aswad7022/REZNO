@@ -29,7 +29,7 @@ export function AdminStoreModerationForm(props: {
         <Input id={`admin-store-reason-${props.action}`} name="reason" required minLength={2} maxLength={1000} />
       </div> : <input type="hidden" name="reason" value="" />}
       <Button type="submit" disabled={pending} variant={needsReason ? "destructive" : "default"}>{props.action}</Button>
-      <p aria-live="polite" className={state.ok ? "text-sm text-emerald-700" : "text-sm text-destructive"}>{state.message}</p>
+      <p aria-live="polite" className={state.ok ? "text-sm text-success" : "text-sm text-destructive"}>{state.message}</p>
     </form>
   );
 }

@@ -1,0 +1,248 @@
+{
+  "gate": "8C",
+  "baseSha": "903cbf8de413145ba83f652e23f41616f79c90d3",
+  "capturedAt": "2026-07-27",
+  "environment": "Disposable local PostgreSQL database and authenticated local Next.js development server",
+  "captures": [
+    {
+      "file": "docs/stage8/baselines/gate8c/admin-access-form-desktop-ar-light.png",
+      "locale": "ar",
+      "direction": "rtl",
+      "theme": "light",
+      "viewport": "desktop",
+      "dimensions": "1440x1000",
+      "families": ["form", "permission"],
+      "sha256": "8b8cf76414c13601017734aca03b088126522c5658687b68eb0c949b941f964d"
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/admin-businesses-filters-desktop-ar-light.png",
+      "locale": "ar",
+      "direction": "rtl",
+      "theme": "light",
+      "viewport": "desktop",
+      "dimensions": "1440x1000",
+      "families": ["table", "form"],
+      "sha256": "5681750f4163fc2bdbe60cf03e37593cfee1fcb7e3f7010ba61f22b2b400b041"
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/admin-commerce-dense-desktop-ar-light.png",
+      "locale": "ar",
+      "direction": "rtl",
+      "theme": "light",
+      "viewport": "desktop",
+      "dimensions": "1440x1000",
+      "families": ["commerce", "dense-data", "table"],
+      "sha256": "fabe55cf3806aad3fccd946de3bce0c713f66c6e5cd0c5186d89f6396e860144"
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/admin-communications-empty-desktop-ar-light.png",
+      "locale": "ar",
+      "direction": "rtl",
+      "theme": "light",
+      "viewport": "desktop",
+      "dimensions": "1425x1167",
+      "families": ["communications"],
+      "sha256": "3a0069e17c43eeb9dbc35f64a5d7396a5f3cd47f26c0d99baedf54b77378991c"
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/admin-error-boundary-compact-en-dark.png",
+      "locale": "en",
+      "direction": "ltr",
+      "theme": "dark",
+      "viewport": "compact",
+      "dimensions": "390x844",
+      "families": ["error"],
+      "sha256": "e7cef145922f5896e1aed89aa7eb7c979e578fdab444c595dbd576dc36d01d35"
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/admin-loading-desktop-en-dark.png",
+      "locale": "en",
+      "direction": "ltr",
+      "theme": "dark",
+      "viewport": "desktop",
+      "dimensions": "1280x720",
+      "families": ["loading"],
+      "sha256": "b24068d6230d9bff8a37c672d1ed86b371033369bf59c8c54dba3c42453502b2"
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/admin-navigation-dialog-compact-ar-dark.png",
+      "locale": "ar",
+      "direction": "rtl",
+      "theme": "dark",
+      "viewport": "compact",
+      "dimensions": "390x844",
+      "families": ["dialog"],
+      "sha256": "546301683497e85a09e781c3cac27da506e4d57c246d50d2c0baa796535babd6"
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/admin-navigation-dialog-compact-en-dark.png",
+      "locale": "en",
+      "direction": "ltr",
+      "theme": "dark",
+      "viewport": "compact",
+      "dimensions": "390x844",
+      "families": ["dialog"],
+      "sha256": "f624e553decc4bf8ee57f1a1ee050a9f27ebb67f941b26dfdd69e3f3142a01a4"
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/admin-overview-compact-ar-dark.png",
+      "locale": "ar",
+      "direction": "rtl",
+      "theme": "dark",
+      "viewport": "compact",
+      "dimensions": "375x1330",
+      "families": ["dense-data"],
+      "sha256": "e72b064a6a7220062b3a14aae282e5bf7f142baba49e7da5ba961cd30f7cda8b"
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/admin-overview-compact-en-dark.png",
+      "locale": "en",
+      "direction": "ltr",
+      "theme": "dark",
+      "viewport": "compact",
+      "dimensions": "375x1330",
+      "families": ["dense-data"],
+      "sha256": "25532390ad20da5ebde0420070f3dc4a1ba20ce462611c3f014b888c2388a6d8"
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/admin-overview-desktop-ar-light.png",
+      "locale": "ar",
+      "direction": "rtl",
+      "theme": "light",
+      "viewport": "desktop",
+      "dimensions": "1440x1000",
+      "families": ["dense-data"],
+      "sha256": "90fbdbf2941c4040bca996751317a803cd7ae72ea286ed2cca83a717079773d5"
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/admin-overview-desktop-en-light.png",
+      "locale": "en",
+      "direction": "ltr",
+      "theme": "light",
+      "viewport": "desktop",
+      "dimensions": "1440x1000",
+      "families": ["dense-data"],
+      "sha256": "c7ee5149eb21e2b52cc0f44654924b4ae9229e1745067ae21bb3ad00049d941f"
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/admin-permission-denied-compact-en-dark.png",
+      "locale": "en",
+      "direction": "ltr",
+      "theme": "dark",
+      "viewport": "compact",
+      "dimensions": "390x844",
+      "families": ["permission", "error"],
+      "sha256": "57fde9c6b80966d4c0f6123907d74f4d7a61e7b39ae76a8eefdc5d0d81e665de"
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/admin-platform-jobs-truth-desktop-ar-light.png",
+      "locale": "ar",
+      "direction": "rtl",
+      "theme": "light",
+      "viewport": "desktop",
+      "dimensions": "1440x1000",
+      "families": ["platform", "dense-data", "table"],
+      "sha256": "c5f556c93d1915c56f9e8ae08561d9f477ffef819d8ba3ea47de6d7132039b60"
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/admin-platform-jobs-truth-desktop-en-light.png",
+      "locale": "en",
+      "direction": "ltr",
+      "theme": "light",
+      "viewport": "desktop",
+      "dimensions": "1440x1000",
+      "families": ["platform", "dense-data", "table"],
+      "sha256": "d871c1da79a5342f5484537ec9d02df240c1b55d7ca003b7e905d842e09dafd5"
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/admin-platform-operations-desktop-ar-light.png",
+      "locale": "ar",
+      "direction": "rtl",
+      "theme": "light",
+      "viewport": "desktop",
+      "dimensions": "1440x1000",
+      "families": ["platform"],
+      "sha256": "5478d18da2daa897531360bb0e7023e3e290e5148e8c65dc84ebc63e03703dce"
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/admin-platform-operations-desktop-en-dark.png",
+      "locale": "en",
+      "direction": "ltr",
+      "theme": "dark",
+      "viewport": "desktop",
+      "dimensions": "1425x1678",
+      "families": ["platform", "dense-data"],
+      "sha256": "282b9b1583c98d076be6c8877ffd2508e4d2209ce627176ee1901c1f5e9c3e49"
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/admin-restaurants-empty-desktop-en-dark.png",
+      "locale": "en",
+      "direction": "ltr",
+      "theme": "dark",
+      "viewport": "desktop",
+      "dimensions": "1440x1000",
+      "families": ["restaurant"],
+      "sha256": "0e2a0ef04ea9d154eb0bedbb7b90eba81b9d8bd7b43426e6089a1e75b76d7744"
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/business-bookings-calendar-compact-ar-dark.png",
+      "locale": "ar",
+      "direction": "rtl",
+      "theme": "dark",
+      "viewport": "compact",
+      "dimensions": "375x2466",
+      "families": ["bookings", "table"],
+      "sha256": "fda8e617d51994c53fbccf4819f773eb9af2aa51a1ad8b248e6bf89cacad79e9"
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/business-dashboard-compact-ckb-dark.png",
+      "locale": "ckb",
+      "direction": "rtl",
+      "theme": "dark",
+      "viewport": "compact",
+      "dimensions": "375x812",
+      "families": ["dense-data"],
+      "sha256": "cdf95f55536d12d2fa6adfe8a8755d0bfb9dca0245bf40c12e10f2ece040d773"
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/business-dashboard-desktop-ckb-dark.png",
+      "locale": "ckb",
+      "direction": "rtl",
+      "theme": "dark",
+      "viewport": "desktop",
+      "dimensions": "1425x990",
+      "families": ["dense-data"],
+      "sha256": "86166e5f398fa6afba804fc220b1b22ae1ac2d4781c69733edeaa83019605d4f"
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/business-dashboard-desktop-ckb-light.png",
+      "locale": "ckb",
+      "direction": "rtl",
+      "theme": "light",
+      "viewport": "desktop",
+      "dimensions": "1425x802",
+      "families": ["dense-data"],
+      "sha256": "5733e16ab054b1da9885ff86c5babdfdde389447d1465c8dfaafe8222639681e"
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/business-services-form-compact-ar-dark.png",
+      "locale": "ar",
+      "direction": "rtl",
+      "theme": "dark",
+      "viewport": "compact",
+      "dimensions": "375x812",
+      "families": ["form"],
+      "sha256": "2d38d2fc097fd5186c4a1abf6c97bbea24a074e259a78afe9acdb4305a040388"
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/business-services-form-compact-ckb-dark.png",
+      "locale": "ckb",
+      "direction": "rtl",
+      "theme": "dark",
+      "viewport": "compact",
+      "dimensions": "375x812",
+      "families": ["form"],
+      "sha256": "2859409e128722d98edb847a88af6b76d60220f1e23caaad5fdc1596b16e6057"
+    }
+  ]
+}

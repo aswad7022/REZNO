@@ -34,7 +34,7 @@ export function MerchantInventoryForms({
       <Field label={t("lowStockThreshold")} name="lowStockThreshold" type="number" min={0} defaultValue={inventory.lowStockThreshold ?? ""} />
       <Button type="submit" disabled={pending}>{t("saveThreshold")}</Button>
     </form>
-    <p aria-live="polite" className={state.ok ? "text-sm text-emerald-700 md:col-span-2" : "text-sm text-destructive md:col-span-2"}>{state.message}</p>
+    <p aria-live="polite" className={state.ok ? "text-sm text-success md:col-span-2" : "text-sm text-destructive md:col-span-2"}>{state.message}</p>
   </div>;
 }
 

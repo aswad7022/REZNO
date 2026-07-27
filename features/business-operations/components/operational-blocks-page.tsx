@@ -38,7 +38,7 @@ function localInputValue(instant: string, timezone: string) {
 function Impact({ details }: { details?: Record<string, boolean | number | string | null> }) {
   const t = useTranslations("OperationalBlocks");
   return details?.total ? (
-    <p className="text-xs text-amber-700">
+    <p className="text-xs text-warning-text">
       {t("impact", {
         generic: Number(details.genericBookings ?? 0),
         restaurant: Number(details.restaurantReservations ?? 0),
@@ -88,7 +88,7 @@ function BlockFields({ block, timezone }: { block?: OperationalBlockView; timezo
 function Confirmation({ id }: { id: string }) {
   const t = useTranslations("OperationalBlocks");
   return (
-    <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 p-3">
+    <div className="rezno-status-warning flex items-start gap-2 rounded-lg border p-3">
       <Checkbox id={id} name="confirmFutureReservations" />
       <Label htmlFor={id} className="text-xs leading-5">
         {t("confirmFutureReservations")}

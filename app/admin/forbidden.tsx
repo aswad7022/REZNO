@@ -12,8 +12,8 @@ export default async function AdminForbiddenPage() {
   ]);
 
   return (
-    <div className="grid min-h-screen place-items-center bg-slate-50 px-4 py-10">
-      <Card className="w-full max-w-lg border-destructive/20 text-center shadow-xl">
+    <div className="rezno-premium-surface grid min-h-screen place-items-center px-4 py-10">
+      <Card className="w-full max-w-lg border-destructive/25 text-center shadow-[var(--shadow-raised)]">
         <CardContent className="p-8">
           <div className="mx-auto grid size-14 place-items-center rounded-3xl bg-destructive/10 text-destructive">
             <ShieldAlert className="size-7" aria-hidden="true" />

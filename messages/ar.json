@@ -1577,6 +1577,33 @@
     "unverifyBusiness": "إلغاء توثيق النشاط",
     "actionCompleted": "تم تنفيذ إجراء الإدارة",
     "actionFailed": "تعذر تنفيذ إجراء الإدارة",
+    "workspaceError": "تعذر تحميل مساحة الإدارة",
+    "workspaceErrorDescription": "لم يُنفذ أي تغيير. أعد المحاولة، أو راجع الصلاحيات إذا استمرت المشكلة.",
+    "retry": "إعادة المحاولة",
+    "navigation": {
+      "label": "التنقل في لوحة الإدارة",
+      "open": "فتح قائمة الإدارة",
+      "close": "إغلاق قائمة الإدارة",
+      "title": "مساحات الإدارة",
+      "description": "انتقل بين العمليات المسموح بها لحسابك.",
+      "backToSite": "العودة للموقع",
+      "items": {
+        "overview": "نظرة عامة",
+        "businesses": "الأنشطة",
+        "users": "المستخدمون",
+        "bookings": "الحجوزات",
+        "restaurants": "المطاعم والكافيهات",
+        "reviews": "المراجعات",
+        "commerce": "التجارة",
+        "communications": "الاتصالات",
+        "messages": "الرسائل",
+        "payments": "المدفوعات",
+        "platformJobs": "مهام المنصة",
+        "platformOperations": "صحة المنصة",
+        "access": "صلاحيات الأدمن",
+        "settings": "الإعدادات"
+      }
+    },
     "permissionsLabels": {
       "ADMIN_DASHBOARD_VIEW": "عرض لوحة الأدمن",
       "BUSINESSES_VIEW": "عرض الأنشطة",

@@ -1654,6 +1654,33 @@
     "unverifyBusiness": "Unverify business",
     "actionCompleted": "Admin action completed",
     "actionFailed": "Admin action failed",
+    "workspaceError": "The admin workspace could not load",
+    "workspaceErrorDescription": "No change was performed. Try again, or review your permissions if the problem continues.",
+    "retry": "Try again",
+    "navigation": {
+      "label": "Admin dashboard navigation",
+      "open": "Open admin menu",
+      "close": "Close admin menu",
+      "title": "Admin workspaces",
+      "description": "Move between the operations allowed for your account.",
+      "backToSite": "Back to site",
+      "items": {
+        "overview": "Overview",
+        "businesses": "Businesses",
+        "users": "Users",
+        "bookings": "Bookings",
+        "restaurants": "Restaurants and cafés",
+        "reviews": "Reviews",
+        "commerce": "Commerce",
+        "communications": "Communications",
+        "messages": "Messages",
+        "payments": "Payments",
+        "platformJobs": "Platform jobs",
+        "platformOperations": "Platform health",
+        "access": "Admin access",
+        "settings": "Settings"
+      }
+    },
     "permissionsLabels": {
       "ADMIN_DASHBOARD_VIEW": "View admin dashboard",
       "BUSINESSES_VIEW": "View businesses",

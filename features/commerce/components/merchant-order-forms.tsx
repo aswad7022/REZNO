@@ -74,6 +74,6 @@ export function MerchantOrderForms({
         </form>;
       })}
     </div>
-    <p aria-live="polite" className={state.ok ? "text-sm text-emerald-700" : "text-sm text-destructive"}>{state.message}</p>
+    <p aria-live="polite" className={state.ok ? "text-sm text-success" : "text-sm text-destructive"}>{state.message}</p>
   </section>;
 }

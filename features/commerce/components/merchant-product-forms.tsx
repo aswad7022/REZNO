@@ -206,7 +206,7 @@ function Field({ label, name, ...props }: React.ComponentProps<typeof Input> & {
 }
 
 function Result({ state }: { state: CommerceActionState }) {
-  return <p aria-live="polite" className={state.ok ? "text-sm text-emerald-700" : "text-sm text-destructive"}>{state.message}</p>;
+  return <p aria-live="polite" className={state.ok ? "text-sm text-success" : "text-sm text-destructive"}>{state.message}</p>;
 }
 
 export function SectionTitle({ children }: { children: ReactNode }) {

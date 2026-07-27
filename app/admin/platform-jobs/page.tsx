@@ -4,6 +4,7 @@ import type { PlatformJobStatus } from "@prisma/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { WorkspaceState } from "@/components/operations/workspace-surface";
 import { AdminPageHeader } from "@/features/admin/components/admin-shell";
 import { requireAdminPermission } from "@/features/admin/services/admin-auth";
 import { STAGE_6_ARCHITECTURE } from "@/features/platform-jobs/domain/contracts";
@@ -29,6 +30,12 @@ export default async function PlatformJobsPage({ searchParams }: {
       title="Platform jobs"
       description="Bounded PostgreSQL-backed durable execution. Automatic scheduling and always-on workers are not connected."
     />
+    <WorkspaceState
+      className="mb-6"
+      tone="warning"
+      title="Stage 6 runtime is not activated"
+      description="Code and durable records may be present, but automatic scheduling and always-on workers remain disconnected. Schedule rows below are configuration records, not proof of execution."
+    />
     <Card className="mb-6">
       <CardHeader><CardTitle>Runtime truth</CardTitle></CardHeader>
       <CardContent className="grid gap-2 text-sm md:grid-cols-2">
@@ -50,7 +57,12 @@ export default async function PlatformJobsPage({ searchParams }: {
           <Button asChild variant="outline"><Link href={`/admin/platform-jobs/${job.id}`}>Safe detail</Link></Button>
         </CardContent>
       </Card>)}
-      {jobs.items.length === 0 ? <p>No durable jobs matched this bounded view.</p> : null}
+      {jobs.items.length === 0 ? (
+        <WorkspaceState
+          title="No matching durable jobs"
+          description="No job matched this bounded filter. This empty state does not imply that workers are active."
+        />
+      ) : null}
       {jobs.nextCursor ? <Button asChild variant="outline"><Link href={`/admin/platform-jobs?cursor=${encodeURIComponent(jobs.nextCursor)}${status ? `&status=${status}` : ""}`}>Next</Link></Button> : null}
     </section>
     <section className="mt-8 space-y-4">
@@ -61,7 +73,12 @@ export default async function PlatformJobsPage({ searchParams }: {
           <Badge>{schedule.enabled ? "ENABLED" : "DISABLED"}</Badge>
         </CardContent>
       </Card>)}
-      {schedules.items.length === 0 ? <p>No schedules are configured. Gate 6A creates no production schedule rows.</p> : null}
+      {schedules.items.length === 0 ? (
+        <WorkspaceState
+          title="No schedules are configured"
+          description="Gate 6A creates no production schedule rows, and Stage 6 runtime remains inactive."
+        />
+      ) : null}
     </section>
   </>;
 }

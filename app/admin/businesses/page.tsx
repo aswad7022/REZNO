@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { WorkspaceState } from "@/components/operations/workspace-surface";
 
 export default async function AdminBusinessesPage({
   searchParams,
@@ -102,6 +103,12 @@ export default async function AdminBusinessesPage({
             </Card>
           );
         })}
+        {businesses.length === 0 ? (
+          <WorkspaceState
+            title="لا توجد أنشطة مطابقة"
+            description="غيّر معايير البحث أو التصفية. لم يتم تعديل أي سجل."
+          />
+        ) : null}
       </div>
     </>
   );

@@ -10,6 +10,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  WorkspaceMetricGrid,
+  WorkspaceState,
+} from "@/components/operations/workspace-surface";
 import { AdminPageHeader } from "@/features/admin/components/admin-shell";
 import { requireAdminPermission } from "@/features/admin/services/admin-auth";
 import { platformJobAdminContext } from "@/features/platform-jobs/services/admin-context";
@@ -66,7 +70,17 @@ export default async function PlatformOperationsPage({
         title="Platform operations"
         description="Automatic runtime, bounded health signals, alerts, and incidents backed by PostgreSQL."
       />
-      <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <WorkspaceState
+        className="mb-6"
+        tone={overview.runtime.state === "ENABLED" ? "warning" : "info"}
+        title={`Runtime state: ${overview.runtime.state}`}
+        description={
+          overview.runtime.state === "ENABLED"
+            ? "The database reports an enabled runtime. Confirm deployment connectivity before treating any scheduler or worker as active."
+            : "Stage 6 runtime is not activated. Stored jobs, schedules, and health records do not prove that automatic execution is connected."
+        }
+      />
+      <WorkspaceMetricGrid>
         {Object.entries(overview.metrics).map(([name, value]) => (
           <Card key={name}>
             <CardHeader>
@@ -77,9 +91,10 @@ export default async function PlatformOperationsPage({
             </CardContent>
           </Card>
         ))}
-      </div>
+      </WorkspaceMetricGrid>
 
-      <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="my-6">
+        <WorkspaceMetricGrid>
         <TruthCard
           label="Distributed rate limit"
           value={`${overview.rateLimit.backend} · ${overview.rateLimit.availability} · FAIL_${overview.rateLimit.failMode}`}
@@ -96,6 +111,7 @@ export default async function PlatformOperationsPage({
           label="Storage provider"
           value={overview.providers.storage}
         />
+        </WorkspaceMetricGrid>
       </div>
 
       <Card className="mb-6">
@@ -196,7 +212,12 @@ export default async function PlatformOperationsPage({
             </CardContent>
           </Card>
         ))}
-        {alerts.items.length === 0 ? <p>No platform alerts.</p> : null}
+        {alerts.items.length === 0 ? (
+          <WorkspaceState
+            title="No platform alerts"
+            description="No alert matched the current bounded view."
+          />
+        ) : null}
         {alerts.nextCursor ? (
           <Button asChild variant="outline">
             <Link href={`/admin/platform-operations?alertCursor=${encodeURIComponent(alerts.nextCursor)}`}>
@@ -243,7 +264,12 @@ export default async function PlatformOperationsPage({
             </CardContent>
           </Card>
         ))}
-        {incidents.items.length === 0 ? <p>No platform incidents.</p> : null}
+        {incidents.items.length === 0 ? (
+          <WorkspaceState
+            title="No platform incidents"
+            description="No incident matched the current bounded view."
+          />
+        ) : null}
         {incidents.nextCursor ? (
           <Button asChild variant="outline">
             <Link href={`/admin/platform-operations?incidentCursor=${encodeURIComponent(incidents.nextCursor)}`}>

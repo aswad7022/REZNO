@@ -267,6 +267,60 @@
     background: color-mix(in oklch, var(--info) 10%, var(--card));
     color: var(--info);
   }
+
+  [data-business-admin-surface] {
+    overflow-wrap: anywhere;
+  }
+
+  [data-business-admin-surface] [data-slot="card"] {
+    box-shadow: var(--shadow-soft);
+  }
+
+  [data-business-admin-surface] :is(input, select, textarea) {
+    background-color: var(--background);
+  }
+
+  [data-business-admin-surface] :is(table) {
+    inline-size: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+
+  [data-business-admin-surface] :is(th, td) {
+    padding-block: 0.75rem;
+    padding-inline: 0.875rem;
+    text-align: start;
+    vertical-align: top;
+  }
+
+  [data-business-admin-surface] th {
+    position: sticky;
+    inset-block-start: 0;
+    z-index: 1;
+    background: color-mix(in oklch, var(--card) 92%, var(--muted));
+    color: var(--muted-foreground);
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+
+  [data-business-admin-surface] tbody tr:not(:last-child) td {
+    border-block-end: 1px solid var(--border);
+  }
+
+  [data-business-admin-surface] tbody tr {
+    transition: background-color var(--motion-duration-fast)
+      var(--motion-ease-standard);
+  }
+
+  [data-business-admin-surface] tbody tr:hover {
+    background: color-mix(in oklch, var(--muted) 55%, transparent);
+  }
+
+  [data-business-admin-surface] [data-slot="dialog-content"],
+  [data-business-admin-surface] [data-slot="sheet-content"] {
+    max-block-size: min(90dvh, 56rem);
+    overflow-y: auto;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -44,7 +44,7 @@ export function CommerceAccessForm({ contextOrganizationId, idempotencyKey, role
         ))}
         {role.assignablePermissions.length === 0 ? <p className="text-sm text-muted-foreground">{t("fixedRole")}</p> : null}
       </div>
-      <p aria-live="polite" className={state.ok ? "text-sm text-emerald-700" : "text-sm text-destructive"}>{state.message}</p>
+      <p aria-live="polite" className={state.ok ? "text-sm text-success" : "text-sm text-destructive"}>{state.message}</p>
       {editable ? <Button type="submit" disabled={pending}>{pending ? t("saving") : t("saveAccess")}</Button> : null}
     </form>
   );
