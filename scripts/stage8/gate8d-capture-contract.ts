@@ -17,6 +17,7 @@ export interface Gate8dCaptureSpec extends Gate8cCaptureSpec {
   browser: Gate8dBrowser;
   viewport: Gate8dViewport;
   zoom: 1 | 2;
+  scrollOffsetY?: number;
 }
 
 const inherited = new Map(gate8cCaptureSpecs.map((spec) => [spec.file, spec]));
@@ -37,7 +38,8 @@ function capture(
     "business-notification-preferences-table-desktop-en-light.png";
   return {
     ...sourceWithoutScroll,
-    ...(scrollTo && !stickyHeaderSafe ? { scrollTo } : {}),
+    ...(scrollTo ? { scrollTo } : {}),
+    ...(stickyHeaderSafe ? { scrollOffsetY: -96 } : {}),
     browser,
     viewport,
     width,
@@ -106,7 +108,7 @@ const browserMatrix = (browser: Gate8dBrowser): Gate8dCaptureSpec[] => [
     "desktop",
     "business-notification-preferences-table-desktop-en-light.png",
     1280,
-    800,
+    900,
   ),
 ];
 

@@ -133,8 +133,13 @@ test("Gate 8D cross-browser contract covers all browsers, viewports, directions,
       .filter((entry) =>
         entry.file.includes("business-notification-preferences-table"),
       )
-      .every((entry) => entry.scrollTo === undefined),
-    "Notification evidence must retain the natural sticky-header-safe position.",
+      .every(
+        (entry) =>
+          entry.scrollTo === "table" &&
+          entry.scrollOffsetY === -96 &&
+          entry.height === 900,
+      ),
+    "Notification evidence must show the table below the sticky header.",
   );
 });
 

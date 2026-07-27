@@ -193,6 +193,12 @@ async function preparePage(
   }
   if (spec.scrollTo) {
     await page.locator(spec.scrollTo).first().scrollIntoViewIfNeeded();
+    if (spec.scrollOffsetY) {
+      await page.evaluate(
+        (offsetY) => window.scrollBy({ top: offsetY, behavior: "instant" }),
+        spec.scrollOffsetY,
+      );
+    }
   }
   await settle(page);
   for (const required of spec.requiredLandmarks) {
