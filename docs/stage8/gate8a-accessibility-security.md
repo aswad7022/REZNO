@@ -21,9 +21,17 @@ regression coverage. The local browser audit covers representative public,
 auth, admin, compact, and mobile error surfaces. Full device/browser/contrast
 matrix closure remains Gate 8D.
 
-The final public desktop browser audit observed 41 interactive controls with
-zero unnamed controls and zero controls below 44 CSS pixels. Auth and Admin
+The final public desktop browser audit observed 26 interactive controls with
+zero unnamed controls and zero controls below 44 CSS pixels. The compact
+marketplace audit observed 42 controls with no undersized target or horizontal
+overflow; the Expo error surface exposed one 44px retry target. Auth and Admin
 snapshots also preserved Arabic RTL and semantic form/navigation names.
+
+Deterministic WCAG calculations now enforce at least 4.5:1 for primary CTA
+endpoints, primary text, and error/success/warning/information soft-state pairs
+in both web themes and both native themes. The light action and status roles
+were darkened where the original values missed AA, while inverse action text
+remains cream.
 
 ## Security review
 

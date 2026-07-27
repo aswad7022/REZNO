@@ -76,7 +76,7 @@ export async function BusinessCard({
           <div className="min-w-0 flex-1">
             <Link
               href={`/${business.slug}`}
-              className="outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+              className="inline-flex min-h-11 items-center outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
             >
               <CardTitle className="truncate text-lg font-bold text-foreground transition-colors group-hover:text-primary">
                 {business.name}
@@ -122,7 +122,7 @@ export async function BusinessCard({
           <Link
             href={`/${business.slug}`}
             aria-label={t("viewBusiness")}
-            className="grid size-9 place-items-center rounded-xl bg-muted text-muted-foreground transition-all group-hover:bg-primary group-hover:text-primary-foreground"
+            className="grid size-11 place-items-center rounded-xl bg-muted text-muted-foreground transition-all group-hover:bg-primary group-hover:text-primary-foreground"
           >
             <ArrowUpLeft className="size-4 transition-transform group-hover:-translate-x-1 group-hover:-translate-y-1 rtl:rotate-90" />
           </Link>

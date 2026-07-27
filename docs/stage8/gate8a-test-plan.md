@@ -71,7 +71,7 @@ the PR Ready and do not begin Gate 8B.
 
 | Check | Final result |
 | --- | --- |
-| Gate 8A + Gate 7D unit regression | `105/105` pass (`7 + 89 + 9`) |
+| Gate 8A + Gate 7D unit regression | `107/107` pass (`9 + 89 + 9`) |
 | Complete unit suites | `558/558` pass (`349 + 209`) |
 | PostgreSQL integration, fresh disposable database | `433/433` pass |
 | Production-server HTTP/RSC/API | `133/133` pass (`6 + 122 + 5`) |
@@ -82,9 +82,13 @@ the PR Ready and do not begin Gate 8B.
 | Expo dependency check / Doctor | current / `20/20` |
 | iOS Hermes export | PASS; `1016` modules; `3.4 MB`; `32` files |
 | Android Hermes export | PASS; `1016` modules; `3.4 MB`; `32` files |
-| Expo Web export | PASS; `752` modules; `2.1 MB`; `34` files |
+| Expo Web export | PASS; `527` modules; `2.1 MB`; `34` files |
 | Root production / Mobile dependency audits | `0 / 0` findings |
 | Migrations | `51`; 48–51 byte-identical; no Migration 52 |
+
+The final focused suite includes explicit WCAG AA checks for the light and dark
+web/native semantic pairs and source contracts for 44×44 shared Web controls,
+dashboard navigation, and the native startup retry action.
 
 The corrected database suites used only fresh local disposable PostgreSQL
 databases and the repository's non-production CI-shaped environment. All

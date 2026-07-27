@@ -105,8 +105,8 @@ allowlist was not relaxed for visual capture.
 The final authoritative runs on the author head completed with no failed,
 skipped, todo, or cancelled test:
 
-- Gate 8A plus complete Gate 7D unit regression: `105/105`
-  (`7 + 89 + 9`)
+- Gate 8A plus complete Gate 7D unit regression: `107/107`
+  (`9 + 89 + 9`)
 - all unit tests: `558/558` (`349 + 209`)
 - all PostgreSQL integration tests on a fresh disposable 51/51 database:
   `433/433`
@@ -116,10 +116,18 @@ skipped, todo, or cancelled test:
 - Next.js production build: `PASS`, `115/115` pages
 - Expo dependency check: current; Expo Doctor: `20/20`
 - iOS and Android Hermes exports: `1016` modules and `3.4 MB` each
-- Expo Web export: `752` modules and `2.1 MB`
+- Expo Web export: `527` modules and `2.1 MB`
 - production and Mobile dependency audits: `0` findings each
-- final public browser audit: `41` controls, `0` unnamed controls, and `0`
+- final public browser audit: `26` controls, `0` unnamed controls, and `0`
   undersized controls at the desktop baseline
+- compact marketplace: `42` controls, `0` undersized, no horizontal overflow;
+  Expo error surface: one 44px retry action
+
+The focused foundation tests calculate WCAG contrast from the actual web
+OKLCH tokens and native RGB tokens. Primary actions/text and all semantic soft
+statuses meet the 4.5:1 AA threshold in light and dark modes. Shared web
+controls and navigation now guarantee both a 44px width and height; the native
+startup recovery action carries the same explicit minimum.
 
 Two early environment diagnostics were not accepted as verification: the
 first PostgreSQL invocation omitted the local cursor-signing secret, and the

@@ -27,10 +27,13 @@
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-destructive: var(--destructive);
+  --color-primary-emphasis: var(--primary-emphasis);
   --color-success-foreground: var(--success-foreground);
   --color-success: var(--success);
   --color-warning-foreground: var(--warning-foreground);
+  --color-warning-text: var(--warning-text);
   --color-warning: var(--warning);
   --color-info-foreground: var(--info-foreground);
   --color-info: var(--info);
@@ -63,19 +66,22 @@
   --card-foreground: oklch(0.205 0.024 62);
   --popover: oklch(0.995 0.008 85);
   --popover-foreground: oklch(0.205 0.024 62);
-  --primary: oklch(0.56 0.13 72);
-  --primary-foreground: oklch(0.16 0.02 62);
+  --primary: oklch(0.5 0.13 72);
+  --primary-emphasis: oklch(0.47 0.14 60);
+  --primary-foreground: oklch(0.985 0.01 82);
   --secondary: oklch(0.93 0.05 78);
   --secondary-foreground: oklch(0.3 0.055 68);
   --muted: oklch(0.95 0.022 80);
   --muted-foreground: oklch(0.45 0.035 64);
   --accent: oklch(0.91 0.075 78);
   --accent-foreground: oklch(0.3 0.065 68);
-  --destructive: oklch(0.577 0.245 27.325);
+  --destructive: oklch(0.5 0.2 27.325);
+  --destructive-foreground: oklch(0.985 0.01 82);
   --success: oklch(0.49 0.13 158);
   --success-foreground: oklch(0.985 0.01 158);
   --warning: oklch(0.63 0.15 72);
   --warning-foreground: oklch(0.18 0.025 62);
+  --warning-text: oklch(0.18 0.025 62);
   --info: oklch(0.52 0.13 245);
   --info-foreground: oklch(0.985 0.008 245);
   --border: oklch(0.86 0.035 78);
@@ -118,6 +124,7 @@
   --popover: oklch(0.185 0.018 66);
   --popover-foreground: oklch(0.95 0.022 82);
   --primary: oklch(0.77 0.13 78);
+  --primary-emphasis: oklch(0.72 0.14 68);
   --primary-foreground: oklch(0.17 0.024 62);
   --secondary: oklch(0.25 0.045 70);
   --secondary-foreground: oklch(0.95 0.022 82);
@@ -126,10 +133,12 @@
   --accent: oklch(0.29 0.065 75);
   --accent-foreground: oklch(0.96 0.022 82);
   --destructive: oklch(0.704 0.191 22.216);
+  --destructive-foreground: oklch(0.14 0.018 64);
   --success: oklch(0.68 0.14 158);
   --success-foreground: oklch(0.14 0.025 158);
   --warning: oklch(0.79 0.14 78);
   --warning-foreground: oklch(0.17 0.024 62);
+  --warning-text: oklch(0.79 0.14 78);
   --info: oklch(0.72 0.12 245);
   --info-foreground: oklch(0.14 0.022 245);
   --border: oklch(1 0 0 / 10%);
@@ -177,10 +186,12 @@
   }
   button,
   [role="button"],
+  [data-slot="button"],
   input,
   select,
   textarea {
     min-block-size: var(--control-min-size);
+    min-inline-size: var(--control-min-size);
   }
   :disabled,
   [aria-disabled="true"] {
@@ -232,7 +243,7 @@
   .rezno-status-warning {
     border-color: color-mix(in oklch, var(--warning) 35%, transparent);
     background: color-mix(in oklch, var(--warning) 12%, var(--card));
-    color: var(--warning-foreground);
+    color: var(--warning-text);
   }
 
   .rezno-status-error {

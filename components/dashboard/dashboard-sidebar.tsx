@@ -45,7 +45,7 @@ function NavigationLink({
       aria-current={active ? "page" : undefined}
       title={collapsed ? t(item.title) : undefined}
       className={cn(
-        "group/link relative flex min-h-10 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-all outline-none focus-visible:ring-3 focus-visible:ring-sidebar-ring/50",
+        "group/link relative flex min-h-11 min-w-11 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-all outline-none focus-visible:ring-3 focus-visible:ring-sidebar-ring/50",
         active
           ? "bg-white/12 text-white shadow-sm ring-1 ring-white/10"
           : "text-sidebar-foreground/68 hover:bg-white/8 hover:text-white",
@@ -125,7 +125,7 @@ export function DashboardSidebar({
       <div className="relative flex h-16 items-center gap-3 border-b border-white/10 px-4">
         <Link
           href={`/${role}`}
-          className="flex min-w-0 items-center gap-3 rounded-xl outline-none focus-visible:ring-3 focus-visible:ring-sidebar-ring/50"
+          className="flex min-h-11 min-w-11 items-center gap-3 rounded-xl outline-none focus-visible:ring-3 focus-visible:ring-sidebar-ring/50"
         >
           <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-sidebar-primary to-[color-mix(in_oklch,var(--sidebar-primary),white_14%)] font-bold text-sidebar-primary-foreground shadow-lg shadow-black/30 ring-1 ring-white/20">
             R
@@ -160,7 +160,7 @@ export function DashboardSidebar({
                       open={isNavigationItemActive(pathname, item.href)}
                       className="group/nav"
                     >
-                      <summary className="flex min-h-10 cursor-pointer list-none items-center gap-1 rounded-xl px-1 text-sm font-medium text-sidebar-foreground/68 outline-none transition-colors hover:bg-white/8 hover:text-white focus-visible:ring-3 focus-visible:ring-sidebar-ring/50">
+                      <summary className="flex min-h-11 min-w-11 cursor-pointer list-none items-center gap-1 rounded-xl px-1 text-sm font-medium text-sidebar-foreground/68 outline-none transition-colors hover:bg-white/8 hover:text-white focus-visible:ring-3 focus-visible:ring-sidebar-ring/50">
                         <Link
                           href={item.href}
                           onClick={(event) => event.stopPropagation()}
@@ -203,7 +203,7 @@ export function DashboardSidebar({
             href="/customer"
             title={collapsed ? t("customerDashboard") : undefined}
             className={cn(
-              "mb-2 flex min-h-10 items-center gap-3 rounded-xl px-3 text-sm font-medium text-sidebar-foreground/80 outline-none transition-colors hover:bg-white/8 hover:text-white focus-visible:ring-3 focus-visible:ring-sidebar-ring/50",
+              "mb-2 flex min-h-11 min-w-11 items-center gap-3 rounded-xl px-3 text-sm font-medium text-sidebar-foreground/80 outline-none transition-colors hover:bg-white/8 hover:text-white focus-visible:ring-3 focus-visible:ring-sidebar-ring/50",
               collapsed && "justify-center px-0",
             )}
           >
@@ -218,7 +218,7 @@ export function DashboardSidebar({
             href="/business"
             title={collapsed ? t("businessDashboard") : undefined}
             className={cn(
-              "mb-2 flex min-h-10 items-center gap-3 rounded-xl px-3 text-sm font-medium text-sidebar-foreground/80 outline-none transition-colors hover:bg-white/8 hover:text-white focus-visible:ring-3 focus-visible:ring-sidebar-ring/50",
+              "mb-2 flex min-h-11 min-w-11 items-center gap-3 rounded-xl px-3 text-sm font-medium text-sidebar-foreground/80 outline-none transition-colors hover:bg-white/8 hover:text-white focus-visible:ring-3 focus-visible:ring-sidebar-ring/50",
               collapsed && "justify-center px-0",
             )}
           >
@@ -233,7 +233,7 @@ export function DashboardSidebar({
             href="/admin"
             title={collapsed ? t("adminDashboard") : undefined}
             className={cn(
-              "mb-2 flex min-h-10 items-center gap-3 rounded-xl px-3 text-sm font-medium text-sidebar-foreground/80 outline-none transition-colors hover:bg-white/8 hover:text-white focus-visible:ring-3 focus-visible:ring-sidebar-ring/50",
+              "mb-2 flex min-h-11 min-w-11 items-center gap-3 rounded-xl px-3 text-sm font-medium text-sidebar-foreground/80 outline-none transition-colors hover:bg-white/8 hover:text-white focus-visible:ring-3 focus-visible:ring-sidebar-ring/50",
               collapsed && "justify-center px-0",
             )}
           >

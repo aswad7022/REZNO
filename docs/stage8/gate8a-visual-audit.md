@@ -37,11 +37,20 @@ were rendered against a disposable local PostgreSQL database migrated to 51/51
 and populated with non-production demo fixtures. The Expo web app was rendered
 at 390×844 and correctly failed closed rather than trusting an unapproved origin.
 
-The final public desktop accessibility pass found 41 interactive controls, no
-unnamed control, and no target below 44 CSS pixels. Auth and Admin snapshots
+The final public desktop accessibility pass found 26 interactive controls, no
+unnamed control, and no target below 44 CSS pixels. The compact marketplace
+found 42 controls, zero undersized controls, and no horizontal overflow. The
+Expo error state exposed one 44px retry action. Auth and Admin snapshots
 retained Arabic `lang="ar"` and `dir="rtl"`, semantic control names, and the
 same minimum-target contract. Automated contracts separately prove English LTR
-and Kurdish RTL direction and both web/native reduced-motion resolution.
+and Kurdish RTL direction, both web/native reduced-motion resolution, and WCAG
+AA contrast for the semantic action/status pairs in light and dark themes.
+
+The independent pre-merge audit caught two foundation gaps before closure:
+several light action/status pairs were below 4.5:1 and the earlier global rule
+guaranteed only control height. The corrected foundation uses AA-safe semantic
+roles and enforces both inline and block minimums; deterministic regression
+tests now prevent either issue from returning.
 
 No staging or production database, provider, runtime, or secret was touched.
 The disposable database, synthetic Admin identity, and generated export
