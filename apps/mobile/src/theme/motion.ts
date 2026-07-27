@@ -2,10 +2,15 @@ export const premiumMotion = {
   duration: {
     fast: 140,
     instant: 90,
-    modalEnter: 280,
+    modalEnter: 320,
     normal: 220,
-    pageEnter: 260,
+    pageEnter: 220,
     slow: 320,
+  },
+  easing: {
+    enter: [0.16, 1, 0.3, 1] as const,
+    exit: [0.4, 0, 1, 1] as const,
+    standard: [0.2, 0, 0, 1] as const,
   },
   pressScale: {
     card: 0.985,
@@ -51,6 +56,7 @@ export function resolvePremiumMotion(preference: MobileMotionPreference) {
         resolvePressScale(value, preference),
       ]),
     ) as Record<keyof typeof premiumMotion.pressScale, number>,
+    easing: premiumMotion.easing,
     spring:
       preference === "reduced"
         ? {

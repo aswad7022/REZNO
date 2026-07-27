@@ -49,7 +49,11 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const [locale, messages] = await Promise.all([getLocale(), getMessages()]);
+  const [locale, messages, accessibility] = await Promise.all([
+    getLocale(),
+    getMessages(),
+    getTranslations("Accessibility"),
+  ]);
 
   return (
     <html
@@ -68,6 +72,9 @@ export default async function RootLayout({
         >
           <NextIntlClientProvider messages={messages} now={new Date()}>
             <PwaRegister />
+            <a className="rezno-skip-link" href="#main-content">
+              {accessibility("skipToContent")}
+            </a>
             {children}
           </NextIntlClientProvider>
         </ThemeProvider>

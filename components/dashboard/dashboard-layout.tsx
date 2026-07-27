@@ -121,7 +121,7 @@ export function DashboardLayout({
       />
       <div
         className={cn(
-          "min-h-screen transition-[padding] duration-200 ease-out",
+          "min-h-screen transition-[padding] duration-(--motion-duration-normal) ease-(--motion-ease-enter) motion-reduce:transition-none",
           collapsed ? "lg:ps-18" : "lg:ps-64",
         )}
       >

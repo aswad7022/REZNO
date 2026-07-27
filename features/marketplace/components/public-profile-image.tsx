@@ -5,6 +5,7 @@ import { useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 
 import { cn } from "@/lib/utils";
+import { reznoBrandFoundation } from "@/design-system/brand-foundation";
 
 export function PublicProfileImage({
   src,
@@ -27,7 +28,12 @@ export function PublicProfileImage({
       className="absolute inset-0"
       initial={false}
       animate={{ opacity: loaded || reducedMotion ? 1 : 0 }}
-      transition={{ duration: 0.35 }}
+      transition={{
+        duration: reducedMotion
+          ? 0
+          : reznoBrandFoundation.motion.duration.normal / 1_000,
+        ease: reznoBrandFoundation.motion.easing.enter,
+      }}
     >
       <Image
         src={src}

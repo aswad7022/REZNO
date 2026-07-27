@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 
 import { cn } from "@/lib/utils";
+import { reznoBrandFoundation } from "@/design-system/brand-foundation";
 
 export function DashboardPageMotion({
   children,
@@ -15,9 +16,18 @@ export function DashboardPageMotion({
   const reducedMotion = useReducedMotion();
   return (
     <motion.div
-      initial={reducedMotion ? false : { opacity: 0, y: 8 }}
+      initial={
+        reducedMotion
+          ? false
+          : { opacity: 0, y: reznoBrandFoundation.motion.offset.page }
+      }
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.22, ease: "easeOut" }}
+      transition={{
+        duration: reducedMotion
+          ? 0
+          : reznoBrandFoundation.motion.duration.normal / 1_000,
+        ease: reznoBrandFoundation.motion.easing.enter,
+      }}
       className={cn(
         "mx-auto flex w-full max-w-[100rem] flex-col gap-6 p-4 sm:p-6 lg:p-8",
         className,

@@ -3,6 +3,9 @@
     "title": "REZNO",
     "description": "Manage bookings and grow your business with REZNO."
   },
+  "Accessibility": {
+    "skipToContent": "Skip to main content"
+  },
   "Common": {
     "language": "Language",
     "languages": {

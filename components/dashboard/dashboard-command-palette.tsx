@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import type { BusinessVertical, CommercePermission, SystemRole } from "@prisma/client";
 import { useTranslations } from "next-intl";
+import { reznoBrandFoundation } from "@/design-system/brand-foundation";
 
 import {
   Command,
@@ -287,7 +288,12 @@ export default function DashboardCommandPalette({
       <motion.div
         initial={reducedMotion ? false : { opacity: 0, y: -8, scale: 0.985 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.16, ease: "easeOut" }}
+        transition={{
+          duration: reducedMotion
+            ? 0
+            : reznoBrandFoundation.motion.duration.fast / 1_000,
+          ease: reznoBrandFoundation.motion.easing.enter,
+        }}
       >
         <Command shouldFilter>
           <CommandInput

@@ -16,6 +16,14 @@ export const reznoBrandFoundation = {
       normal: 220,
       slow: 320,
     },
+    easing: {
+      enter: [0.16, 1, 0.3, 1],
+      exit: [0.4, 0, 1, 1],
+      standard: [0.2, 0, 0, 1],
+    },
+    offset: {
+      page: 8,
+    },
     reduced: {
       duration: 0,
       pressScale: 1,
