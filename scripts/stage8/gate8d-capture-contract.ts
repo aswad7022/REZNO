@@ -31,8 +31,13 @@ function capture(
 ): Gate8dCaptureSpec {
   const source = inherited.get(inheritedFile);
   if (!source) throw new Error(`Missing Gate 8C capture contract ${inheritedFile}`);
+  const { scrollTo, ...sourceWithoutScroll } = source;
+  const stickyHeaderSafe =
+    inheritedFile ===
+    "business-notification-preferences-table-desktop-en-light.png";
   return {
-    ...source,
+    ...sourceWithoutScroll,
+    ...(scrollTo && !stickyHeaderSafe ? { scrollTo } : {}),
     browser,
     viewport,
     width,

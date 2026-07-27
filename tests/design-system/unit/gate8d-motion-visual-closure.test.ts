@@ -121,6 +121,14 @@ test("Gate 8D cross-browser contract covers all browsers, viewports, directions,
   assert.ok(gate8dCaptureSpecs.some((entry) => entry.locale === "ckb"));
   assert.ok(gate8dCaptureSpecs.some((entry) => entry.theme === "light"));
   assert.ok(gate8dCaptureSpecs.some((entry) => entry.theme === "dark"));
+  assert.ok(
+    gate8dCaptureSpecs
+      .filter((entry) =>
+        entry.file.includes("business-notification-preferences-table"),
+      )
+      .every((entry) => entry.scrollTo === undefined),
+    "Notification evidence must retain the natural sticky-header-safe position.",
+  );
 });
 
 test("Gate 8D evidence is production-attested, deterministic, browser-authenticated, and human-reviewed", async () => {
@@ -154,6 +162,11 @@ test("Gate 8D validator rejects forged format, blank images, stale DOM, a11y, pe
   const blank = await inspectGate8dPng(onePixelPng);
   assert.equal(blank.width, 1);
   const manifest = JSON.parse(read(manifestFile)) as Gate8dVisualManifest;
+  const forgedBlank = structuredClone(manifest.captures[0]);
+  forgedBlank.viewportWidth = blank.width;
+  forgedBlank.viewportHeight = blank.height;
+  forgedBlank.image = blank;
+  await assert.rejects(() => validateGate8dCapture(forgedBlank, onePixelPng));
   const dom = structuredClone(manifest.captures[0].dom);
   dom.horizontalOverflow = 1;
   assert.throws(() => validateGate8dDom(dom));
