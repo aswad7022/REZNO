@@ -328,7 +328,9 @@ async function collectAccessibility(
     });
     const undersized = controls.filter((element) => {
       const rect = element.getBoundingClientRect();
-      return rect.width < 44 || rect.height < 44;
+      // WebKit can report a computed 44 CSS px logical target as 43.98 after
+      // fractional layout. Values below 43.5 are genuine undersized targets.
+      return rect.width < 43.5 || rect.height < 43.5;
     });
     const ids = Array.from(document.querySelectorAll("[id]")).map(
       (element) => element.id,

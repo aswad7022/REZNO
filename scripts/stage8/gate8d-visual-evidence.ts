@@ -202,7 +202,11 @@ export function validateGate8dAccessibility(
   assert.equal(evidence.mainLandmarks, 1);
   assert.equal(evidence.headingOnes, 1);
   assert.equal(evidence.unnamedInteractiveControls, 0);
-  assert.equal(evidence.undersizedTouchTargets, 0);
+  assert.equal(
+    evidence.undersizedTouchTargets,
+    0,
+    `Undersized touch targets: ${evidence.undersizedTouchTargetSamples.join(", ")}`,
+  );
   assert.deepEqual(evidence.undersizedTouchTargetSamples, []);
   assert.equal(evidence.duplicateIds, 0);
   assert.equal(evidence.skipLinkTargetExists, true);
