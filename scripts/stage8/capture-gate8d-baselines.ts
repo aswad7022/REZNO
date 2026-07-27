@@ -340,6 +340,12 @@ async function collectAccessibility(
       headingOnes: document.querySelectorAll("h1").length,
       unnamedInteractiveControls: unnamed.length,
       undersizedTouchTargets: undersized.length,
+      undersizedTouchTargetSamples: undersized.slice(0, 12).map((element) => {
+        const rect = element.getBoundingClientRect();
+        return `${element.tagName.toLowerCase()}${element.id ? `#${element.id}` : ""}[${
+          element.getAttribute("data-slot") ?? element.getAttribute("role") ?? ""
+        }]=${rect.width.toFixed(2)}x${rect.height.toFixed(2)}`;
+      }),
       duplicateIds: new Set(duplicates).size,
       skipLinkTargetExists:
         Boolean(document.querySelector('.rezno-skip-link[href="#main-content"]')) &&
@@ -490,6 +496,7 @@ async function capturePass(
       for (const spec of gate8dCaptureSpecs.filter(
         (entry) => entry.browser === browserName,
       )) {
+        process.stdout.write(`Capturing ${spec.file}\n`);
         evidence.push(
           await captureOne(
             browser,

@@ -57,6 +57,7 @@ export interface Gate8dAccessibilityEvidence {
   headingOnes: number;
   unnamedInteractiveControls: number;
   undersizedTouchTargets: number;
+  undersizedTouchTargetSamples: string[];
   duplicateIds: number;
   skipLinkTargetExists: boolean;
   focusVisibleSupported: boolean;
@@ -202,6 +203,7 @@ export function validateGate8dAccessibility(
   assert.equal(evidence.headingOnes, 1);
   assert.equal(evidence.unnamedInteractiveControls, 0);
   assert.equal(evidence.undersizedTouchTargets, 0);
+  assert.deepEqual(evidence.undersizedTouchTargetSamples, []);
   assert.equal(evidence.duplicateIds, 0);
   assert.equal(evidence.skipLinkTargetExists, true);
   assert.equal(evidence.focusVisibleSupported, true);
