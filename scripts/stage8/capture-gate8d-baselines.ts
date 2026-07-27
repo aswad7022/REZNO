@@ -177,8 +177,7 @@ async function preparePage(
     `${spec.file} returned ${status}`,
   );
   if (spec.openAdminNavigation) {
-    const label = spec.locale === "en" ? "Open admin menu" : "فتح قائمة الإدارة";
-    await page.getByRole("button", { name: label }).click();
+    await page.locator('[data-slot="sheet-trigger"]').click();
   }
   if (spec.scrollTo) {
     await page.locator(spec.scrollTo).first().scrollIntoViewIfNeeded();
