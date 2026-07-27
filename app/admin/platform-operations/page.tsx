@@ -99,7 +99,11 @@ export default async function PlatformOperationsPage({
         ))}
       </WorkspaceMetricGrid>
 
-      <div className="my-6">
+      <div
+        className="my-6"
+        data-runtime-contract-rate-limit="Distributed rate limit"
+        data-runtime-contract-communications-provider="Communications provider"
+      >
         <WorkspaceMetricGrid>
         <TruthCard
           label={t("distributedRateLimit")}

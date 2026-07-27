@@ -1656,7 +1656,7 @@
     },
     "platformJobs": {
       "title": "Platform jobs",
-      "description": "Bounded PostgreSQL-backed durable execution. Automatic scheduling and always-on workers are not connected.",
+      "description": "Bounded durable execution. Automatic scheduling and always-on workers are not connected.",
       "runtimeInactiveTitle": "Stage 6 runtime is not activated",
       "runtimeInactiveDescription": "Code and durable records may be present, but automatic scheduling and always-on workers remain disconnected. Schedule rows below are configuration records, not proof of execution.",
       "runtimeTruth": "Runtime truth",
@@ -1677,7 +1677,7 @@
     },
     "platformOperations": {
       "title": "Platform operations",
-      "description": "Automatic runtime, bounded health signals, alerts, and incidents backed by PostgreSQL.",
+      "description": "Automatic runtime, bounded health signals, alerts, and incidents.",
       "runtimeInactiveTitle": "Stage 6 runtime is not activated",
       "runtimeInactiveDescription": "Stage 6 runtime is not activated. Stored jobs, schedules, and health records do not prove that automatic execution is connected.",
       "runtimeEnabledTitle": "The database reports an enabled runtime",

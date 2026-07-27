@@ -512,7 +512,6 @@ export const gate8cCaptureSpecs: Gate8cCaptureSpec[] = [
       forbidden("en", "Stage 6 runtime is not activated"),
     ],
     languageExceptions: [
-      "PostgreSQL",
       "job type/status/source enum identifiers",
       "runtime architecture values",
     ],
