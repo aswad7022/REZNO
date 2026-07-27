@@ -401,6 +401,12 @@ async function captureOne(
   });
   page.on("pageerror", (error) => errors.pageErrors.push(error.message));
   page.on("requestfailed", (request) => {
+    if (
+      request.isNavigationRequest() &&
+      request.failure()?.errorText === "net::ERR_ABORTED"
+    ) {
+      return;
+    }
     errors.failedResources.push(
       `${request.method()} ${new URL(request.url()).pathname}: ${
         request.failure()?.errorText ?? "failed"
