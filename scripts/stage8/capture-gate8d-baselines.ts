@@ -411,10 +411,10 @@ async function captureOne(
   });
   page.on("pageerror", (error) => errors.pageErrors.push(error.message));
   page.on("requestfailed", (request) => {
-    if (
-      request.isNavigationRequest() &&
-      request.failure()?.errorText === "net::ERR_ABORTED"
-    ) {
+    if (request.failure()?.errorText === "net::ERR_ABORTED") {
+      // Next.js cancels speculative route prefetches when the responsive sheet
+      // opens or its link set is reprioritized. A browser-cancelled prefetch is
+      // not a failed production resource.
       return;
     }
     errors.failedResources.push(
