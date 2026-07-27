@@ -29,6 +29,7 @@ const reviewFile = "docs/stage8/gate8d-baseline-human-review.json";
 test("Gate 8D owns final motion, browser, accessibility, and performance closure only", () => {
   const scope = read("docs/stage8/stage8-canonical-scope.md");
   const gate = read("docs/stage8/gate8d-motion-visual-closure.md");
+  const closure = read("docs/stage8/stage8-closure.md");
   assert.match(scope, /Motion, Visual QA & Stage Closure/);
   assert.match(gate, /Presentation-only: `YES`/);
   assert.match(gate, /Stage 6 runtime: `NOT ACTIVATED`/);
@@ -38,6 +39,12 @@ test("Gate 8D owns final motion, browser, accessibility, and performance closure
   );
   assert.match(gate, /Artificial intelligence: `NOT STARTED`/);
   assert.match(gate, /Migration 52: `NOT CREATED`/);
+  assert.match(closure, /becomes effective only when the exact Gate 8D head/);
+  assert.match(closure, /Artificial intelligence is `NOT STARTED`/);
+  assert.match(
+    closure,
+    /DEFERRED_BY_OWNER — CODE MERGED, EXTERNAL VALIDATION NOT COMPLETED/,
+  );
 });
 
 test("Web and Mobile consume one bounded motion contract with deterministic reduced motion", () => {
