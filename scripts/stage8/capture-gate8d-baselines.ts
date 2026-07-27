@@ -292,7 +292,11 @@ async function collectAccessibility(
   page: Page,
 ): Promise<Gate8dAccessibilityEvidence> {
   return await page.evaluate(() => {
-    const visible = (element: Element) => {
+    const controls = Array.from(
+      document.querySelectorAll(
+        'button,input:not([type="hidden"]),select,textarea,[role="button"]',
+      ),
+    ).filter((element) => {
       const rect = element.getBoundingClientRect();
       const style = getComputedStyle(element);
       return (
@@ -301,12 +305,7 @@ async function collectAccessibility(
         style.visibility !== "hidden" &&
         style.display !== "none"
       );
-    };
-    const controls = Array.from(
-      document.querySelectorAll(
-        'button,input:not([type="hidden"]),select,textarea,[role="button"]',
-      ),
-    ).filter(visible);
+    });
     const unnamed = controls.filter((element) => {
       const label =
         element.getAttribute("aria-label") ||
