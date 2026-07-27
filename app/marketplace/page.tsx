@@ -136,7 +136,7 @@ export default async function MarketplacePage({
           <span className="inline-flex rounded-full border border-primary/15 bg-primary/8 px-3 py-1 text-sm font-semibold text-primary">
             {t("searchDiscovery")}
           </span>
-          <h1 className="mt-5 bg-gradient-to-l from-slate-950 via-primary to-violet-700 bg-clip-text text-4xl font-black tracking-tight text-transparent sm:text-5xl dark:from-white dark:via-violet-200 dark:to-indigo-200">
+          <h1 className="mt-5 bg-gradient-to-l from-foreground via-primary to-[color-mix(in_oklch,var(--primary),var(--foreground)_24%)] bg-clip-text text-4xl font-black tracking-tight text-transparent sm:text-5xl dark:from-foreground dark:via-primary dark:to-[color-mix(in_oklch,var(--primary),white_22%)]">
             {t("title")}
           </h1>
           <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg">

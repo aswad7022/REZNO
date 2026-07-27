@@ -20,3 +20,44 @@ export const premiumMotion = {
     stiffness: 220,
   },
 } as const;
+
+export type MobileMotionPreference = "full" | "reduced";
+
+export function resolveMotionDuration(
+  duration: number,
+  preference: MobileMotionPreference,
+) {
+  return preference === "reduced" ? 0 : duration;
+}
+
+export function resolvePressScale(
+  scale: number,
+  preference: MobileMotionPreference,
+) {
+  return preference === "reduced" ? 1 : scale;
+}
+
+export function resolvePremiumMotion(preference: MobileMotionPreference) {
+  return {
+    duration: Object.fromEntries(
+      Object.entries(premiumMotion.duration).map(([key, value]) => [
+        key,
+        resolveMotionDuration(value, preference),
+      ]),
+    ) as Record<keyof typeof premiumMotion.duration, number>,
+    pressScale: Object.fromEntries(
+      Object.entries(premiumMotion.pressScale).map(([key, value]) => [
+        key,
+        resolvePressScale(value, preference),
+      ]),
+    ) as Record<keyof typeof premiumMotion.pressScale, number>,
+    spring:
+      preference === "reduced"
+        ? {
+            damping: premiumMotion.spring.damping,
+            mass: premiumMotion.spring.mass,
+            stiffness: 1_000,
+          }
+        : premiumMotion.spring,
+  };
+}

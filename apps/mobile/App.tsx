@@ -9807,8 +9807,12 @@ const createStyles = (theme: MobileTheme) =>
       textAlign: "center",
     },
     startupRetryButton: {
+      alignItems: "center",
       backgroundColor: theme.colors.accent,
       borderRadius: theme.radii.pill,
+      justifyContent: "center",
+      minHeight: 44,
+      minWidth: 44,
       paddingHorizontal: 22,
       paddingVertical: 12,
     },

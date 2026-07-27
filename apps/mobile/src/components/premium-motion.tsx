@@ -14,7 +14,10 @@ import {
   useSyncExternalStore,
 } from "react";
 
-import { premiumMotion } from "../theme/motion";
+import {
+  premiumMotion,
+  resolveMotionDuration,
+} from "../theme/motion";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -72,7 +75,10 @@ export function PremiumPressable({
 
     if (reducedMotion) {
       Animated.timing(opacity, {
-        duration: premiumMotion.duration.instant,
+        duration: resolveMotionDuration(
+          premiumMotion.duration.instant,
+          "reduced",
+        ),
         easing: Easing.out(Easing.quad),
         toValue: pressed ? 0.92 : 1,
         useNativeDriver: true,
@@ -171,7 +177,10 @@ export function PremiumEntrance({
 
     const animation = reducedMotion
       ? Animated.timing(opacity, {
-          duration: premiumMotion.duration.instant,
+          duration: resolveMotionDuration(
+            premiumMotion.duration.instant,
+            "reduced",
+          ),
           easing: Easing.out(Easing.quad),
           toValue: 1,
           useNativeDriver: true,

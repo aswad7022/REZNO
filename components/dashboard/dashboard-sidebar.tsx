@@ -45,7 +45,7 @@ function NavigationLink({
       aria-current={active ? "page" : undefined}
       title={collapsed ? t(item.title) : undefined}
       className={cn(
-        "group/link relative flex min-h-10 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-all outline-none focus-visible:ring-3 focus-visible:ring-sidebar-ring/50",
+        "group/link relative flex min-h-11 min-w-11 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-all outline-none focus-visible:ring-3 focus-visible:ring-sidebar-ring/50",
         active
           ? "bg-white/12 text-white shadow-sm ring-1 ring-white/10"
           : "text-sidebar-foreground/68 hover:bg-white/8 hover:text-white",
@@ -55,7 +55,7 @@ function NavigationLink({
     >
       <span
         className={cn(
-          "absolute inset-y-2 start-0 w-0.5 rounded-full bg-violet-300 opacity-0 transition-opacity",
+          "absolute inset-y-2 start-0 w-0.5 rounded-full bg-sidebar-primary opacity-0 transition-opacity",
           active && "opacity-100",
         )}
         aria-hidden="true"
@@ -63,7 +63,7 @@ function NavigationLink({
       <Icon
         className={cn(
           "size-4 shrink-0 transition-colors",
-          active ? "text-violet-200" : "text-sidebar-foreground/55 group-hover/link:text-violet-100",
+          active ? "text-sidebar-primary" : "text-sidebar-foreground/55 group-hover/link:text-sidebar-primary",
         )}
         aria-hidden="true"
       />
@@ -121,13 +121,13 @@ export function DashboardSidebar({
         collapsed ? "w-18" : "w-64",
       )}
     >
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(124,92,255,0.28),transparent_20rem),linear-gradient(180deg,rgba(255,255,255,0.05),transparent)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,color-mix(in_oklch,var(--sidebar-primary)_24%,transparent),transparent_20rem),linear-gradient(180deg,rgba(255,255,255,0.05),transparent)]" />
       <div className="relative flex h-16 items-center gap-3 border-b border-white/10 px-4">
         <Link
           href={`/${role}`}
-          className="flex min-w-0 items-center gap-3 rounded-xl outline-none focus-visible:ring-3 focus-visible:ring-sidebar-ring/50"
+          className="flex min-h-11 min-w-11 items-center gap-3 rounded-xl outline-none focus-visible:ring-3 focus-visible:ring-sidebar-ring/50"
         >
-          <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-500 font-bold text-white shadow-lg shadow-violet-950/30 ring-1 ring-white/20">
+          <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-sidebar-primary to-[color-mix(in_oklch,var(--sidebar-primary),white_14%)] font-bold text-sidebar-primary-foreground shadow-lg shadow-black/30 ring-1 ring-white/20">
             R
           </span>
           <span
@@ -160,7 +160,7 @@ export function DashboardSidebar({
                       open={isNavigationItemActive(pathname, item.href)}
                       className="group/nav"
                     >
-                      <summary className="flex min-h-10 cursor-pointer list-none items-center gap-1 rounded-xl px-1 text-sm font-medium text-sidebar-foreground/68 outline-none transition-colors hover:bg-white/8 hover:text-white focus-visible:ring-3 focus-visible:ring-sidebar-ring/50">
+                      <summary className="flex min-h-11 min-w-11 cursor-pointer list-none items-center gap-1 rounded-xl px-1 text-sm font-medium text-sidebar-foreground/68 outline-none transition-colors hover:bg-white/8 hover:text-white focus-visible:ring-3 focus-visible:ring-sidebar-ring/50">
                         <Link
                           href={item.href}
                           onClick={(event) => event.stopPropagation()}
@@ -203,7 +203,7 @@ export function DashboardSidebar({
             href="/customer"
             title={collapsed ? t("customerDashboard") : undefined}
             className={cn(
-              "mb-2 flex min-h-10 items-center gap-3 rounded-xl px-3 text-sm font-medium text-sidebar-foreground/80 outline-none transition-colors hover:bg-white/8 hover:text-white focus-visible:ring-3 focus-visible:ring-sidebar-ring/50",
+              "mb-2 flex min-h-11 min-w-11 items-center gap-3 rounded-xl px-3 text-sm font-medium text-sidebar-foreground/80 outline-none transition-colors hover:bg-white/8 hover:text-white focus-visible:ring-3 focus-visible:ring-sidebar-ring/50",
               collapsed && "justify-center px-0",
             )}
           >
@@ -218,7 +218,7 @@ export function DashboardSidebar({
             href="/business"
             title={collapsed ? t("businessDashboard") : undefined}
             className={cn(
-              "mb-2 flex min-h-10 items-center gap-3 rounded-xl px-3 text-sm font-medium text-sidebar-foreground/80 outline-none transition-colors hover:bg-white/8 hover:text-white focus-visible:ring-3 focus-visible:ring-sidebar-ring/50",
+              "mb-2 flex min-h-11 min-w-11 items-center gap-3 rounded-xl px-3 text-sm font-medium text-sidebar-foreground/80 outline-none transition-colors hover:bg-white/8 hover:text-white focus-visible:ring-3 focus-visible:ring-sidebar-ring/50",
               collapsed && "justify-center px-0",
             )}
           >
@@ -233,7 +233,7 @@ export function DashboardSidebar({
             href="/admin"
             title={collapsed ? t("adminDashboard") : undefined}
             className={cn(
-              "mb-2 flex min-h-10 items-center gap-3 rounded-xl px-3 text-sm font-medium text-sidebar-foreground/80 outline-none transition-colors hover:bg-white/8 hover:text-white focus-visible:ring-3 focus-visible:ring-sidebar-ring/50",
+              "mb-2 flex min-h-11 min-w-11 items-center gap-3 rounded-xl px-3 text-sm font-medium text-sidebar-foreground/80 outline-none transition-colors hover:bg-white/8 hover:text-white focus-visible:ring-3 focus-visible:ring-sidebar-ring/50",
               collapsed && "justify-center px-0",
             )}
           >

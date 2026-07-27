@@ -14,6 +14,7 @@ export type MobileTheme = {
     disabledText: string;
     foreground: string;
     foregroundInverse: string;
+    focus: string;
     gold: string;
     goldSoft: string;
     hero: string;
@@ -22,6 +23,8 @@ export type MobileTheme = {
     mutedForeground: string;
     nav: string;
     overlay: string;
+    info: string;
+    infoSoft: string;
     shadow: string;
     success: string;
     successSoft: string;
@@ -40,6 +43,7 @@ export type MobileTheme = {
     md: number;
     sm: number;
     xl: number;
+    xxl: number;
     xs: number;
   };
 };
@@ -56,6 +60,7 @@ const shared = {
     md: 16,
     sm: 10,
     xl: 26,
+    xxl: 32,
     xs: 6,
   },
 };
@@ -77,6 +82,7 @@ export const darkMobileTheme: MobileTheme = {
     disabledText: "#7f8a97",
     foreground: "#ffffff",
     foregroundInverse: "#160d02",
+    focus: "#ffe097",
     gold: "#ffc13a",
     goldSoft: "#2b210f",
     hero: "#03070c",
@@ -85,6 +91,8 @@ export const darkMobileTheme: MobileTheme = {
     mutedForeground: "#b2bbc7",
     nav: "rgba(2, 6, 10, 0.98)",
     overlay: "rgba(0, 0, 0, 0.44)",
+    info: "#60a5fa",
+    infoSoft: "#10243a",
     shadow: "#000000",
     success: "#34d399",
     successSoft: "#0d2b24",
@@ -97,21 +105,22 @@ export const darkMobileTheme: MobileTheme = {
 export const lightMobileTheme: MobileTheme = {
   ...shared,
   colors: {
-    accent: "#c98616",
+    accent: "#8a5a10",
     accentMuted: "#f7e5bd",
     background: "#f8efe0",
     border: "#ddc79b",
     card: "#fff9ef",
     cardElevated: "#fffdf8",
     cream: "#fff8ec",
-    danger: "#dc2626",
+    danger: "#b91c1c",
     dangerSoft: "#fde8e8",
-    deepGold: "#8f5f13",
+    deepGold: "#754a09",
     disabled: "#e7dccb",
     disabledText: "#91826c",
     foreground: "#17140f",
-    foregroundInverse: "#17140f",
-    gold: "#c98a12",
+    foregroundInverse: "#fff8ec",
+    focus: "#8f5f13",
+    gold: "#8a5a10",
     goldSoft: "#f5e4bd",
     hero: "#fff0cb",
     heroMuted: "#fff8ee",
@@ -119,10 +128,12 @@ export const lightMobileTheme: MobileTheme = {
     mutedForeground: "#675b4c",
     nav: "rgba(255, 248, 236, 0.96)",
     overlay: "rgba(80, 55, 9, 0.1)",
+    info: "#1d4ed8",
+    infoSoft: "#e7efff",
     shadow: "#5a3c09",
-    success: "#059669",
+    success: "#047857",
     successSoft: "#e3f6ec",
-    warning: "#b8750b",
+    warning: "#a35d00",
     warningSoft: "#fff3d6",
   },
   isDark: false,

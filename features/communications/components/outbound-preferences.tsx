@@ -45,7 +45,12 @@ export function OutboundPreferences({ initial }: { initial: OutboundPreferencesD
               <tr key={category} className="border-t">
                 <td className="p-2">{category}{category === "ACCOUNT" ? <span className="block text-xs text-muted-foreground">{t("mandatoryPreference")}</span> : null}</td>
                 {outboundChannels.map((channel) => (
-                  <td key={channel} className="p-2"><input aria-label={`${channel} ${category}`} type="checkbox" checked={value.categories[channel].includes(category)} onChange={() => toggle(channel, category)} /></td>
+                  <td key={channel} className="p-2">
+                    <label className="inline-grid size-11 place-items-center rounded-lg">
+                      <span className="sr-only">{`${channel} ${category}`}</span>
+                      <input aria-label={`${channel} ${category}`} className="size-4" type="checkbox" checked={value.categories[channel].includes(category)} onChange={() => toggle(channel, category)} />
+                    </label>
+                  </td>
                 ))}
               </tr>
             ))}</tbody>

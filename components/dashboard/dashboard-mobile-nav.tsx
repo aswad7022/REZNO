@@ -75,9 +75,9 @@ export function DashboardMobileNav({
         side={locale === "en" ? "left" : "right"}
         className="w-[min(19rem,calc(100vw-2rem))] gap-0 overflow-hidden bg-sidebar p-0 text-sidebar-foreground"
       >
-        <SheetHeader className="h-16 justify-center border-b border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(124,92,255,0.25),transparent_16rem)]">
+        <SheetHeader className="h-16 justify-center border-b border-white/10 bg-[radial-gradient(circle_at_top_right,color-mix(in_oklch,var(--sidebar-primary)_22%,transparent),transparent_16rem)]">
           <SheetTitle className="flex items-center gap-3">
-            <span className="grid size-10 place-items-center rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-500 font-bold text-white shadow-lg shadow-violet-950/30">
+            <span className="grid size-10 place-items-center rounded-2xl bg-gradient-to-br from-sidebar-primary to-[color-mix(in_oklch,var(--sidebar-primary),white_14%)] font-bold text-sidebar-primary-foreground shadow-lg shadow-black/30">
               R
             </span>
             <span className="text-white">REZNO</span>
