@@ -52,6 +52,11 @@ guaranteed only control height. The corrected foundation uses AA-safe semantic
 roles and enforces both inline and block minimums; deterministic regression
 tests now prevent either issue from returning.
 
+A follow-up review also caught that applying those minimums directly to every
+`input` enlarged native checkbox/radio indicators. The final rule excludes
+checkbox, radio, and hidden inputs, keeps each indicator compact, and assigns
+the 44×44 hit target to its label or an explicit table-cell wrapper.
+
 No staging or production database, provider, runtime, or secret was touched.
 The disposable database, synthetic Admin identity, and generated export
 artifacts were deleted after capture.

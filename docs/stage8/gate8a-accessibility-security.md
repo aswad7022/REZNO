@@ -27,6 +27,11 @@ marketplace audit observed 42 controls with no undersized target or horizontal
 overflow; the Expo error surface exposed one 44px retry target. Auth and Admin
 snapshots also preserved Arabic RTL and semantic form/navigation names.
 
+Checkboxes and radios retain a compact 16px visual indicator while their
+associated label/wrapper owns the 44×44 hit area. The global rule explicitly
+excludes checkbox, radio, and hidden inputs so table rows and dense forms are
+not visually inflated.
+
 Deterministic WCAG calculations now enforce at least 4.5:1 for primary CTA
 endpoints, primary text, and error/success/warning/information soft-state pairs
 in both web themes and both native themes. The light action and status roles

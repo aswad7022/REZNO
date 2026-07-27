@@ -129,6 +129,10 @@ statuses meet the 4.5:1 AA threshold in light and dark modes. Shared web
 controls and navigation now guarantee both a 44px width and height; the native
 startup recovery action carries the same explicit minimum.
 
+Checkbox and radio indicators remain visually compact; their associated label
+or explicit wrapper provides the 44×44 activation area. Hidden inputs and the
+indicators themselves are excluded from the global control-size rule.
+
 Two early environment diagnostics were not accepted as verification: the
 first PostgreSQL invocation omitted the local cursor-signing secret, and the
 first HTTP invocation omitted the disposable database URL from the test

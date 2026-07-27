@@ -298,6 +298,9 @@ test("Gate 8A primitives cover interactive state and minimum-target contracts", 
     "components/dashboard/dashboard-sidebar.tsx",
   );
   const mobileApp = readRepoFile("apps/mobile/App.tsx");
+  const outboundPreferences = readRepoFile(
+    "features/communications/components/outbound-preferences.tsx",
+  );
   const input = readRepoFile("components/ui/input.tsx");
 
   for (const state of [
@@ -313,9 +316,21 @@ test("Gate 8A primitives cover interactive state and minimum-target contracts", 
   assert.match(input, /h-11/);
   assert.match(css, /min-block-size: var\(--control-min-size\)/);
   assert.match(css, /min-inline-size: var\(--control-min-size\)/);
+  assert.match(
+    css,
+    /input:not\(\[type="checkbox"\]\):not\(\[type="radio"\]\):not\(\[type="hidden"\]\)/,
+  );
+  assert.match(css, /label:has\(input\[type="checkbox"\]\)/);
+  assert.match(css, /label:has\(input\[type="radio"\]\)/);
+  assert.match(
+    css,
+    /input\[type="checkbox"\],[\s\S]*?input\[type="radio"\][\s\S]*?block-size: 1rem;[\s\S]*?inline-size: 1rem;/,
+  );
   assert.match(button, /min-h-11 min-w-11/);
   assert.doesNotMatch(dashboardSidebar, /min-h-10/);
   assert.match(dashboardSidebar, /min-h-11 min-w-11/);
+  assert.match(outboundPreferences, /inline-grid size-11 place-items-center/);
+  assert.match(outboundPreferences, /className="size-4" type="checkbox"/);
   assert.match(
     mobileApp,
     /startupRetryButton:\s*\{[\s\S]*?minHeight:\s*44,[\s\S]*?minWidth:\s*44,/,
