@@ -39,6 +39,16 @@ function collectTsxFiles(dir: string): string[] {
 }
 
 function ensureGitCommitAvailable(sha: string) {
+  const isShallow = execFileSync("git", ["rev-parse", "--is-shallow-repository"], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  }).trim();
+  if (isShallow === "true") {
+    execFileSync("git", ["fetch", "--unshallow", "origin"], {
+      cwd: repoRoot,
+      stdio: "ignore",
+    });
+  }
   try {
     execFileSync("git", ["cat-file", "-e", `${sha}^{commit}`], {
       cwd: repoRoot,
