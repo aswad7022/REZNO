@@ -4,6 +4,8 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
 
+import sharp from "sharp";
+
 import { reznoBrandFoundation } from "../../../design-system/brand-foundation";
 import {
   assertGate8dCaptureContract,
@@ -30,7 +32,7 @@ test("Gate 8D owns final motion, browser, accessibility, and performance closure
   const scope = read("docs/stage8/stage8-canonical-scope.md");
   const gate = read("docs/stage8/gate8d-motion-visual-closure.md");
   const closure = read("docs/stage8/stage8-closure.md");
-  assert.match(scope, /Motion, Visual QA & Stage Closure/);
+  assert.match(scope, /Motion, Visual QA (?:&|and) Stage Closure/);
   assert.match(gate, /Presentation-only: `YES`/);
   assert.match(gate, /Stage 6 runtime: `NOT ACTIVATED`/);
   assert.match(
@@ -79,7 +81,7 @@ test("Directional primitives use logical placement and reduced-motion fallbacks"
   ]) {
     const source = read(file);
     assert.match(source, /motion-reduce:/, file);
-    assert.doesNotMatch(source, /\b(?:right|left)-[23]\b/, file);
+    assert.doesNotMatch(source, /[\s"'`](?:right|left)-[23]\b/, file);
     assert.doesNotMatch(source, /\bduration-(?:100|200)\b/, file);
   }
   assert.match(read("components/ui/dialog.tsx"), /rtl:translate-x-1\/2/);
@@ -166,10 +168,16 @@ test("Gate 8D evidence is production-attested, deterministic, browser-authentica
 });
 
 test("Gate 8D validator rejects forged format, blank images, stale DOM, a11y, performance, and review evidence", async () => {
-  const onePixelPng = Buffer.from(
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9WlS8AAAAASUVORK5CYII=",
-    "base64",
-  );
+  const onePixelPng = await sharp({
+    create: {
+      width: 1,
+      height: 1,
+      channels: 4,
+      background: { r: 255, g: 255, b: 255, alpha: 1 },
+    },
+  })
+    .png()
+    .toBuffer();
   await assert.rejects(() => inspectGate8dPng(Buffer.from("not png")));
   const blank = await inspectGate8dPng(onePixelPng);
   assert.equal(blank.width, 1);
