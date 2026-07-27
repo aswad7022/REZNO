@@ -105,6 +105,23 @@ async function resetGate8cVisualData() {
   await prisma.distributedRateLimitBucket.deleteMany();
 }
 
+async function waitForGate8cVisualDatabaseIdle() {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    const active = await prisma.$queryRaw<Array<{ count: bigint }>>`
+      SELECT COUNT(*)::bigint AS count
+      FROM pg_stat_activity
+      WHERE datname = current_database()
+        AND pid <> pg_backend_pid()
+        AND state <> 'idle'
+    `;
+    if (Number(active[0]?.count ?? 0) === 0) return;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error(
+    "Gate 8C fixture cleanup refused to race an active database request.",
+  );
+}
+
 async function createIdentity(input: {
   email: string;
   firstName: string;
@@ -473,5 +490,6 @@ export async function readGate8cVisualFixtureLocale(role: Gate8cVisualRole) {
 }
 
 export async function cleanupGate8cVisualFixture() {
+  await waitForGate8cVisualDatabaseIdle();
   await resetGate8cVisualData();
 }
