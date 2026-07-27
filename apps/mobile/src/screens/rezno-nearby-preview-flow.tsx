@@ -1982,7 +1982,6 @@ const createStyles = (theme: MobileTheme, width: number) => {
       borderColor: "rgba(233, 174, 62, 0.18)",
       borderRadius: 20,
       borderWidth: 1,
-      direction: "ltr",
       flexDirection: "row-reverse",
       gap: 10,
       minHeight: 88,
@@ -2020,7 +2019,6 @@ const createStyles = (theme: MobileTheme, width: number) => {
     },
     businessRatingRow: {
       alignItems: "center",
-      direction: "ltr",
       flexDirection: "row-reverse",
       gap: 4,
     },
@@ -2059,7 +2057,6 @@ const createStyles = (theme: MobileTheme, width: number) => {
     },
     businessTrustRow: {
       alignItems: "center",
-      direction: "ltr",
       flexDirection: "row-reverse",
       gap: 8,
       marginTop: 2,
@@ -2074,7 +2071,6 @@ const createStyles = (theme: MobileTheme, width: number) => {
       alignItems: "center",
       backgroundColor: "#102019",
       borderRadius: 10,
-      direction: "ltr",
       flexDirection: "row-reverse",
       gap: 4,
       minHeight: 22,
@@ -2149,7 +2145,6 @@ const createStyles = (theme: MobileTheme, width: number) => {
       writingDirection: "rtl",
     },
     customGuestActions: {
-      direction: "ltr",
       flexDirection: "row",
       gap: 10,
       marginTop: 16,
@@ -2292,7 +2287,6 @@ const createStyles = (theme: MobileTheme, width: number) => {
       writingDirection: "rtl",
     },
     dateRow: {
-      direction: "ltr",
       flexDirection: "row",
       gap: 10,
       paddingHorizontal: 4,
@@ -2343,7 +2337,6 @@ const createStyles = (theme: MobileTheme, width: number) => {
       borderColor: "rgba(233, 174, 62, 0.12)",
       borderRadius: 17,
       borderWidth: 1,
-      direction: "ltr",
       flexDirection: "row",
       gap: 10,
       minHeight: 62,
@@ -2411,7 +2404,6 @@ const createStyles = (theme: MobileTheme, width: number) => {
       borderColor: "rgba(233, 174, 62, 0.16)",
       borderRadius: 19,
       borderWidth: 1,
-      direction: "ltr",
       flexDirection: "row-reverse",
       gap: 10,
       minHeight: 88,
@@ -2439,7 +2431,6 @@ const createStyles = (theme: MobileTheme, width: number) => {
     },
     employeeRatingRow: {
       alignItems: "center",
-      direction: "ltr",
       flexDirection: "row-reverse",
       gap: 4,
       marginTop: 2,
@@ -2485,7 +2476,6 @@ const createStyles = (theme: MobileTheme, width: number) => {
     },
     employeeStatusRow: {
       alignItems: "center",
-      direction: "ltr",
       flexDirection: "row-reverse",
       gap: 4,
       marginTop: 2,
@@ -2521,7 +2511,6 @@ const createStyles = (theme: MobileTheme, width: number) => {
       writingDirection: "rtl",
     },
     featureWrap: {
-      direction: "rtl",
       flexDirection: "row",
       flexWrap: "wrap",
       gap: 9,
@@ -2544,7 +2533,6 @@ const createStyles = (theme: MobileTheme, width: number) => {
       backgroundColor: "#070b0e",
       borderBottomColor: "rgba(233, 174, 62, 0.14)",
       borderBottomWidth: 1,
-      direction: "ltr",
       flexDirection: "row-reverse",
       gap: 12,
       minHeight: 88,
@@ -2580,7 +2568,6 @@ const createStyles = (theme: MobileTheme, width: number) => {
     },
     eyebrowRow: {
       alignItems: "center",
-      direction: "ltr",
       flexDirection: "row",
       justifyContent: "space-between",
       marginBottom: 2,
@@ -2688,7 +2675,6 @@ const createStyles = (theme: MobileTheme, width: number) => {
       borderRadius: 20,
       borderWidth: 1,
       bottom: 14,
-      direction: "ltr",
       flexDirection: "row-reverse",
       gap: 9,
       left: 14,
@@ -2737,7 +2723,6 @@ const createStyles = (theme: MobileTheme, width: number) => {
     },
     heroTrustRow: {
       alignItems: "center",
-      direction: "ltr",
       flexDirection: "row-reverse",
       flexWrap: "wrap",
       gap: 6,
@@ -2758,14 +2743,12 @@ const createStyles = (theme: MobileTheme, width: number) => {
     },
     identityHeading: {
       alignItems: "flex-start",
-      direction: "ltr",
       flexDirection: "row",
       gap: 12,
       justifyContent: "space-between",
     },
     identityTopRow: {
       alignItems: "flex-start",
-      direction: "ltr",
       flexDirection: "row",
       gap: 12,
     },
@@ -2796,7 +2779,6 @@ const createStyles = (theme: MobileTheme, width: number) => {
     },
     infoRow: {
       alignItems: "center",
-      direction: "ltr",
       flexDirection: "row-reverse",
       gap: 9,
       minHeight: 46,
@@ -2816,7 +2798,6 @@ const createStyles = (theme: MobileTheme, width: number) => {
     },
     overviewMetricsRow: {
       alignItems: "center",
-      direction: "rtl",
       flexDirection: "row",
       gap: 18,
       marginTop: 12,
@@ -2827,7 +2808,6 @@ const createStyles = (theme: MobileTheme, width: number) => {
       borderColor: "rgba(233, 174, 62, 0.14)",
       borderRadius: 18,
       borderWidth: 1,
-      direction: "rtl",
       flexDirection: "row",
       gap: 10,
       paddingHorizontal: 13,
@@ -2917,7 +2897,6 @@ const createStyles = (theme: MobileTheme, width: number) => {
       borderColor: "rgba(233, 174, 62, 0.18)",
       borderRadius: 20,
       borderWidth: 1,
-      direction: "rtl",
       flexDirection: "row",
       gap: 9,
       minHeight: 84,
@@ -2966,7 +2945,6 @@ const createStyles = (theme: MobileTheme, width: number) => {
     },
     optionCardServiceRtl: {
       alignItems: "stretch",
-      direction: "ltr",
     },
     optionCardSelected: {
       backgroundColor: "#211b0e",
@@ -2991,7 +2969,6 @@ const createStyles = (theme: MobileTheme, width: number) => {
     },
     optionMetaRow: {
       alignItems: "center",
-      direction: "rtl",
       flexDirection: "row",
       gap: 6,
       justifyContent: "space-between",
@@ -3078,7 +3055,6 @@ const createStyles = (theme: MobileTheme, width: number) => {
       borderColor: "rgba(233, 174, 62, 0.16)",
       borderRadius: 22,
       borderWidth: 1,
-      direction: "rtl",
       flexDirection: "row",
       gap: 12,
       padding: 13,
@@ -3240,7 +3216,6 @@ const createStyles = (theme: MobileTheme, width: number) => {
       writingDirection: "rtl",
     },
     selectionGrid: {
-      direction: "ltr",
       flexDirection: "row-reverse",
       flexWrap: "wrap",
       gap: 9,
@@ -3302,7 +3277,6 @@ const createStyles = (theme: MobileTheme, width: number) => {
       alignItems: "flex-start",
       borderBottomColor: "rgba(233, 174, 62, 0.08)",
       borderBottomWidth: 1,
-      direction: "ltr",
       flexDirection: "row-reverse",
       gap: 8,
       justifyContent: "space-between",
@@ -3324,7 +3298,6 @@ const createStyles = (theme: MobileTheme, width: number) => {
       borderColor: "rgba(233, 174, 62, 0.18)",
       borderRadius: 15,
       borderWidth: 1,
-      direction: "ltr",
       flexDirection: "row",
       gap: 7,
       justifyContent: "center",
@@ -3341,7 +3314,6 @@ const createStyles = (theme: MobileTheme, width: number) => {
       width: 15,
     },
     timeGrid: {
-      direction: "ltr",
       flexDirection: "row-reverse",
       flexWrap: "wrap",
       gap: 9,

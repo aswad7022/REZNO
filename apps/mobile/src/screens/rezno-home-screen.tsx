@@ -1658,7 +1658,6 @@ const createStyles = (theme: MobileTheme) => {
       minWidth: 0,
     },
     businessRailContent: {
-      direction: "ltr",
       flexDirection: "row",
       gap: 8,
       paddingBottom: 3,
@@ -1735,7 +1734,6 @@ const createStyles = (theme: MobileTheme) => {
       transform: [{ translateY: 1 }],
     },
     categoryGrid: {
-      direction: "ltr",
       flexDirection: "row",
       flexWrap: "wrap",
     },
@@ -2333,7 +2331,6 @@ const createStyles = (theme: MobileTheme) => {
     },
     screen: {
       backgroundColor: palette.background,
-      direction: "ltr",
       gap: 13,
       paddingBottom: 10,
       paddingTop: 4,

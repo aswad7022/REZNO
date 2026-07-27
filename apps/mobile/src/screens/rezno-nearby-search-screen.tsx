@@ -1478,7 +1478,6 @@ const createStyles = (theme: MobileTheme) => {
       color: "#191204",
     },
     filterRow: {
-      direction: "ltr",
       flexDirection: "row",
       width: "100%",
     },
@@ -1685,7 +1684,6 @@ const createStyles = (theme: MobileTheme) => {
       borderColor: "rgba(233, 174, 62, 0.17)",
       borderRadius: 18,
       borderWidth: 1,
-      direction: "ltr",
       flexDirection: "row",
       gap: 10,
       paddingHorizontal: 9,
@@ -1738,7 +1736,6 @@ const createStyles = (theme: MobileTheme) => {
     },
     resultsHeader: {
       alignItems: "center",
-      direction: "ltr",
       flexDirection: "row",
       justifyContent: "space-between",
       minHeight: 52,
@@ -1851,7 +1848,6 @@ const createStyles = (theme: MobileTheme) => {
       borderColor: "rgba(233, 174, 62, 0.18)",
       borderRadius: 30,
       borderWidth: 1,
-      direction: "ltr",
       flexDirection: "row",
       gap: 10,
       paddingLeft: 14,

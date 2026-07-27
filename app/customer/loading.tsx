@@ -1,5 +1,5 @@
-import { DashboardLoading } from "@/components/dashboard/dashboard-loading";
+import { CustomerDashboardLoading } from "@/components/customer/customer-loading";
 
 export default function Loading() {
-  return <DashboardLoading />;
+  return <CustomerDashboardLoading />;
 }

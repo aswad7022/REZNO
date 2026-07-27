@@ -40,7 +40,10 @@ export default async function Home() {
   ]);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div
+      className="min-h-screen bg-background"
+      data-customer-surface="public-home"
+    >
       <PublicHeader />
       <main>
         <section className="relative overflow-hidden border-b">

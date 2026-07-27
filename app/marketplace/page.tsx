@@ -128,7 +128,10 @@ export default async function MarketplacePage({
   const listHref = marketplaceHref(query, { view: "list" });
 
   return (
-    <div className="min-h-screen bg-background">
+    <div
+      className="min-h-screen bg-background"
+      data-customer-surface="marketplace"
+    >
       <PublicHeader />
       <main className="relative mx-auto max-w-7xl overflow-hidden px-4 py-10 pb-[calc(6rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-16 md:pb-16">
         <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[28rem] bg-[radial-gradient(circle_at_top_right,color-mix(in_oklch,var(--primary)_18%,transparent),transparent_32rem),radial-gradient(circle_at_top_left,color-mix(in_oklch,var(--accent)_16%,transparent),transparent_28rem)]" />
