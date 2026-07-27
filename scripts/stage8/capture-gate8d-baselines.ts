@@ -101,10 +101,21 @@ async function configureContext(
     viewport: { width: spec.width, height: spec.height },
     deviceScaleFactor: 1,
   });
-  await context.addCookies(cookies(baseUrl, roleCookie(fixture, spec.role)));
+  await context.addCookies([
+    ...cookies(baseUrl, roleCookie(fixture, spec.role)),
+    {
+      name: "REZNO_LOCALE",
+      value: spec.locale,
+      domain: new URL(baseUrl).hostname,
+      path: "/",
+      httpOnly: true,
+      sameSite: "Lax" as const,
+    },
+  ]);
   await context.addInitScript(
     ({ theme }) => {
       localStorage.setItem("theme", theme);
+      localStorage.setItem("rezno-dashboard-sidebar-collapsed", "false");
       const state = {
         cls: 0,
         fcp: 0,
