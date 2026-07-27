@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { getFormatter, getTranslations } from "next-intl/server";
 
 import { CustomerStatusBadge } from "@/components/customer/customer-state";
+import { customerPaymentTone } from "@/components/customer/customer-payment-status";
 import {
   DashboardPageHeader,
   DashboardShell,
@@ -18,9 +19,6 @@ import {
 import { requireCustomerIdentity } from "@/features/identity/server";
 import { PaymentDomainError } from "@/features/payments/domain/errors";
 import { getCustomerPaymentIntent } from "@/features/payments/services/payment-intents";
-
-type PaymentStatus =
-  Awaited<ReturnType<typeof getCustomerPaymentIntent>>["status"];
 
 export default async function CustomerPaymentDetailPage({
   params,
@@ -51,7 +49,7 @@ export default async function CustomerPaymentDetailPage({
             <Link href="/customer/payments">
               <ArrowLeft
                 aria-hidden="true"
-                className="rtl:rotate-0 ltr:rotate-180"
+                className="rtl:rotate-180"
               />
               {t("allPayments")}
             </Link>
@@ -68,7 +66,7 @@ export default async function CustomerPaymentDetailPage({
             </span>
             <CardTitle>{t(`target.${payment.target.kind}`)}</CardTitle>
           </div>
-          <CustomerStatusBadge tone={paymentTone(payment.status)}>
+          <CustomerStatusBadge tone={customerPaymentTone(payment.status)}>
             {t(`status.${payment.status}`)}
           </CustomerStatusBadge>
         </CardHeader>
@@ -192,24 +190,4 @@ function PaymentHistory({
       </div>
     </section>
   );
-}
-
-function paymentTone(
-  status: PaymentStatus,
-): "error" | "info" | "success" | "warning" {
-  if (
-    status === "CAPTURED"
-    || status === "PARTIALLY_CAPTURED"
-    || status === "PARTIALLY_REFUNDED"
-    || status === "REFUNDED"
-  ) {
-    return "success";
-  }
-  if (status === "FAILED" || status === "CANCELLED" || status === "EXPIRED") {
-    return "error";
-  }
-  if (status === "REQUIRES_ACTION" || status === "PROCESSING") {
-    return "warning";
-  }
-  return "info";
 }

@@ -9,6 +9,7 @@ complete Gate 8A/Stage 7D regression chain. The Gate 8B contract verifies:
 - truthful accessible Web state roles;
 - geolocation denied/unavailable/busy behavior;
 - localized server-authoritative payment presentation;
+- mirrored payment-detail navigation and non-success partial-payment tones;
 - semantic Mobile avatar/payment roles and 44×44 targets;
 - upload/payment recovery wording;
 - baseline file integrity and required visual matrix;

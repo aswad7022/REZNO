@@ -4,6 +4,8 @@ import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
 
+import { customerPaymentTone } from "../../../components/customer/customer-payment-status";
+
 const repoRoot = path.resolve(import.meta.dirname, "../../..");
 const readRepoFile = (relativePath: string) =>
   readFileSync(path.join(repoRoot, relativePath), "utf8");
@@ -94,7 +96,21 @@ test("Gate 8B customer payment presentation is localized and server-authoritativ
   assert.match(detail, /getCustomerPaymentIntent\(person\.id, intentId\)/);
   assert.match(detail, /providerActionDescription/);
   assert.match(detail, /CustomerStatusBadge/);
+  assert.match(detail, /className="rtl:rotate-180"/);
+  assert.doesNotMatch(detail, /rtl:rotate-0|ltr:rotate-180/);
   assert.doesNotMatch(detail, /marks? a payment paid/i);
+
+  assert.equal(customerPaymentTone("CAPTURED"), "success");
+  assert.equal(customerPaymentTone("REFUNDED"), "success");
+  assert.equal(customerPaymentTone("PARTIALLY_CAPTURED"), "warning");
+  assert.equal(customerPaymentTone("PARTIALLY_REFUNDED"), "warning");
+  assert.equal(customerPaymentTone("REQUIRES_ACTION"), "warning");
+  assert.equal(customerPaymentTone("PROCESSING"), "warning");
+  assert.equal(customerPaymentTone("FAILED"), "error");
+  assert.equal(customerPaymentTone("CANCELLED"), "error");
+  assert.equal(customerPaymentTone("EXPIRED"), "error");
+  assert.equal(customerPaymentTone("CREATED"), "info");
+  assert.equal(customerPaymentTone("AUTHORIZED"), "info");
 
   for (const locale of ["ar", "ckb", "en"]) {
     const messages = JSON.parse(readRepoFile(`messages/${locale}.json`)) as {

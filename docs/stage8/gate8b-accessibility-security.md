@@ -21,6 +21,9 @@
   follow the page locale.
 - Intent, attempt, and refund status enums are translated before display; raw
   provider-state identifiers do not leak into localized customer copy.
+- Directional payment-detail navigation points back in LTR and mirrors in RTL.
+- Only fully captured or fully refunded intents use the success role. Partial
+  capture/refund remains a warning so color never overstates financial truth.
 - Long localized text uses wrapping, balanced/prettified headings, flexible
   grids, and truncation only for non-critical compact identifiers.
 

@@ -6,6 +6,7 @@ import {
   CustomerState,
   CustomerStatusBadge,
 } from "@/components/customer/customer-state";
+import { customerPaymentTone } from "@/components/customer/customer-payment-status";
 import {
   DashboardPageHeader,
   DashboardShell,
@@ -19,9 +20,6 @@ import {
 } from "@/components/ui/card";
 import { requireCustomerIdentity } from "@/features/identity/server";
 import { listCustomerPayments } from "@/features/payments/services/queries";
-
-type PaymentStatus =
-  Awaited<ReturnType<typeof listCustomerPayments>>["items"][number]["status"];
 
 export default async function CustomerPaymentsPage({
   searchParams,
@@ -69,7 +67,7 @@ export default async function CustomerPaymentsPage({
                     {t(`target.${payment.target.kind}`)}
                   </CardTitle>
                 </div>
-                <CustomerStatusBadge tone={paymentTone(payment.status)}>
+                <CustomerStatusBadge tone={customerPaymentTone(payment.status)}>
                   {t(`status.${payment.status}`)}
                 </CustomerStatusBadge>
               </CardHeader>
@@ -121,24 +119,4 @@ function PaymentAmount({ label, value }: { label: string; value: string }) {
       </p>
     </div>
   );
-}
-
-function paymentTone(
-  status: PaymentStatus,
-): "error" | "info" | "success" | "warning" {
-  if (
-    status === "CAPTURED"
-    || status === "PARTIALLY_CAPTURED"
-    || status === "PARTIALLY_REFUNDED"
-    || status === "REFUNDED"
-  ) {
-    return "success";
-  }
-  if (status === "FAILED" || status === "CANCELLED" || status === "EXPIRED") {
-    return "error";
-  }
-  if (status === "REQUIRES_ACTION" || status === "PROCESSING") {
-    return "warning";
-  }
-  return "info";
 }
