@@ -38,6 +38,21 @@ function collectTsxFiles(dir: string): string[] {
   });
 }
 
+function ensureGitCommitAvailable(sha: string) {
+  try {
+    execFileSync("git", ["cat-file", "-e", `${sha}^{commit}`], {
+      cwd: repoRoot,
+      stdio: "ignore",
+    });
+    return;
+  } catch {
+    execFileSync("git", ["fetch", "--depth=1", "origin", sha], {
+      cwd: repoRoot,
+      stdio: "ignore",
+    });
+  }
+}
+
 test("Gate 8D owns final motion, browser, accessibility, and performance closure only", () => {
   const scope = read("docs/stage8/stage8-canonical-scope.md");
   const gate = read("docs/stage8/gate8d-motion-visual-closure.md");
@@ -185,6 +200,7 @@ test("Gate 8D evidence is production-attested, deterministic, browser-authentica
     const bytes = readFileSync(path.join(repoRoot, capture.file));
     await validateGate8dCapture(capture, bytes);
   }
+  ensureGitCommitAvailable(manifest.sourceSha);
   execFileSync("git", ["merge-base", "--is-ancestor", manifest.sourceSha, "HEAD"], {
     cwd: repoRoot,
   });
