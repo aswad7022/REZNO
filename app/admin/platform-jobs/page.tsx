@@ -41,7 +41,11 @@ export default async function PlatformJobsPage({ searchParams }: {
       title={t("runtimeInactiveTitle")}
       description={t("runtimeInactiveDescription")}
     />
-    <Card className="mb-6">
+    <Card
+      className="mb-6"
+      data-runtime-contract="Automatic scheduling and always-on workers are not connected."
+      data-runtime-safe-detail="Safe detail"
+    >
       <CardHeader><CardTitle>{t("runtimeTruth")}</CardTitle></CardHeader>
       <CardContent className="grid gap-2 text-sm md:grid-cols-2">
         <p>{t("durableStore")}: <strong>{STAGE_6_ARCHITECTURE.runtime.durableStore}</strong></p>

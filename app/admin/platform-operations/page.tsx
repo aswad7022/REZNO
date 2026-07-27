@@ -120,7 +120,11 @@ export default async function PlatformOperationsPage({
         </WorkspaceMetricGrid>
       </div>
 
-      <Card className="mb-6">
+      <Card
+        className="mb-6"
+        data-runtime-contract-title="Platform operations"
+        data-runtime-contract-bootstrap="Bootstrap 13 disabled schedules"
+      >
         <CardHeader>
           <CardTitle>{t("automaticRuntime")}</CardTitle>
         </CardHeader>
