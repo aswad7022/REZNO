@@ -6,6 +6,7 @@ export default function MarketplaceLoading() {
     <div className="min-h-screen">
       <PublicHeader />
       <main
+        id="main-content"
         className="rezno-premium-surface mx-auto max-w-7xl space-y-8 px-4 py-10 sm:px-6 sm:py-14"
         aria-busy="true"
         data-customer-surface="marketplace-loading"

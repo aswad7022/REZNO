@@ -2,7 +2,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export default function PublicBusinessLoading() {
   return (
-    <main className="mx-auto w-full max-w-7xl space-y-8 px-4 py-6 sm:px-6">
+    <main id="main-content" className="mx-auto w-full max-w-7xl space-y-8 px-4 py-6 sm:px-6">
       <Skeleton className="aspect-[16/6] min-h-44 w-full rounded-2xl" />
       <div className="flex items-end gap-4">
         <Skeleton className="size-28 rounded-3xl" />

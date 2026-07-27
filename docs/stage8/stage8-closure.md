@@ -20,6 +20,10 @@ Visual, Motion, Responsive, and Accessibility Closure — is formally `CLOSED`.
   semantic preflight, image hashes, determinism, and performance measurements.
 - `docs/stage8/gate8d-baseline-human-review.json` records the independent
   image-by-image review for all 24 captures.
+- The PR head may sit one evidence-only commit above that source SHA. That
+  commit is valid only when it contains the generated Gate 8D manifest, PNG
+  baselines, and human-review record; the validator rejects any later
+  application, fixture, harness, or documentation change.
 - The pull request checks and merge record provide the final independent
   review, test, deployment, and thread state.
 

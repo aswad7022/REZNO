@@ -45,7 +45,7 @@ export default async function Home() {
       data-customer-surface="public-home"
     >
       <PublicHeader />
-      <main>
+      <main id="main-content">
         <section className="relative overflow-hidden border-b">
           <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_20%,color-mix(in_oklch,var(--primary)_10%,transparent),transparent_35%)]" />
           <div className="mx-auto grid max-w-7xl items-center gap-12 px-4 py-20 sm:px-6 sm:py-28 lg:grid-cols-[1.1fr_.9fr] lg:py-36">

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
@@ -27,6 +28,15 @@ const repoRoot = path.resolve(import.meta.dirname, "../../..");
 const read = (file: string) => readFileSync(path.join(repoRoot, file), "utf8");
 const manifestFile = "docs/stage8/baselines/gate8d-baselines.json";
 const reviewFile = "docs/stage8/gate8d-baseline-human-review.json";
+
+function collectTsxFiles(dir: string): string[] {
+  const absolute = path.join(repoRoot, dir);
+  return readdirSync(absolute, { withFileTypes: true }).flatMap((entry) => {
+    const relative = path.join(dir, entry.name);
+    if (entry.isDirectory()) return collectTsxFiles(relative);
+    return entry.isFile() && entry.name.endsWith(".tsx") ? [relative] : [];
+  });
+}
 
 test("Gate 8D owns final motion, browser, accessibility, and performance closure only", () => {
   const scope = read("docs/stage8/stage8-canonical-scope.md");
@@ -104,6 +114,15 @@ test("Skip navigation, focus, touch, and live-state foundations remain explicit"
     const messages = JSON.parse(read(`messages/${locale}.json`));
     assert.ok(messages.Accessibility.skipToContent);
   }
+  const filesWithMain = [
+    ...collectTsxFiles("app"),
+    ...collectTsxFiles("features/marketplace/components"),
+  ].filter((file) => read(file).includes("<main"));
+  const missingTarget = filesWithMain.filter((file) => {
+    const source = read(file);
+    return /<main\b/.test(source) && !/<main\b[^>]*\bid="main-content"/s.test(source);
+  });
+  assert.deepEqual(missingTarget, []);
 });
 
 test("Gate 8D cross-browser contract covers all browsers, viewports, directions, themes, and roles", () => {
@@ -165,6 +184,27 @@ test("Gate 8D evidence is production-attested, deterministic, browser-authentica
     const bytes = readFileSync(path.join(repoRoot, capture.file));
     await validateGate8dCapture(capture, bytes);
   }
+  execFileSync("git", ["merge-base", "--is-ancestor", manifest.sourceSha, "HEAD"], {
+    cwd: repoRoot,
+  });
+  const filesAfterSource = execFileSync(
+    "git",
+    ["diff", "--name-only", `${manifest.sourceSha}..HEAD`],
+    { cwd: repoRoot, encoding: "utf8" },
+  )
+    .split("\n")
+    .filter(Boolean);
+  assert.deepEqual(
+    filesAfterSource.filter(
+      (file) =>
+        !(
+          file === manifestFile ||
+          file === reviewFile ||
+          file.startsWith("docs/stage8/baselines/gate8d/")
+        ),
+    ),
+    [],
+  );
 });
 
 test("Gate 8D validator rejects forged format, blank images, stale DOM, a11y, performance, and review evidence", async () => {

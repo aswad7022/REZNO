@@ -91,3 +91,10 @@ Gate 8D and Stage 8 close only after the Draft PR is reviewed independently in
 a separate clean worktree at an exact head SHA, all P0/P1/P2 findings are fixed,
 review threads are zero, local and remote checks are green, the reviewed SHA is
 merged, and post-merge checks succeed.
+
+The visual manifest intentionally records the production-attested source SHA
+used to build and capture the baselines. The final PR head may add one
+evidence-only commit after that source SHA, limited to the generated Gate 8D
+manifest, PNG baselines, and human-review record. The Gate 8D validator rejects
+any source, fixture, harness, application, or documentation change after the
+attested source SHA so stale evidence cannot close the gate.

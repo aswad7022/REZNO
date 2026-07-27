@@ -15,7 +15,7 @@ export default function RootError({
 }) {
   const t = useTranslations("Errors");
   return (
-    <main className="rezno-premium-surface grid min-h-screen min-w-0 place-items-center p-6">
+    <main id="main-content" className="rezno-premium-surface grid min-h-screen min-w-0 place-items-center p-6">
       <CustomerState
         action={
           <Button onClick={reset}>
