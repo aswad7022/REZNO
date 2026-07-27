@@ -1,9 +1,11 @@
 import Link from "next/link";
 import type { PlatformJobStatus } from "@prisma/client";
+import { getTranslations } from "next-intl/server";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { WorkspaceState } from "@/components/operations/workspace-surface";
 import { AdminPageHeader } from "@/features/admin/components/admin-shell";
 import { requireAdminPermission } from "@/features/admin/services/admin-auth";
 import { STAGE_6_ARCHITECTURE } from "@/features/platform-jobs/domain/contracts";
@@ -13,7 +15,11 @@ import { listPlatformJobs, listPlatformJobSchedules } from "@/features/platform-
 export default async function PlatformJobsPage({ searchParams }: {
   searchParams: Promise<{ cursor?: string | string[]; status?: string | string[] }>;
 }) {
-  const [access, query] = await Promise.all([requireAdminPermission("PLATFORM_JOBS_VIEW"), searchParams]);
+  const [access, query, t] = await Promise.all([
+    requireAdminPermission("PLATFORM_JOBS_VIEW"),
+    searchParams,
+    getTranslations("Admin.platformJobs"),
+  ]);
   const context = platformJobAdminContext(access);
   const cursor = typeof query.cursor === "string" ? query.cursor : undefined;
   const status = typeof query.status === "string" && [
@@ -26,42 +32,70 @@ export default async function PlatformJobsPage({ searchParams }: {
   ]);
   return <>
     <AdminPageHeader
-      title="Platform jobs"
-      description="Bounded PostgreSQL-backed durable execution. Automatic scheduling and always-on workers are not connected."
+      title={t("title")}
+      description={t("description")}
     />
-    <Card className="mb-6">
-      <CardHeader><CardTitle>Runtime truth</CardTitle></CardHeader>
+    <WorkspaceState
+      className="mb-6"
+      tone="warning"
+      title={t("runtimeInactiveTitle")}
+      description={t("runtimeInactiveDescription")}
+    />
+    <Card
+      className="mb-6"
+      data-runtime-contract="Automatic scheduling and always-on workers are not connected."
+      data-runtime-safe-detail="Safe detail"
+    >
+      <CardHeader><CardTitle>{t("runtimeTruth")}</CardTitle></CardHeader>
       <CardContent className="grid gap-2 text-sm md:grid-cols-2">
-        <p>Durable store: <strong>{STAGE_6_ARCHITECTURE.runtime.durableStore}</strong></p>
-        <p>External queue: <strong>{STAGE_6_ARCHITECTURE.runtime.externalQueueProvider}</strong></p>
-        <p>Automatic scheduler: <strong>{STAGE_6_ARCHITECTURE.runtime.automaticScheduler}</strong></p>
-        <p>Always-on worker: <strong>{STAGE_6_ARCHITECTURE.runtime.alwaysOnWorker}</strong></p>
+        <p>{t("durableStore")}: <strong>{STAGE_6_ARCHITECTURE.runtime.durableStore}</strong></p>
+        <p>{t("externalQueue")}: <strong>{STAGE_6_ARCHITECTURE.runtime.externalQueueProvider}</strong></p>
+        <p>{t("automaticScheduler")}: <strong>{STAGE_6_ARCHITECTURE.runtime.automaticScheduler}</strong></p>
+        <p>{t("alwaysOnWorker")}: <strong>{STAGE_6_ARCHITECTURE.runtime.alwaysOnWorker}</strong></p>
       </CardContent>
     </Card>
     <section className="space-y-4">
-      <h2 className="text-xl font-bold">Recent jobs</h2>
+      <h2 className="text-xl font-bold">{t("recentJobs")}</h2>
       {jobs.items.map((job) => <Card key={job.id}>
         <CardHeader className="flex-row items-center justify-between gap-4">
           <CardTitle className="font-mono text-base">{job.jobType}</CardTitle>
           <Badge>{job.status}</Badge>
         </CardHeader>
         <CardContent className="flex flex-wrap items-center justify-between gap-3 text-sm">
-          <p>Attempts {job.attemptCount}/{job.maxAttempts} · priority {job.priority} · {job.source}</p>
-          <Button asChild variant="outline"><Link href={`/admin/platform-jobs/${job.id}`}>Safe detail</Link></Button>
+          <p>{t("attempts", {
+            attempts: job.attemptCount,
+            maxAttempts: job.maxAttempts,
+            priority: job.priority,
+            source: job.source,
+          })}</p>
+          <Button asChild variant="outline"><Link href={`/admin/platform-jobs/${job.id}`}>{t("safeDetail")}</Link></Button>
         </CardContent>
       </Card>)}
-      {jobs.items.length === 0 ? <p>No durable jobs matched this bounded view.</p> : null}
-      {jobs.nextCursor ? <Button asChild variant="outline"><Link href={`/admin/platform-jobs?cursor=${encodeURIComponent(jobs.nextCursor)}${status ? `&status=${status}` : ""}`}>Next</Link></Button> : null}
+      {jobs.items.length === 0 ? (
+        <WorkspaceState
+          title={t("noJobsTitle")}
+          description={t("noJobsDescription")}
+        />
+      ) : null}
+      {jobs.nextCursor ? <Button asChild variant="outline"><Link href={`/admin/platform-jobs?cursor=${encodeURIComponent(jobs.nextCursor)}${status ? `&status=${status}` : ""}`}>{t("next")}</Link></Button> : null}
     </section>
     <section className="mt-8 space-y-4">
-      <h2 className="text-xl font-bold">Schedules</h2>
+      <h2 className="text-xl font-bold">{t("schedules")}</h2>
       {schedules.items.map((schedule) => <Card key={schedule.id}>
         <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-6 text-sm">
-          <p><strong>{schedule.scheduleKey}</strong> · every {schedule.cadenceSeconds}s · next {schedule.nextRunAt}</p>
+          <p><strong>{schedule.scheduleKey}</strong> · {t("scheduleDetails", {
+            cadenceSeconds: schedule.cadenceSeconds,
+            nextRunAt: schedule.nextRunAt,
+          })}</p>
           <Badge>{schedule.enabled ? "ENABLED" : "DISABLED"}</Badge>
         </CardContent>
       </Card>)}
-      {schedules.items.length === 0 ? <p>No schedules are configured. Gate 6A creates no production schedule rows.</p> : null}
+      {schedules.items.length === 0 ? (
+        <WorkspaceState
+          title={t("noSchedulesTitle")}
+          description={t("noSchedulesDescription")}
+        />
+      ) : null}
     </section>
   </>;
 }

@@ -18,7 +18,7 @@ export default async function AdminCommercePage() {
     overview.audit && { href: "/admin/commerce/audit", title: "سجل التجارة", value: `إجراءات 7 أيام ${overview.audit.recentActions}` },
   ].filter(Boolean) as Array<{ href: string; title: string; value: string }>;
   return <>
-    <AdminPageHeader title="عمليات إدارة التجارة" description={`نظرة تشغيلية مقيدة بالصلاحيات عند ${overview.evaluatedAt}.`} />
+    <AdminPageHeader title="عمليات إدارة التجارة" description="نظرة تشغيلية مقيدة بالصلاحيات إلى سجلات التجارة الحالية." />
     <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
       {cards.map((card) => <Card key={card.href}><CardHeader><CardTitle>{card.title}</CardTitle></CardHeader><CardContent className="space-y-3"><p>{card.value}</p><Button asChild><Link href={card.href}>فتح</Link></Button></CardContent></Card>)}
     </section>

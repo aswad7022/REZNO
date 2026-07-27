@@ -121,7 +121,7 @@ export async function BusinessCalendarPage({
           </h2>
           <div className="grid gap-3 lg:grid-cols-2">
             {pendingCustomerRequests.map((request) => (
-              <Card key={request.id} className="border-indigo-300/40">
+              <Card key={request.id} className="border-info/35">
                 <CardContent className="space-y-2 p-4 text-sm">
                   <p className="font-semibold">{request.customerName} · {request.serviceName}</p>
                   <p className="text-muted-foreground">{request.branchName}</p>

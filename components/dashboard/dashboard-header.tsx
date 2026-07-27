@@ -57,7 +57,7 @@ export function DashboardHeader({
 }) {
   return (
     <header className="sticky top-0 z-30 border-b border-border/70 bg-background/82 shadow-sm shadow-slate-950/[0.03] backdrop-blur-xl">
-      <div className="flex h-[4.25rem] items-center gap-2 px-4 sm:px-6">
+      <div className="flex h-[4.25rem] min-w-0 items-center gap-2 px-4 sm:px-6">
         <DashboardMobileNav
           role={role}
           vertical={vertical}
@@ -73,7 +73,7 @@ export function DashboardHeader({
         <div className="hidden min-w-0 flex-1 lg:block">
           <DashboardBreadcrumbs />
         </div>
-        <div className="flex flex-1 justify-end gap-1.5 lg:flex-none">
+        <div className="flex min-w-0 flex-1 justify-end gap-1.5 lg:flex-none">
           {role === "customer" ? (
             <div className="hidden md:block">
               <Suspense
@@ -93,11 +93,13 @@ export function DashboardHeader({
           ) : null}
           <DashboardCommandTrigger />
           {canAccessMessages ? (
-            <DashboardMessagesShortcut
-              href={messagesHref}
-              unreadCount={unreadMessages}
-              items={messagePreviews}
-            />
+            <div className="hidden sm:block">
+              <DashboardMessagesShortcut
+                href={messagesHref}
+                unreadCount={unreadMessages}
+                items={messagePreviews}
+              />
+            </div>
           ) : null}
           <DashboardNotifications role={role} items={notifications} unreadCount={unreadNotifications} />
           <DashboardLanguageSwitcher />

@@ -3,6 +3,10 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import {
+  WorkspaceScrollRegion,
+  WorkspaceState,
+} from "@/components/operations/workspace-surface";
 import { AdminPageHeader } from "@/features/admin/components/admin-shell";
 import { AdminCommerceDateFilterForm } from "@/features/commerce/components/admin-commerce-date-filter-form";
 import {
@@ -43,8 +47,9 @@ export default async function AdminCommerceAuditPage({ searchParams }: { searchP
     </AdminCommerceDateFilterForm>
     <div className="space-y-3">{page.data.map((entry) => <Card key={entry.id}>
       <CardHeader><CardTitle>{entry.action}</CardTitle></CardHeader>
-      <CardContent className="text-sm"><p>{entry.targetType} · {entry.targetId}</p><p>{entry.admin.name} · {entry.createdAt}</p><pre className="mt-2 overflow-auto whitespace-pre-wrap">{JSON.stringify(entry.metadata, null, 2)}</pre></CardContent>
+      <CardContent className="text-sm"><p>{entry.targetType} · {entry.targetId}</p><p>{entry.admin.name} · {entry.createdAt}</p><WorkspaceScrollRegion className="mt-2 shadow-none" label={`بيانات وصفية منقحة للإجراء ${entry.action}`}><pre className="min-w-max whitespace-pre-wrap p-3 font-mono text-xs">{JSON.stringify(entry.metadata, null, 2)}</pre></WorkspaceScrollRegion></CardContent>
     </Card>)}</div>
+    {page.data.length === 0 ? <WorkspaceState title="لا توجد نتائج تدقيق" description="لم يطابق أي إدخال نطاق التصفية الحالي." /> : null}
     {page.pageInfo.nextCursor ? <Button asChild className="mt-6" variant="outline"><Link href={adminAuditNextHref(query, page.pageInfo.nextCursor)}>التالي</Link></Button> : null}
   </>;
 }

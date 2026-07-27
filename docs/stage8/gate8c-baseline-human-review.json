@@ -1,0 +1,273 @@
+{
+  "gate": "8C",
+  "evidenceSetSha256": "a955f459dec940471f5d4d3d66449bf04380111a0c7659a8645f596672954616",
+  "productionBuildId": "4gzDFy9HlJOmA1rk-wTka",
+  "reviewedAt": "2026-07-27",
+  "reviewer": "human",
+  "captures": [
+    {
+      "file": "docs/stage8/baselines/gate8c/admin-access-form-desktop-ar-light.png",
+      "sha256": "e89d5b074ce4c925540e7ecccc8acbdae70678a24cd2a31d51c7d28ed2443f44",
+      "result": "PASS",
+      "visibleLanguage": true,
+      "visibleState": true,
+      "viewportThemeDirection": true,
+      "noPii": true,
+      "noOverflowOrOverlay": true,
+      "notes": "Fresh review: the Arabic admin grant form is final, readable across the wide RTL canvas, and shows only fixed fixture identities."
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/admin-businesses-filters-desktop-ar-light.png",
+      "sha256": "6256716fe9b40bcf72a108cb8053c4315b1e697c02b55e1da4a8a56800b87f56",
+      "result": "PASS",
+      "visibleLanguage": true,
+      "visibleState": true,
+      "viewportThemeDirection": true,
+      "noPii": true,
+      "noOverflowOrOverlay": true,
+      "notes": "Fresh review: Arabic business filters and two deterministic business cards are balanced, unclipped, and free of overlays."
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/admin-commerce-dense-desktop-ar-light.png",
+      "sha256": "ad8349db0136898918586b4b3fb6283286f0fd103bcd0006eeb85a8ddd650369",
+      "result": "PASS",
+      "visibleLanguage": true,
+      "visibleState": true,
+      "viewportThemeDirection": true,
+      "noPii": true,
+      "noOverflowOrOverlay": true,
+      "notes": "Fresh review: the Arabic commerce overview presents all six operational cards in a stable desktop grid with no sensitive values."
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/admin-communications-empty-desktop-ar-light.png",
+      "sha256": "ab4f4b5f4fe02fe3465e187aa0af6495c417e2ebede1658320882cdaa32e33f8",
+      "result": "PASS",
+      "visibleLanguage": true,
+      "visibleState": true,
+      "viewportThemeDirection": true,
+      "noPii": true,
+      "noOverflowOrOverlay": true,
+      "notes": "Fresh review: the Arabic communications history contains the genuine no-campaign state only, with no campaign form, skeleton, or record."
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/admin-not-found-error-compact-en-dark.png",
+      "sha256": "a276ffa4b57ece949cbd2f398e3a259150421411eb26230f53bc70eb6e88da03",
+      "result": "PASS",
+      "visibleLanguage": true,
+      "visibleState": true,
+      "viewportThemeDirection": true,
+      "noPii": true,
+      "noOverflowOrOverlay": true,
+      "notes": "Fresh review: the compact English 404 surface has a centered final error message and home action without a development error portal."
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/admin-loading-desktop-en-dark.png",
+      "sha256": "74a6c7c473f66eb683d838c4647fd13b0534db80d75aa9236efb8d6905a6cbef",
+      "result": "PASS",
+      "visibleLanguage": true,
+      "visibleState": true,
+      "viewportThemeDirection": true,
+      "noPii": true,
+      "noOverflowOrOverlay": true,
+      "notes": "Fresh review: this intentional English loading-state capture contains the documented skeleton and no final-state controls or overlays."
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/admin-navigation-dialog-compact-ar-dark.png",
+      "sha256": "c471f2008dce72d3608b18d192ed58340e80da7f52c000145a4a096ebb064b71",
+      "result": "PASS",
+      "visibleLanguage": true,
+      "visibleState": true,
+      "viewportThemeDirection": true,
+      "noPii": true,
+      "noOverflowOrOverlay": true,
+      "notes": "Fresh review: the Arabic navigation sheet opens on the RTL edge, exposes localized destinations, and preserves a usable compact width."
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/admin-navigation-dialog-compact-en-dark.png",
+      "sha256": "bc9af4b19d49618ae0c7562ced600eae5de8ee33f62e0cf01e3362510c1bb706",
+      "result": "PASS",
+      "visibleLanguage": true,
+      "visibleState": true,
+      "viewportThemeDirection": true,
+      "noPii": true,
+      "noOverflowOrOverlay": true,
+      "notes": "Fresh review: the English navigation sheet opens on the LTR edge, remains full-width for compact mode, and has no horizontal collapse."
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/admin-overview-compact-ar-dark.png",
+      "sha256": "27d7d1e34e75f9d0543dc25e987ea639a37d9ed70c43d8d08e39e11a0b613ea0",
+      "result": "PASS",
+      "visibleLanguage": true,
+      "visibleState": true,
+      "viewportThemeDirection": true,
+      "noPii": true,
+      "noOverflowOrOverlay": true,
+      "notes": "Fresh review: the Arabic compact control-center heading and stacked metrics consume the viewport normally with correct RTL alignment."
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/admin-overview-compact-en-dark.png",
+      "sha256": "1217a67e60249415f42bc80c9ad71bfe8baeb9f94ff95eea701d5b6131bab6c9",
+      "result": "PASS",
+      "visibleLanguage": true,
+      "visibleState": true,
+      "viewportThemeDirection": true,
+      "noPii": true,
+      "noOverflowOrOverlay": true,
+      "notes": "Fresh review: the English compact control center is genuinely English and uses the full content column instead of a narrow strip."
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/admin-overview-desktop-ar-light.png",
+      "sha256": "b97a451946166fa5163a41d80571fb52de68e8b3962c9c13e0aa3d2766aef881",
+      "result": "PASS",
+      "visibleLanguage": true,
+      "visibleState": true,
+      "viewportThemeDirection": true,
+      "noPii": true,
+      "noOverflowOrOverlay": true,
+      "notes": "Fresh review: the Arabic desktop control center shows localized metrics and fixed fixture businesses in a complete light RTL layout."
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/admin-overview-desktop-en-light.png",
+      "sha256": "a8e13256c39b11a81387595e9e085486878ae325752b6e1c31778d32e424a94f",
+      "result": "PASS",
+      "visibleLanguage": true,
+      "visibleState": true,
+      "viewportThemeDirection": true,
+      "noPii": true,
+      "noOverflowOrOverlay": true,
+      "notes": "Fresh review: the English desktop control center shows the same deterministic state in a complete light LTR layout without clipping."
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/admin-permission-denied-compact-en-dark.png",
+      "sha256": "e121f916313b0e412db551a543b409d3ea5df478c303383c9ede3257f415f653",
+      "result": "PASS",
+      "visibleLanguage": true,
+      "visibleState": true,
+      "viewportThemeDirection": true,
+      "noPii": true,
+      "noOverflowOrOverlay": true,
+      "notes": "Fresh review: the English permission-denied page is a final 403 surface with a reachable home action and no protected application data."
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/admin-platform-jobs-truth-desktop-ar-light.png",
+      "sha256": "61ce6cc6cf1ce98e5be95fd9e90ddb1cfb4aa6e8f97ec6a7f24369400816f8b6",
+      "result": "PASS",
+      "visibleLanguage": true,
+      "visibleState": true,
+      "viewportThemeDirection": true,
+      "noPii": true,
+      "noOverflowOrOverlay": true,
+      "notes": "Fresh review: the Arabic platform-jobs page visibly states the inactive runtime truth and genuine empty jobs and schedules states."
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/business-notification-preferences-table-desktop-en-light.png",
+      "sha256": "9af3ed2fad8bba3dee71a7b47177f7b20a8d77172a881cd9ad9ff84c19ce938a",
+      "result": "PASS",
+      "visibleLanguage": true,
+      "visibleState": true,
+      "viewportThemeDirection": true,
+      "noPii": true,
+      "noOverflowOrOverlay": true,
+      "notes": "Fresh review: the English business notification preferences table is readable inside its desktop surface with no unintended page overflow."
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/admin-platform-operations-desktop-ar-light.png",
+      "sha256": "45f7bd41b5ac1a28f51e647b1281cab8dfa7c476a026e59624cb8c734277e3e3",
+      "result": "PASS",
+      "visibleLanguage": true,
+      "visibleState": true,
+      "viewportThemeDirection": true,
+      "noPii": true,
+      "noOverflowOrOverlay": true,
+      "notes": "Fresh review: the Arabic platform-operations dashboard displays localized runtime warning, zero metrics, and disabled provider truth."
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/admin-platform-operations-desktop-en-dark.png",
+      "sha256": "e7db5f6494b89b2f39e16500237409f02601390fd4f6c60188999aa7ab98bba4",
+      "result": "PASS",
+      "visibleLanguage": true,
+      "visibleState": true,
+      "viewportThemeDirection": true,
+      "noPii": true,
+      "noOverflowOrOverlay": true,
+      "notes": "Fresh review: the English dark platform-operations dashboard visibly keeps Stage 6 unactivated and presents stable zero metrics."
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/admin-restaurants-empty-desktop-en-dark.png",
+      "sha256": "1b5010283c473b281fab576e09d7489efe93c4e44d9ba3344ac753053836fbf5",
+      "result": "PASS",
+      "visibleLanguage": true,
+      "visibleState": true,
+      "viewportThemeDirection": true,
+      "noPii": true,
+      "noOverflowOrOverlay": true,
+      "notes": "Fresh review: the English restaurant administration page shows its genuine final empty state without a table, skeleton, or fixture leak."
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/business-bookings-calendar-compact-ar-dark.png",
+      "sha256": "c40768c08dccb2aa176d42436cb2a3d65631960a6acd654e3e552fb48f844b0e",
+      "result": "PASS",
+      "visibleLanguage": true,
+      "visibleState": true,
+      "viewportThemeDirection": true,
+      "noPii": true,
+      "noOverflowOrOverlay": true,
+      "notes": "Fresh review: the Arabic compact booking card is singular, centered, fully reachable, and contains a masked-safe fixed fixture email only."
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/business-dashboard-compact-ckb-dark.png",
+      "sha256": "98cd4b4271c8457378c19427c649f83a7872da0678c049c92a0d96b42d8d3cc0",
+      "result": "PASS",
+      "visibleLanguage": true,
+      "visibleState": true,
+      "viewportThemeDirection": true,
+      "noPii": true,
+      "noOverflowOrOverlay": true,
+      "notes": "Fresh review: the Kurdish compact business dashboard is vertically coherent, localized, unclipped, and free of overlays in dark mode."
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/business-dashboard-desktop-ckb-dark.png",
+      "sha256": "50e9ba1ad262c7c680b9bee33d429a2b2757e328b10a702ce1669087f13e58f8",
+      "result": "PASS",
+      "visibleLanguage": true,
+      "visibleState": true,
+      "viewportThemeDirection": true,
+      "noPii": true,
+      "noOverflowOrOverlay": true,
+      "notes": "Fresh review: the Kurdish dark desktop dashboard uses the entire workspace, preserves the side navigation, and contains no private data."
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/business-dashboard-desktop-ckb-light.png",
+      "sha256": "794453228839527805c6381d1267755fb7595a4356761c4daab27dcca19104f5",
+      "result": "PASS",
+      "visibleLanguage": true,
+      "visibleState": true,
+      "viewportThemeDirection": true,
+      "noPii": true,
+      "noOverflowOrOverlay": true,
+      "notes": "Fresh review: the Kurdish light desktop dashboard matches the dark-state structure with stable fixed content and no visual overflow."
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/business-services-form-compact-ar-dark.png",
+      "sha256": "18d011383128b105f5f93f65efeb9793a97fc096e902cf7ea6740100b0714597",
+      "result": "PASS",
+      "visibleLanguage": true,
+      "visibleState": true,
+      "viewportThemeDirection": true,
+      "noPii": true,
+      "noOverflowOrOverlay": true,
+      "notes": "Fresh review: the Arabic compact service form is complete through its submit action and stays within the dark mobile-width surface."
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/business-services-form-compact-ckb-dark.png",
+      "sha256": "240347f5064bced52e60e91b97cc8837b4e0c17d143823175502f4a23ef82f9b",
+      "result": "PASS",
+      "visibleLanguage": true,
+      "visibleState": true,
+      "viewportThemeDirection": true,
+      "noPii": true,
+      "noOverflowOrOverlay": true,
+      "notes": "Fresh review: the Kurdish compact service form is visibly localized, complete through submission, and aligned correctly for RTL."
+    }
+  ]
+}

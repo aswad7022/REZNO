@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 
+import { WorkspaceState } from "@/components/operations/workspace-surface";
 import { AdminPageHeader } from "@/features/admin/components/admin-shell";
 import { getAdminRestaurants } from "@/features/admin/services/admin-dashboard";
 import { Badge } from "@/components/ui/badge";
@@ -7,13 +9,16 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
 export default async function AdminRestaurantsPage() {
-  const restaurants = await getAdminRestaurants();
+  const [restaurants, t] = await Promise.all([
+    getAdminRestaurants(),
+    getTranslations("Admin"),
+  ]);
 
   return (
     <>
       <AdminPageHeader
-        title="المطاعم والكافيهات"
-        description="متابعة الأنشطة التي تستخدم تجربة الطاولات والقائمة."
+        title={t("restaurantsTitle")}
+        description={t("restaurantsDescription")}
       />
       <div className="grid gap-3">
         {restaurants.map((business) => (
@@ -30,23 +35,33 @@ export default async function AdminRestaurantsPage() {
                   {business.profile?.businessCategory ?? business.vertical}
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  {business._count.branches} فرع ·{" "}
-                  {business._count.restaurantTables} طاولة ·{" "}
-                  {business._count.menuItems} صنف ·{" "}
-                  {business._count.bookings} حجز
+                  {t("restaurantsStats", {
+                    bookings: business._count.bookings,
+                    branches: business._count.branches,
+                    items: business._count.menuItems,
+                    tables: business._count.restaurantTables,
+                  })}
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
                 <Badge variant="secondary">{business.vertical}</Badge>
                 <Button asChild size="sm" variant="outline">
                   <Link href={`/${business.slug}`} target="_blank">
-                    الصفحة العامة
+                    {t("viewPublicPage")}
                   </Link>
                 </Button>
               </div>
             </CardContent>
           </Card>
         ))}
+        {restaurants.length === 0 ? (
+          <div data-admin-restaurants-state="empty">
+            <WorkspaceState
+              title={t("restaurantsEmptyTitle")}
+              description={t("restaurantsEmptyDescription")}
+            />
+          </div>
+        ) : null}
       </div>
     </>
   );

@@ -93,7 +93,10 @@ export function DashboardLayout({
   }
 
   return (
-    <div className="rezno-premium-surface min-h-screen">
+    <div
+      className="rezno-premium-surface min-h-screen"
+      data-business-admin-surface={role === "business" ? "business" : undefined}
+    >
       <DashboardCommandPalette
         role={role}
         publicSlug={publicSlug}

@@ -4,6 +4,7 @@ import { getTranslations } from "next-intl/server";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { WorkspaceState } from "@/components/operations/workspace-surface";
 import { AdminPageHeader } from "@/features/admin/components/admin-shell";
 import { canAdmin, requireAdminPermission } from "@/features/admin/services/admin-auth";
 import { CampaignEditor } from "@/features/communications/components/campaign-editor";
@@ -49,12 +50,27 @@ export default async function AdminCommunicationsPage({
         description={t("adminDescription")}
       />
       {canDispatch ? <ManualDispatch /> : null}
-      {canSend ? <div className="mt-6"><CampaignEditor /></div> : null}
+      {canSend ? (
+        <div className="mt-6" data-stage4-communications-create-form="true">
+          <CampaignEditor />
+        </div>
+      ) : null}
       <Card className="mt-6 border-primary/10">
         <CardHeader><CardTitle>{t("campaignHistory")}</CardTitle></CardHeader>
         <CardContent className="space-y-3">
-          {page.items.length === 0 ? <p className="text-sm text-muted-foreground">{t("noCampaigns")}</p> : page.items.map((campaign) => (
-            <article key={campaign.id} className="rounded-xl border p-4">
+          {page.items.length === 0 ? (
+            <div data-stage4-communications-state="empty">
+              <WorkspaceState
+                title={t("noCampaigns")}
+                description={t("noCampaignsDescription")}
+              />
+            </div>
+          ) : page.items.map((campaign) => (
+            <article
+              key={campaign.id}
+              className="rounded-xl border p-4"
+              data-stage4-communications-state="campaign"
+            >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <Link className="font-mono text-sm font-semibold underline" href={campaignDetailHref(campaign.id, status, cursor)}>{campaign.id}</Link>

@@ -1,0 +1,5533 @@
+{
+  "gate": "8C",
+  "baseSha": "903cbf8de413145ba83f652e23f41616f79c90d3",
+  "capturedAt": "2026-07-27T16:18:28.871Z",
+  "environment": "Disposable local PostgreSQL database and harness-owned authenticated Next.js production build/server",
+  "productionAttestation": {
+    "schemaVersion": 1,
+    "gitSha": "171fe6be39c3d7b14c6855293f4df7df1b0cc4c2",
+    "buildId": "4gzDFy9HlJOmA1rk-wTka",
+    "buildCommand": [
+      "npm",
+      "run",
+      "build"
+    ],
+    "startCommand": [
+      "/Users/user/.nvm/versions/node/v24.18.0/bin/node",
+      "/Users/user/Documents/REZNO/REZNO/rezno-stage8-gate8c/node_modules/next/dist/bin/next",
+      "start",
+      "--hostname",
+      "127.0.0.1",
+      "--port",
+      "62554"
+    ],
+    "nodeEnv": "production",
+    "pid": 23629,
+    "port": 62554,
+    "hostname": "127.0.0.1",
+    "startedAt": "2026-07-27T16:18:28.871Z",
+    "ownedByHarness": true,
+    "ownershipCheck": "spawned-child-alive-and-exclusive-port",
+    "buildFiles": {
+      ".next/BUILD_ID": "3f1494b7537710b0e69c1a2b4b9b5db0a82a03611b440b8272391f4639002b9c",
+      ".next/app-path-routes-manifest.json": "3cfbdcbd9b80a87775afb81736d9c1c7e1428249bb32fba6c129963bfc759d9c",
+      ".next/build-manifest.json": "7f139e1f87ec08821cb71c11a64c7f1a7ec87fc87106e05df7fed8265831ba77"
+    },
+    "captureScriptSha256": "c6e2d9d05dcab2ffcb444a8f776ec670661e94853e0d67b9110ac884e3d9538d",
+    "harnessScriptSha256": "5c5efe445e4ddf637411dd8cbe137238dc5bd9c3e260ad14e33a076a34fd8c33",
+    "integritySha256": "763f6b2cd735b160a319c6d7d2d32f78fce0c941726f89c67603c57b8f830019"
+  },
+  "determinism": {
+    "passes": 2,
+    "fixtureFingerprint": "7047d8ded2878edad6c7ae25de5ac434449a8a2d4ecb32a886823bcf9ea024f5",
+    "identicalCaptureCount": 24,
+    "identicalPreflightCount": 24,
+    "semanticManifestSha256": "a955f459dec940471f5d4d3d66449bf04380111a0c7659a8645f596672954616"
+  },
+  "capturePolicy": {
+    "browser": "Chromium 151.0.7922.34",
+    "fixtures": "Fixed UUIDs, timestamps, .example identities, null phones, and deterministic Gate 8C domain data",
+    "motion": "prefers-reduced-motion plus disabled CSS animations/transitions",
+    "screenshotScope": "viewport-only; no full-page stitching",
+    "sensitiveData": "fixtures.example identities only; credential, phone, and non-fixture email scans passed",
+    "localeEvidence": "visible locale-specific text plus cookie, browser locale, HTML direction, and Person preferred-language agreement",
+    "productionProvenance": "harness-owned next build and next start; BUILD_ID, Git SHA, child PID/port, commands, and build/script hashes attested",
+    "determinism": "two clean fixture generations on one attested build produced byte-identical images and preflight records",
+    "humanReview": "Fresh external record binds every PNG hash to visible language/state, viewport-theme-direction, privacy, overflow/overlay checks, and an image-specific human note"
+  },
+  "captures": [
+    {
+      "file": "docs/stage8/baselines/gate8c/admin-access-form-desktop-ar-light.png",
+      "route": "/admin/access?mode=add&q=visual-fixture-candidate%40fixtures.example&userId=gate8c-visual-candidate-user#grant-admin",
+      "viewport": "desktop",
+      "viewportWidth": 1440,
+      "viewportHeight": 1000,
+      "locale": "ar",
+      "direction": "rtl",
+      "theme": "light",
+      "role": "root-super-admin",
+      "expectedState": "final",
+      "requiredLandmarks": [
+        {
+          "selector": "[data-business-admin-surface=\"admin\"]"
+        },
+        {
+          "selector": "main#main-content"
+        },
+        {
+          "selector": "h1"
+        },
+        {
+          "selector": "#grant-admin",
+          "requireInViewport": true
+        },
+        {
+          "selector": "input[name=\"userId\"]",
+          "requireInViewport": true
+        },
+        {
+          "selector": "input[name=\"permissions\"]",
+          "minCount": 1,
+          "requireInViewport": true
+        }
+      ],
+      "forbiddenStates": [
+        {
+          "selector": "[aria-busy=\"true\"]",
+          "description": "loading state on a final capture"
+        },
+        {
+          "selector": "[data-slot=\"skeleton\"]",
+          "description": "skeleton on a final capture"
+        },
+        {
+          "selector": "nextjs-portal",
+          "description": "Next.js development overlay"
+        },
+        {
+          "selector": "[data-nextjs-dialog-overlay]",
+          "description": "Next.js error overlay"
+        },
+        {
+          "selector": "[data-next-badge-root]",
+          "description": "Next.js development badge"
+        }
+      ],
+      "requiredVisibleText": [
+        {
+          "language": "ar",
+          "requireInViewport": true,
+          "selector": "body",
+          "text": "إضافة أدمن جديد"
+        },
+        {
+          "language": "ar",
+          "requireInViewport": true,
+          "selector": "body",
+          "text": "منح وصول أدمن"
+        }
+      ],
+      "forbiddenVisibleText": [
+        {
+          "language": "en",
+          "selector": "body",
+          "text": "Add new admin",
+          "viewportOnly": true
+        }
+      ],
+      "languageExceptions": [
+        "Root Super Admin",
+        "REZNO_ADMIN_EMAILS",
+        "permission enum identifiers"
+      ],
+      "stateContract": {
+        "marker": {
+          "selector": "#grant-admin",
+          "requireInViewport": true
+        }
+      },
+      "expectedMime": "image/png",
+      "expectedFormat": "png",
+      "actualWidth": 1440,
+      "actualHeight": 1000,
+      "sha256": "e89d5b074ce4c925540e7ecccc8acbdae70678a24cd2a31d51c7d28ed2443f44",
+      "families": [
+        "form",
+        "permission"
+      ],
+      "visualMetrics": {
+        "entropy": 2.1327,
+        "maxChannelStandardDeviation": 30.8727,
+        "approximateUniqueColors": 123,
+        "contentWidthRatio": 0.8542,
+        "contentHeightRatio": 0.9896,
+        "contentPixelRatio": 0.2166,
+        "edgeDensity": 0.0875
+      },
+      "preflight": {
+        "pathname": "/admin/access",
+        "route": "/admin/access?mode=add&q=visual-fixture-candidate%40fixtures.example&userId=gate8c-visual-candidate-user#grant-admin",
+        "locale": "ar",
+        "direction": "rtl",
+        "theme": "light",
+        "observedState": "final",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "localeEvidence": {
+          "browserLocale": "ar-IQ",
+          "cookieLocale": "ar",
+          "fixtureLanguage": "AR",
+          "fixtureUserId": "gate8c-visual-admin-user"
+        },
+        "documentReadyState": "complete",
+        "fontsReady": true,
+        "requiredLandmarks": [
+          {
+            "selector": "[data-business-admin-surface=\"admin\"]",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "main#main-content",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "h1",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "#grant-admin",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "input[name=\"userId\"]",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "input[name=\"permissions\"]",
+            "count": 64,
+            "visibleCount": 64,
+            "inViewportCount": 33
+          }
+        ],
+        "forbiddenStates": [
+          {
+            "selector": "[aria-busy=\"true\"]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-slot=\"skeleton\"]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "nextjs-portal",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-nextjs-dialog-overlay]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-next-badge-root]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          }
+        ],
+        "requiredVisibleText": [
+          {
+            "selector": "body",
+            "text": "إضافة أدمن جديد",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "body",
+            "text": "منح وصول أدمن",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          }
+        ],
+        "forbiddenVisibleText": [
+          {
+            "selector": "body",
+            "text": "Add new admin",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          }
+        ],
+        "stateEvidence": {
+          "marker": "#grant-admin",
+          "count": 1,
+          "visibleCount": 1,
+          "inViewportCount": 1,
+          "conflictingStates": []
+        },
+        "horizontalOverflowPx": 0,
+        "mainWidthRatio": 0.8889,
+        "runningAnimations": 0,
+        "consoleErrors": [],
+        "pageErrors": [],
+        "failedResources": [],
+        "responseErrors": [],
+        "nonSyntheticEmails": [],
+        "realisticPhoneMatches": [],
+        "sensitiveTextMatches": [],
+        "visibleTextSha256": "2553fa8c966d40ce34d9033ac027d4737ed579a1e06760f761e759c905ddbf36",
+        "screenshotScope": "viewport"
+      },
+      "humanReview": {
+        "result": "PASS",
+        "reviewedAt": "2026-07-27",
+        "notes": "Fresh review: the Arabic admin grant form is final, readable across the wide RTL canvas, and shows only fixed fixture identities."
+      }
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/admin-businesses-filters-desktop-ar-light.png",
+      "route": "/admin/businesses",
+      "viewport": "desktop",
+      "viewportWidth": 1440,
+      "viewportHeight": 1000,
+      "locale": "ar",
+      "direction": "rtl",
+      "theme": "light",
+      "role": "root-super-admin",
+      "expectedState": "final",
+      "requiredLandmarks": [
+        {
+          "selector": "[data-business-admin-surface=\"admin\"]"
+        },
+        {
+          "selector": "main#main-content"
+        },
+        {
+          "selector": "h1"
+        },
+        {
+          "selector": "form"
+        },
+        {
+          "selector": "input[name=\"q\"]"
+        }
+      ],
+      "forbiddenStates": [
+        {
+          "selector": "[aria-busy=\"true\"]",
+          "description": "loading state on a final capture"
+        },
+        {
+          "selector": "[data-slot=\"skeleton\"]",
+          "description": "skeleton on a final capture"
+        },
+        {
+          "selector": "nextjs-portal",
+          "description": "Next.js development overlay"
+        },
+        {
+          "selector": "[data-nextjs-dialog-overlay]",
+          "description": "Next.js error overlay"
+        },
+        {
+          "selector": "[data-next-badge-root]",
+          "description": "Next.js development badge"
+        }
+      ],
+      "requiredVisibleText": [
+        {
+          "language": "ar",
+          "requireInViewport": true,
+          "selector": "body",
+          "text": "الأنشطة"
+        },
+        {
+          "language": "ar",
+          "requireInViewport": true,
+          "selector": "body",
+          "text": "تصفية"
+        }
+      ],
+      "forbiddenVisibleText": [
+        {
+          "language": "en",
+          "selector": "body",
+          "text": "Businesses",
+          "viewportOnly": true
+        }
+      ],
+      "languageExceptions": [
+        "business vertical and status enum identifiers"
+      ],
+      "stateContract": {
+        "marker": {
+          "selector": "main#main-content",
+          "requireInViewport": true
+        }
+      },
+      "expectedMime": "image/png",
+      "expectedFormat": "png",
+      "actualWidth": 1440,
+      "actualHeight": 1000,
+      "sha256": "6256716fe9b40bcf72a108cb8053c4315b1e697c02b55e1da4a8a56800b87f56",
+      "families": [
+        "table",
+        "form"
+      ],
+      "visualMetrics": {
+        "entropy": 2.9632,
+        "maxChannelStandardDeviation": 21.4092,
+        "approximateUniqueColors": 114,
+        "contentWidthRatio": 0.9271,
+        "contentHeightRatio": 0.6146,
+        "contentPixelRatio": 0.2551,
+        "edgeDensity": 0.0431
+      },
+      "preflight": {
+        "pathname": "/admin/businesses",
+        "route": "/admin/businesses",
+        "locale": "ar",
+        "direction": "rtl",
+        "theme": "light",
+        "observedState": "final",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "localeEvidence": {
+          "browserLocale": "ar-IQ",
+          "cookieLocale": "ar",
+          "fixtureLanguage": "AR",
+          "fixtureUserId": "gate8c-visual-admin-user"
+        },
+        "documentReadyState": "complete",
+        "fontsReady": true,
+        "requiredLandmarks": [
+          {
+            "selector": "[data-business-admin-surface=\"admin\"]",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "main#main-content",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "h1",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "form",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "input[name=\"q\"]",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          }
+        ],
+        "forbiddenStates": [
+          {
+            "selector": "[aria-busy=\"true\"]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-slot=\"skeleton\"]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "nextjs-portal",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-nextjs-dialog-overlay]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-next-badge-root]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          }
+        ],
+        "requiredVisibleText": [
+          {
+            "selector": "body",
+            "text": "الأنشطة",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "body",
+            "text": "تصفية",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          }
+        ],
+        "forbiddenVisibleText": [
+          {
+            "selector": "body",
+            "text": "Businesses",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          }
+        ],
+        "stateEvidence": {
+          "marker": "main#main-content",
+          "count": 1,
+          "visibleCount": 1,
+          "inViewportCount": 1,
+          "conflictingStates": []
+        },
+        "horizontalOverflowPx": 0,
+        "mainWidthRatio": 0.8889,
+        "runningAnimations": 0,
+        "consoleErrors": [],
+        "pageErrors": [],
+        "failedResources": [],
+        "responseErrors": [],
+        "nonSyntheticEmails": [],
+        "realisticPhoneMatches": [],
+        "sensitiveTextMatches": [],
+        "visibleTextSha256": "2461960578dd1fc3641ba3f1fa34da0a895ec967b8a8abf429c7ed75ad38dcdf",
+        "screenshotScope": "viewport"
+      },
+      "humanReview": {
+        "result": "PASS",
+        "reviewedAt": "2026-07-27",
+        "notes": "Fresh review: Arabic business filters and two deterministic business cards are balanced, unclipped, and free of overlays."
+      }
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/admin-commerce-dense-desktop-ar-light.png",
+      "route": "/admin/commerce",
+      "viewport": "desktop",
+      "viewportWidth": 1440,
+      "viewportHeight": 1000,
+      "locale": "ar",
+      "direction": "rtl",
+      "theme": "light",
+      "role": "root-super-admin",
+      "expectedState": "final",
+      "requiredLandmarks": [
+        {
+          "selector": "[data-business-admin-surface=\"admin\"]"
+        },
+        {
+          "selector": "main#main-content"
+        },
+        {
+          "selector": "h1"
+        },
+        {
+          "selector": "a[href=\"/admin/commerce/stores\"]"
+        },
+        {
+          "selector": "a[href=\"/admin/commerce/orders\"]"
+        }
+      ],
+      "forbiddenStates": [
+        {
+          "selector": "[aria-busy=\"true\"]",
+          "description": "loading state on a final capture"
+        },
+        {
+          "selector": "[data-slot=\"skeleton\"]",
+          "description": "skeleton on a final capture"
+        },
+        {
+          "selector": "nextjs-portal",
+          "description": "Next.js development overlay"
+        },
+        {
+          "selector": "[data-nextjs-dialog-overlay]",
+          "description": "Next.js error overlay"
+        },
+        {
+          "selector": "[data-next-badge-root]",
+          "description": "Next.js development badge"
+        }
+      ],
+      "requiredVisibleText": [
+        {
+          "language": "ar",
+          "requireInViewport": true,
+          "selector": "body",
+          "text": "عمليات إدارة التجارة"
+        },
+        {
+          "language": "ar",
+          "requireInViewport": true,
+          "selector": "body",
+          "text": "المتاجر"
+        }
+      ],
+      "forbiddenVisibleText": [
+        {
+          "language": "en",
+          "selector": "body",
+          "text": "Commerce operations",
+          "viewportOnly": true
+        }
+      ],
+      "languageExceptions": [],
+      "stateContract": {
+        "marker": {
+          "selector": "main#main-content",
+          "requireInViewport": true
+        }
+      },
+      "expectedMime": "image/png",
+      "expectedFormat": "png",
+      "actualWidth": 1440,
+      "actualHeight": 1000,
+      "sha256": "ad8349db0136898918586b4b3fb6283286f0fd103bcd0006eeb85a8ddd650369",
+      "families": [
+        "commerce",
+        "dense-data",
+        "table"
+      ],
+      "visualMetrics": {
+        "entropy": 2.9808,
+        "maxChannelStandardDeviation": 26.7415,
+        "approximateUniqueColors": 139,
+        "contentWidthRatio": 0.9167,
+        "contentHeightRatio": 0.5938,
+        "contentPixelRatio": 0.2374,
+        "edgeDensity": 0.0519
+      },
+      "preflight": {
+        "pathname": "/admin/commerce",
+        "route": "/admin/commerce",
+        "locale": "ar",
+        "direction": "rtl",
+        "theme": "light",
+        "observedState": "final",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "localeEvidence": {
+          "browserLocale": "ar-IQ",
+          "cookieLocale": "ar",
+          "fixtureLanguage": "AR",
+          "fixtureUserId": "gate8c-visual-admin-user"
+        },
+        "documentReadyState": "complete",
+        "fontsReady": true,
+        "requiredLandmarks": [
+          {
+            "selector": "[data-business-admin-surface=\"admin\"]",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "main#main-content",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "h1",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "a[href=\"/admin/commerce/stores\"]",
+            "count": 2,
+            "visibleCount": 2,
+            "inViewportCount": 2
+          },
+          {
+            "selector": "a[href=\"/admin/commerce/orders\"]",
+            "count": 2,
+            "visibleCount": 2,
+            "inViewportCount": 2
+          }
+        ],
+        "forbiddenStates": [
+          {
+            "selector": "[aria-busy=\"true\"]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-slot=\"skeleton\"]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "nextjs-portal",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-nextjs-dialog-overlay]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-next-badge-root]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          }
+        ],
+        "requiredVisibleText": [
+          {
+            "selector": "body",
+            "text": "عمليات إدارة التجارة",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "body",
+            "text": "المتاجر",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          }
+        ],
+        "forbiddenVisibleText": [
+          {
+            "selector": "body",
+            "text": "Commerce operations",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          }
+        ],
+        "stateEvidence": {
+          "marker": "main#main-content",
+          "count": 1,
+          "visibleCount": 1,
+          "inViewportCount": 1,
+          "conflictingStates": []
+        },
+        "horizontalOverflowPx": 0,
+        "mainWidthRatio": 0.8889,
+        "runningAnimations": 0,
+        "consoleErrors": [],
+        "pageErrors": [],
+        "failedResources": [],
+        "responseErrors": [],
+        "nonSyntheticEmails": [],
+        "realisticPhoneMatches": [],
+        "sensitiveTextMatches": [],
+        "visibleTextSha256": "2f9100c4f79d6e46747f5f12cbd11913404c728caf4205c89d541dd00b42faf9",
+        "screenshotScope": "viewport"
+      },
+      "humanReview": {
+        "result": "PASS",
+        "reviewedAt": "2026-07-27",
+        "notes": "Fresh review: the Arabic commerce overview presents all six operational cards in a stable desktop grid with no sensitive values."
+      }
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/admin-communications-empty-desktop-ar-light.png",
+      "route": "/admin/communications",
+      "viewport": "desktop",
+      "viewportWidth": 1440,
+      "viewportHeight": 1000,
+      "locale": "ar",
+      "direction": "rtl",
+      "theme": "light",
+      "role": "communications-viewer",
+      "expectedState": "empty",
+      "requiredLandmarks": [
+        {
+          "selector": "[data-business-admin-surface=\"admin\"]"
+        },
+        {
+          "selector": "main#main-content"
+        },
+        {
+          "selector": "h1"
+        },
+        {
+          "selector": "[data-stage4-communications-state=\"empty\"]",
+          "requireInViewport": true
+        }
+      ],
+      "forbiddenStates": [
+        {
+          "selector": "[aria-busy=\"true\"]",
+          "description": "loading state on a final capture"
+        },
+        {
+          "selector": "[data-slot=\"skeleton\"]",
+          "description": "skeleton on a final capture"
+        },
+        {
+          "selector": "nextjs-portal",
+          "description": "Next.js development overlay"
+        },
+        {
+          "selector": "[data-nextjs-dialog-overlay]",
+          "description": "Next.js error overlay"
+        },
+        {
+          "selector": "[data-next-badge-root]",
+          "description": "Next.js development badge"
+        },
+        {
+          "selector": "[data-stage4-communications-state=\"campaign\"]",
+          "description": "campaign result in the declared empty state",
+          "viewportOnly": true
+        },
+        {
+          "selector": "[data-stage4-communications-create-form=\"true\"]",
+          "description": "campaign creation form in the empty-state viewport",
+          "viewportOnly": true
+        }
+      ],
+      "requiredVisibleText": [
+        {
+          "language": "ar",
+          "requireInViewport": true,
+          "selector": "body",
+          "text": "سجل الحملات"
+        },
+        {
+          "language": "ar",
+          "requireInViewport": true,
+          "selector": "body",
+          "text": "لا توجد حملات بعد."
+        }
+      ],
+      "forbiddenVisibleText": [
+        {
+          "language": "en",
+          "selector": "body",
+          "text": "No campaigns yet.",
+          "viewportOnly": true
+        }
+      ],
+      "languageExceptions": [],
+      "stateContract": {
+        "marker": {
+          "selector": "[data-stage4-communications-state=\"empty\"]",
+          "requireInViewport": true
+        },
+        "forbiddenInViewport": [
+          {
+            "selector": "[data-stage4-communications-state=\"campaign\"]",
+            "description": "campaign result"
+          },
+          {
+            "selector": "[data-stage4-communications-create-form=\"true\"]",
+            "description": "campaign creation form"
+          },
+          {
+            "selector": "[aria-busy=\"true\"]",
+            "description": "loading state"
+          }
+        ]
+      },
+      "expectedMime": "image/png",
+      "expectedFormat": "png",
+      "actualWidth": 1440,
+      "actualHeight": 1000,
+      "sha256": "ab4f4b5f4fe02fe3465e187aa0af6495c417e2ebede1658320882cdaa32e33f8",
+      "families": [
+        "communications",
+        "empty"
+      ],
+      "visualMetrics": {
+        "entropy": 2.8146,
+        "maxChannelStandardDeviation": 17.4366,
+        "approximateUniqueColors": 118,
+        "contentWidthRatio": 0.9167,
+        "contentHeightRatio": 0.3646,
+        "contentPixelRatio": 0.1457,
+        "edgeDensity": 0.0356
+      },
+      "preflight": {
+        "pathname": "/admin/communications",
+        "route": "/admin/communications",
+        "locale": "ar",
+        "direction": "rtl",
+        "theme": "light",
+        "observedState": "empty",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "localeEvidence": {
+          "browserLocale": "ar-IQ",
+          "cookieLocale": "ar",
+          "fixtureLanguage": "AR",
+          "fixtureUserId": "gate8c-visual-communications-viewer-user"
+        },
+        "documentReadyState": "complete",
+        "fontsReady": true,
+        "requiredLandmarks": [
+          {
+            "selector": "[data-business-admin-surface=\"admin\"]",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "main#main-content",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "h1",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "[data-stage4-communications-state=\"empty\"]",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          }
+        ],
+        "forbiddenStates": [
+          {
+            "selector": "[aria-busy=\"true\"]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-slot=\"skeleton\"]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "nextjs-portal",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-nextjs-dialog-overlay]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-next-badge-root]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-stage4-communications-state=\"campaign\"]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-stage4-communications-create-form=\"true\"]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          }
+        ],
+        "requiredVisibleText": [
+          {
+            "selector": "body",
+            "text": "سجل الحملات",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "body",
+            "text": "لا توجد حملات بعد.",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          }
+        ],
+        "forbiddenVisibleText": [
+          {
+            "selector": "body",
+            "text": "No campaigns yet.",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          }
+        ],
+        "stateEvidence": {
+          "marker": "[data-stage4-communications-state=\"empty\"]",
+          "count": 1,
+          "visibleCount": 1,
+          "inViewportCount": 1,
+          "conflictingStates": [
+            {
+              "count": 0,
+              "inViewportCount": 0,
+              "selector": "[data-stage4-communications-state=\"campaign\"]"
+            },
+            {
+              "count": 0,
+              "inViewportCount": 0,
+              "selector": "[data-stage4-communications-create-form=\"true\"]"
+            },
+            {
+              "count": 0,
+              "inViewportCount": 0,
+              "selector": "[aria-busy=\"true\"]"
+            }
+          ]
+        },
+        "horizontalOverflowPx": 0,
+        "mainWidthRatio": 0.8889,
+        "runningAnimations": 0,
+        "consoleErrors": [],
+        "pageErrors": [],
+        "failedResources": [],
+        "responseErrors": [],
+        "nonSyntheticEmails": [],
+        "realisticPhoneMatches": [],
+        "sensitiveTextMatches": [],
+        "visibleTextSha256": "9a11501bbde93b399003d07a373d2423d5a4fff17783dfab80df48b3aca77575",
+        "screenshotScope": "viewport"
+      },
+      "humanReview": {
+        "result": "PASS",
+        "reviewedAt": "2026-07-27",
+        "notes": "Fresh review: the Arabic communications history contains the genuine no-campaign state only, with no campaign form, skeleton, or record."
+      }
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/admin-not-found-error-compact-en-dark.png",
+      "route": "/admin/gate8c-intentional-not-found",
+      "viewport": "compact",
+      "viewportWidth": 390,
+      "viewportHeight": 844,
+      "locale": "en",
+      "direction": "ltr",
+      "theme": "dark",
+      "role": "root-super-admin",
+      "expectedState": "error",
+      "requiredLandmarks": [
+        {
+          "selector": "main",
+          "requireInViewport": true
+        },
+        {
+          "selector": "h1",
+          "requireInViewport": true
+        },
+        {
+          "selector": "text=404",
+          "requireInViewport": true
+        }
+      ],
+      "forbiddenStates": [
+        {
+          "selector": "[aria-busy=\"true\"]",
+          "description": "loading state on a final capture"
+        },
+        {
+          "selector": "[data-slot=\"skeleton\"]",
+          "description": "skeleton on a final capture"
+        },
+        {
+          "selector": "nextjs-portal",
+          "description": "Next.js development overlay"
+        },
+        {
+          "selector": "[data-nextjs-dialog-overlay]",
+          "description": "Next.js error overlay"
+        },
+        {
+          "selector": "[data-next-badge-root]",
+          "description": "Next.js development badge"
+        }
+      ],
+      "requiredVisibleText": [
+        {
+          "language": "en",
+          "requireInViewport": true,
+          "selector": "body",
+          "text": "Page not found"
+        },
+        {
+          "language": "en",
+          "requireInViewport": true,
+          "selector": "body",
+          "text": "Back to home"
+        }
+      ],
+      "forbiddenVisibleText": [
+        {
+          "language": "ar",
+          "selector": "body",
+          "text": "الصفحة غير موجودة",
+          "viewportOnly": true
+        }
+      ],
+      "languageExceptions": [
+        "404"
+      ],
+      "stateContract": {
+        "marker": {
+          "selector": "h1",
+          "requireInViewport": true
+        }
+      },
+      "expectedMime": "image/png",
+      "expectedFormat": "png",
+      "actualWidth": 390,
+      "actualHeight": 844,
+      "sha256": "a276ffa4b57ece949cbd2f398e3a259150421411eb26230f53bc70eb6e88da03",
+      "families": [
+        "error"
+      ],
+      "visualMetrics": {
+        "entropy": 4.3028,
+        "maxChannelStandardDeviation": 28.6431,
+        "approximateUniqueColors": 110,
+        "contentWidthRatio": 1,
+        "contentHeightRatio": 1,
+        "contentPixelRatio": 0.4183,
+        "edgeDensity": 0.0367
+      },
+      "preflight": {
+        "pathname": "/admin/gate8c-intentional-not-found",
+        "route": "/admin/gate8c-intentional-not-found",
+        "locale": "en",
+        "direction": "ltr",
+        "theme": "dark",
+        "observedState": "error",
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "localeEvidence": {
+          "browserLocale": "en-US",
+          "cookieLocale": "en",
+          "fixtureLanguage": "EN",
+          "fixtureUserId": "gate8c-visual-admin-user"
+        },
+        "documentReadyState": "complete",
+        "fontsReady": true,
+        "requiredLandmarks": [
+          {
+            "selector": "main",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "h1",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "text=404",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          }
+        ],
+        "forbiddenStates": [
+          {
+            "selector": "[aria-busy=\"true\"]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-slot=\"skeleton\"]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "nextjs-portal",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-nextjs-dialog-overlay]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-next-badge-root]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          }
+        ],
+        "requiredVisibleText": [
+          {
+            "selector": "body",
+            "text": "Page not found",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "body",
+            "text": "Back to home",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          }
+        ],
+        "forbiddenVisibleText": [
+          {
+            "selector": "body",
+            "text": "الصفحة غير موجودة",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          }
+        ],
+        "stateEvidence": {
+          "marker": "h1",
+          "count": 1,
+          "visibleCount": 1,
+          "inViewportCount": 1,
+          "conflictingStates": []
+        },
+        "horizontalOverflowPx": 0,
+        "mainWidthRatio": 1,
+        "runningAnimations": 0,
+        "consoleErrors": [],
+        "pageErrors": [],
+        "failedResources": [],
+        "responseErrors": [],
+        "nonSyntheticEmails": [],
+        "realisticPhoneMatches": [],
+        "sensitiveTextMatches": [],
+        "visibleTextSha256": "08cf98e3b62b09b56c6ce88e0a82459d4ea590c856d3777864d9a76be578a7bd",
+        "screenshotScope": "viewport"
+      },
+      "humanReview": {
+        "result": "PASS",
+        "reviewedAt": "2026-07-27",
+        "notes": "Fresh review: the compact English 404 surface has a centered final error message and home action without a development error portal."
+      }
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/admin-loading-desktop-en-dark.png",
+      "route": "/admin/platform-jobs",
+      "viewport": "desktop",
+      "viewportWidth": 1280,
+      "viewportHeight": 720,
+      "locale": "en",
+      "direction": "ltr",
+      "theme": "dark",
+      "role": "root-super-admin",
+      "expectedState": "loading",
+      "requiredLandmarks": [
+        {
+          "selector": "[data-business-admin-surface=\"admin\"]"
+        },
+        {
+          "selector": "main#main-content"
+        },
+        {
+          "selector": "[aria-busy=\"true\"]",
+          "requireInViewport": true
+        },
+        {
+          "selector": "[data-slot=\"skeleton\"]",
+          "minCount": 1,
+          "requireInViewport": true
+        }
+      ],
+      "forbiddenStates": [
+        {
+          "selector": "nextjs-portal",
+          "description": "Next.js development overlay"
+        },
+        {
+          "selector": "[data-nextjs-dialog-overlay]",
+          "description": "Next.js error overlay"
+        },
+        {
+          "selector": "[data-next-badge-root]",
+          "description": "Next.js development badge"
+        }
+      ],
+      "requiredVisibleText": [
+        {
+          "language": "en",
+          "requireInViewport": true,
+          "selector": "body",
+          "text": "Platform jobs"
+        },
+        {
+          "language": "en",
+          "requireInViewport": true,
+          "selector": "body",
+          "text": "Overview"
+        }
+      ],
+      "forbiddenVisibleText": [
+        {
+          "language": "ar",
+          "selector": "body",
+          "text": "مهام المنصة",
+          "viewportOnly": true
+        }
+      ],
+      "languageExceptions": [],
+      "stateContract": {
+        "marker": {
+          "selector": "[aria-busy=\"true\"]",
+          "requireInViewport": true
+        }
+      },
+      "expectedMime": "image/png",
+      "expectedFormat": "png",
+      "actualWidth": 1280,
+      "actualHeight": 720,
+      "sha256": "74a6c7c473f66eb683d838c4647fd13b0534db80d75aa9236efb8d6905a6cbef",
+      "families": [
+        "loading"
+      ],
+      "visualMetrics": {
+        "entropy": 2.9186,
+        "maxChannelStandardDeviation": 13.7674,
+        "approximateUniqueColors": 74,
+        "contentWidthRatio": 1,
+        "contentHeightRatio": 0.9167,
+        "contentPixelRatio": 0.8123,
+        "edgeDensity": 0.0189
+      },
+      "preflight": {
+        "pathname": "/admin/platform-jobs",
+        "route": "/admin/platform-jobs",
+        "locale": "en",
+        "direction": "ltr",
+        "theme": "dark",
+        "observedState": "loading",
+        "viewport": {
+          "width": 1280,
+          "height": 720
+        },
+        "localeEvidence": {
+          "browserLocale": "en-US",
+          "cookieLocale": "en",
+          "fixtureLanguage": "EN",
+          "fixtureUserId": "gate8c-visual-admin-user"
+        },
+        "documentReadyState": "complete",
+        "fontsReady": true,
+        "requiredLandmarks": [
+          {
+            "selector": "[data-business-admin-surface=\"admin\"]",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "main#main-content",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "[aria-busy=\"true\"]",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "[data-slot=\"skeleton\"]",
+            "count": 8,
+            "visibleCount": 8,
+            "inViewportCount": 8
+          }
+        ],
+        "forbiddenStates": [
+          {
+            "selector": "nextjs-portal",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-nextjs-dialog-overlay]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-next-badge-root]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          }
+        ],
+        "requiredVisibleText": [
+          {
+            "selector": "body",
+            "text": "Platform jobs",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "body",
+            "text": "Overview",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          }
+        ],
+        "forbiddenVisibleText": [
+          {
+            "selector": "body",
+            "text": "مهام المنصة",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          }
+        ],
+        "stateEvidence": {
+          "marker": "[aria-busy=\"true\"]",
+          "count": 1,
+          "visibleCount": 1,
+          "inViewportCount": 1,
+          "conflictingStates": []
+        },
+        "horizontalOverflowPx": 0,
+        "mainWidthRatio": 1,
+        "runningAnimations": 0,
+        "consoleErrors": [],
+        "pageErrors": [],
+        "failedResources": [],
+        "responseErrors": [],
+        "nonSyntheticEmails": [],
+        "realisticPhoneMatches": [],
+        "sensitiveTextMatches": [],
+        "visibleTextSha256": "cf115ebc973a58a727f5d7f30943b198205b3dfec4418f529a4205fb9bb95dc5",
+        "screenshotScope": "viewport"
+      },
+      "humanReview": {
+        "result": "PASS",
+        "reviewedAt": "2026-07-27",
+        "notes": "Fresh review: this intentional English loading-state capture contains the documented skeleton and no final-state controls or overlays."
+      }
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/admin-navigation-dialog-compact-ar-dark.png",
+      "route": "/admin",
+      "viewport": "compact",
+      "viewportWidth": 390,
+      "viewportHeight": 844,
+      "locale": "ar",
+      "direction": "rtl",
+      "theme": "dark",
+      "role": "root-super-admin",
+      "expectedState": "dialog-open",
+      "requiredLandmarks": [
+        {
+          "selector": "[data-business-admin-surface=\"admin\"]"
+        },
+        {
+          "selector": "main#main-content"
+        },
+        {
+          "selector": "h1"
+        },
+        {
+          "selector": "[role=\"dialog\"]",
+          "requireInViewport": true
+        },
+        {
+          "selector": "nav[aria-label=\"التنقل في لوحة الإدارة\"]"
+        }
+      ],
+      "forbiddenStates": [
+        {
+          "selector": "[aria-busy=\"true\"]",
+          "description": "loading state on a final capture"
+        },
+        {
+          "selector": "[data-slot=\"skeleton\"]",
+          "description": "skeleton on a final capture"
+        },
+        {
+          "selector": "nextjs-portal",
+          "description": "Next.js development overlay"
+        },
+        {
+          "selector": "[data-nextjs-dialog-overlay]",
+          "description": "Next.js error overlay"
+        },
+        {
+          "selector": "[data-next-badge-root]",
+          "description": "Next.js development badge"
+        }
+      ],
+      "requiredVisibleText": [
+        {
+          "language": "ar",
+          "requireInViewport": true,
+          "selector": "body",
+          "text": "مساحات الإدارة"
+        },
+        {
+          "language": "ar",
+          "requireInViewport": true,
+          "selector": "body",
+          "text": "نظرة عامة"
+        }
+      ],
+      "forbiddenVisibleText": [
+        {
+          "language": "en",
+          "selector": "body",
+          "text": "Admin workspaces",
+          "viewportOnly": true
+        }
+      ],
+      "languageExceptions": [],
+      "stateContract": {
+        "marker": {
+          "selector": "[role=\"dialog\"]",
+          "requireInViewport": true
+        }
+      },
+      "expectedMime": "image/png",
+      "expectedFormat": "png",
+      "actualWidth": 390,
+      "actualHeight": 844,
+      "sha256": "c471f2008dce72d3608b18d192ed58340e80da7f52c000145a4a096ebb064b71",
+      "families": [
+        "dialog"
+      ],
+      "visualMetrics": {
+        "entropy": 2.1131,
+        "maxChannelStandardDeviation": 17.323,
+        "approximateUniqueColors": 66,
+        "contentWidthRatio": 0.9688,
+        "contentHeightRatio": 0.9688,
+        "contentPixelRatio": 0.1502,
+        "edgeDensity": 0.0551
+      },
+      "preflight": {
+        "pathname": "/admin",
+        "route": "/admin",
+        "locale": "ar",
+        "direction": "rtl",
+        "theme": "dark",
+        "observedState": "dialog-open",
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "localeEvidence": {
+          "browserLocale": "ar-IQ",
+          "cookieLocale": "ar",
+          "fixtureLanguage": "AR",
+          "fixtureUserId": "gate8c-visual-admin-user"
+        },
+        "documentReadyState": "complete",
+        "fontsReady": true,
+        "requiredLandmarks": [
+          {
+            "selector": "[data-business-admin-surface=\"admin\"]",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "main#main-content",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "h1",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "[role=\"dialog\"]",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "nav[aria-label=\"التنقل في لوحة الإدارة\"]",
+            "count": 2,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          }
+        ],
+        "forbiddenStates": [
+          {
+            "selector": "[aria-busy=\"true\"]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-slot=\"skeleton\"]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "nextjs-portal",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-nextjs-dialog-overlay]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-next-badge-root]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          }
+        ],
+        "requiredVisibleText": [
+          {
+            "selector": "body",
+            "text": "مساحات الإدارة",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "body",
+            "text": "نظرة عامة",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          }
+        ],
+        "forbiddenVisibleText": [
+          {
+            "selector": "body",
+            "text": "Admin workspaces",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          }
+        ],
+        "stateEvidence": {
+          "marker": "[role=\"dialog\"]",
+          "count": 1,
+          "visibleCount": 1,
+          "inViewportCount": 1,
+          "conflictingStates": []
+        },
+        "horizontalOverflowPx": 0,
+        "mainWidthRatio": 1,
+        "runningAnimations": 0,
+        "consoleErrors": [],
+        "pageErrors": [],
+        "failedResources": [],
+        "responseErrors": [],
+        "nonSyntheticEmails": [],
+        "realisticPhoneMatches": [],
+        "sensitiveTextMatches": [],
+        "visibleTextSha256": "53cdf709191e4d5190c7062c66fa79b4822bbc6ae0fcf1b2afbfb1042722933e",
+        "screenshotScope": "viewport"
+      },
+      "humanReview": {
+        "result": "PASS",
+        "reviewedAt": "2026-07-27",
+        "notes": "Fresh review: the Arabic navigation sheet opens on the RTL edge, exposes localized destinations, and preserves a usable compact width."
+      }
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/admin-navigation-dialog-compact-en-dark.png",
+      "route": "/admin",
+      "viewport": "compact",
+      "viewportWidth": 390,
+      "viewportHeight": 844,
+      "locale": "en",
+      "direction": "ltr",
+      "theme": "dark",
+      "role": "root-super-admin",
+      "expectedState": "dialog-open",
+      "requiredLandmarks": [
+        {
+          "selector": "[data-business-admin-surface=\"admin\"]"
+        },
+        {
+          "selector": "main#main-content"
+        },
+        {
+          "selector": "h1"
+        },
+        {
+          "selector": "[role=\"dialog\"]",
+          "requireInViewport": true
+        },
+        {
+          "selector": "nav[aria-label=\"Admin dashboard navigation\"]"
+        }
+      ],
+      "forbiddenStates": [
+        {
+          "selector": "[aria-busy=\"true\"]",
+          "description": "loading state on a final capture"
+        },
+        {
+          "selector": "[data-slot=\"skeleton\"]",
+          "description": "skeleton on a final capture"
+        },
+        {
+          "selector": "nextjs-portal",
+          "description": "Next.js development overlay"
+        },
+        {
+          "selector": "[data-nextjs-dialog-overlay]",
+          "description": "Next.js error overlay"
+        },
+        {
+          "selector": "[data-next-badge-root]",
+          "description": "Next.js development badge"
+        }
+      ],
+      "requiredVisibleText": [
+        {
+          "language": "en",
+          "requireInViewport": true,
+          "selector": "body",
+          "text": "Admin workspaces"
+        },
+        {
+          "language": "en",
+          "requireInViewport": true,
+          "selector": "body",
+          "text": "Overview"
+        }
+      ],
+      "forbiddenVisibleText": [
+        {
+          "language": "ar",
+          "selector": "body",
+          "text": "مساحات الإدارة",
+          "viewportOnly": true
+        }
+      ],
+      "languageExceptions": [],
+      "stateContract": {
+        "marker": {
+          "selector": "[role=\"dialog\"]",
+          "requireInViewport": true
+        }
+      },
+      "expectedMime": "image/png",
+      "expectedFormat": "png",
+      "actualWidth": 390,
+      "actualHeight": 844,
+      "sha256": "bc9af4b19d49618ae0c7562ced600eae5de8ee33f62e0cf01e3362510c1bb706",
+      "families": [
+        "dialog"
+      ],
+      "visualMetrics": {
+        "entropy": 2.1725,
+        "maxChannelStandardDeviation": 17.9473,
+        "approximateUniqueColors": 67,
+        "contentWidthRatio": 0.9688,
+        "contentHeightRatio": 0.9583,
+        "contentPixelRatio": 0.1605,
+        "edgeDensity": 0.0596
+      },
+      "preflight": {
+        "pathname": "/admin",
+        "route": "/admin",
+        "locale": "en",
+        "direction": "ltr",
+        "theme": "dark",
+        "observedState": "dialog-open",
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "localeEvidence": {
+          "browserLocale": "en-US",
+          "cookieLocale": "en",
+          "fixtureLanguage": "EN",
+          "fixtureUserId": "gate8c-visual-admin-user"
+        },
+        "documentReadyState": "complete",
+        "fontsReady": true,
+        "requiredLandmarks": [
+          {
+            "selector": "[data-business-admin-surface=\"admin\"]",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "main#main-content",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "h1",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "[role=\"dialog\"]",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "nav[aria-label=\"Admin dashboard navigation\"]",
+            "count": 2,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          }
+        ],
+        "forbiddenStates": [
+          {
+            "selector": "[aria-busy=\"true\"]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-slot=\"skeleton\"]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "nextjs-portal",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-nextjs-dialog-overlay]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-next-badge-root]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          }
+        ],
+        "requiredVisibleText": [
+          {
+            "selector": "body",
+            "text": "Admin workspaces",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "body",
+            "text": "Overview",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          }
+        ],
+        "forbiddenVisibleText": [
+          {
+            "selector": "body",
+            "text": "مساحات الإدارة",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          }
+        ],
+        "stateEvidence": {
+          "marker": "[role=\"dialog\"]",
+          "count": 1,
+          "visibleCount": 1,
+          "inViewportCount": 1,
+          "conflictingStates": []
+        },
+        "horizontalOverflowPx": 0,
+        "mainWidthRatio": 1,
+        "runningAnimations": 0,
+        "consoleErrors": [],
+        "pageErrors": [],
+        "failedResources": [],
+        "responseErrors": [],
+        "nonSyntheticEmails": [],
+        "realisticPhoneMatches": [],
+        "sensitiveTextMatches": [],
+        "visibleTextSha256": "67f236a9ed1f43a15f60981188d954f64cbe601e71cb8010742874e3937e1580",
+        "screenshotScope": "viewport"
+      },
+      "humanReview": {
+        "result": "PASS",
+        "reviewedAt": "2026-07-27",
+        "notes": "Fresh review: the English navigation sheet opens on the LTR edge, remains full-width for compact mode, and has no horizontal collapse."
+      }
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/admin-overview-compact-ar-dark.png",
+      "route": "/admin",
+      "viewport": "compact",
+      "viewportWidth": 390,
+      "viewportHeight": 844,
+      "locale": "ar",
+      "direction": "rtl",
+      "theme": "dark",
+      "role": "root-super-admin",
+      "expectedState": "final",
+      "requiredLandmarks": [
+        {
+          "selector": "[data-business-admin-surface=\"admin\"]"
+        },
+        {
+          "selector": "main#main-content"
+        },
+        {
+          "selector": "h1"
+        },
+        {
+          "selector": "button[aria-label=\"فتح قائمة الإدارة\"]"
+        }
+      ],
+      "forbiddenStates": [
+        {
+          "selector": "[aria-busy=\"true\"]",
+          "description": "loading state on a final capture"
+        },
+        {
+          "selector": "[data-slot=\"skeleton\"]",
+          "description": "skeleton on a final capture"
+        },
+        {
+          "selector": "nextjs-portal",
+          "description": "Next.js development overlay"
+        },
+        {
+          "selector": "[data-nextjs-dialog-overlay]",
+          "description": "Next.js error overlay"
+        },
+        {
+          "selector": "[data-next-badge-root]",
+          "description": "Next.js development badge"
+        }
+      ],
+      "requiredVisibleText": [
+        {
+          "language": "ar",
+          "requireInViewport": true,
+          "selector": "body",
+          "text": "مركز تحكم المنصة"
+        },
+        {
+          "language": "ar",
+          "requireInViewport": true,
+          "selector": "body",
+          "text": "إجمالي الأنشطة"
+        }
+      ],
+      "forbiddenVisibleText": [
+        {
+          "language": "en",
+          "selector": "body",
+          "text": "Platform control center",
+          "viewportOnly": true
+        }
+      ],
+      "languageExceptions": [
+        "REZNO",
+        "database and runtime enum values"
+      ],
+      "stateContract": {
+        "marker": {
+          "selector": "main#main-content",
+          "requireInViewport": true
+        }
+      },
+      "expectedMime": "image/png",
+      "expectedFormat": "png",
+      "actualWidth": 390,
+      "actualHeight": 844,
+      "sha256": "27d7d1e34e75f9d0543dc25e987ea639a37d9ed70c43d8d08e39e11a0b613ea0",
+      "families": [
+        "dense-data"
+      ],
+      "visualMetrics": {
+        "entropy": 3.4972,
+        "maxChannelStandardDeviation": 26.1054,
+        "approximateUniqueColors": 140,
+        "contentWidthRatio": 1,
+        "contentHeightRatio": 1,
+        "contentPixelRatio": 0.2784,
+        "edgeDensity": 0.0619
+      },
+      "preflight": {
+        "pathname": "/admin",
+        "route": "/admin",
+        "locale": "ar",
+        "direction": "rtl",
+        "theme": "dark",
+        "observedState": "final",
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "localeEvidence": {
+          "browserLocale": "ar-IQ",
+          "cookieLocale": "ar",
+          "fixtureLanguage": "AR",
+          "fixtureUserId": "gate8c-visual-admin-user"
+        },
+        "documentReadyState": "complete",
+        "fontsReady": true,
+        "requiredLandmarks": [
+          {
+            "selector": "[data-business-admin-surface=\"admin\"]",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "main#main-content",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "h1",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "button[aria-label=\"فتح قائمة الإدارة\"]",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          }
+        ],
+        "forbiddenStates": [
+          {
+            "selector": "[aria-busy=\"true\"]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-slot=\"skeleton\"]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "nextjs-portal",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-nextjs-dialog-overlay]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-next-badge-root]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          }
+        ],
+        "requiredVisibleText": [
+          {
+            "selector": "body",
+            "text": "مركز تحكم المنصة",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "body",
+            "text": "إجمالي الأنشطة",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          }
+        ],
+        "forbiddenVisibleText": [
+          {
+            "selector": "body",
+            "text": "Platform control center",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          }
+        ],
+        "stateEvidence": {
+          "marker": "main#main-content",
+          "count": 1,
+          "visibleCount": 1,
+          "inViewportCount": 1,
+          "conflictingStates": []
+        },
+        "horizontalOverflowPx": 0,
+        "mainWidthRatio": 1,
+        "runningAnimations": 0,
+        "consoleErrors": [],
+        "pageErrors": [],
+        "failedResources": [],
+        "responseErrors": [],
+        "nonSyntheticEmails": [],
+        "realisticPhoneMatches": [],
+        "sensitiveTextMatches": [],
+        "visibleTextSha256": "025f85ac77a603c56edc69bb5a07a64baa3fec9ff41297034e6b6fb61469e38d",
+        "screenshotScope": "viewport"
+      },
+      "humanReview": {
+        "result": "PASS",
+        "reviewedAt": "2026-07-27",
+        "notes": "Fresh review: the Arabic compact control-center heading and stacked metrics consume the viewport normally with correct RTL alignment."
+      }
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/admin-overview-compact-en-dark.png",
+      "route": "/admin",
+      "viewport": "compact",
+      "viewportWidth": 390,
+      "viewportHeight": 844,
+      "locale": "en",
+      "direction": "ltr",
+      "theme": "dark",
+      "role": "root-super-admin",
+      "expectedState": "final",
+      "requiredLandmarks": [
+        {
+          "selector": "[data-business-admin-surface=\"admin\"]"
+        },
+        {
+          "selector": "main#main-content"
+        },
+        {
+          "selector": "h1"
+        },
+        {
+          "selector": "button[aria-label=\"Open admin menu\"]"
+        }
+      ],
+      "forbiddenStates": [
+        {
+          "selector": "[aria-busy=\"true\"]",
+          "description": "loading state on a final capture"
+        },
+        {
+          "selector": "[data-slot=\"skeleton\"]",
+          "description": "skeleton on a final capture"
+        },
+        {
+          "selector": "nextjs-portal",
+          "description": "Next.js development overlay"
+        },
+        {
+          "selector": "[data-nextjs-dialog-overlay]",
+          "description": "Next.js error overlay"
+        },
+        {
+          "selector": "[data-next-badge-root]",
+          "description": "Next.js development badge"
+        }
+      ],
+      "requiredVisibleText": [
+        {
+          "language": "en",
+          "requireInViewport": true,
+          "selector": "body",
+          "text": "Platform control center"
+        },
+        {
+          "language": "en",
+          "requireInViewport": true,
+          "selector": "body",
+          "text": "Total businesses"
+        }
+      ],
+      "forbiddenVisibleText": [
+        {
+          "language": "ar",
+          "selector": "body",
+          "text": "مركز تحكم المنصة",
+          "viewportOnly": true
+        }
+      ],
+      "languageExceptions": [
+        "REZNO",
+        "database and runtime enum values"
+      ],
+      "stateContract": {
+        "marker": {
+          "selector": "main#main-content",
+          "requireInViewport": true
+        }
+      },
+      "expectedMime": "image/png",
+      "expectedFormat": "png",
+      "actualWidth": 390,
+      "actualHeight": 844,
+      "sha256": "1217a67e60249415f42bc80c9ad71bfe8baeb9f94ff95eea701d5b6131bab6c9",
+      "families": [
+        "dense-data"
+      ],
+      "visualMetrics": {
+        "entropy": 3.524,
+        "maxChannelStandardDeviation": 26.9421,
+        "approximateUniqueColors": 145,
+        "contentWidthRatio": 1,
+        "contentHeightRatio": 1,
+        "contentPixelRatio": 0.2788,
+        "edgeDensity": 0.0634
+      },
+      "preflight": {
+        "pathname": "/admin",
+        "route": "/admin",
+        "locale": "en",
+        "direction": "ltr",
+        "theme": "dark",
+        "observedState": "final",
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "localeEvidence": {
+          "browserLocale": "en-US",
+          "cookieLocale": "en",
+          "fixtureLanguage": "EN",
+          "fixtureUserId": "gate8c-visual-admin-user"
+        },
+        "documentReadyState": "complete",
+        "fontsReady": true,
+        "requiredLandmarks": [
+          {
+            "selector": "[data-business-admin-surface=\"admin\"]",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "main#main-content",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "h1",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "button[aria-label=\"Open admin menu\"]",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          }
+        ],
+        "forbiddenStates": [
+          {
+            "selector": "[aria-busy=\"true\"]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-slot=\"skeleton\"]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "nextjs-portal",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-nextjs-dialog-overlay]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-next-badge-root]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          }
+        ],
+        "requiredVisibleText": [
+          {
+            "selector": "body",
+            "text": "Platform control center",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "body",
+            "text": "Total businesses",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          }
+        ],
+        "forbiddenVisibleText": [
+          {
+            "selector": "body",
+            "text": "مركز تحكم المنصة",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          }
+        ],
+        "stateEvidence": {
+          "marker": "main#main-content",
+          "count": 1,
+          "visibleCount": 1,
+          "inViewportCount": 1,
+          "conflictingStates": []
+        },
+        "horizontalOverflowPx": 0,
+        "mainWidthRatio": 1,
+        "runningAnimations": 0,
+        "consoleErrors": [],
+        "pageErrors": [],
+        "failedResources": [],
+        "responseErrors": [],
+        "nonSyntheticEmails": [],
+        "realisticPhoneMatches": [],
+        "sensitiveTextMatches": [],
+        "visibleTextSha256": "3bf9fffc38319335b7584fd8d39b7e32d384d38053a60db0aab61541957ffe96",
+        "screenshotScope": "viewport"
+      },
+      "humanReview": {
+        "result": "PASS",
+        "reviewedAt": "2026-07-27",
+        "notes": "Fresh review: the English compact control center is genuinely English and uses the full content column instead of a narrow strip."
+      }
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/admin-overview-desktop-ar-light.png",
+      "route": "/admin",
+      "viewport": "desktop",
+      "viewportWidth": 1440,
+      "viewportHeight": 1000,
+      "locale": "ar",
+      "direction": "rtl",
+      "theme": "light",
+      "role": "root-super-admin",
+      "expectedState": "final",
+      "requiredLandmarks": [
+        {
+          "selector": "[data-business-admin-surface=\"admin\"]"
+        },
+        {
+          "selector": "main#main-content"
+        },
+        {
+          "selector": "h1"
+        },
+        {
+          "selector": "nav[aria-label=\"التنقل في لوحة الإدارة\"]"
+        }
+      ],
+      "forbiddenStates": [
+        {
+          "selector": "[aria-busy=\"true\"]",
+          "description": "loading state on a final capture"
+        },
+        {
+          "selector": "[data-slot=\"skeleton\"]",
+          "description": "skeleton on a final capture"
+        },
+        {
+          "selector": "nextjs-portal",
+          "description": "Next.js development overlay"
+        },
+        {
+          "selector": "[data-nextjs-dialog-overlay]",
+          "description": "Next.js error overlay"
+        },
+        {
+          "selector": "[data-next-badge-root]",
+          "description": "Next.js development badge"
+        }
+      ],
+      "requiredVisibleText": [
+        {
+          "language": "ar",
+          "requireInViewport": true,
+          "selector": "body",
+          "text": "مركز تحكم المنصة"
+        },
+        {
+          "language": "ar",
+          "requireInViewport": true,
+          "selector": "body",
+          "text": "أحدث الأنشطة"
+        }
+      ],
+      "forbiddenVisibleText": [
+        {
+          "language": "en",
+          "selector": "body",
+          "text": "Platform control center",
+          "viewportOnly": true
+        }
+      ],
+      "languageExceptions": [
+        "REZNO",
+        "database and runtime enum values"
+      ],
+      "stateContract": {
+        "marker": {
+          "selector": "main#main-content",
+          "requireInViewport": true
+        }
+      },
+      "expectedMime": "image/png",
+      "expectedFormat": "png",
+      "actualWidth": 1440,
+      "actualHeight": 1000,
+      "sha256": "b97a451946166fa5163a41d80571fb52de68e8b3962c9c13e0aa3d2766aef881",
+      "families": [
+        "dense-data"
+      ],
+      "visualMetrics": {
+        "entropy": 2.9691,
+        "maxChannelStandardDeviation": 23.0745,
+        "approximateUniqueColors": 119,
+        "contentWidthRatio": 0.9271,
+        "contentHeightRatio": 0.5729,
+        "contentPixelRatio": 0.227,
+        "edgeDensity": 0.0493
+      },
+      "preflight": {
+        "pathname": "/admin",
+        "route": "/admin",
+        "locale": "ar",
+        "direction": "rtl",
+        "theme": "light",
+        "observedState": "final",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "localeEvidence": {
+          "browserLocale": "ar-IQ",
+          "cookieLocale": "ar",
+          "fixtureLanguage": "AR",
+          "fixtureUserId": "gate8c-visual-admin-user"
+        },
+        "documentReadyState": "complete",
+        "fontsReady": true,
+        "requiredLandmarks": [
+          {
+            "selector": "[data-business-admin-surface=\"admin\"]",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "main#main-content",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "h1",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "nav[aria-label=\"التنقل في لوحة الإدارة\"]",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          }
+        ],
+        "forbiddenStates": [
+          {
+            "selector": "[aria-busy=\"true\"]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-slot=\"skeleton\"]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "nextjs-portal",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-nextjs-dialog-overlay]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-next-badge-root]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          }
+        ],
+        "requiredVisibleText": [
+          {
+            "selector": "body",
+            "text": "مركز تحكم المنصة",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "body",
+            "text": "أحدث الأنشطة",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          }
+        ],
+        "forbiddenVisibleText": [
+          {
+            "selector": "body",
+            "text": "Platform control center",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          }
+        ],
+        "stateEvidence": {
+          "marker": "main#main-content",
+          "count": 1,
+          "visibleCount": 1,
+          "inViewportCount": 1,
+          "conflictingStates": []
+        },
+        "horizontalOverflowPx": 0,
+        "mainWidthRatio": 0.8889,
+        "runningAnimations": 0,
+        "consoleErrors": [],
+        "pageErrors": [],
+        "failedResources": [],
+        "responseErrors": [],
+        "nonSyntheticEmails": [],
+        "realisticPhoneMatches": [],
+        "sensitiveTextMatches": [],
+        "visibleTextSha256": "b57b7f4b48c8f362c48634e7251f18ed42a2411302369e1178f62ac99fd10775",
+        "screenshotScope": "viewport"
+      },
+      "humanReview": {
+        "result": "PASS",
+        "reviewedAt": "2026-07-27",
+        "notes": "Fresh review: the Arabic desktop control center shows localized metrics and fixed fixture businesses in a complete light RTL layout."
+      }
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/admin-overview-desktop-en-light.png",
+      "route": "/admin",
+      "viewport": "desktop",
+      "viewportWidth": 1440,
+      "viewportHeight": 1000,
+      "locale": "en",
+      "direction": "ltr",
+      "theme": "light",
+      "role": "root-super-admin",
+      "expectedState": "final",
+      "requiredLandmarks": [
+        {
+          "selector": "[data-business-admin-surface=\"admin\"]"
+        },
+        {
+          "selector": "main#main-content"
+        },
+        {
+          "selector": "h1"
+        },
+        {
+          "selector": "nav[aria-label=\"Admin dashboard navigation\"]"
+        }
+      ],
+      "forbiddenStates": [
+        {
+          "selector": "[aria-busy=\"true\"]",
+          "description": "loading state on a final capture"
+        },
+        {
+          "selector": "[data-slot=\"skeleton\"]",
+          "description": "skeleton on a final capture"
+        },
+        {
+          "selector": "nextjs-portal",
+          "description": "Next.js development overlay"
+        },
+        {
+          "selector": "[data-nextjs-dialog-overlay]",
+          "description": "Next.js error overlay"
+        },
+        {
+          "selector": "[data-next-badge-root]",
+          "description": "Next.js development badge"
+        }
+      ],
+      "requiredVisibleText": [
+        {
+          "language": "en",
+          "requireInViewport": true,
+          "selector": "body",
+          "text": "Platform control center"
+        },
+        {
+          "language": "en",
+          "requireInViewport": true,
+          "selector": "body",
+          "text": "Recent businesses"
+        }
+      ],
+      "forbiddenVisibleText": [
+        {
+          "language": "ar",
+          "selector": "body",
+          "text": "مركز تحكم المنصة",
+          "viewportOnly": true
+        }
+      ],
+      "languageExceptions": [
+        "REZNO",
+        "database and runtime enum values"
+      ],
+      "stateContract": {
+        "marker": {
+          "selector": "main#main-content",
+          "requireInViewport": true
+        }
+      },
+      "expectedMime": "image/png",
+      "expectedFormat": "png",
+      "actualWidth": 1440,
+      "actualHeight": 1000,
+      "sha256": "a8e13256c39b11a81387595e9e085486878ae325752b6e1c31778d32e424a94f",
+      "families": [
+        "dense-data"
+      ],
+      "visualMetrics": {
+        "entropy": 3.007,
+        "maxChannelStandardDeviation": 24.2377,
+        "approximateUniqueColors": 121,
+        "contentWidthRatio": 0.9375,
+        "contentHeightRatio": 0.5729,
+        "contentPixelRatio": 0.2307,
+        "edgeDensity": 0.0525
+      },
+      "preflight": {
+        "pathname": "/admin",
+        "route": "/admin",
+        "locale": "en",
+        "direction": "ltr",
+        "theme": "light",
+        "observedState": "final",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "localeEvidence": {
+          "browserLocale": "en-US",
+          "cookieLocale": "en",
+          "fixtureLanguage": "EN",
+          "fixtureUserId": "gate8c-visual-admin-user"
+        },
+        "documentReadyState": "complete",
+        "fontsReady": true,
+        "requiredLandmarks": [
+          {
+            "selector": "[data-business-admin-surface=\"admin\"]",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "main#main-content",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "h1",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "nav[aria-label=\"Admin dashboard navigation\"]",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          }
+        ],
+        "forbiddenStates": [
+          {
+            "selector": "[aria-busy=\"true\"]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-slot=\"skeleton\"]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "nextjs-portal",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-nextjs-dialog-overlay]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-next-badge-root]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          }
+        ],
+        "requiredVisibleText": [
+          {
+            "selector": "body",
+            "text": "Platform control center",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "body",
+            "text": "Recent businesses",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          }
+        ],
+        "forbiddenVisibleText": [
+          {
+            "selector": "body",
+            "text": "مركز تحكم المنصة",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          }
+        ],
+        "stateEvidence": {
+          "marker": "main#main-content",
+          "count": 1,
+          "visibleCount": 1,
+          "inViewportCount": 1,
+          "conflictingStates": []
+        },
+        "horizontalOverflowPx": 0,
+        "mainWidthRatio": 0.8889,
+        "runningAnimations": 0,
+        "consoleErrors": [],
+        "pageErrors": [],
+        "failedResources": [],
+        "responseErrors": [],
+        "nonSyntheticEmails": [],
+        "realisticPhoneMatches": [],
+        "sensitiveTextMatches": [],
+        "visibleTextSha256": "61cc2ab11e66df294a136d029d5805396fb5074bb6dcdc9e7e64f5eb726d92db",
+        "screenshotScope": "viewport"
+      },
+      "humanReview": {
+        "result": "PASS",
+        "reviewedAt": "2026-07-27",
+        "notes": "Fresh review: the English desktop control center shows the same deterministic state in a complete light LTR layout without clipping."
+      }
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/admin-permission-denied-compact-en-dark.png",
+      "route": "/admin",
+      "viewport": "compact",
+      "viewportWidth": 390,
+      "viewportHeight": 844,
+      "locale": "en",
+      "direction": "ltr",
+      "theme": "dark",
+      "role": "authenticated-non-admin",
+      "expectedState": "permission-denied",
+      "requiredLandmarks": [
+        {
+          "selector": "h1",
+          "requireInViewport": true
+        },
+        {
+          "selector": "text=403",
+          "requireInViewport": true
+        },
+        {
+          "selector": "a[href=\"/\"]",
+          "requireInViewport": true
+        }
+      ],
+      "forbiddenStates": [
+        {
+          "selector": "[aria-busy=\"true\"]",
+          "description": "loading state on a final capture"
+        },
+        {
+          "selector": "[data-slot=\"skeleton\"]",
+          "description": "skeleton on a final capture"
+        },
+        {
+          "selector": "nextjs-portal",
+          "description": "Next.js development overlay"
+        },
+        {
+          "selector": "[data-nextjs-dialog-overlay]",
+          "description": "Next.js error overlay"
+        },
+        {
+          "selector": "[data-next-badge-root]",
+          "description": "Next.js development badge"
+        }
+      ],
+      "requiredVisibleText": [
+        {
+          "language": "en",
+          "requireInViewport": true,
+          "selector": "body",
+          "text": "Access unavailable"
+        },
+        {
+          "language": "en",
+          "requireInViewport": true,
+          "selector": "body",
+          "text": "cannot access this area"
+        }
+      ],
+      "forbiddenVisibleText": [
+        {
+          "language": "ar",
+          "selector": "body",
+          "text": "غير مصرح",
+          "viewportOnly": true
+        }
+      ],
+      "languageExceptions": [
+        "403"
+      ],
+      "stateContract": {
+        "marker": {
+          "selector": "h1",
+          "requireInViewport": true
+        }
+      },
+      "expectedMime": "image/png",
+      "expectedFormat": "png",
+      "actualWidth": 390,
+      "actualHeight": 844,
+      "sha256": "e121f916313b0e412db551a543b409d3ea5df478c303383c9ede3257f415f653",
+      "families": [
+        "permission",
+        "error"
+      ],
+      "visualMetrics": {
+        "entropy": 4.353,
+        "maxChannelStandardDeviation": 28.2546,
+        "approximateUniqueColors": 118,
+        "contentWidthRatio": 1,
+        "contentHeightRatio": 1,
+        "contentPixelRatio": 0.4367,
+        "edgeDensity": 0.0453
+      },
+      "preflight": {
+        "pathname": "/admin",
+        "route": "/admin",
+        "locale": "en",
+        "direction": "ltr",
+        "theme": "dark",
+        "observedState": "permission-denied",
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "localeEvidence": {
+          "browserLocale": "en-US",
+          "cookieLocale": "en",
+          "fixtureLanguage": "EN",
+          "fixtureUserId": "gate8c-visual-candidate-user"
+        },
+        "documentReadyState": "complete",
+        "fontsReady": true,
+        "requiredLandmarks": [
+          {
+            "selector": "h1",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "text=403",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "a[href=\"/\"]",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          }
+        ],
+        "forbiddenStates": [
+          {
+            "selector": "[aria-busy=\"true\"]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-slot=\"skeleton\"]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "nextjs-portal",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-nextjs-dialog-overlay]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-next-badge-root]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          }
+        ],
+        "requiredVisibleText": [
+          {
+            "selector": "body",
+            "text": "Access unavailable",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "body",
+            "text": "cannot access this area",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          }
+        ],
+        "forbiddenVisibleText": [
+          {
+            "selector": "body",
+            "text": "غير مصرح",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          }
+        ],
+        "stateEvidence": {
+          "marker": "h1",
+          "count": 1,
+          "visibleCount": 1,
+          "inViewportCount": 1,
+          "conflictingStates": []
+        },
+        "horizontalOverflowPx": 0,
+        "mainWidthRatio": 1,
+        "runningAnimations": 0,
+        "consoleErrors": [],
+        "pageErrors": [],
+        "failedResources": [],
+        "responseErrors": [],
+        "nonSyntheticEmails": [],
+        "realisticPhoneMatches": [],
+        "sensitiveTextMatches": [],
+        "visibleTextSha256": "eb100e8cbf96928e67b1a30e81f424467d36e8d62421204c0055ffaf61b10a87",
+        "screenshotScope": "viewport"
+      },
+      "humanReview": {
+        "result": "PASS",
+        "reviewedAt": "2026-07-27",
+        "notes": "Fresh review: the English permission-denied page is a final 403 surface with a reachable home action and no protected application data."
+      }
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/admin-platform-jobs-truth-desktop-ar-light.png",
+      "route": "/admin/platform-jobs",
+      "viewport": "desktop",
+      "viewportWidth": 1440,
+      "viewportHeight": 1000,
+      "locale": "ar",
+      "direction": "rtl",
+      "theme": "light",
+      "role": "root-super-admin",
+      "expectedState": "final",
+      "requiredLandmarks": [
+        {
+          "selector": "[data-business-admin-surface=\"admin\"]"
+        },
+        {
+          "selector": "main#main-content"
+        },
+        {
+          "selector": "h1"
+        },
+        {
+          "selector": "[role=\"status\"]"
+        }
+      ],
+      "forbiddenStates": [
+        {
+          "selector": "[aria-busy=\"true\"]",
+          "description": "loading state on a final capture"
+        },
+        {
+          "selector": "[data-slot=\"skeleton\"]",
+          "description": "skeleton on a final capture"
+        },
+        {
+          "selector": "nextjs-portal",
+          "description": "Next.js development overlay"
+        },
+        {
+          "selector": "[data-nextjs-dialog-overlay]",
+          "description": "Next.js error overlay"
+        },
+        {
+          "selector": "[data-next-badge-root]",
+          "description": "Next.js development badge"
+        }
+      ],
+      "requiredVisibleText": [
+        {
+          "language": "ar",
+          "requireInViewport": true,
+          "selector": "body",
+          "text": "مهام المنصة"
+        },
+        {
+          "language": "ar",
+          "requireInViewport": true,
+          "selector": "body",
+          "text": "وقت تشغيل المرحلة السادسة غير مفعّل"
+        }
+      ],
+      "forbiddenVisibleText": [
+        {
+          "language": "en",
+          "selector": "body",
+          "text": "Stage 6 runtime is not activated",
+          "viewportOnly": true
+        }
+      ],
+      "languageExceptions": [
+        "job type/status/source enum identifiers",
+        "runtime architecture values"
+      ],
+      "stateContract": {
+        "marker": {
+          "selector": "[role=\"status\"]",
+          "requireInViewport": true
+        }
+      },
+      "expectedMime": "image/png",
+      "expectedFormat": "png",
+      "actualWidth": 1440,
+      "actualHeight": 1000,
+      "sha256": "61ce6cc6cf1ce98e5be95fd9e90ddb1cfb4aa6e8f97ec6a7f24369400816f8b6",
+      "families": [
+        "platform",
+        "dense-data"
+      ],
+      "visualMetrics": {
+        "entropy": 3.3877,
+        "maxChannelStandardDeviation": 24.5331,
+        "approximateUniqueColors": 137,
+        "contentWidthRatio": 0.9271,
+        "contentHeightRatio": 0.7708,
+        "contentPixelRatio": 0.3156,
+        "edgeDensity": 0.0808
+      },
+      "preflight": {
+        "pathname": "/admin/platform-jobs",
+        "route": "/admin/platform-jobs",
+        "locale": "ar",
+        "direction": "rtl",
+        "theme": "light",
+        "observedState": "final",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "localeEvidence": {
+          "browserLocale": "ar-IQ",
+          "cookieLocale": "ar",
+          "fixtureLanguage": "AR",
+          "fixtureUserId": "gate8c-visual-admin-user"
+        },
+        "documentReadyState": "complete",
+        "fontsReady": true,
+        "requiredLandmarks": [
+          {
+            "selector": "[data-business-admin-surface=\"admin\"]",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "main#main-content",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "h1",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "[role=\"status\"]",
+            "count": 3,
+            "visibleCount": 3,
+            "inViewportCount": 3
+          }
+        ],
+        "forbiddenStates": [
+          {
+            "selector": "[aria-busy=\"true\"]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-slot=\"skeleton\"]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "nextjs-portal",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-nextjs-dialog-overlay]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-next-badge-root]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          }
+        ],
+        "requiredVisibleText": [
+          {
+            "selector": "body",
+            "text": "مهام المنصة",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "body",
+            "text": "وقت تشغيل المرحلة السادسة غير مفعّل",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          }
+        ],
+        "forbiddenVisibleText": [
+          {
+            "selector": "body",
+            "text": "Stage 6 runtime is not activated",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          }
+        ],
+        "stateEvidence": {
+          "marker": "[role=\"status\"]",
+          "count": 3,
+          "visibleCount": 3,
+          "inViewportCount": 3,
+          "conflictingStates": []
+        },
+        "horizontalOverflowPx": 0,
+        "mainWidthRatio": 0.8889,
+        "runningAnimations": 0,
+        "consoleErrors": [],
+        "pageErrors": [],
+        "failedResources": [],
+        "responseErrors": [],
+        "nonSyntheticEmails": [],
+        "realisticPhoneMatches": [],
+        "sensitiveTextMatches": [],
+        "visibleTextSha256": "3dc0ced100c2d4b6bca940d06cd695c095d1efbb2b6878ef81408902df6fa708",
+        "screenshotScope": "viewport"
+      },
+      "humanReview": {
+        "result": "PASS",
+        "reviewedAt": "2026-07-27",
+        "notes": "Fresh review: the Arabic platform-jobs page visibly states the inactive runtime truth and genuine empty jobs and schedules states."
+      }
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/business-notification-preferences-table-desktop-en-light.png",
+      "route": "/business/notifications",
+      "viewport": "desktop",
+      "viewportWidth": 1440,
+      "viewportHeight": 1000,
+      "locale": "en",
+      "direction": "ltr",
+      "theme": "light",
+      "role": "business-owner",
+      "expectedState": "final",
+      "requiredLandmarks": [
+        {
+          "selector": "[data-business-admin-surface=\"business\"]"
+        },
+        {
+          "selector": "main#main-content"
+        },
+        {
+          "selector": "h1"
+        },
+        {
+          "selector": "table",
+          "requireInViewport": true
+        }
+      ],
+      "forbiddenStates": [
+        {
+          "selector": "[aria-busy=\"true\"]",
+          "description": "loading state on a final capture"
+        },
+        {
+          "selector": "[data-slot=\"skeleton\"]",
+          "description": "skeleton on a final capture"
+        },
+        {
+          "selector": "nextjs-portal",
+          "description": "Next.js development overlay"
+        },
+        {
+          "selector": "[data-nextjs-dialog-overlay]",
+          "description": "Next.js error overlay"
+        },
+        {
+          "selector": "[data-next-badge-root]",
+          "description": "Next.js development badge"
+        }
+      ],
+      "requiredVisibleText": [
+        {
+          "language": "en",
+          "requireInViewport": true,
+          "selector": "body",
+          "text": "Outbound channel preferences"
+        },
+        {
+          "language": "en",
+          "requireInViewport": true,
+          "selector": "body",
+          "text": "Category"
+        }
+      ],
+      "forbiddenVisibleText": [
+        {
+          "language": "ar",
+          "selector": "body",
+          "text": "تفضيلات قنوات الإرسال",
+          "viewportOnly": true
+        }
+      ],
+      "languageExceptions": [
+        "EMAIL, SMS, PUSH and communication category enum identifiers"
+      ],
+      "stateContract": {
+        "marker": {
+          "selector": "table",
+          "requireInViewport": true
+        }
+      },
+      "expectedMime": "image/png",
+      "expectedFormat": "png",
+      "actualWidth": 1440,
+      "actualHeight": 1000,
+      "sha256": "9af3ed2fad8bba3dee71a7b47177f7b20a8d77172a881cd9ad9ff84c19ce938a",
+      "families": [
+        "communications",
+        "form",
+        "table"
+      ],
+      "visualMetrics": {
+        "entropy": 3.1885,
+        "maxChannelStandardDeviation": 88.3266,
+        "approximateUniqueColors": 179,
+        "contentWidthRatio": 1,
+        "contentHeightRatio": 1,
+        "contentPixelRatio": 1,
+        "edgeDensity": 0.0785
+      },
+      "preflight": {
+        "pathname": "/business/notifications",
+        "route": "/business/notifications",
+        "locale": "en",
+        "direction": "ltr",
+        "theme": "light",
+        "observedState": "final",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "localeEvidence": {
+          "browserLocale": "en-US",
+          "cookieLocale": "en",
+          "fixtureLanguage": "EN",
+          "fixtureUserId": "gate8c-visual-business-user"
+        },
+        "documentReadyState": "complete",
+        "fontsReady": true,
+        "requiredLandmarks": [
+          {
+            "selector": "[data-business-admin-surface=\"business\"]",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "main#main-content",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "h1",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "table",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          }
+        ],
+        "forbiddenStates": [
+          {
+            "selector": "[aria-busy=\"true\"]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-slot=\"skeleton\"]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "nextjs-portal",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-nextjs-dialog-overlay]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-next-badge-root]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          }
+        ],
+        "requiredVisibleText": [
+          {
+            "selector": "body",
+            "text": "Outbound channel preferences",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "body",
+            "text": "Category",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          }
+        ],
+        "forbiddenVisibleText": [
+          {
+            "selector": "body",
+            "text": "تفضيلات قنوات الإرسال",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          }
+        ],
+        "stateEvidence": {
+          "marker": "table",
+          "count": 1,
+          "visibleCount": 1,
+          "inViewportCount": 1,
+          "conflictingStates": []
+        },
+        "horizontalOverflowPx": 0,
+        "mainWidthRatio": 0.8222,
+        "runningAnimations": 0,
+        "consoleErrors": [],
+        "pageErrors": [],
+        "failedResources": [],
+        "responseErrors": [],
+        "nonSyntheticEmails": [],
+        "realisticPhoneMatches": [],
+        "sensitiveTextMatches": [],
+        "visibleTextSha256": "2706b3440baf7a77fc6e4a3c0dba083a8f124115323d947dfe442b3d643c2876",
+        "screenshotScope": "viewport"
+      },
+      "humanReview": {
+        "result": "PASS",
+        "reviewedAt": "2026-07-27",
+        "notes": "Fresh review: the English business notification preferences table is readable inside its desktop surface with no unintended page overflow."
+      }
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/admin-platform-operations-desktop-ar-light.png",
+      "route": "/admin/platform-operations",
+      "viewport": "desktop",
+      "viewportWidth": 1440,
+      "viewportHeight": 1000,
+      "locale": "ar",
+      "direction": "rtl",
+      "theme": "light",
+      "role": "root-super-admin",
+      "expectedState": "final",
+      "requiredLandmarks": [
+        {
+          "selector": "[data-business-admin-surface=\"admin\"]"
+        },
+        {
+          "selector": "main#main-content"
+        },
+        {
+          "selector": "h1"
+        },
+        {
+          "selector": "[role=\"status\"]"
+        }
+      ],
+      "forbiddenStates": [
+        {
+          "selector": "[aria-busy=\"true\"]",
+          "description": "loading state on a final capture"
+        },
+        {
+          "selector": "[data-slot=\"skeleton\"]",
+          "description": "skeleton on a final capture"
+        },
+        {
+          "selector": "nextjs-portal",
+          "description": "Next.js development overlay"
+        },
+        {
+          "selector": "[data-nextjs-dialog-overlay]",
+          "description": "Next.js error overlay"
+        },
+        {
+          "selector": "[data-next-badge-root]",
+          "description": "Next.js development badge"
+        }
+      ],
+      "requiredVisibleText": [
+        {
+          "language": "ar",
+          "requireInViewport": true,
+          "selector": "body",
+          "text": "عمليات المنصة"
+        },
+        {
+          "language": "ar",
+          "requireInViewport": true,
+          "selector": "body",
+          "text": "وقت تشغيل المرحلة السادسة غير مفعّل"
+        }
+      ],
+      "forbiddenVisibleText": [
+        {
+          "language": "en",
+          "selector": "body",
+          "text": "Platform operations",
+          "viewportOnly": true
+        }
+      ],
+      "languageExceptions": [
+        "provider/runtime enum identifiers",
+        "health metric identifiers"
+      ],
+      "stateContract": {
+        "marker": {
+          "selector": "[role=\"status\"]",
+          "requireInViewport": true
+        }
+      },
+      "expectedMime": "image/png",
+      "expectedFormat": "png",
+      "actualWidth": 1440,
+      "actualHeight": 1000,
+      "sha256": "45f7bd41b5ac1a28f51e647b1281cab8dfa7c476a026e59624cb8c734277e3e3",
+      "families": [
+        "platform"
+      ],
+      "visualMetrics": {
+        "entropy": 3.1668,
+        "maxChannelStandardDeviation": 28.0984,
+        "approximateUniqueColors": 143,
+        "contentWidthRatio": 0.9271,
+        "contentHeightRatio": 0.9896,
+        "contentPixelRatio": 0.417,
+        "edgeDensity": 0.0817
+      },
+      "preflight": {
+        "pathname": "/admin/platform-operations",
+        "route": "/admin/platform-operations",
+        "locale": "ar",
+        "direction": "rtl",
+        "theme": "light",
+        "observedState": "final",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "localeEvidence": {
+          "browserLocale": "ar-IQ",
+          "cookieLocale": "ar",
+          "fixtureLanguage": "AR",
+          "fixtureUserId": "gate8c-visual-admin-user"
+        },
+        "documentReadyState": "complete",
+        "fontsReady": true,
+        "requiredLandmarks": [
+          {
+            "selector": "[data-business-admin-surface=\"admin\"]",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "main#main-content",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "h1",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "[role=\"status\"]",
+            "count": 3,
+            "visibleCount": 3,
+            "inViewportCount": 1
+          }
+        ],
+        "forbiddenStates": [
+          {
+            "selector": "[aria-busy=\"true\"]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-slot=\"skeleton\"]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "nextjs-portal",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-nextjs-dialog-overlay]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-next-badge-root]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          }
+        ],
+        "requiredVisibleText": [
+          {
+            "selector": "body",
+            "text": "عمليات المنصة",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "body",
+            "text": "وقت تشغيل المرحلة السادسة غير مفعّل",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          }
+        ],
+        "forbiddenVisibleText": [
+          {
+            "selector": "body",
+            "text": "Platform operations",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          }
+        ],
+        "stateEvidence": {
+          "marker": "[role=\"status\"]",
+          "count": 3,
+          "visibleCount": 3,
+          "inViewportCount": 1,
+          "conflictingStates": []
+        },
+        "horizontalOverflowPx": 0,
+        "mainWidthRatio": 0.8889,
+        "runningAnimations": 0,
+        "consoleErrors": [],
+        "pageErrors": [],
+        "failedResources": [],
+        "responseErrors": [],
+        "nonSyntheticEmails": [],
+        "realisticPhoneMatches": [],
+        "sensitiveTextMatches": [],
+        "visibleTextSha256": "d2bc5d991871054def7cec042ce39a60ea3e04821023f3146347fe53acac0ce0",
+        "screenshotScope": "viewport"
+      },
+      "humanReview": {
+        "result": "PASS",
+        "reviewedAt": "2026-07-27",
+        "notes": "Fresh review: the Arabic platform-operations dashboard displays localized runtime warning, zero metrics, and disabled provider truth."
+      }
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/admin-platform-operations-desktop-en-dark.png",
+      "route": "/admin/platform-operations",
+      "viewport": "desktop",
+      "viewportWidth": 1440,
+      "viewportHeight": 1000,
+      "locale": "en",
+      "direction": "ltr",
+      "theme": "dark",
+      "role": "root-super-admin",
+      "expectedState": "final",
+      "requiredLandmarks": [
+        {
+          "selector": "[data-business-admin-surface=\"admin\"]"
+        },
+        {
+          "selector": "main#main-content"
+        },
+        {
+          "selector": "h1"
+        },
+        {
+          "selector": "[role=\"status\"]"
+        }
+      ],
+      "forbiddenStates": [
+        {
+          "selector": "[aria-busy=\"true\"]",
+          "description": "loading state on a final capture"
+        },
+        {
+          "selector": "[data-slot=\"skeleton\"]",
+          "description": "skeleton on a final capture"
+        },
+        {
+          "selector": "nextjs-portal",
+          "description": "Next.js development overlay"
+        },
+        {
+          "selector": "[data-nextjs-dialog-overlay]",
+          "description": "Next.js error overlay"
+        },
+        {
+          "selector": "[data-next-badge-root]",
+          "description": "Next.js development badge"
+        }
+      ],
+      "requiredVisibleText": [
+        {
+          "language": "en",
+          "requireInViewport": true,
+          "selector": "body",
+          "text": "Platform operations"
+        },
+        {
+          "language": "en",
+          "requireInViewport": true,
+          "selector": "body",
+          "text": "Stage 6 runtime is not activated"
+        }
+      ],
+      "forbiddenVisibleText": [
+        {
+          "language": "ar",
+          "selector": "body",
+          "text": "عمليات المنصة",
+          "viewportOnly": true
+        }
+      ],
+      "languageExceptions": [
+        "provider/runtime enum identifiers",
+        "health metric identifiers"
+      ],
+      "stateContract": {
+        "marker": {
+          "selector": "[role=\"status\"]",
+          "requireInViewport": true
+        }
+      },
+      "expectedMime": "image/png",
+      "expectedFormat": "png",
+      "actualWidth": 1440,
+      "actualHeight": 1000,
+      "sha256": "e7db5f6494b89b2f39e16500237409f02601390fd4f6c60188999aa7ab98bba4",
+      "families": [
+        "platform",
+        "dense-data"
+      ],
+      "visualMetrics": {
+        "entropy": 3.8739,
+        "maxChannelStandardDeviation": 25.5951,
+        "approximateUniqueColors": 134,
+        "contentWidthRatio": 1,
+        "contentHeightRatio": 0.9896,
+        "contentPixelRatio": 0.3652,
+        "edgeDensity": 0.0772
+      },
+      "preflight": {
+        "pathname": "/admin/platform-operations",
+        "route": "/admin/platform-operations",
+        "locale": "en",
+        "direction": "ltr",
+        "theme": "dark",
+        "observedState": "final",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "localeEvidence": {
+          "browserLocale": "en-US",
+          "cookieLocale": "en",
+          "fixtureLanguage": "EN",
+          "fixtureUserId": "gate8c-visual-admin-user"
+        },
+        "documentReadyState": "complete",
+        "fontsReady": true,
+        "requiredLandmarks": [
+          {
+            "selector": "[data-business-admin-surface=\"admin\"]",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "main#main-content",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "h1",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "[role=\"status\"]",
+            "count": 3,
+            "visibleCount": 3,
+            "inViewportCount": 1
+          }
+        ],
+        "forbiddenStates": [
+          {
+            "selector": "[aria-busy=\"true\"]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-slot=\"skeleton\"]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "nextjs-portal",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-nextjs-dialog-overlay]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-next-badge-root]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          }
+        ],
+        "requiredVisibleText": [
+          {
+            "selector": "body",
+            "text": "Platform operations",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "body",
+            "text": "Stage 6 runtime is not activated",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          }
+        ],
+        "forbiddenVisibleText": [
+          {
+            "selector": "body",
+            "text": "عمليات المنصة",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          }
+        ],
+        "stateEvidence": {
+          "marker": "[role=\"status\"]",
+          "count": 3,
+          "visibleCount": 3,
+          "inViewportCount": 1,
+          "conflictingStates": []
+        },
+        "horizontalOverflowPx": 0,
+        "mainWidthRatio": 0.8889,
+        "runningAnimations": 0,
+        "consoleErrors": [],
+        "pageErrors": [],
+        "failedResources": [],
+        "responseErrors": [],
+        "nonSyntheticEmails": [],
+        "realisticPhoneMatches": [],
+        "sensitiveTextMatches": [],
+        "visibleTextSha256": "ddecbd267bdb8b6b1dca369132344e2fa85de942a1c74bb237e89aed7818adb9",
+        "screenshotScope": "viewport"
+      },
+      "humanReview": {
+        "result": "PASS",
+        "reviewedAt": "2026-07-27",
+        "notes": "Fresh review: the English dark platform-operations dashboard visibly keeps Stage 6 unactivated and presents stable zero metrics."
+      }
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/admin-restaurants-empty-desktop-en-dark.png",
+      "route": "/admin/restaurants",
+      "viewport": "desktop",
+      "viewportWidth": 1440,
+      "viewportHeight": 1000,
+      "locale": "en",
+      "direction": "ltr",
+      "theme": "dark",
+      "role": "root-super-admin",
+      "expectedState": "empty",
+      "requiredLandmarks": [
+        {
+          "selector": "[data-business-admin-surface=\"admin\"]"
+        },
+        {
+          "selector": "main#main-content"
+        },
+        {
+          "selector": "h1"
+        },
+        {
+          "selector": "[data-admin-restaurants-state=\"empty\"]",
+          "requireInViewport": true
+        }
+      ],
+      "forbiddenStates": [
+        {
+          "selector": "[aria-busy=\"true\"]",
+          "description": "loading state on a final capture"
+        },
+        {
+          "selector": "[data-slot=\"skeleton\"]",
+          "description": "skeleton on a final capture"
+        },
+        {
+          "selector": "nextjs-portal",
+          "description": "Next.js development overlay"
+        },
+        {
+          "selector": "[data-nextjs-dialog-overlay]",
+          "description": "Next.js error overlay"
+        },
+        {
+          "selector": "[data-next-badge-root]",
+          "description": "Next.js development badge"
+        }
+      ],
+      "requiredVisibleText": [
+        {
+          "language": "en",
+          "requireInViewport": true,
+          "selector": "body",
+          "text": "Restaurants and cafés"
+        },
+        {
+          "language": "en",
+          "requireInViewport": true,
+          "selector": "body",
+          "text": "No restaurants or cafés are registered"
+        }
+      ],
+      "forbiddenVisibleText": [
+        {
+          "language": "ar",
+          "selector": "body",
+          "text": "لا توجد مطاعم أو مقاهٍ مسجلة",
+          "viewportOnly": true
+        }
+      ],
+      "languageExceptions": [],
+      "stateContract": {
+        "marker": {
+          "selector": "[data-admin-restaurants-state=\"empty\"]",
+          "requireInViewport": true
+        }
+      },
+      "expectedMime": "image/png",
+      "expectedFormat": "png",
+      "actualWidth": 1440,
+      "actualHeight": 1000,
+      "sha256": "1b5010283c473b281fab576e09d7489efe93c4e44d9ba3344ac753053836fbf5",
+      "families": [
+        "restaurant",
+        "empty"
+      ],
+      "visualMetrics": {
+        "entropy": 4.8323,
+        "maxChannelStandardDeviation": 18.2569,
+        "approximateUniqueColors": 108,
+        "contentWidthRatio": 1,
+        "contentHeightRatio": 0.4792,
+        "contentPixelRatio": 0.4226,
+        "edgeDensity": 0.037
+      },
+      "preflight": {
+        "pathname": "/admin/restaurants",
+        "route": "/admin/restaurants",
+        "locale": "en",
+        "direction": "ltr",
+        "theme": "dark",
+        "observedState": "empty",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "localeEvidence": {
+          "browserLocale": "en-US",
+          "cookieLocale": "en",
+          "fixtureLanguage": "EN",
+          "fixtureUserId": "gate8c-visual-admin-user"
+        },
+        "documentReadyState": "complete",
+        "fontsReady": true,
+        "requiredLandmarks": [
+          {
+            "selector": "[data-business-admin-surface=\"admin\"]",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "main#main-content",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "h1",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "[data-admin-restaurants-state=\"empty\"]",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          }
+        ],
+        "forbiddenStates": [
+          {
+            "selector": "[aria-busy=\"true\"]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-slot=\"skeleton\"]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "nextjs-portal",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-nextjs-dialog-overlay]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-next-badge-root]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          }
+        ],
+        "requiredVisibleText": [
+          {
+            "selector": "body",
+            "text": "Restaurants and cafés",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "body",
+            "text": "No restaurants or cafés are registered",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          }
+        ],
+        "forbiddenVisibleText": [
+          {
+            "selector": "body",
+            "text": "لا توجد مطاعم أو مقاهٍ مسجلة",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          }
+        ],
+        "stateEvidence": {
+          "marker": "[data-admin-restaurants-state=\"empty\"]",
+          "count": 1,
+          "visibleCount": 1,
+          "inViewportCount": 1,
+          "conflictingStates": []
+        },
+        "horizontalOverflowPx": 0,
+        "mainWidthRatio": 0.8889,
+        "runningAnimations": 0,
+        "consoleErrors": [],
+        "pageErrors": [],
+        "failedResources": [],
+        "responseErrors": [],
+        "nonSyntheticEmails": [],
+        "realisticPhoneMatches": [],
+        "sensitiveTextMatches": [],
+        "visibleTextSha256": "27873cc13887eb6d7b44668400537c02affd85a48a6778f901b078e2f6e74eb0",
+        "screenshotScope": "viewport"
+      },
+      "humanReview": {
+        "result": "PASS",
+        "reviewedAt": "2026-07-27",
+        "notes": "Fresh review: the English restaurant administration page shows its genuine final empty state without a table, skeleton, or fixture leak."
+      }
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/business-bookings-calendar-compact-ar-dark.png",
+      "route": "/business/bookings?view=upcoming",
+      "viewport": "compact",
+      "viewportWidth": 390,
+      "viewportHeight": 844,
+      "locale": "ar",
+      "direction": "rtl",
+      "theme": "dark",
+      "role": "business-owner",
+      "expectedState": "final",
+      "requiredLandmarks": [
+        {
+          "selector": "[data-business-admin-surface=\"business\"]"
+        },
+        {
+          "selector": "main#main-content"
+        },
+        {
+          "selector": "h1"
+        },
+        {
+          "selector": "form input[name=\"date\"]"
+        },
+        {
+          "selector": "a[href*=\"/business/bookings/\"]",
+          "minCount": 1,
+          "requireInViewport": true
+        }
+      ],
+      "forbiddenStates": [
+        {
+          "selector": "[aria-busy=\"true\"]",
+          "description": "loading state on a final capture"
+        },
+        {
+          "selector": "[data-slot=\"skeleton\"]",
+          "description": "skeleton on a final capture"
+        },
+        {
+          "selector": "nextjs-portal",
+          "description": "Next.js development overlay"
+        },
+        {
+          "selector": "[data-nextjs-dialog-overlay]",
+          "description": "Next.js error overlay"
+        },
+        {
+          "selector": "[data-next-badge-root]",
+          "description": "Next.js development badge"
+        }
+      ],
+      "requiredVisibleText": [
+        {
+          "language": "ar",
+          "requireInViewport": true,
+          "selector": "body",
+          "text": "الحجوزات القادمة"
+        },
+        {
+          "language": "ar",
+          "requireInViewport": true,
+          "selector": "body",
+          "text": "مؤكد"
+        },
+        {
+          "language": "technical",
+          "requireInViewport": true,
+          "selector": "body",
+          "text": "Visual Fixture Customer"
+        },
+        {
+          "language": "technical",
+          "requireInViewport": true,
+          "selector": "body",
+          "text": "Visual Fixture Service"
+        }
+      ],
+      "forbiddenVisibleText": [
+        {
+          "language": "en",
+          "selector": "body",
+          "text": "Business bookings",
+          "viewportOnly": true
+        }
+      ],
+      "languageExceptions": [
+        "explicit synthetic fixture names",
+        "booking status enum identifier"
+      ],
+      "stateContract": {
+        "marker": {
+          "selector": "a[href*=\"/business/bookings/\"]",
+          "requireInViewport": true
+        }
+      },
+      "expectedMime": "image/png",
+      "expectedFormat": "png",
+      "actualWidth": 390,
+      "actualHeight": 844,
+      "sha256": "c40768c08dccb2aa176d42436cb2a3d65631960a6acd654e3e552fb48f844b0e",
+      "families": [
+        "bookings"
+      ],
+      "visualMetrics": {
+        "entropy": 3.8683,
+        "maxChannelStandardDeviation": 36.088,
+        "approximateUniqueColors": 166,
+        "contentWidthRatio": 0.9375,
+        "contentHeightRatio": 0.9896,
+        "contentPixelRatio": 0.2806,
+        "edgeDensity": 0.1178
+      },
+      "preflight": {
+        "pathname": "/business/bookings",
+        "route": "/business/bookings?view=upcoming",
+        "locale": "ar",
+        "direction": "rtl",
+        "theme": "dark",
+        "observedState": "final",
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "localeEvidence": {
+          "browserLocale": "ar-IQ",
+          "cookieLocale": "ar",
+          "fixtureLanguage": "AR",
+          "fixtureUserId": "gate8c-visual-business-user"
+        },
+        "documentReadyState": "complete",
+        "fontsReady": true,
+        "requiredLandmarks": [
+          {
+            "selector": "[data-business-admin-surface=\"business\"]",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "main#main-content",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "h1",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "form input[name=\"date\"]",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "a[href*=\"/business/bookings/\"]",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          }
+        ],
+        "forbiddenStates": [
+          {
+            "selector": "[aria-busy=\"true\"]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-slot=\"skeleton\"]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "nextjs-portal",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-nextjs-dialog-overlay]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-next-badge-root]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          }
+        ],
+        "requiredVisibleText": [
+          {
+            "selector": "body",
+            "text": "الحجوزات القادمة",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "body",
+            "text": "مؤكد",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "body",
+            "text": "Visual Fixture Customer",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "body",
+            "text": "Visual Fixture Service",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          }
+        ],
+        "forbiddenVisibleText": [
+          {
+            "selector": "body",
+            "text": "Business bookings",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          }
+        ],
+        "stateEvidence": {
+          "marker": "a[href*=\"/business/bookings/\"]",
+          "count": 1,
+          "visibleCount": 1,
+          "inViewportCount": 1,
+          "conflictingStates": []
+        },
+        "horizontalOverflowPx": 0,
+        "mainWidthRatio": 1,
+        "runningAnimations": 0,
+        "consoleErrors": [],
+        "pageErrors": [],
+        "failedResources": [],
+        "responseErrors": [],
+        "nonSyntheticEmails": [],
+        "realisticPhoneMatches": [],
+        "sensitiveTextMatches": [],
+        "visibleTextSha256": "88c66e74653b7ce50d797a439e6ee5ae2211509278bb82addfad47b94c36e99b",
+        "screenshotScope": "viewport"
+      },
+      "humanReview": {
+        "result": "PASS",
+        "reviewedAt": "2026-07-27",
+        "notes": "Fresh review: the Arabic compact booking card is singular, centered, fully reachable, and contains a masked-safe fixed fixture email only."
+      }
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/business-dashboard-compact-ckb-dark.png",
+      "route": "/business",
+      "viewport": "compact",
+      "viewportWidth": 390,
+      "viewportHeight": 844,
+      "locale": "ckb",
+      "direction": "rtl",
+      "theme": "dark",
+      "role": "business-owner",
+      "expectedState": "final",
+      "requiredLandmarks": [
+        {
+          "selector": "[data-business-admin-surface=\"business\"]"
+        },
+        {
+          "selector": "main#main-content"
+        },
+        {
+          "selector": "h1"
+        }
+      ],
+      "forbiddenStates": [
+        {
+          "selector": "[aria-busy=\"true\"]",
+          "description": "loading state on a final capture"
+        },
+        {
+          "selector": "[data-slot=\"skeleton\"]",
+          "description": "skeleton on a final capture"
+        },
+        {
+          "selector": "nextjs-portal",
+          "description": "Next.js development overlay"
+        },
+        {
+          "selector": "[data-nextjs-dialog-overlay]",
+          "description": "Next.js error overlay"
+        },
+        {
+          "selector": "[data-next-badge-root]",
+          "description": "Next.js development badge"
+        }
+      ],
+      "requiredVisibleText": [
+        {
+          "language": "ckb",
+          "requireInViewport": true,
+          "selector": "body",
+          "text": "بەخێربێیتەوە"
+        },
+        {
+          "language": "ckb",
+          "requireInViewport": true,
+          "selector": "body",
+          "text": "پوختەی کردارەکانی بازرگانی"
+        }
+      ],
+      "forbiddenVisibleText": [
+        {
+          "language": "en",
+          "selector": "body",
+          "text": "Welcome back",
+          "viewportOnly": true
+        }
+      ],
+      "languageExceptions": [
+        "explicit synthetic fixture names"
+      ],
+      "stateContract": {
+        "marker": {
+          "selector": "main#main-content",
+          "requireInViewport": true
+        }
+      },
+      "expectedMime": "image/png",
+      "expectedFormat": "png",
+      "actualWidth": 390,
+      "actualHeight": 844,
+      "sha256": "98cd4b4271c8457378c19427c649f83a7872da0678c049c92a0d96b42d8d3cc0",
+      "families": [
+        "dense-data"
+      ],
+      "visualMetrics": {
+        "entropy": 6.0868,
+        "maxChannelStandardDeviation": 105.3623,
+        "approximateUniqueColors": 557,
+        "contentWidthRatio": 1,
+        "contentHeightRatio": 0.9688,
+        "contentPixelRatio": 0.6114,
+        "edgeDensity": 0.197
+      },
+      "preflight": {
+        "pathname": "/business",
+        "route": "/business",
+        "locale": "ckb",
+        "direction": "rtl",
+        "theme": "dark",
+        "observedState": "final",
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "localeEvidence": {
+          "browserLocale": "ckb-IQ",
+          "cookieLocale": "ckb",
+          "fixtureLanguage": "KU",
+          "fixtureUserId": "gate8c-visual-business-user"
+        },
+        "documentReadyState": "complete",
+        "fontsReady": true,
+        "requiredLandmarks": [
+          {
+            "selector": "[data-business-admin-surface=\"business\"]",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "main#main-content",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "h1",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 0
+          }
+        ],
+        "forbiddenStates": [
+          {
+            "selector": "[aria-busy=\"true\"]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-slot=\"skeleton\"]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "nextjs-portal",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-nextjs-dialog-overlay]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-next-badge-root]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          }
+        ],
+        "requiredVisibleText": [
+          {
+            "selector": "body",
+            "text": "بەخێربێیتەوە",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "body",
+            "text": "پوختەی کردارەکانی بازرگانی",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          }
+        ],
+        "forbiddenVisibleText": [
+          {
+            "selector": "body",
+            "text": "Welcome back",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          }
+        ],
+        "stateEvidence": {
+          "marker": "main#main-content",
+          "count": 1,
+          "visibleCount": 1,
+          "inViewportCount": 1,
+          "conflictingStates": []
+        },
+        "horizontalOverflowPx": 0,
+        "mainWidthRatio": 1,
+        "runningAnimations": 0,
+        "consoleErrors": [],
+        "pageErrors": [],
+        "failedResources": [],
+        "responseErrors": [],
+        "nonSyntheticEmails": [],
+        "realisticPhoneMatches": [],
+        "sensitiveTextMatches": [],
+        "visibleTextSha256": "2830db7ca73fb4d4cf34b591279cf904094cab8697fbe6ab1f297feccd350fa4",
+        "screenshotScope": "viewport"
+      },
+      "humanReview": {
+        "result": "PASS",
+        "reviewedAt": "2026-07-27",
+        "notes": "Fresh review: the Kurdish compact business dashboard is vertically coherent, localized, unclipped, and free of overlays in dark mode."
+      }
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/business-dashboard-desktop-ckb-dark.png",
+      "route": "/business",
+      "viewport": "desktop",
+      "viewportWidth": 1440,
+      "viewportHeight": 1000,
+      "locale": "ckb",
+      "direction": "rtl",
+      "theme": "dark",
+      "role": "business-owner",
+      "expectedState": "final",
+      "requiredLandmarks": [
+        {
+          "selector": "[data-business-admin-surface=\"business\"]"
+        },
+        {
+          "selector": "main#main-content"
+        },
+        {
+          "selector": "h1"
+        }
+      ],
+      "forbiddenStates": [
+        {
+          "selector": "[aria-busy=\"true\"]",
+          "description": "loading state on a final capture"
+        },
+        {
+          "selector": "[data-slot=\"skeleton\"]",
+          "description": "skeleton on a final capture"
+        },
+        {
+          "selector": "nextjs-portal",
+          "description": "Next.js development overlay"
+        },
+        {
+          "selector": "[data-nextjs-dialog-overlay]",
+          "description": "Next.js error overlay"
+        },
+        {
+          "selector": "[data-next-badge-root]",
+          "description": "Next.js development badge"
+        }
+      ],
+      "requiredVisibleText": [
+        {
+          "language": "ckb",
+          "requireInViewport": true,
+          "selector": "body",
+          "text": "بەخێربێیتەوە"
+        },
+        {
+          "language": "ckb",
+          "requireInViewport": true,
+          "selector": "body",
+          "text": "نزیکترین حجزەکان"
+        }
+      ],
+      "forbiddenVisibleText": [
+        {
+          "language": "en",
+          "selector": "body",
+          "text": "Nearest bookings",
+          "viewportOnly": true
+        }
+      ],
+      "languageExceptions": [
+        "explicit synthetic fixture names"
+      ],
+      "stateContract": {
+        "marker": {
+          "selector": "main#main-content",
+          "requireInViewport": true
+        }
+      },
+      "expectedMime": "image/png",
+      "expectedFormat": "png",
+      "actualWidth": 1440,
+      "actualHeight": 1000,
+      "sha256": "50e9ba1ad262c7c680b9bee33d429a2b2757e328b10a702ce1669087f13e58f8",
+      "families": [
+        "dense-data"
+      ],
+      "visualMetrics": {
+        "entropy": 5.4364,
+        "maxChannelStandardDeviation": 94.6072,
+        "approximateUniqueColors": 476,
+        "contentWidthRatio": 1,
+        "contentHeightRatio": 1,
+        "contentPixelRatio": 0.4596,
+        "edgeDensity": 0.1472
+      },
+      "preflight": {
+        "pathname": "/business",
+        "route": "/business",
+        "locale": "ckb",
+        "direction": "rtl",
+        "theme": "dark",
+        "observedState": "final",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "localeEvidence": {
+          "browserLocale": "ckb-IQ",
+          "cookieLocale": "ckb",
+          "fixtureLanguage": "KU",
+          "fixtureUserId": "gate8c-visual-business-user"
+        },
+        "documentReadyState": "complete",
+        "fontsReady": true,
+        "requiredLandmarks": [
+          {
+            "selector": "[data-business-admin-surface=\"business\"]",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "main#main-content",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "h1",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 0
+          }
+        ],
+        "forbiddenStates": [
+          {
+            "selector": "[aria-busy=\"true\"]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-slot=\"skeleton\"]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "nextjs-portal",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-nextjs-dialog-overlay]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-next-badge-root]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          }
+        ],
+        "requiredVisibleText": [
+          {
+            "selector": "body",
+            "text": "بەخێربێیتەوە",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "body",
+            "text": "نزیکترین حجزەکان",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          }
+        ],
+        "forbiddenVisibleText": [
+          {
+            "selector": "body",
+            "text": "Nearest bookings",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          }
+        ],
+        "stateEvidence": {
+          "marker": "main#main-content",
+          "count": 1,
+          "visibleCount": 1,
+          "inViewportCount": 1,
+          "conflictingStates": []
+        },
+        "horizontalOverflowPx": 0,
+        "mainWidthRatio": 0.8222,
+        "runningAnimations": 0,
+        "consoleErrors": [],
+        "pageErrors": [],
+        "failedResources": [],
+        "responseErrors": [],
+        "nonSyntheticEmails": [],
+        "realisticPhoneMatches": [],
+        "sensitiveTextMatches": [],
+        "visibleTextSha256": "a402e095155f392e9fdeb1fcf62c6b608e6c5a61810e62f5aadffaa42d3c70d4",
+        "screenshotScope": "viewport"
+      },
+      "humanReview": {
+        "result": "PASS",
+        "reviewedAt": "2026-07-27",
+        "notes": "Fresh review: the Kurdish dark desktop dashboard uses the entire workspace, preserves the side navigation, and contains no private data."
+      }
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/business-dashboard-desktop-ckb-light.png",
+      "route": "/business",
+      "viewport": "desktop",
+      "viewportWidth": 1440,
+      "viewportHeight": 1000,
+      "locale": "ckb",
+      "direction": "rtl",
+      "theme": "light",
+      "role": "business-owner",
+      "expectedState": "final",
+      "requiredLandmarks": [
+        {
+          "selector": "[data-business-admin-surface=\"business\"]"
+        },
+        {
+          "selector": "main#main-content"
+        },
+        {
+          "selector": "h1"
+        }
+      ],
+      "forbiddenStates": [
+        {
+          "selector": "[aria-busy=\"true\"]",
+          "description": "loading state on a final capture"
+        },
+        {
+          "selector": "[data-slot=\"skeleton\"]",
+          "description": "skeleton on a final capture"
+        },
+        {
+          "selector": "nextjs-portal",
+          "description": "Next.js development overlay"
+        },
+        {
+          "selector": "[data-nextjs-dialog-overlay]",
+          "description": "Next.js error overlay"
+        },
+        {
+          "selector": "[data-next-badge-root]",
+          "description": "Next.js development badge"
+        }
+      ],
+      "requiredVisibleText": [
+        {
+          "language": "ckb",
+          "requireInViewport": true,
+          "selector": "body",
+          "text": "بەخێربێیتەوە"
+        },
+        {
+          "language": "ckb",
+          "requireInViewport": true,
+          "selector": "body",
+          "text": "نزیکترین حجزەکان"
+        }
+      ],
+      "forbiddenVisibleText": [
+        {
+          "language": "en",
+          "selector": "body",
+          "text": "Nearest bookings",
+          "viewportOnly": true
+        }
+      ],
+      "languageExceptions": [
+        "explicit synthetic fixture names"
+      ],
+      "stateContract": {
+        "marker": {
+          "selector": "main#main-content",
+          "requireInViewport": true
+        }
+      },
+      "expectedMime": "image/png",
+      "expectedFormat": "png",
+      "actualWidth": 1440,
+      "actualHeight": 1000,
+      "sha256": "794453228839527805c6381d1267755fb7595a4356761c4daab27dcca19104f5",
+      "families": [
+        "dense-data"
+      ],
+      "visualMetrics": {
+        "entropy": 5.4287,
+        "maxChannelStandardDeviation": 95.9311,
+        "approximateUniqueColors": 513,
+        "contentWidthRatio": 1,
+        "contentHeightRatio": 1,
+        "contentPixelRatio": 0.9986,
+        "edgeDensity": 0.1535
+      },
+      "preflight": {
+        "pathname": "/business",
+        "route": "/business",
+        "locale": "ckb",
+        "direction": "rtl",
+        "theme": "light",
+        "observedState": "final",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "localeEvidence": {
+          "browserLocale": "ckb-IQ",
+          "cookieLocale": "ckb",
+          "fixtureLanguage": "KU",
+          "fixtureUserId": "gate8c-visual-business-user"
+        },
+        "documentReadyState": "complete",
+        "fontsReady": true,
+        "requiredLandmarks": [
+          {
+            "selector": "[data-business-admin-surface=\"business\"]",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "main#main-content",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "h1",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 0
+          }
+        ],
+        "forbiddenStates": [
+          {
+            "selector": "[aria-busy=\"true\"]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-slot=\"skeleton\"]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "nextjs-portal",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-nextjs-dialog-overlay]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-next-badge-root]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          }
+        ],
+        "requiredVisibleText": [
+          {
+            "selector": "body",
+            "text": "بەخێربێیتەوە",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "body",
+            "text": "نزیکترین حجزەکان",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          }
+        ],
+        "forbiddenVisibleText": [
+          {
+            "selector": "body",
+            "text": "Nearest bookings",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          }
+        ],
+        "stateEvidence": {
+          "marker": "main#main-content",
+          "count": 1,
+          "visibleCount": 1,
+          "inViewportCount": 1,
+          "conflictingStates": []
+        },
+        "horizontalOverflowPx": 0,
+        "mainWidthRatio": 0.8222,
+        "runningAnimations": 0,
+        "consoleErrors": [],
+        "pageErrors": [],
+        "failedResources": [],
+        "responseErrors": [],
+        "nonSyntheticEmails": [],
+        "realisticPhoneMatches": [],
+        "sensitiveTextMatches": [],
+        "visibleTextSha256": "a402e095155f392e9fdeb1fcf62c6b608e6c5a61810e62f5aadffaa42d3c70d4",
+        "screenshotScope": "viewport"
+      },
+      "humanReview": {
+        "result": "PASS",
+        "reviewedAt": "2026-07-27",
+        "notes": "Fresh review: the Kurdish light desktop dashboard matches the dark-state structure with stable fixed content and no visual overflow."
+      }
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/business-services-form-compact-ar-dark.png",
+      "route": "/business/services",
+      "viewport": "compact",
+      "viewportWidth": 390,
+      "viewportHeight": 844,
+      "locale": "ar",
+      "direction": "rtl",
+      "theme": "dark",
+      "role": "business-owner",
+      "expectedState": "final",
+      "requiredLandmarks": [
+        {
+          "selector": "[data-business-admin-surface=\"business\"]"
+        },
+        {
+          "selector": "main#main-content"
+        },
+        {
+          "selector": "h1"
+        },
+        {
+          "selector": "form"
+        },
+        {
+          "selector": "input[name=\"name\"]",
+          "requireInViewport": true
+        }
+      ],
+      "forbiddenStates": [
+        {
+          "selector": "[aria-busy=\"true\"]",
+          "description": "loading state on a final capture"
+        },
+        {
+          "selector": "[data-slot=\"skeleton\"]",
+          "description": "skeleton on a final capture"
+        },
+        {
+          "selector": "nextjs-portal",
+          "description": "Next.js development overlay"
+        },
+        {
+          "selector": "[data-nextjs-dialog-overlay]",
+          "description": "Next.js error overlay"
+        },
+        {
+          "selector": "[data-next-badge-root]",
+          "description": "Next.js development badge"
+        }
+      ],
+      "requiredVisibleText": [
+        {
+          "language": "ar",
+          "requireInViewport": true,
+          "selector": "body",
+          "text": "إضافة خدمة"
+        },
+        {
+          "language": "ar",
+          "requireInViewport": true,
+          "selector": "body",
+          "text": "اسم الخدمة"
+        }
+      ],
+      "forbiddenVisibleText": [
+        {
+          "language": "en",
+          "selector": "body",
+          "text": "Add service",
+          "viewportOnly": true
+        }
+      ],
+      "languageExceptions": [],
+      "stateContract": {
+        "marker": {
+          "selector": "input[name=\"name\"]",
+          "requireInViewport": true
+        }
+      },
+      "expectedMime": "image/png",
+      "expectedFormat": "png",
+      "actualWidth": 390,
+      "actualHeight": 844,
+      "sha256": "18d011383128b105f5f93f65efeb9793a97fc096e902cf7ea6740100b0714597",
+      "families": [
+        "form"
+      ],
+      "visualMetrics": {
+        "entropy": 4.4729,
+        "maxChannelStandardDeviation": 43.3327,
+        "approximateUniqueColors": 162,
+        "contentWidthRatio": 1,
+        "contentHeightRatio": 0.9688,
+        "contentPixelRatio": 0.5281,
+        "edgeDensity": 0.0922
+      },
+      "preflight": {
+        "pathname": "/business/services",
+        "route": "/business/services",
+        "locale": "ar",
+        "direction": "rtl",
+        "theme": "dark",
+        "observedState": "final",
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "localeEvidence": {
+          "browserLocale": "ar-IQ",
+          "cookieLocale": "ar",
+          "fixtureLanguage": "AR",
+          "fixtureUserId": "gate8c-visual-business-user"
+        },
+        "documentReadyState": "complete",
+        "fontsReady": true,
+        "requiredLandmarks": [
+          {
+            "selector": "[data-business-admin-surface=\"business\"]",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "main#main-content",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "h1",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "form",
+            "count": 5,
+            "visibleCount": 2,
+            "inViewportCount": 2
+          },
+          {
+            "selector": "input[name=\"name\"]",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          }
+        ],
+        "forbiddenStates": [
+          {
+            "selector": "[aria-busy=\"true\"]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-slot=\"skeleton\"]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "nextjs-portal",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-nextjs-dialog-overlay]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-next-badge-root]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          }
+        ],
+        "requiredVisibleText": [
+          {
+            "selector": "body",
+            "text": "إضافة خدمة",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "body",
+            "text": "اسم الخدمة",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          }
+        ],
+        "forbiddenVisibleText": [
+          {
+            "selector": "body",
+            "text": "Add service",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          }
+        ],
+        "stateEvidence": {
+          "marker": "input[name=\"name\"]",
+          "count": 1,
+          "visibleCount": 1,
+          "inViewportCount": 1,
+          "conflictingStates": []
+        },
+        "horizontalOverflowPx": 0,
+        "mainWidthRatio": 1,
+        "runningAnimations": 0,
+        "consoleErrors": [],
+        "pageErrors": [],
+        "failedResources": [],
+        "responseErrors": [],
+        "nonSyntheticEmails": [],
+        "realisticPhoneMatches": [],
+        "sensitiveTextMatches": [],
+        "visibleTextSha256": "aa53b5f524c5f07cf86bd43e3ed297c31b9c0682f2cbc20547e57254a85ad6c9",
+        "screenshotScope": "viewport"
+      },
+      "humanReview": {
+        "result": "PASS",
+        "reviewedAt": "2026-07-27",
+        "notes": "Fresh review: the Arabic compact service form is complete through its submit action and stays within the dark mobile-width surface."
+      }
+    },
+    {
+      "file": "docs/stage8/baselines/gate8c/business-services-form-compact-ckb-dark.png",
+      "route": "/business/services",
+      "viewport": "compact",
+      "viewportWidth": 390,
+      "viewportHeight": 844,
+      "locale": "ckb",
+      "direction": "rtl",
+      "theme": "dark",
+      "role": "business-owner",
+      "expectedState": "final",
+      "requiredLandmarks": [
+        {
+          "selector": "[data-business-admin-surface=\"business\"]"
+        },
+        {
+          "selector": "main#main-content"
+        },
+        {
+          "selector": "h1"
+        },
+        {
+          "selector": "form"
+        },
+        {
+          "selector": "input[name=\"name\"]",
+          "requireInViewport": true
+        }
+      ],
+      "forbiddenStates": [
+        {
+          "selector": "[aria-busy=\"true\"]",
+          "description": "loading state on a final capture"
+        },
+        {
+          "selector": "[data-slot=\"skeleton\"]",
+          "description": "skeleton on a final capture"
+        },
+        {
+          "selector": "nextjs-portal",
+          "description": "Next.js development overlay"
+        },
+        {
+          "selector": "[data-nextjs-dialog-overlay]",
+          "description": "Next.js error overlay"
+        },
+        {
+          "selector": "[data-next-badge-root]",
+          "description": "Next.js development badge"
+        }
+      ],
+      "requiredVisibleText": [
+        {
+          "language": "ckb",
+          "requireInViewport": true,
+          "selector": "body",
+          "text": "زیادکردنی خزمەتگوزاری"
+        },
+        {
+          "language": "ckb",
+          "requireInViewport": true,
+          "selector": "body",
+          "text": "ناوی خزمەتگوزاری"
+        }
+      ],
+      "forbiddenVisibleText": [
+        {
+          "language": "en",
+          "selector": "body",
+          "text": "Add service",
+          "viewportOnly": true
+        }
+      ],
+      "languageExceptions": [],
+      "stateContract": {
+        "marker": {
+          "selector": "input[name=\"name\"]",
+          "requireInViewport": true
+        }
+      },
+      "expectedMime": "image/png",
+      "expectedFormat": "png",
+      "actualWidth": 390,
+      "actualHeight": 844,
+      "sha256": "240347f5064bced52e60e91b97cc8837b4e0c17d143823175502f4a23ef82f9b",
+      "families": [
+        "form"
+      ],
+      "visualMetrics": {
+        "entropy": 4.5478,
+        "maxChannelStandardDeviation": 44.787,
+        "approximateUniqueColors": 199,
+        "contentWidthRatio": 1,
+        "contentHeightRatio": 0.9688,
+        "contentPixelRatio": 0.5396,
+        "edgeDensity": 0.1149
+      },
+      "preflight": {
+        "pathname": "/business/services",
+        "route": "/business/services",
+        "locale": "ckb",
+        "direction": "rtl",
+        "theme": "dark",
+        "observedState": "final",
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "localeEvidence": {
+          "browserLocale": "ckb-IQ",
+          "cookieLocale": "ckb",
+          "fixtureLanguage": "KU",
+          "fixtureUserId": "gate8c-visual-business-user"
+        },
+        "documentReadyState": "complete",
+        "fontsReady": true,
+        "requiredLandmarks": [
+          {
+            "selector": "[data-business-admin-surface=\"business\"]",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "main#main-content",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "h1",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "form",
+            "count": 5,
+            "visibleCount": 2,
+            "inViewportCount": 2
+          },
+          {
+            "selector": "input[name=\"name\"]",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          }
+        ],
+        "forbiddenStates": [
+          {
+            "selector": "[aria-busy=\"true\"]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-slot=\"skeleton\"]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "nextjs-portal",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-nextjs-dialog-overlay]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          },
+          {
+            "selector": "[data-next-badge-root]",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          }
+        ],
+        "requiredVisibleText": [
+          {
+            "selector": "body",
+            "text": "زیادکردنی خزمەتگوزاری",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          },
+          {
+            "selector": "body",
+            "text": "ناوی خزمەتگوزاری",
+            "count": 1,
+            "visibleCount": 1,
+            "inViewportCount": 1
+          }
+        ],
+        "forbiddenVisibleText": [
+          {
+            "selector": "body",
+            "text": "Add service",
+            "count": 0,
+            "visibleCount": 0,
+            "inViewportCount": 0
+          }
+        ],
+        "stateEvidence": {
+          "marker": "input[name=\"name\"]",
+          "count": 1,
+          "visibleCount": 1,
+          "inViewportCount": 1,
+          "conflictingStates": []
+        },
+        "horizontalOverflowPx": 0,
+        "mainWidthRatio": 1,
+        "runningAnimations": 0,
+        "consoleErrors": [],
+        "pageErrors": [],
+        "failedResources": [],
+        "responseErrors": [],
+        "nonSyntheticEmails": [],
+        "realisticPhoneMatches": [],
+        "sensitiveTextMatches": [],
+        "visibleTextSha256": "e72cae75d292343fdb41417ea08584356c0529bd9530a9563b4bda387f98b656",
+        "screenshotScope": "viewport"
+      },
+      "humanReview": {
+        "result": "PASS",
+        "reviewedAt": "2026-07-27",
+        "notes": "Fresh review: the Kurdish compact service form is visibly localized, complete through submission, and aligned correctly for RTL."
+      }
+    }
+  ]
+}

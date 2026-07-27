@@ -45,10 +45,12 @@ export default async function AdminUserDetailsPage({
       />
       {query.adminAction ? (
         <div
+          aria-live="polite"
+          role={query.adminAction === "success" ? "status" : "alert"}
           className={
             query.adminAction === "success"
-              ? "mb-5 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"
-              : "mb-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+              ? "rezno-status-success mb-5 rounded-2xl border px-4 py-3 text-sm"
+              : "rezno-status-error mb-5 rounded-2xl border px-4 py-3 text-sm"
           }
         >
           {query.adminAction === "success"

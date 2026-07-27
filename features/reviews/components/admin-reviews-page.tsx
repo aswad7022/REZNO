@@ -45,7 +45,7 @@ export async function AdminReviewsPage() {
           </Card>
         ) : (
           reviews.map((review) => (
-            <article key={review.id} className="rounded-2xl border bg-white p-4">
+            <article key={review.id} className="rounded-2xl border bg-card p-4 shadow-[var(--shadow-soft)]">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">

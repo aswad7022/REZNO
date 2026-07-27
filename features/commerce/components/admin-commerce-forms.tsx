@@ -112,5 +112,5 @@ function Field(props: React.ComponentProps<typeof Input> & { label: string; name
 }
 
 function SubmitState(props: { destructive?: boolean; label: string; pending: boolean; state: CommerceActionState }) {
-  return <div className="space-y-2"><Button disabled={props.pending} type="submit" variant={props.destructive ? "destructive" : "default"}>{props.pending ? "جارٍ التنفيذ…" : props.label}</Button><p aria-live="polite" className={props.state.ok ? "text-sm text-emerald-700" : "text-sm text-destructive"}>{props.state.message}</p></div>;
+  return <div className="space-y-2"><Button disabled={props.pending} type="submit" variant={props.destructive ? "destructive" : "default"}>{props.pending ? "جارٍ التنفيذ…" : props.label}</Button><p aria-live="polite" className={props.state.ok ? "text-sm text-success" : "text-sm text-destructive"}>{props.state.message}</p></div>;
 }

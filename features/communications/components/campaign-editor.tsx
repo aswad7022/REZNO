@@ -259,7 +259,7 @@ export function CampaignEditor({ initial }: { initial?: CampaignDetailDto }) {
               <Input id="scheduleAt" type="datetime-local" value={scheduleAt} onChange={(event) => setScheduleAt(event.target.value)} className="max-w-sm" />
               <Button type="button" variant="outline" onClick={schedule} disabled={pending || !scheduleAt}>{t("schedule")}</Button>
             </div>
-            <p className="text-xs text-amber-700">{t("noScheduler")}</p>
+            <p className="text-xs text-warning-text">{t("noScheduler")}</p>
           </div>
         ) : null}
         {message ? <p aria-live="polite" role="status" className="rounded-xl bg-muted p-3 text-sm">{message}</p> : null}

@@ -81,7 +81,7 @@ export function MerchantStoreForm({
       </div>
       <FulfillmentSection prefix="delivery" enabled={store?.deliveryEnabled} city={store?.deliveryCity} area={store?.deliveryArea} disabled={disabled} />
       <FulfillmentSection prefix="pickup" enabled={store?.pickupEnabled} city={store?.pickupCity} area={store?.pickupArea} street={store?.pickupStreet} details={store?.pickupAdditionalDetails} instructions={store?.pickupInstructions} disabled={disabled} />
-      <p id="store-form-result" aria-live="polite" className={state.ok ? "text-sm text-emerald-700" : "text-sm text-destructive"}>{state.message}</p>
+      <p id="store-form-result" aria-live="polite" className={state.ok ? "text-sm text-success" : "text-sm text-destructive"}>{state.message}</p>
       <Button type="submit" disabled={pending || disabled}>{pending ? t("saving") : t(store ? "save" : "create")}</Button>
     </form>
   );
@@ -111,7 +111,7 @@ export function UnsafeStoreImagesRemediationForm({
       <Button type="submit" variant="destructive" disabled={pending}>
         {pending ? t("saving") : t("clearUnsafeImages")}
       </Button>
-      <p aria-live="polite" className={state.ok ? "text-sm text-emerald-700" : "text-sm text-destructive"}>
+      <p aria-live="polite" className={state.ok ? "text-sm text-success" : "text-sm text-destructive"}>
         {state.message}
       </p>
     </form>
@@ -157,7 +157,7 @@ export function MerchantStoreLifecycleForms({
           <Button type="submit" variant="destructive" disabled={pending}>{t("archive")}</Button>
         </form>
       ) : null}
-      <p aria-live="polite" className={state.ok ? "text-sm text-emerald-700" : "text-sm text-destructive"}>{state.message}</p>
+      <p aria-live="polite" className={state.ok ? "text-sm text-success" : "text-sm text-destructive"}>{state.message}</p>
     </div>
   );
 }

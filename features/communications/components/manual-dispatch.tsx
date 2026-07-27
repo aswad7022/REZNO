@@ -11,9 +11,9 @@ export function ManualDispatch() {
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState("");
   return (
-    <div className="rounded-xl border border-amber-300 bg-amber-50 p-4">
-      <p className="text-sm font-semibold text-amber-950">{t("manualTitle")}</p>
-      <p className="mt-1 text-xs text-amber-800">{t("manualDescription")}</p>
+    <div className="rezno-status-warning rounded-xl border p-4">
+      <p className="text-sm font-semibold">{t("manualTitle")}</p>
+      <p className="mt-1 text-xs">{t("manualDescription")}</p>
       <Button className="mt-3" type="button" disabled={pending} onClick={() => startTransition(async () => {
         const result = await manuallyDispatchDueAction({
           idempotencyKey: crypto.randomUUID(),
