@@ -2,6 +2,12 @@ import { createHash } from "node:crypto";
 
 import sharp from "sharp";
 
+import {
+  gate8cCanonicalJson,
+  gate8cSha256,
+  type Gate8cProductionAttestation,
+} from "./gate8c-production-harness";
+
 export const PNG_SIGNATURE = Buffer.from([
   0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
 ]);
@@ -22,11 +28,33 @@ export interface Gate8cSelectorContract {
   selector: string;
   minCount?: number;
   textIncludes?: string;
+  requireVisible?: boolean;
+  requireInViewport?: boolean;
 }
 
 export interface Gate8cForbiddenSelectorContract {
   selector: string;
   description: string;
+  viewportOnly?: boolean;
+}
+
+export interface Gate8cVisibleTextContract {
+  selector: string;
+  text: string;
+  language: Gate8cLocale | "technical";
+  requireInViewport?: boolean;
+}
+
+export interface Gate8cForbiddenTextContract {
+  selector: string;
+  text: string;
+  language: Gate8cLocale;
+  viewportOnly?: boolean;
+}
+
+export interface Gate8cStateContract {
+  marker: Gate8cSelectorContract;
+  forbiddenInViewport?: Gate8cForbiddenSelectorContract[];
 }
 
 export interface Gate8cPagePreflight {
@@ -35,16 +63,53 @@ export interface Gate8cPagePreflight {
   locale: string;
   direction: string;
   theme: string;
-  expectedState: string;
+  observedState: string;
   viewport: { width: number; height: number };
+  localeEvidence: {
+    browserLocale: string;
+    cookieLocale: Gate8cLocale;
+    fixtureLanguage: string;
+    fixtureUserId: string;
+  };
   documentReadyState: string;
   fontsReady: boolean;
   requiredLandmarks: Array<{
     selector: string;
     count: number;
     matchedText?: boolean;
+    visibleCount: number;
+    inViewportCount: number;
   }>;
-  forbiddenStates: Array<{ selector: string; count: number }>;
+  forbiddenStates: Array<{
+    selector: string;
+    count: number;
+    inViewportCount: number;
+  }>;
+  requiredVisibleText: Array<{
+    selector: string;
+    text: string;
+    count: number;
+    visibleCount: number;
+    inViewportCount: number;
+  }>;
+  forbiddenVisibleText: Array<{
+    selector: string;
+    text: string;
+    count: number;
+    visibleCount: number;
+    inViewportCount: number;
+  }>;
+  stateEvidence: {
+    marker: string;
+    count: number;
+    visibleCount: number;
+    inViewportCount: number;
+    conflictingStates: Array<{
+      selector: string;
+      count: number;
+      inViewportCount: number;
+    }>;
+  };
   horizontalOverflowPx: number;
   mainWidthRatio: number;
   runningAnimations: number;
@@ -54,6 +119,8 @@ export interface Gate8cPagePreflight {
   responseErrors: string[];
   sensitiveTextMatches: string[];
   nonSyntheticEmails: string[];
+  realisticPhoneMatches: string[];
+  visibleTextSha256: string;
   screenshotScope: "viewport";
 }
 
@@ -80,6 +147,10 @@ export interface Gate8cCaptureEvidence {
   expectedState: Gate8cExpectedState;
   requiredLandmarks: Gate8cSelectorContract[];
   forbiddenStates: Gate8cForbiddenSelectorContract[];
+  requiredVisibleText: Gate8cVisibleTextContract[];
+  forbiddenVisibleText: Gate8cForbiddenTextContract[];
+  languageExceptions: string[];
+  stateContract: Gate8cStateContract;
   expectedMime: "image/png";
   expectedFormat: "png";
   actualWidth: number;
@@ -92,6 +163,85 @@ export interface Gate8cCaptureEvidence {
     result: "PENDING" | "PASS";
     reviewedAt: string;
     notes: string;
+  };
+}
+
+export interface Gate8cVisualManifest {
+  gate: "8C";
+  baseSha: string;
+  capturedAt: string;
+  environment: string;
+  productionAttestation: Gate8cProductionAttestation;
+  determinism: {
+    passes: 2;
+    fixtureFingerprint: string;
+    identicalCaptureCount: number;
+    identicalPreflightCount: number;
+    semanticManifestSha256: string;
+  };
+  capturePolicy: {
+    browser: string;
+    fixtures: string;
+    motion: string;
+    screenshotScope: string;
+    sensitiveData: string;
+    localeEvidence: string;
+    productionProvenance: string;
+    determinism: string;
+    humanReview: string;
+  };
+  captures: Gate8cCaptureEvidence[];
+}
+
+function normalizeGate8cDigits(value: string) {
+  const arabic = "٠١٢٣٤٥٦٧٨٩";
+  const eastern = "۰۱۲۳۴۵۶۷۸۹";
+  return [...value]
+    .map((character) => {
+      const arabicIndex = arabic.indexOf(character);
+      if (arabicIndex >= 0) return String(arabicIndex);
+      const easternIndex = eastern.indexOf(character);
+      if (easternIndex >= 0) return String(easternIndex);
+      return character;
+    })
+    .join("");
+}
+
+export function inspectGate8cVisibleTextPrivacy(text: string) {
+  const normalized = normalizeGate8cDigits(text);
+  const sensitivePatterns = [
+    /postgresql:\/\/\S+/giu,
+    /session_token\s*=\s*\S+/giu,
+    /Bearer\s+[A-Za-z0-9._~+/=-]+/giu,
+    /\bsk-(?:proj-)?[A-Za-z0-9_-]{12,}\b/giu,
+    /\b(?:token|cookie|secret)\s*[:=]\s*[A-Za-z0-9._~+/=-]{12,}\b/giu,
+  ];
+  const sensitiveTextMatches = sensitivePatterns.flatMap(
+    (pattern) => normalized.match(pattern) ?? [],
+  );
+  const emails =
+    normalized.match(
+      /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/giu,
+    ) ?? [];
+  const nonSyntheticEmails = emails.filter(
+    (email) => !email.toLowerCase().endsWith("@fixtures.example"),
+  );
+  const realisticPhoneMatches = [
+    ...new Set(
+      [
+        ...(normalized.match(
+          /(?:^|[^\w])\+\d(?:[\s().-]*\d){7,14}(?=$|[^\w])/gu,
+        ) ?? []),
+        ...(normalized.match(
+          /(?:^|[^\d])(?:964)?0?7[3-9]\d{8}(?=$|[^\d])/gu,
+        ) ?? []),
+      ].map((match) => match.replace(/\D/gu, "")),
+    ),
+  ];
+  return {
+    nonSyntheticEmails,
+    realisticPhoneMatches,
+    sensitiveTextMatches,
   };
 }
 
@@ -248,6 +398,9 @@ export function validateGate8cPagePreflight(
     | "viewportHeight"
     | "requiredLandmarks"
     | "forbiddenStates"
+    | "requiredVisibleText"
+    | "forbiddenVisibleText"
+    | "stateContract"
     | "preflight"
   >,
 ) {
@@ -264,8 +417,8 @@ export function validateGate8cPagePreflight(
   if (preflight.theme !== evidence.theme) {
     throw new Error("Preflight theme does not match the manifest theme.");
   }
-  if (preflight.expectedState !== evidence.expectedState) {
-    throw new Error("Preflight state does not match the manifest state.");
+  if (preflight.observedState !== evidence.expectedState) {
+    throw new Error("Measured page state does not match the manifest state.");
   }
   if (
     preflight.viewport.width !== evidence.viewportWidth ||
@@ -283,6 +436,24 @@ export function validateGate8cPagePreflight(
   if (preflight.screenshotScope !== "viewport") {
     throw new Error("Gate 8C evidence must use a viewport screenshot.");
   }
+  const expectedFixtureLanguage =
+    evidence.locale === "ar" ? "AR" : evidence.locale === "ckb" ? "KU" : "EN";
+  const expectedBrowserLocale =
+    evidence.locale === "ar"
+      ? "ar-IQ"
+      : evidence.locale === "ckb"
+        ? "ckb-IQ"
+        : "en-US";
+  if (
+    preflight.localeEvidence.cookieLocale !== evidence.locale ||
+    preflight.localeEvidence.fixtureLanguage !== expectedFixtureLanguage ||
+    preflight.localeEvidence.browserLocale !== expectedBrowserLocale ||
+    !preflight.localeEvidence.fixtureUserId
+  ) {
+    throw new Error(
+      "Route/session/fixture locale evidence does not match the visible locale.",
+    );
+  }
   if (preflight.horizontalOverflowPx > 1) {
     throw new Error("The page has unexpected horizontal overflow.");
   }
@@ -299,6 +470,7 @@ export function validateGate8cPagePreflight(
     ["response", preflight.responseErrors],
     ["sensitive-content", preflight.sensitiveTextMatches],
     ["non-synthetic-email", preflight.nonSyntheticEmails],
+    ["realistic-phone", preflight.realisticPhoneMatches],
   ] as const) {
     if (errors.length > 0) {
       throw new Error(`Unacceptable ${label} errors were present at capture time.`);
@@ -316,15 +488,95 @@ export function validateGate8cPagePreflight(
         `Required landmark text is missing: ${required.selector}`,
       );
     }
+    if (required.requireVisible !== false && measured.visibleCount < 1) {
+      throw new Error(`Required landmark is not visible: ${required.selector}`);
+    }
+    if (required.requireInViewport && measured.inViewportCount < 1) {
+      throw new Error(
+        `Required landmark is outside the capture viewport: ${required.selector}`,
+      );
+    }
   }
   for (const forbidden of evidence.forbiddenStates) {
     const measured = preflight.forbiddenStates.find(
       (entry) => entry.selector === forbidden.selector,
     );
-    if (!measured || measured.count !== 0) {
+    const present = forbidden.viewportOnly
+      ? (measured?.inViewportCount ?? 0) !== 0
+      : (measured?.count ?? 0) !== 0;
+    if (!measured || present) {
       throw new Error(`Forbidden page state is present: ${forbidden.description}`);
     }
   }
+  for (const required of evidence.requiredVisibleText) {
+    const measured = preflight.requiredVisibleText.find(
+      (entry) =>
+        entry.selector === required.selector && entry.text === required.text,
+    );
+    if (!measured || measured.visibleCount < 1) {
+      throw new Error(
+        `Required visible ${required.language} text is missing: ${required.text}`,
+      );
+    }
+    if (required.requireInViewport !== false && measured.inViewportCount < 1) {
+      throw new Error(
+        `Required visible text is outside the capture viewport: ${required.text}`,
+      );
+    }
+  }
+  for (const forbidden of evidence.forbiddenVisibleText) {
+    const measured = preflight.forbiddenVisibleText.find(
+      (entry) =>
+        entry.selector === forbidden.selector && entry.text === forbidden.text,
+    );
+    const present = forbidden.viewportOnly !== false
+      ? (measured?.inViewportCount ?? 0) > 0
+      : (measured?.visibleCount ?? 0) > 0;
+    if (!measured || present) {
+      throw new Error(
+        `Forbidden visible ${forbidden.language} text is present: ${forbidden.text}`,
+      );
+    }
+  }
+  const state = preflight.stateEvidence;
+  if (
+    state.marker !== evidence.stateContract.marker.selector ||
+    state.count < (evidence.stateContract.marker.minCount ?? 1) ||
+    state.visibleCount < 1 ||
+    (evidence.stateContract.marker.requireInViewport !== false &&
+      state.inViewportCount < 1)
+  ) {
+    throw new Error(
+      `Expected ${evidence.expectedState} state marker is not visibly proven.`,
+    );
+  }
+  for (const forbidden of evidence.stateContract.forbiddenInViewport ?? []) {
+    const measured = state.conflictingStates.find(
+      (entry) => entry.selector === forbidden.selector,
+    );
+    if (!measured || measured.inViewportCount !== 0) {
+      throw new Error(
+        `Expected ${evidence.expectedState} state conflicts with ${forbidden.description}.`,
+      );
+    }
+  }
+  if (!/^[a-f0-9]{64}$/.test(preflight.visibleTextSha256)) {
+    throw new Error("Visible page text fingerprint is missing.");
+  }
+}
+
+export function semanticGate8cCaptureDigest(
+  captures: Gate8cCaptureEvidence[],
+) {
+  return gate8cSha256(
+    gate8cCanonicalJson(
+      captures.map((capture) =>
+        Object.fromEntries(
+          Object.entries(capture).filter(([key]) => key !== "humanReview"),
+        ),
+      ),
+    ),
+  );
 }
 
 export async function validateGate8cCapture(

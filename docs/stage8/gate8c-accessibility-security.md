@@ -34,12 +34,20 @@
 - No token, cookie, provider payload, financial secret, connection string,
   personal contact value, or runtime credential is added to source, logs, or
   visual evidence.
-- Production baseline preflight rejects credential-shaped text and any
-  non-synthetic email address. Capture reports store paths and status classes,
-  never session-cookie values.
-- Every baseline uses disposable synthetic `@rezno.invalid` accounts, and the
-  fixture script removes its users, domain records, and rate-limit buckets
-  after capture.
+- Production baseline preflight rejects credential-shaped text, realistic
+  international/local phones in Arabic or Latin digits, and email outside the
+  approved `fixtures.example` domain. Capture reports counts and hashes, never
+  session-cookie values.
+- Every baseline uses fixed disposable `fixtures.example` accounts, valid
+  fixed UUIDs, fixed dates, explicit `Visual Fixture` names, and null phones.
+  The fixture contains no random or wall-clock-derived value and removes all
+  users, domain records, sessions, and rate-limit buckets after each pass.
+- The capture process cannot target an existing localhost server. It owns
+  `next build`/`next start`, binds Git/BUILD_ID/script/build hashes and child
+  ownership in an integrity-checked attestation, and terminates the child.
+- Visible language is verified independently of `<html lang>` through exact
+  localized text, forbidden foreign text, and cookie/browser/Person-language
+  agreement. Technical untranslated identifiers are explicit per baseline.
 - No authorization, API, action, persistence, provider, or runtime code changes.
 
 ## Runtime truth

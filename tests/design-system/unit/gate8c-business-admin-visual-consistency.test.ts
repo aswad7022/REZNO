@@ -6,8 +6,15 @@ import test from "node:test";
 
 import {
   validateGate8cCapture,
-  type Gate8cCaptureEvidence,
+  type Gate8cVisualManifest,
 } from "../../../scripts/stage8/gate8c-visual-evidence";
+import {
+  validateGate8cProductionAttestation,
+} from "../../../scripts/stage8/gate8c-production-harness";
+import {
+  assertGate8cCaptureContract,
+  gate8cCaptureSpecs,
+} from "../../../scripts/stage8/gate8c-capture-contract";
 
 const repoRoot = path.resolve(import.meta.dirname, "../../..");
 const readRepoFile = (relativePath: string) =>
@@ -134,11 +141,11 @@ test("Platform operations never infer runtime activation from stored records", (
   const jobs = readRepoFile("app/admin/platform-jobs/page.tsx");
   const operations = readRepoFile("app/admin/platform-operations/page.tsx");
 
-  assert.match(jobs, /Stage 6 runtime is not activated/);
-  assert.match(jobs, /configuration records, not proof of execution/);
-  assert.match(operations, /Runtime state: \$\{overview\.runtime\.state\}/);
-  assert.match(operations, /do not prove that automatic execution is connected/);
-  assert.match(operations, /Confirm deployment connectivity/);
+  assert.match(jobs, /runtimeInactiveTitle/);
+  assert.match(jobs, /runtimeInactiveDescription/);
+  assert.match(operations, /runtimeInactiveTitle/);
+  assert.match(operations, /runtimeInactiveDescription/);
+  assert.match(operations, /runtimeEnabledDescription/);
 });
 
 test("Scoped Business and Admin presentation uses semantic status colors", () => {
@@ -169,21 +176,24 @@ test("Scoped Business and Admin presentation uses semantic status colors", () =>
 test("Gate 8C visual evidence is format, page-state, metric, and byte authenticated", async () => {
   const manifest = JSON.parse(
     readRepoFile("docs/stage8/baselines/gate8c-baselines.json"),
-  ) as {
-    environment: string;
-    capturePolicy: {
-      screenshotScope: string;
-      sensitiveData: string;
-      humanReview: string;
-    };
-    captures: Gate8cCaptureEvidence[];
-  };
+  ) as Gate8cVisualManifest;
 
   assert.match(manifest.environment, /production build\/server/);
   assert.equal(manifest.capturePolicy.screenshotScope.includes("viewport"), true);
-  assert.match(manifest.capturePolicy.sensitiveData, /synthetic fixtures/);
-  assert.match(manifest.capturePolicy.humanReview, /reviewed individually/);
-  assert.ok(manifest.captures.length >= 16);
+  assert.match(manifest.capturePolicy.sensitiveData, /fixtures\.example/);
+  assert.match(manifest.capturePolicy.humanReview, /Fresh external record/);
+  assert.equal(manifest.captures.length, 24);
+  assert.equal(manifest.determinism.passes, 2);
+  assert.equal(manifest.determinism.identicalCaptureCount, 24);
+  assert.equal(manifest.determinism.identicalPreflightCount, 24);
+  assert.match(manifest.determinism.fixtureFingerprint, /^[a-f0-9]{64}$/);
+  assert.match(manifest.determinism.semanticManifestSha256, /^[a-f0-9]{64}$/);
+  validateGate8cProductionAttestation(manifest.productionAttestation, {
+    buildId: manifest.productionAttestation.buildId,
+    captureScriptSha256: manifest.productionAttestation.captureScriptSha256,
+    gitSha: manifest.productionAttestation.gitSha,
+    harnessScriptSha256: manifest.productionAttestation.harnessScriptSha256,
+  });
   assert.ok(manifest.captures.some((entry) => entry.viewport === "desktop"));
   assert.ok(manifest.captures.some((entry) => entry.viewport === "compact"));
   assert.ok(manifest.captures.some((entry) => entry.theme === "light"));
@@ -219,6 +229,39 @@ test("Gate 8C visual evidence is format, page-state, metric, and byte authentica
     const bytes = readFileSync(absolutePath);
     await validateGate8cCapture(capture, bytes);
   }
+});
+
+test("Gate 8C capture cases prove visible locale, measured state, and exact technical exceptions", () => {
+  assertGate8cCaptureContract();
+  assert.equal(gate8cCaptureSpecs.length, 24);
+  for (const spec of gate8cCaptureSpecs) {
+    assert.ok(spec.requiredVisibleText.length >= 2, spec.file);
+    assert.ok(spec.forbiddenVisibleText.length >= 1, spec.file);
+    assert.ok(spec.stateContract.marker.selector, spec.file);
+    assert.ok(spec.reviewPrompt.length >= 24, spec.file);
+  }
+});
+
+test("Gate 8C fixtures and capture provenance exclude random or wall-clock-visible data", () => {
+  const fixture = readRepoFile("scripts/stage8/gate8c-visual-fixture.ts");
+  const capture = readRepoFile("scripts/stage8/capture-gate8c-baselines.ts");
+  const harness = readRepoFile("scripts/stage8/gate8c-production-harness.ts");
+
+  assert.doesNotMatch(fixture, /randomUUID|Math\.random|Date\.now/);
+  assert.match(fixture, /Visual Fixture Customer/);
+  assert.match(fixture, /@fixtures\.example/);
+  assert.match(fixture, /phone: null/);
+  assert.match(fixture, /2030-01-15T12:00:00\.000Z/);
+  assert.match(capture, /capturePass\(/);
+  assert.match(capture, /assertDeterministicPasses/);
+  assert.match(capture, /production\.assertOwnedResponder/);
+  assert.match(capture, /startGate8cProductionHarness/);
+  assert.doesNotMatch(capture, /GATE8C_VISUAL_BASE_URL\s*\?\?/);
+  assert.match(harness, /nextCliPath/);
+  assert.match(harness, /"start"/);
+  assert.match(harness, /BUILD_ID/);
+  assert.match(harness, /assertCleanSourceTree/);
+  assert.match(harness, /assertOwnedResponder/);
 });
 
 test("Gate 8C does not create Migration 52 and preserves migration hashes", () => {

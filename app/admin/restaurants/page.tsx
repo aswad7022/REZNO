@@ -55,10 +55,12 @@ export default async function AdminRestaurantsPage() {
           </Card>
         ))}
         {restaurants.length === 0 ? (
-          <WorkspaceState
-            title={t("restaurantsEmptyTitle")}
-            description={t("restaurantsEmptyDescription")}
-          />
+          <div data-admin-restaurants-state="empty">
+            <WorkspaceState
+              title={t("restaurantsEmptyTitle")}
+              description={t("restaurantsEmptyDescription")}
+            />
+          </div>
         ) : null}
       </div>
     </>

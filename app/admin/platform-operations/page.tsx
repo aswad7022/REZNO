@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -41,9 +42,10 @@ export default async function PlatformOperationsPage({
     incidentCursor?: string | string[];
   }>;
 }) {
-  const [access, query] = await Promise.all([
+  const [access, query, t] = await Promise.all([
     requireAdminPermission("PLATFORM_OPERATIONS_VIEW"),
     searchParams,
+    getTranslations("Admin.platformOperations"),
   ]);
   const context = platformJobAdminContext(access);
   const canManage = access.isSuperAdmin
@@ -67,17 +69,21 @@ export default async function PlatformOperationsPage({
   return (
     <>
       <AdminPageHeader
-        title="Platform operations"
-        description="Automatic runtime, bounded health signals, alerts, and incidents backed by PostgreSQL."
+        title={t("title")}
+        description={t("description")}
       />
       <WorkspaceState
         className="mb-6"
         tone={overview.runtime.state === "ENABLED" ? "warning" : "info"}
-        title={`Runtime state: ${overview.runtime.state}`}
+        title={
+          overview.runtime.state === "ENABLED"
+            ? t("runtimeEnabledTitle")
+            : t("runtimeInactiveTitle")
+        }
         description={
           overview.runtime.state === "ENABLED"
-            ? "The database reports an enabled runtime. Confirm deployment connectivity before treating any scheduler or worker as active."
-            : "Stage 6 runtime is not activated. Stored jobs, schedules, and health records do not prove that automatic execution is connected."
+            ? t("runtimeEnabledDescription")
+            : t("runtimeInactiveDescription")
         }
       />
       <WorkspaceMetricGrid>
@@ -96,19 +102,19 @@ export default async function PlatformOperationsPage({
       <div className="my-6">
         <WorkspaceMetricGrid>
         <TruthCard
-          label="Distributed rate limit"
+          label={t("distributedRateLimit")}
           value={`${overview.rateLimit.backend} · ${overview.rateLimit.availability} · FAIL_${overview.rateLimit.failMode}`}
         />
         <TruthCard
-          label="Communications provider"
+          label={t("communicationsProvider")}
           value={overview.providers.communications}
         />
         <TruthCard
-          label="Payment provider"
+          label={t("paymentProvider")}
           value={overview.providers.payment}
         />
         <TruthCard
-          label="Storage provider"
+          label={t("storageProvider")}
           value={overview.providers.storage}
         />
         </WorkspaceMetricGrid>
@@ -116,19 +122,19 @@ export default async function PlatformOperationsPage({
 
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle>Automatic runtime</CardTitle>
+          <CardTitle>{t("automaticRuntime")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 text-sm">
           <div className="flex flex-wrap items-center gap-3">
             <Badge>{overview.runtime.state}</Badge>
             <Badge>{overview.runtime.connection}</Badge>
-            <span>Last invocation: {overview.runtime.lastInvocationAt ?? "never"}</span>
-            <span>Last success: {overview.runtime.lastSucceededAt ?? "never"}</span>
+            <span>{t("lastInvocation")}: {overview.runtime.lastInvocationAt ?? t("never")}</span>
+            <span>{t("lastSuccess")}: {overview.runtime.lastSucceededAt ?? t("never")}</span>
           </div>
           {canManage && !overview.runtime.configured ? (
             <form action={initializePlatformRuntimeAction}>
               <input name="idempotencyKey" type="hidden" value={randomUUID()} />
-              <Button type="submit">Initialize disabled runtime</Button>
+              <Button type="submit">{t("initializeDisabledRuntime")}</Button>
             </form>
           ) : null}
           {canManage && overview.runtime.configured && overview.runtime.version ? (
@@ -141,7 +147,9 @@ export default async function PlatformOperationsPage({
                 value={overview.runtime.state === "ENABLED" ? "false" : "true"}
               />
               <Button type="submit" variant={overview.runtime.state === "ENABLED" ? "destructive" : "default"}>
-                {overview.runtime.state === "ENABLED" ? "Disable runtime" : "Enable runtime"}
+                {overview.runtime.state === "ENABLED"
+                  ? t("disableRuntime")
+                  : t("enableRuntime")}
               </Button>
             </form>
           ) : null}
@@ -149,14 +157,14 @@ export default async function PlatformOperationsPage({
             <form action={bootstrapPlatformSchedulesAction}>
               <input name="idempotencyKey" type="hidden" value={randomUUID()} />
               <Button type="submit" variant="outline">
-                Bootstrap 13 disabled schedules
+                {t("bootstrapSchedules")}
               </Button>
             </form>
           ) : null}
           {canViewJobs ? (
             <Button asChild variant="outline">
               <Link href="/admin/platform-jobs">
-                Open durable jobs and schedules
+                {t("openJobs")}
               </Link>
             </Button>
           ) : null}
@@ -164,7 +172,7 @@ export default async function PlatformOperationsPage({
       </Card>
 
       <section className="space-y-4">
-        <h2 className="text-xl font-bold">Alerts</h2>
+        <h2 className="text-xl font-bold">{t("alerts")}</h2>
         {alerts.items.map((alert) => (
           <Card key={alert.id}>
             <CardHeader className="flex-row items-center justify-between gap-3">
@@ -176,7 +184,9 @@ export default async function PlatformOperationsPage({
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
               <p>
-                {alert.domain} · {alert.rule} · occurrences {alert.occurrenceCount}
+                {alert.domain} · {alert.rule} · {t("occurrences", {
+                  count: alert.occurrenceCount,
+                })}
               </p>
               {canManage ? (
                 <div className="flex flex-wrap gap-2">
@@ -185,7 +195,7 @@ export default async function PlatformOperationsPage({
                       action={acknowledgePlatformAlertAction}
                       field="alertId"
                       id={alert.id}
-                      label="Acknowledge"
+                      label={t("acknowledge")}
                       version={alert.version}
                     />
                   ) : null}
@@ -194,7 +204,7 @@ export default async function PlatformOperationsPage({
                       action={resolvePlatformAlertAction}
                       field="alertId"
                       id={alert.id}
-                      label="Resolve"
+                      label={t("resolve")}
                       version={alert.version}
                     />
                   ) : null}
@@ -203,7 +213,7 @@ export default async function PlatformOperationsPage({
                       action={createPlatformIncidentAction}
                       field="alertId"
                       id={alert.id}
-                      label="Create incident"
+                      label={t("createIncident")}
                       version={alert.version}
                     />
                   )}
@@ -214,21 +224,21 @@ export default async function PlatformOperationsPage({
         ))}
         {alerts.items.length === 0 ? (
           <WorkspaceState
-            title="No platform alerts"
-            description="No alert matched the current bounded view."
+            title={t("noAlertsTitle")}
+            description={t("noAlertsDescription")}
           />
         ) : null}
         {alerts.nextCursor ? (
           <Button asChild variant="outline">
             <Link href={`/admin/platform-operations?alertCursor=${encodeURIComponent(alerts.nextCursor)}`}>
-              Next alerts
+              {t("nextAlerts")}
             </Link>
           </Button>
         ) : null}
       </section>
 
       <section className="mt-8 space-y-4">
-        <h2 className="text-xl font-bold">Incidents</h2>
+        <h2 className="text-xl font-bold">{t("incidents")}</h2>
         {incidents.items.map((incident) => (
           <Card key={incident.id}>
             <CardContent className="space-y-3 pt-6 text-sm">
@@ -246,7 +256,7 @@ export default async function PlatformOperationsPage({
                       action={acknowledgePlatformIncidentAction}
                       field="incidentId"
                       id={incident.id}
-                      label="Acknowledge"
+                      label={t("acknowledge")}
                       version={incident.version}
                     />
                   ) : null}
@@ -255,7 +265,7 @@ export default async function PlatformOperationsPage({
                       action={resolvePlatformIncidentAction}
                       field="incidentId"
                       id={incident.id}
-                      label="Resolve"
+                      label={t("resolve")}
                       version={incident.version}
                     />
                   ) : null}
@@ -266,14 +276,14 @@ export default async function PlatformOperationsPage({
         ))}
         {incidents.items.length === 0 ? (
           <WorkspaceState
-            title="No platform incidents"
-            description="No incident matched the current bounded view."
+            title={t("noIncidentsTitle")}
+            description={t("noIncidentsDescription")}
           />
         ) : null}
         {incidents.nextCursor ? (
           <Button asChild variant="outline">
             <Link href={`/admin/platform-operations?incidentCursor=${encodeURIComponent(incidents.nextCursor)}`}>
-              Next incidents
+              {t("nextIncidents")}
             </Link>
           </Button>
         ) : null}

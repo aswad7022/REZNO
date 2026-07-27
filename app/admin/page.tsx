@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { Activity, Building2, CalendarDays, Database, ShieldCheck, Users } from "lucide-react";
+import { getTranslations } from "next-intl/server";
 
 import { AdminPageHeader } from "@/features/admin/components/admin-shell";
 import { getAdminOverview } from "@/features/admin/services/admin-dashboard";
@@ -10,20 +11,23 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 export const metadata: Metadata = { title: "Super Admin | REZNO" };
 
 export default async function AdminOverviewPage() {
-  const overview = await getAdminOverview();
+  const [overview, t] = await Promise.all([
+    getAdminOverview(),
+    getTranslations("Admin.overview"),
+  ]);
   const stats = [
-    ["إجمالي الأنشطة", overview.businesses, Building2],
-    ["الأنشطة النشطة", overview.activeBusinesses, Activity],
-    ["المستخدمون", overview.users, Users],
-    ["الحجوزات", overview.bookings, CalendarDays],
-    ["مطاعم/كافيهات", overview.restaurants, Building2],
+    [t("totalBusinesses"), overview.businesses, Building2],
+    [t("activeBusinesses"), overview.activeBusinesses, Activity],
+    [t("users"), overview.users, Users],
+    [t("bookings"), overview.bookings, CalendarDays],
+    [t("restaurants"), overview.restaurants, Building2],
   ] as const;
 
   return (
     <>
       <AdminPageHeader
-        title="مركز تحكم المنصة"
-        description="نظرة عامة آمنة على حالة REZNO بدون إجراءات حذف أو تغييرات مدمرة."
+        title={t("title")}
+        description={t("description")}
       />
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {stats.map(([label, value, Icon]) => (
@@ -43,7 +47,7 @@ export default async function AdminOverviewPage() {
       <section className="mt-6 grid gap-6 lg:grid-cols-3">
         <Card className="border-primary/10 lg:col-span-2">
           <CardHeader>
-            <CardTitle>أحدث الأنشطة</CardTitle>
+            <CardTitle>{t("recentBusinesses")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {overview.recentBusinesses.map((business) => (
@@ -69,18 +73,28 @@ export default async function AdminOverviewPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Database className="size-4" />
-              حالة النظام
+              {t("systemStatus")}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
-            <Status label="Database" ok={overview.databaseConnected} />
-            <Status label="Auth secret" ok={overview.authConfigured} />
+            <Status
+              connected={t("connected")}
+              incomplete={t("incomplete")}
+              label={t("database")}
+              ok={overview.databaseConnected}
+            />
+            <Status
+              connected={t("connected")}
+              incomplete={t("incomplete")}
+              label={t("authSecret")}
+              ok={overview.authConfigured}
+            />
             <div className="flex justify-between">
-              <span>Environment</span>
+              <span>{t("environment")}</span>
               <Badge variant="secondary">{overview.environment}</Badge>
             </div>
             <div className="flex justify-between">
-              <span>Admin guard</span>
+              <span>{t("adminGuard")}</span>
               <Badge variant="secondary">
                 <ShieldCheck className="me-1 size-3" />
                 REZNO_ADMIN_EMAILS
@@ -93,12 +107,22 @@ export default async function AdminOverviewPage() {
   );
 }
 
-function Status({ label, ok }: { label: string; ok: boolean }) {
+function Status({
+  connected,
+  incomplete,
+  label,
+  ok,
+}: {
+  connected: string;
+  incomplete: string;
+  label: string;
+  ok: boolean;
+}) {
   return (
     <div className="flex justify-between">
       <span>{label}</span>
       <Badge variant={ok ? "default" : "destructive"}>
-        {ok ? "متصل" : "غير مكتمل"}
+        {ok ? connected : incomplete}
       </Badge>
     </div>
   );

@@ -26,8 +26,9 @@ cancellations.
 8. Next.js production build.
 9. Expo dependency compatibility and Expo Doctor.
 10. iOS/Android Hermes and Web exports.
-11. Visual-manifest file, page-preflight, metric, dimension, format, and hash
-    verification.
+11. Visual-manifest file, visible-language/state preflight, production
+    attestation, two-pass determinism, privacy, metric, dimension, format, and
+    hash verification.
 12. Production and Mobile dependency audits.
 13. Secret/privacy scan and final P0/P1/P2 review.
 
@@ -77,26 +78,43 @@ Storage, Prisma, index, migration, or assertion change was made.
    `test`.
 2. Install the lockfile-pinned browser with
    `npx --no-install playwright-core install chromium`.
-3. Build with `next build` and run the result with `next start`; a development
-   server is not acceptable evidence.
-4. Run `npm run visual:capture:stage8c` with the local production origin in
-   `GATE8C_VISUAL_BASE_URL` and the disposable `DATABASE_URL`.
-5. The capture tool creates and removes only synthetic fixtures, waits for
+3. Run `npm run visual:capture:stage8c` with only the disposable
+   `DATABASE_URL`. The command rejects `GATE8C_VISUAL_BASE_URL`; it builds and
+   starts its own Next.js production child.
+4. The harness must reject a dirty/uncommitted source tree. The production
+   attestation must contain the clean source Git SHA, `.next/BUILD_ID`,
+   official build/start commands, `NODE_ENV=production`, owned child PID and
+   loopback port, start time, build-file hashes, capture/harness hashes, and a
+   valid integrity digest. The owned child/responder is checked before each
+   capture and after each pass. External localhost, `next dev`, mismatched build
+   or commit, missing fields, modified fields, and an unowned PID are rejected.
+5. The capture tool creates and removes only fixed fixtures, waits for
    fonts and declared UI landmarks, disables motion, and records zero
-   unacceptable console, page, resource, or HTTP response errors.
-6. A new capture is written with human review set to `PENDING`. Inspect all 24
-   PNG files individually and record `PASS`, the review date, and image-specific
-   notes only after that inspection. Then run `npm run visual:review:stage8c`
-   with `GATE8C_VISUAL_REVIEW_CONFIRM=I_REVIEWED_EACH_GATE8C_CAPTURE` and an
-   exact `GATE8C_VISUAL_REVIEW_DATE`; the separate command revalidates every
-   reviewed file, and the validator rejects pending review.
+   unacceptable console, page, resource, HTTP response, credential, phone, or
+   non-fixture-email errors. Locale cookie/browser/Person language must agree
+   with exact visible text and direction.
+6. The fixture is recreated and every image generated twice. All 24 PNG bytes,
+   visible preflight records, fixture fingerprints, and semantic capture
+   records must match.
+7. A new capture is written with human review set to `PENDING`. Open all 24 PNG
+   files individually and create a fresh
+   `docs/stage8/gate8c-baseline-human-review.json` record bound to the evidence
+   set, production BUILD_ID, each PNG hash, and image-specific observations.
+   Then run `npm run visual:review:stage8c` with
+   `GATE8C_VISUAL_REVIEW_CONFIRM=I_OPENED_AND_REVIEWED_ALL_24_GATE8C_PNGS`.
+   The review command rejects copied/generic notes, missing checks, stale hashes,
+   or pending evidence.
 
-The validator has explicit negative regression coverage for JPEG bytes named
-`.png`, blank images, incorrect dimensions, a final state with a skeleton, a
-collapsed compact layout, a development overlay, an automatically pending
-human review, and route/locale/state manifest mismatches. Speculative Next.js
-prefetch requests cancelled with a browser `ERR_ABORTED` result are classified
-as expected cancellation; every other failed resource remains blocking.
+Negative coverage includes JPEG bytes named `.png`, blank images, incorrect
+dimensions, a final state with a skeleton, a collapsed compact layout,
+development overlays, pending human review, route/locale/state mismatch,
+English metadata with Arabic content, Arabic metadata with English content,
+session/fixture locale disagreement, realistic Arabic/Latin phone data,
+non-fixture email, credentials, an empty label with a visible form/table/loading
+state, external localhost, `next dev`, BUILD_ID/commit mismatch, incomplete or
+tampered attestation, and an unowned server PID. Speculative Next.js prefetch
+requests cancelled with a browser `ERR_ABORTED` result are the sole expected
+resource cancellation.
 
 ## Integrity
 
