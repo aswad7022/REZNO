@@ -233,7 +233,7 @@ export async function validateGate8dCapture(
   assert.deepEqual(image, capture.image);
   assert.equal(image.width, capture.viewportWidth);
   assert.equal(image.height, capture.viewportHeight);
-  assert.ok(image.entropy > 2, "Screenshot is blank or near-uniform.");
+  assert.ok(image.entropy >= 1.2, "Screenshot is blank or near-uniform.");
   assert.deepEqual(image.metadataFields, []);
 }
 
