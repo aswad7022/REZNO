@@ -120,7 +120,8 @@ test("Skip navigation, focus, touch, and live-state foundations remain explicit"
   ].filter((file) => read(file).includes("<main"));
   const missingTarget = filesWithMain.filter((file) => {
     const source = read(file);
-    return /<main\b/.test(source) && !/<main\b[^>]*\bid="main-content"/s.test(source);
+    const mainTags = source.match(/<main\b[^>]*>/g) ?? [];
+    return mainTags.some((tag) => !tag.includes('id="main-content"'));
   });
   assert.deepEqual(missingTarget, []);
 });
