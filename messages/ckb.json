@@ -1208,6 +1208,7 @@
     "hintClose": "Esc بۆ داخستن"
   },
   "Dashboard": {
+    "activeBusiness": "بازرگانی چالاک",
     "navigation": {
       "label": "ڕێنیشاندانی داشبۆرد",
       "groups": {

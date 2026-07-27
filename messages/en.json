@@ -1296,6 +1296,7 @@
     "hintClose": "Esc to close"
   },
   "Dashboard": {
+    "activeBusiness": "Active business",
     "navigation": {
       "label": "Dashboard navigation",
       "groups": {
