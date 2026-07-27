@@ -11,6 +11,7 @@ import {
   type BrowserType,
   type Page,
 } from "playwright-core";
+import sharp from "sharp";
 
 import {
   assertGate8dCaptureContract,
@@ -442,6 +443,11 @@ async function captureOne(
     caret: "hide",
     type: "png",
   });
+  const normalized = await sharp(await readFile(output))
+    .rotate()
+    .png({ adaptiveFiltering: false, compressionLevel: 9 })
+    .toBuffer();
+  await writeFile(output, normalized);
   const bytes = await readFile(output);
   const image = await inspectGate8dPng(bytes);
   const evidence: Gate8dCaptureEvidence = {
