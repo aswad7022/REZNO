@@ -188,6 +188,10 @@ async function preparePage(
     status < 400 || spec.allowedDocumentStatuses?.includes(status),
     `${spec.file} returned ${status}`,
   );
+  // Fonts can change element geometry after navigation. Stabilize them before
+  // computing any interaction or scroll position, then settle once more after
+  // the requested state is in place.
+  await settle(page);
   if (spec.openAdminNavigation) {
     await page.locator('[data-slot="sheet-trigger"]').click();
   }
