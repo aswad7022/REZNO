@@ -9,8 +9,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CustomerDiscoveryAssistant } from "@/features/ai/components/customer-discovery-assistant";
-import { getAiGateBCapability } from "@/features/ai/gate-b";
 import type { AiLocale } from "@/features/ai/contracts";
+import { getAiGateCClientReadiness } from "@/features/ai/provider-operations";
 import { requireCustomerIdentity } from "@/features/identity/server";
 
 const AI_FOUNDATION_ITEMS = [
@@ -25,7 +25,7 @@ export default async function CustomerAssistantPage() {
     getTranslations("CustomerAssistant"),
     getLocale(),
   ]);
-  const capability = getAiGateBCapability();
+  const capability = getAiGateCClientReadiness();
 
   return (
     <DashboardShell>

@@ -4,7 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 
 import type { AiLocale } from "@/features/ai/contracts";
-import type { AiGateBResponse } from "@/features/ai/gate-b";
+import type { AiGateBPublicResponse } from "@/features/ai/gate-b";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -28,7 +28,7 @@ export function CustomerDiscoveryAssistant(props: {
   const [question, setQuestion] = useState("");
   const [lastQuestion, setLastQuestion] = useState("");
   const [state, setState] = useState<"idle" | "loading" | "done" | "error">("idle");
-  const [response, setResponse] = useState<AiGateBResponse | null>(null);
+  const [response, setResponse] = useState<AiGateBPublicResponse | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const canSubmit = useMemo(() => question.trim().length >= 3 && state !== "loading", [question, state]);
 
@@ -48,7 +48,7 @@ export function CustomerDiscoveryAssistant(props: {
         body: JSON.stringify({ question: trimmed, locale: props.locale }),
         signal: controller.signal,
       });
-      const body = await result.json() as { data?: AiGateBResponse; error?: { message?: string } };
+      const body = await result.json() as { data?: AiGateBPublicResponse; error?: { message?: string } };
       if (!body.data) throw new Error(body.error?.message ?? "AI unavailable");
       setResponse(body.data);
       setState("done");
@@ -115,7 +115,7 @@ export function CustomerDiscoveryAssistant(props: {
   );
 }
 
-function AssistantResult(props: { readonly response: AiGateBResponse; readonly locale: AiLocale; readonly copy: Copy }) {
+function AssistantResult(props: { readonly response: AiGateBPublicResponse; readonly locale: AiLocale; readonly copy: Copy }) {
   const response = props.response;
   if (!response.ok) {
     return (
