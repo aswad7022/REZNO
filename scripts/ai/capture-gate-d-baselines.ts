@@ -321,7 +321,10 @@ async function collectDomEvidence(page: Page, spec: AiGateDCaptureSpec, errors: 
           const label = element.getAttribute("aria-label") || element.textContent || element.value || "";
           const tag = element.tagName.toLowerCase();
           const href = element.getAttribute("href") || "";
-          return `${tag}${href ? `[href="${href}"]` : ""}${label ? ` "${label.trim().slice(0, 60)}"` : ""} ${Math.round(rect.width)}x${Math.round(rect.height)}`;
+          return tag
+            + (href ? '[href="' + href + '"]' : "")
+            + (label ? ' "' + label.trim().slice(0, 60) + '"' : "")
+            + " " + Math.round(rect.width) + "x" + Math.round(rect.height);
         }),
         unnamedInteractiveControls: unnamed,
         undersizedTouchTargets: undersized.length,
