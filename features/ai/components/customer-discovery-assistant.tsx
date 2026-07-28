@@ -47,6 +47,12 @@ export function CustomerDiscoveryAssistant(props: {
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const resultRef = useRef<HTMLDivElement | null>(null);
   const canSubmit = useMemo(() => question.trim().length >= 3 && state.kind !== "loading", [question, state.kind]);
+  const canRetry = lastQuestion.length > 0
+    && state.kind !== "loading"
+    && (
+      state.kind === "error"
+      || (state.kind === "done" && response !== null && !response.ok && isRetryableResponseStatus(response.status))
+    );
 
   useEffect(() => () => {
     generationRef.current += 1;
@@ -153,7 +159,7 @@ export function CustomerDiscoveryAssistant(props: {
                 {props.copy.cancel}
               </Button>
             ) : null}
-            {state.kind === "error" && lastQuestion ? (
+            {canRetry ? (
               <Button type="button" variant="outline" onClick={() => void submit(lastQuestion)}>
                 {props.copy.retry}
               </Button>
@@ -176,6 +182,10 @@ export function CustomerDiscoveryAssistant(props: {
       </CardContent>
     </Card>
   );
+}
+
+function isRetryableResponseStatus(status: Exclude<AiGateBPublicResponse["status"], "ANSWER">) {
+  return status === "TIMEOUT" || status === "RATE_LIMITED" || status === "UNAVAILABLE";
 }
 
 function getStatusMessage(
