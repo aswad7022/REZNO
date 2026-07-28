@@ -64,10 +64,10 @@ export function DashboardUserNav({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        className="rounded-full outline-none transition-transform hover:scale-[1.03] focus-visible:ring-3 focus-visible:ring-ring/50"
+        className="grid min-h-11 min-w-11 place-items-center rounded-full outline-none transition-transform hover:scale-[1.03] focus-visible:ring-3 focus-visible:ring-ring/50"
         aria-label={t("openUserMenu")}
       >
-        <Avatar className="size-9 border border-border shadow-sm">
+        <Avatar className="size-11 border border-border shadow-sm">
           {user.image ? <AvatarImage src={user.image} alt="" /> : null}
           <AvatarFallback>{getInitials(user.name) || "RU"}</AvatarFallback>
         </Avatar>

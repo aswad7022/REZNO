@@ -500,7 +500,7 @@ test("Gate C public route responses strip model IDs and provider internals from 
   assert.match(read("app/api/ai/customer/discovery/route.ts"), /toPublicAiGateBResponse/);
 });
 
-test("Gate C documentation and scans keep Stage 8 closure, Gate A/B regression, no Gate D, and no Migration 52", () => {
+test("Gate C documentation and scans keep Stage 8 closure, Gate A/B/D regression, and no Migration 52", () => {
   const files = [
     "docs/ai/ai-canonical-scope.md",
     "docs/ai/gate-c-canonical-scope.md",
@@ -516,12 +516,13 @@ test("Gate C documentation and scans keep Stage 8 closure, Gate A/B regression, 
     "app/api/ai/customer/discovery/route.ts",
   ];
   const combined = files.map(read).join("\n");
-  assert.match(read("docs/ai/ai-canonical-scope.md"), /Gate C:\s+`ACTIVE — AUTHOR IMPLEMENTATION`/);
+  assert.match(read("docs/ai/ai-canonical-scope.md"), /Gate C:\s+`CLOSED`/);
+  assert.match(read("docs/ai/ai-canonical-scope.md"), /Gate D:\s+`ACTIVE — AUTHOR IMPLEMENTATION`/);
   assert.match(combined, /Gate A:\s+`CLOSED`|Gate A[\s\S]*CLOSED/);
   assert.match(combined, /Gate B:\s+`CLOSED`|Gate B[\s\S]*CLOSED/);
   assert.match(combined, /c9182bb53b55cb1fa01104db0e92733bcd740e89/);
   assert.match(combined, /CLOSED\s*\/\s*OPEN\s*\/\s*HALF_OPEN/);
   assert.match(combined, /Stage 8 historical closure/i);
-  assert.doesNotMatch(combined, /Gate D:\s+`ACTIVE|Migration 52:\s*`CREATED`/i);
+  assert.doesNotMatch(combined, /Migration 52:\s*`CREATED`/i);
   assert.equal(read("prisma/migrations/migration_lock.toml").includes("Migration 52"), false);
 });

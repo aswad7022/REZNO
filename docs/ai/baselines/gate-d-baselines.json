@@ -1,0 +1,455 @@
+{
+  "schemaVersion": 1,
+  "gate": "AI-D",
+  "environment": "owned Next.js production build/server",
+  "baseSha": "0374452b33cdeffe491e7f102d05ca271463adde",
+  "sourceSha": "dc7cd33f82c7410bdc458bab44f5825d6414ff7a",
+  "gateCMergeSha": "0374452b33cdeffe491e7f102d05ca271463adde",
+  "productionAttestation": {
+    "schemaVersion": 1,
+    "sourceSha": "dc7cd33f82c7410bdc458bab44f5825d6414ff7a",
+    "nodeEnv": "production",
+    "hostname": "127.0.0.1",
+    "ownedByHarness": true,
+    "buildId": "DceeZ4V0YeElovJaTjbas",
+    "providerRequestLimit": 3,
+    "captureScriptSha256": "b40b790fac1971fe9b0d0a0d4850ca307ca1f98fdccc9804cf3fa915aaab347e",
+    "harnessMode": "owned-next-production-server"
+  },
+  "capturePolicy": {
+    "reducedMotion": "reduce",
+    "provider": "mocked at REZNO API boundary; no Gemini call",
+    "sensitiveData": "synthetic fixtures only"
+  },
+  "captures": [
+    {
+      "file": "docs/ai/baselines/gate-d/desktop-en-light-disabled.png",
+      "route": "/customer/assistant",
+      "viewportWidth": 1365,
+      "viewportHeight": 900,
+      "viewport": "desktop",
+      "locale": "en",
+      "direction": "ltr",
+      "theme": "light",
+      "expectedState": "disabled",
+      "providerRequestCount": 0,
+      "image": {
+        "format": "png",
+        "width": 1365,
+        "height": 900,
+        "sha256": "504e4162c3684b53c6135a0ca0def5cd0b3a7cd48b1bd2192db1dfee58530714",
+        "entropy": 4.508735420298763,
+        "channels": 3,
+        "metadataFields": []
+      },
+      "dom": {
+        "route": "/customer/assistant",
+        "locale": "en",
+        "direction": "ltr",
+        "theme": "light",
+        "htmlLang": "en",
+        "htmlDir": "ltr",
+        "resolvedColorScheme": "light",
+        "expectedState": "disabled",
+        "mainLandmarks": 1,
+        "headingOnes": 1,
+        "requiredTextCounts": {
+          "REZNO AI": 1,
+          "AI is not enabled yet": 1
+        },
+        "forbiddenTextCounts": {
+          "Ask assistant": 0,
+          "Checking public REZNO results": 0
+        },
+        "horizontalOverflow": 0,
+        "developmentOverlayCount": 0,
+        "errorOverlayCount": 0,
+        "skeletonCount": 0,
+        "touchTargetFailures": [],
+        "unnamedInteractiveControls": 0,
+        "undersizedTouchTargets": 0,
+        "runningAnimations": 0,
+        "consoleErrors": [],
+        "pageErrors": [],
+        "failedResources": []
+      },
+      "reviewPrompt": "Verify disabled for en/ltr/light at 1365x900; no PII, no overlay, no crop, and only REZNO links are visible."
+    },
+    {
+      "file": "docs/ai/baselines/gate-d/desktop-en-light-success-citations.png",
+      "route": "/customer/assistant",
+      "viewportWidth": 1365,
+      "viewportHeight": 900,
+      "viewport": "desktop",
+      "locale": "en",
+      "direction": "ltr",
+      "theme": "light",
+      "expectedState": "success",
+      "providerRequestCount": 0,
+      "image": {
+        "format": "png",
+        "width": 1365,
+        "height": 900,
+        "sha256": "de0cc819fa5e68b861abb5f09a42ec65a2c290055557a5ba917ec0142343dc6f",
+        "entropy": 4.254249266523402,
+        "channels": 3,
+        "metadataFields": []
+      },
+      "dom": {
+        "route": "/customer/assistant",
+        "locale": "en",
+        "direction": "ltr",
+        "theme": "light",
+        "htmlLang": "en",
+        "htmlDir": "ltr",
+        "resolvedColorScheme": "light",
+        "expectedState": "success",
+        "mainLandmarks": 1,
+        "headingOnes": 1,
+        "requiredTextCounts": {
+          "Grounded REZNO result ready": 1,
+          "Sources": 1,
+          "Gate D Family Restaurant": 1
+        },
+        "forbiddenTextCounts": {
+          "The assistant is unavailable": 0,
+          "I can’t handle that safely": 0
+        },
+        "horizontalOverflow": 0,
+        "developmentOverlayCount": 0,
+        "errorOverlayCount": 0,
+        "skeletonCount": 0,
+        "touchTargetFailures": [],
+        "unnamedInteractiveControls": 0,
+        "undersizedTouchTargets": 0,
+        "runningAnimations": 0,
+        "consoleErrors": [],
+        "pageErrors": [],
+        "failedResources": []
+      },
+      "reviewPrompt": "Verify success for en/ltr/light at 1365x900; no PII, no overlay, no crop, and only REZNO links are visible."
+    },
+    {
+      "file": "docs/ai/baselines/gate-d/compact-ar-dark-refusal.png",
+      "route": "/customer/assistant",
+      "viewportWidth": 390,
+      "viewportHeight": 844,
+      "viewport": "compact",
+      "locale": "ar",
+      "direction": "rtl",
+      "theme": "dark",
+      "expectedState": "refusal",
+      "providerRequestCount": 0,
+      "image": {
+        "format": "png",
+        "width": 390,
+        "height": 844,
+        "sha256": "5adaf2e90311695183c3faa44a230a22102aa57d49a6d206a2359ba99c6df6f2",
+        "entropy": 4.5603038806439145,
+        "channels": 3,
+        "metadataFields": []
+      },
+      "dom": {
+        "route": "/customer/assistant",
+        "locale": "ar",
+        "direction": "rtl",
+        "theme": "dark",
+        "htmlLang": "ar",
+        "htmlDir": "rtl",
+        "resolvedColorScheme": "dark",
+        "expectedState": "refusal",
+        "mainLandmarks": 1,
+        "headingOnes": 1,
+        "requiredTextCounts": {
+          "رفض المساعد": 1,
+          "لا يمكن معالجة هذا الطلب بأمان": 1
+        },
+        "forbiddenTextCounts": {
+          "Gate D Family Restaurant": 0,
+          "Checking public REZNO results": 0
+        },
+        "horizontalOverflow": 0,
+        "developmentOverlayCount": 0,
+        "errorOverlayCount": 0,
+        "skeletonCount": 0,
+        "touchTargetFailures": [],
+        "unnamedInteractiveControls": 0,
+        "undersizedTouchTargets": 0,
+        "runningAnimations": 0,
+        "consoleErrors": [],
+        "pageErrors": [],
+        "failedResources": []
+      },
+      "reviewPrompt": "Verify refusal for ar/rtl/dark at 390x844; no PII, no overlay, no crop, and only REZNO links are visible."
+    },
+    {
+      "file": "docs/ai/baselines/gate-d/compact-ckb-light-no-results.png",
+      "route": "/customer/assistant",
+      "viewportWidth": 390,
+      "viewportHeight": 844,
+      "viewport": "compact",
+      "locale": "ckb",
+      "direction": "rtl",
+      "theme": "light",
+      "expectedState": "no-results",
+      "providerRequestCount": 0,
+      "image": {
+        "format": "png",
+        "width": 390,
+        "height": 844,
+        "sha256": "236aa75df083447d1105f4055b54958c19660b533ba99ae381c0304b51833dad",
+        "entropy": 4.180453728578868,
+        "channels": 3,
+        "metadataFields": []
+      },
+      "dom": {
+        "route": "/customer/assistant",
+        "locale": "ckb",
+        "direction": "rtl",
+        "theme": "light",
+        "htmlLang": "ckb",
+        "htmlDir": "rtl",
+        "resolvedColorScheme": "light",
+        "expectedState": "no-results",
+        "mainLandmarks": 1,
+        "headingOnes": 1,
+        "requiredTextCounts": {
+          "هیچ ئەنجامێکی گشتیی بازاڕی REZNO": 1,
+          "هیچ ئەنجامی گشتیی پێویست": 1
+        },
+        "forbiddenTextCounts": {
+          "Gate D Family Restaurant": 0,
+          "یاریدەدەر ئێستا بەردەست نییە": 0
+        },
+        "horizontalOverflow": 0,
+        "developmentOverlayCount": 0,
+        "errorOverlayCount": 0,
+        "skeletonCount": 0,
+        "touchTargetFailures": [],
+        "unnamedInteractiveControls": 0,
+        "undersizedTouchTargets": 0,
+        "runningAnimations": 0,
+        "consoleErrors": [],
+        "pageErrors": [],
+        "failedResources": []
+      },
+      "reviewPrompt": "Verify no-results for ckb/rtl/light at 390x844; no PII, no overlay, no crop, and only REZNO links are visible."
+    },
+    {
+      "file": "docs/ai/baselines/gate-d/compact-en-dark-loading.png",
+      "route": "/customer/assistant",
+      "viewportWidth": 390,
+      "viewportHeight": 844,
+      "viewport": "compact",
+      "locale": "en",
+      "direction": "ltr",
+      "theme": "dark",
+      "expectedState": "loading",
+      "providerRequestCount": 0,
+      "image": {
+        "format": "png",
+        "width": 390,
+        "height": 844,
+        "sha256": "cba94c3f2a1f85b7f02ae1a34f5c22d42b49d06737d884cf53def856f46ea7d6",
+        "entropy": 4.48041025706334,
+        "channels": 3,
+        "metadataFields": []
+      },
+      "dom": {
+        "route": "/customer/assistant",
+        "locale": "en",
+        "direction": "ltr",
+        "theme": "dark",
+        "htmlLang": "en",
+        "htmlDir": "ltr",
+        "resolvedColorScheme": "dark",
+        "expectedState": "loading",
+        "mainLandmarks": 1,
+        "headingOnes": 1,
+        "requiredTextCounts": {
+          "Checking public REZNO results": 1,
+          "Cancel": 1
+        },
+        "forbiddenTextCounts": {
+          "Grounded REZNO result ready": 0,
+          "The assistant is unavailable": 0
+        },
+        "horizontalOverflow": 0,
+        "developmentOverlayCount": 0,
+        "errorOverlayCount": 0,
+        "skeletonCount": 0,
+        "touchTargetFailures": [],
+        "unnamedInteractiveControls": 0,
+        "undersizedTouchTargets": 0,
+        "runningAnimations": 0,
+        "consoleErrors": [],
+        "pageErrors": [],
+        "failedResources": []
+      },
+      "reviewPrompt": "Verify loading for en/ltr/dark at 390x844; no PII, no overlay, no crop, and only REZNO links are visible."
+    },
+    {
+      "file": "docs/ai/baselines/gate-d/desktop-ar-light-timeout.png",
+      "route": "/customer/assistant",
+      "viewportWidth": 1365,
+      "viewportHeight": 900,
+      "viewport": "desktop",
+      "locale": "ar",
+      "direction": "rtl",
+      "theme": "light",
+      "expectedState": "timeout",
+      "providerRequestCount": 0,
+      "image": {
+        "format": "png",
+        "width": 1365,
+        "height": 900,
+        "sha256": "661af27b5502a9f3ee121b2c1c5a16f048fe3a38f438eb9a984ab849356ac553",
+        "entropy": 3.9940502314129844,
+        "channels": 3,
+        "metadataFields": []
+      },
+      "dom": {
+        "route": "/customer/assistant",
+        "locale": "ar",
+        "direction": "rtl",
+        "theme": "light",
+        "htmlLang": "ar",
+        "htmlDir": "rtl",
+        "resolvedColorScheme": "light",
+        "expectedState": "timeout",
+        "mainLandmarks": 1,
+        "headingOnes": 1,
+        "requiredTextCounts": {
+          "استغرق المساعد وقتًا طويلًا": 1,
+          "إعادة المحاولة": 1
+        },
+        "forbiddenTextCounts": {
+          "Gate D Family Restaurant": 0,
+          "المصادر": 0
+        },
+        "horizontalOverflow": 0,
+        "developmentOverlayCount": 0,
+        "errorOverlayCount": 0,
+        "skeletonCount": 0,
+        "touchTargetFailures": [],
+        "unnamedInteractiveControls": 0,
+        "undersizedTouchTargets": 0,
+        "runningAnimations": 0,
+        "consoleErrors": [],
+        "pageErrors": [],
+        "failedResources": []
+      },
+      "reviewPrompt": "Verify timeout for ar/rtl/light at 1365x900; no PII, no overlay, no crop, and only REZNO links are visible."
+    },
+    {
+      "file": "docs/ai/baselines/gate-d/desktop-en-dark-rate-limited.png",
+      "route": "/customer/assistant",
+      "viewportWidth": 1365,
+      "viewportHeight": 900,
+      "viewport": "desktop",
+      "locale": "en",
+      "direction": "ltr",
+      "theme": "dark",
+      "expectedState": "rate-limited",
+      "providerRequestCount": 0,
+      "image": {
+        "format": "png",
+        "width": 1365,
+        "height": 900,
+        "sha256": "f2859b15c90ea255094bf05f1c52956dff9dff2afb757787b20ef1781799f6ed",
+        "entropy": 4.680463515003794,
+        "channels": 3,
+        "metadataFields": []
+      },
+      "dom": {
+        "route": "/customer/assistant",
+        "locale": "en",
+        "direction": "ltr",
+        "theme": "dark",
+        "htmlLang": "en",
+        "htmlDir": "ltr",
+        "resolvedColorScheme": "dark",
+        "expectedState": "rate-limited",
+        "mainLandmarks": 1,
+        "headingOnes": 1,
+        "requiredTextCounts": {
+          "temporary limit": 1,
+          "Retry": 1
+        },
+        "forbiddenTextCounts": {
+          "Gate D Family Restaurant": 0,
+          "Sources": 0
+        },
+        "horizontalOverflow": 0,
+        "developmentOverlayCount": 0,
+        "errorOverlayCount": 0,
+        "skeletonCount": 0,
+        "touchTargetFailures": [],
+        "unnamedInteractiveControls": 0,
+        "undersizedTouchTargets": 0,
+        "runningAnimations": 0,
+        "consoleErrors": [],
+        "pageErrors": [],
+        "failedResources": []
+      },
+      "reviewPrompt": "Verify rate-limited for en/ltr/dark at 1365x900; no PII, no overlay, no crop, and only REZNO links are visible."
+    },
+    {
+      "file": "docs/ai/baselines/gate-d/compact-ckb-dark-unavailable.png",
+      "route": "/customer/assistant",
+      "viewportWidth": 390,
+      "viewportHeight": 844,
+      "viewport": "compact",
+      "locale": "ckb",
+      "direction": "rtl",
+      "theme": "dark",
+      "expectedState": "unavailable",
+      "providerRequestCount": 0,
+      "image": {
+        "format": "png",
+        "width": 390,
+        "height": 844,
+        "sha256": "501f1b604eb2934a0e590ef90f638dcd08490b7763ef6e5d30914997de33459b",
+        "entropy": 4.5983760731323855,
+        "channels": 3,
+        "metadataFields": []
+      },
+      "dom": {
+        "route": "/customer/assistant",
+        "locale": "ckb",
+        "direction": "rtl",
+        "theme": "dark",
+        "htmlLang": "ckb",
+        "htmlDir": "rtl",
+        "resolvedColorScheme": "dark",
+        "expectedState": "unavailable",
+        "mainLandmarks": 1,
+        "headingOnes": 1,
+        "requiredTextCounts": {
+          "یاریدەدەر ئێستا بەردەست نییە": 1,
+          "دووبارە هەوڵبدە": 1
+        },
+        "forbiddenTextCounts": {
+          "Gate D Family Restaurant": 0,
+          "ئەنجامی پشتڕاستکراوی REZNO": 0
+        },
+        "horizontalOverflow": 0,
+        "developmentOverlayCount": 0,
+        "errorOverlayCount": 0,
+        "skeletonCount": 0,
+        "touchTargetFailures": [],
+        "unnamedInteractiveControls": 0,
+        "undersizedTouchTargets": 0,
+        "runningAnimations": 0,
+        "consoleErrors": [],
+        "pageErrors": [],
+        "failedResources": []
+      },
+      "reviewPrompt": "Verify unavailable for ckb/rtl/dark at 390x844; no PII, no overlay, no crop, and only REZNO links are visible."
+    }
+  ],
+  "humanReview": {
+    "status": "PASS",
+    "record": "docs/ai/gate-d-baseline-human-review.json"
+  }
+}

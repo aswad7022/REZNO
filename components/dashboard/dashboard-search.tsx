@@ -42,7 +42,7 @@ export function DashboardSearch() {
         onChange={(event) => setQuery(event.target.value)}
         placeholder={t("searchPlaceholder")}
         aria-label={t("searchLabel")}
-        className="h-9 bg-muted/40 ps-9"
+        className="h-11 bg-muted/40 ps-9"
       />
     </form>
   );

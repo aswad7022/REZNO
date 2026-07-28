@@ -23,6 +23,8 @@
     "test:ai-gate-a": "NODE_OPTIONS=--conditions=react-server tsx --test tests/ai/unit/gate-a-foundation.test.ts",
     "test:ai-gate-b": "NODE_OPTIONS=--conditions=react-server tsx --test tests/ai/unit/gate-a-foundation.test.ts tests/ai/unit/gate-b-grounded-discovery.test.ts",
     "test:ai-gate-c": "NODE_OPTIONS=--conditions=react-server tsx --test tests/ai/unit/gate-a-foundation.test.ts tests/ai/unit/gate-b-grounded-discovery.test.ts tests/ai/unit/gate-c-provider-operations.test.ts",
+    "test:ai-gate-d": "NODE_OPTIONS=--conditions=react-server tsx --test tests/ai/unit/gate-a-foundation.test.ts tests/ai/unit/gate-b-grounded-discovery.test.ts tests/ai/unit/gate-c-provider-operations.test.ts tests/ai/unit/gate-d-end-to-end-closure.test.ts",
+    "visual:capture:ai-gate-d": "NODE_OPTIONS=--conditions=react-server tsx scripts/ai/capture-gate-d-baselines.ts",
     "visual:capture:stage8c": "tsx scripts/stage8/capture-gate8c-baselines.ts",
     "visual:review:stage8c": "tsx scripts/stage8/review-gate8c-baselines.ts",
     "visual:capture:stage8d": "tsx scripts/stage8/capture-gate8d-baselines.ts",

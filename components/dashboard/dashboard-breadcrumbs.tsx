@@ -46,7 +46,12 @@ export function DashboardBreadcrumbs() {
                   <BreadcrumbPage>{label}</BreadcrumbPage>
                 ) : (
                   <BreadcrumbLink asChild>
-                    <Link href={href}>{label}</Link>
+                    <Link
+                      href={href}
+                      className="inline-flex min-h-11 items-center rounded-md px-1"
+                    >
+                      {label}
+                    </Link>
                   </BreadcrumbLink>
                 )}
               </BreadcrumbItem>

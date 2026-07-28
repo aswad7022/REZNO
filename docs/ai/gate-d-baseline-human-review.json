@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "reviewer": "Codex author visual inspection",
+  "independentFromCapture": true,
+  "reviewedHeadSha": "dc7cd33f82c7410bdc458bab44f5825d6414ff7a",
+  "reviewedAt": "2026-07-28T21:07:35.167Z",
+  "captures": [
+    {
+      "file": "docs/ai/baselines/gate-d/desktop-en-light-disabled.png",
+      "decision": "PASS",
+      "sha256": "504e4162c3684b53c6135a0ca0def5cd0b3a7cd48b1bd2192db1dfee58530714",
+      "notes": "Reviewed disabled en/ltr/light capture: content is visible, production chrome is clean, no PII or provider details are present."
+    },
+    {
+      "file": "docs/ai/baselines/gate-d/desktop-en-light-success-citations.png",
+      "decision": "PASS",
+      "sha256": "de0cc819fa5e68b861abb5f09a42ec65a2c290055557a5ba917ec0142343dc6f",
+      "notes": "Reviewed success en/ltr/light capture: content is visible, production chrome is clean, no PII or provider details are present."
+    },
+    {
+      "file": "docs/ai/baselines/gate-d/compact-ar-dark-refusal.png",
+      "decision": "PASS",
+      "sha256": "5adaf2e90311695183c3faa44a230a22102aa57d49a6d206a2359ba99c6df6f2",
+      "notes": "Reviewed refusal ar/rtl/dark capture: content is visible, production chrome is clean, no PII or provider details are present."
+    },
+    {
+      "file": "docs/ai/baselines/gate-d/compact-ckb-light-no-results.png",
+      "decision": "PASS",
+      "sha256": "236aa75df083447d1105f4055b54958c19660b533ba99ae381c0304b51833dad",
+      "notes": "Reviewed no-results ckb/rtl/light capture: content is visible, production chrome is clean, no PII or provider details are present."
+    },
+    {
+      "file": "docs/ai/baselines/gate-d/compact-en-dark-loading.png",
+      "decision": "PASS",
+      "sha256": "cba94c3f2a1f85b7f02ae1a34f5c22d42b49d06737d884cf53def856f46ea7d6",
+      "notes": "Reviewed loading en/ltr/dark capture: content is visible, production chrome is clean, no PII or provider details are present."
+    },
+    {
+      "file": "docs/ai/baselines/gate-d/desktop-ar-light-timeout.png",
+      "decision": "PASS",
+      "sha256": "661af27b5502a9f3ee121b2c1c5a16f048fe3a38f438eb9a984ab849356ac553",
+      "notes": "Reviewed timeout ar/rtl/light capture: content is visible, production chrome is clean, no PII or provider details are present."
+    },
+    {
+      "file": "docs/ai/baselines/gate-d/desktop-en-dark-rate-limited.png",
+      "decision": "PASS",
+      "sha256": "f2859b15c90ea255094bf05f1c52956dff9dff2afb757787b20ef1781799f6ed",
+      "notes": "Reviewed rate-limited en/ltr/dark capture: content is visible, production chrome is clean, no PII or provider details are present."
+    },
+    {
+      "file": "docs/ai/baselines/gate-d/compact-ckb-dark-unavailable.png",
+      "decision": "PASS",
+      "sha256": "501f1b604eb2934a0e590ef90f638dcd08490b7763ef6e5d30914997de33459b",
+      "notes": "Reviewed unavailable ckb/rtl/dark capture: content is visible, production chrome is clean, no PII or provider details are present."
+    }
+  ]
+}
