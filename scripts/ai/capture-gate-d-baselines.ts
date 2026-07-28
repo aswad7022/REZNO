@@ -376,7 +376,9 @@ async function captureSpec(baseUrl: string, sessionCookie: string, spec: AiGateD
     page.on("pageerror", (error) => errors.pageErrors.push(error.message));
     page.on("requestfailed", (request) => {
       if (request.url().includes("/api/ai/customer/discovery") && spec.expectedState === "loading") return;
-      errors.failedResources.push(request.url());
+      const failure = request.failure()?.errorText ?? "unknown";
+      if (request.url().includes("_rsc=") && failure.includes("ERR_ABORTED")) return;
+      errors.failedResources.push(`${request.method()} ${request.url()} ${failure}`);
     });
     await configurePage(page, baseUrl, sessionCookie, spec);
     const response = await page.goto(`${baseUrl}/customer/assistant`, { waitUntil: "networkidle" });
