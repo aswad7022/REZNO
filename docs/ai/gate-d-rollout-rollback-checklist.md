@@ -20,4 +20,3 @@ Migration 52: `NOT CREATED`
 - Confirm `/customer/assistant` returns the disabled/coming-soon state.
 - Confirm `/api/ai/customer/discovery` does not acquire budget, search Marketplace, or call Gemini.
 - Confirm telemetry remains prompt/response/key/PII free.
-

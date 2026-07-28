@@ -14,4 +14,3 @@ The code path remains safe for merge while production AI stays disabled. The fol
 - Stage 7 external validation remains deferred.
 
 Gemini live smoke status for the author environment: `NOT_RUN — LOCAL SECRET UNAVAILABLE` unless a local key is present and the bounded three-request limit is explicitly observed.
-

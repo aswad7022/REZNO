@@ -29,4 +29,3 @@ Web/Mobile clients must not contain:
 - model configuration
 - provider-specific secrets
 - direct Gemini network calls
-

@@ -32,4 +32,3 @@ The deterministic red-team corpus is implemented in `features/ai/gate-d.ts` and 
 ## Live evaluation
 
 Gemini live smoke is optional and local-only. Current author status: `NOT_RUN — LOCAL SECRET UNAVAILABLE`. No prompt, response, key, customer data, or real Marketplace data is printed or persisted when smoke is skipped or run.
-

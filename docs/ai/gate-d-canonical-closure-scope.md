@@ -28,4 +28,3 @@ Gate D is the final AI closure gate for safety, UX, accessibility, evidence, red
 - Safety/privacy cases must pass at `100%`; any pre-provider refusal must prove `providerRequestCount=0`.
 - Accepted claims must be server-built from REZNO-known public facts.
 - Visual evidence must come from a locally owned `next start` production server with synthetic fixtures and no Gemini call.
-
