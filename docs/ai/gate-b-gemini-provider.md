@@ -8,6 +8,7 @@ Interactions API:
   server tooling into the production dependency audit.
 - API style: Interactions API (`POST /v1beta/interactions`)
 - Endpoint origin: `https://generativelanguage.googleapis.com`
+- Authentication: `GEMINI_API_KEY` is sent only in the official `x-goog-api-key` request header. The request URL has no `key` query parameter and provider errors/logs never include the key.
 - API revision header: `2026-06-08`
 - Storage: `store: false`
 - Tool calling: disabled; REZNO executes tools itself before the provider call.
@@ -27,7 +28,8 @@ It was selected after a read-only Gemini model listing confirmed Flash-family mo
 Gate B is designed for Free Tier local validation only:
 
 - limited request count;
+- authenticated Person and service-wide rate limits plus bounded concurrency before any provider call;
 - no paid/billing tier escalation;
 - no private customer, booking, payment, staff, admin, platform, token, cookie, or session data;
-- synthetic eval prompts and public Marketplace data only;
+- synthetic eval prompts and public Marketplace data only, with no internal IDs in provider payloads;
 - quota/rate errors return safe local unavailable/rate-limited responses.

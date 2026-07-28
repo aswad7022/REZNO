@@ -115,11 +115,12 @@ async function postGeminiInteraction(
   const onAbort = () => controller.abort();
   signal?.addEventListener("abort", onAbort, { once: true });
   try {
-    const response = await fetch(`${AI_GATE_B_GEMINI_ORIGIN}/v1beta/interactions?key=${encodeURIComponent(apiKey)}`, {
+    const response = await fetch(`${AI_GATE_B_GEMINI_ORIGIN}/v1beta/interactions`, {
       body: JSON.stringify(request),
       headers: {
         "content-type": "application/json",
         "api-revision": "2026-06-08",
+        "x-goog-api-key": apiKey,
       },
       method: "POST",
       signal: controller.signal,
