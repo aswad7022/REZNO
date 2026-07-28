@@ -1358,6 +1358,27 @@
     "lightTheme": "Use light theme",
     "darkTheme": "Use dark theme"
   },
+  "CustomerAssistant": {
+    "title": "REZNO AI",
+    "description": "The assistant is in foundation mode. No external AI provider is connected and no automated recommendations are running.",
+    "badge": "Coming soon",
+    "emptyTitle": "AI is not enabled yet",
+    "emptyDescription": "Gate A is building safety, policy, grounding, and evaluation contracts first. Customer-facing AI remains closed by default.",
+    "foundation": {
+      "safety": {
+        "title": "Safety first",
+        "description": "Requests are bounded, side-effect free, and fail closed before any future provider can respond."
+      },
+      "privacy": {
+        "title": "Private by design",
+        "description": "Authorization context stays separate from prompt text and sensitive data is not logged."
+      },
+      "grounding": {
+        "title": "Grounded answers only",
+        "description": "Future answers must cite allowed REZNO sources and never claim unsupported facts."
+      }
+    }
+  },
   "CustomerPayments": {
     "title": "Payments",
     "description": "Track server-verified payment, capture, and refund status.",
