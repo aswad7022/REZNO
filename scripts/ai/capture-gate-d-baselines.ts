@@ -292,15 +292,15 @@ async function collectDomEvidence(page: Page, spec: AiGateDCaptureSpec, errors: 
   const [mainLandmarks, headingOnes, metrics] = await Promise.all([
     page.locator("main").count(),
     page.locator("h1").count(),
-    page.evaluate(() => {
-      const visible = (element: Element) => {
+    page.evaluate(`(() => {
+      const visible = (element) => {
         const rect = element.getBoundingClientRect();
         const style = window.getComputedStyle(element);
         return rect.width > 0 && rect.height > 0 && style.visibility !== "hidden" && style.display !== "none";
       };
       const interactive = [...document.querySelectorAll("button,a,input,textarea,select")].filter(visible);
       const unnamed = interactive.filter((element) => {
-        const label = element.getAttribute("aria-label") || element.textContent || (element as HTMLInputElement).value || "";
+        const label = element.getAttribute("aria-label") || element.textContent || element.value || "";
         return label.trim().length === 0;
       }).length;
       const undersized = interactive.filter((element) => {
@@ -319,7 +319,7 @@ async function collectDomEvidence(page: Page, spec: AiGateDCaptureSpec, errors: 
         unnamedInteractiveControls: unnamed,
         undersizedTouchTargets: undersized,
       };
-    }),
+    })()`),
   ]);
   return {
     route: "/customer/assistant",
