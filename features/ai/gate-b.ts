@@ -45,11 +45,13 @@ export type AiGateBProviderErrorCode =
 
 export class AiGateBProviderError extends Error {
   readonly code: AiGateBProviderErrorCode;
+  readonly providerRequestCount?: number;
 
-  constructor(code: AiGateBProviderErrorCode, message: string = code) {
+  constructor(code: AiGateBProviderErrorCode, message: string = code, options: { readonly providerRequestCount?: number } = {}) {
     super(message);
     this.name = "AiGateBProviderError";
     this.code = code;
+    this.providerRequestCount = options.providerRequestCount;
   }
 }
 
@@ -141,6 +143,11 @@ export type AiGateBResponse =
       readonly automated: true;
       readonly metadata: AiGateBMetadata;
     };
+
+export type AiGateBPublicMetadata = Omit<AiGateBMetadata, "modelId">;
+export type AiGateBPublicResponse =
+  | (Omit<Extract<AiGateBResponse, { ok: true }>, "modelId" | "metadata"> & { readonly metadata: AiGateBPublicMetadata })
+  | (Omit<Extract<AiGateBResponse, { ok: false }>, "metadata"> & { readonly metadata: AiGateBPublicMetadata });
 
 export type AiGateBMetadata = {
   readonly policyVersion: typeof AI_GATE_B_POLICY_VERSION;
@@ -290,15 +297,18 @@ export async function runAiGateBCustomerDiscovery(input: {
   readonly provider: AiGateBProvider;
   readonly marketplaceSearch?: AiGateBMarketplaceSearch;
   readonly env?: AiGateBEnv;
+  readonly skipCapabilityCheck?: boolean;
   readonly signal?: AbortSignal;
 }): Promise<AiGateBResponse> {
   const env = input.env ?? process.env;
   const startedAt = Date.now();
   const normalizedQuestion = normalizeAiGateBQuestion(input.question);
   const baseMetadata = (extra: Partial<AiGateBMetadata> = {}): AiGateBMetadata => createAiGateBMetadata(normalizedQuestion, startedAt, extra);
-  const capability = getAiGateBCapability(env);
-  if (!capability.enabled) {
-    return { ok: false, status: "UNAVAILABLE", safeMessage: SAFE_MESSAGES.UNAVAILABLE, automated: true, metadata: baseMetadata() };
+  if (!input.skipCapabilityCheck) {
+    const capability = getAiGateBCapability(env);
+    if (!capability.enabled) {
+      return { ok: false, status: "UNAVAILABLE", safeMessage: SAFE_MESSAGES.UNAVAILABLE, automated: true, metadata: baseMetadata() };
+    }
   }
   if (shouldRefuseAiGateBQuestion(normalizedQuestion)) {
     return createAiGateBRefusalResponse({ question: normalizedQuestion, startedAt });
@@ -342,6 +352,9 @@ export async function runAiGateBCustomerDiscovery(input: {
     });
   } catch (error) {
     const code = error instanceof AiGateBProviderError ? error.code : "UNAVAILABLE";
+    const providerRequestCount = error instanceof AiGateBProviderError
+      ? error.providerRequestCount ?? 1
+      : 1;
     const status = code === "QUOTA_OR_RATE_LIMITED"
       ? "RATE_LIMITED"
       : code === "TIMEOUT"
@@ -356,7 +369,7 @@ export async function runAiGateBCustomerDiscovery(input: {
         provider: input.provider.id,
         modelId: getAiGateBModel(env),
         marketplaceResultCount: publicResults.length,
-        providerRequestCount: 1,
+        providerRequestCount,
       }),
     };
   }
@@ -444,6 +457,41 @@ export function validateAiGateBProviderOutput(
     modelId: context.modelId,
     citations,
     metadata: context.metadata,
+  };
+}
+
+export function toPublicAiGateBResponse(response: AiGateBResponse): AiGateBPublicResponse {
+  const metadata = toPublicAiGateBMetadata(response.metadata);
+  if (response.ok) {
+    return {
+      ok: true,
+      status: "ANSWER",
+      answer: response.answer,
+      automated: response.automated,
+      citations: response.citations,
+      metadata,
+    };
+  }
+  return {
+    ok: false,
+    status: response.status,
+    safeMessage: response.safeMessage,
+    automated: response.automated,
+    metadata,
+  };
+}
+
+function toPublicAiGateBMetadata(metadata: AiGateBMetadata): AiGateBPublicMetadata {
+  return {
+    policyVersion: metadata.policyVersion,
+    promptVersion: metadata.promptVersion,
+    evalVersion: metadata.evalVersion,
+    provider: metadata.provider,
+    inputChars: metadata.inputChars,
+    marketplaceResultCount: metadata.marketplaceResultCount,
+    providerRequestCount: metadata.providerRequestCount,
+    ...(metadata.estimatedTokens === undefined ? {} : { estimatedTokens: metadata.estimatedTokens }),
+    ...(metadata.latencyMs === undefined ? {} : { latencyMs: metadata.latencyMs }),
   };
 }
 

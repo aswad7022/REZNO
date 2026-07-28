@@ -23,6 +23,8 @@ type AiGateBConcurrencyBackend = {
 
 const PERSON_RATE = Object.freeze({ limit: 6, windowMs: 60_000 });
 const SERVICE_RATE = Object.freeze({ limit: 30, windowMs: 60_000 });
+const GATE_C_PERSON_DAILY_RATE = Object.freeze({ limit: 60, windowMs: 24 * 60 * 60_000 });
+const GATE_C_SERVICE_DAILY_RATE = Object.freeze({ limit: 200, windowMs: 24 * 60 * 60_000 });
 const SERVICE_CONCURRENCY = 2;
 
 let rateLimitConsumer: AiGateBRateLimitConsumer = consumeRateLimit;
@@ -34,6 +36,19 @@ export async function acquireAiGateBProviderBudget(personId: string): Promise<Ai
   const serviceRate = await consumeBudgetRate("ai.gate-b.service", "service:gemini-free-tier", SERVICE_RATE);
   if (!serviceRate.ok) return serviceRate;
   const lease = await (concurrencyBackend ?? defaultConcurrencyBackend()).acquire(personId);
+  return lease.ok ? idempotentLease(lease) : lease;
+}
+
+export async function acquireAiGateCProviderBudget(personId: string): Promise<AiGateBBudgetLease | AiGateBBudgetRejection> {
+  const personWindow = await consumeBudgetRate("ai.gate-c.person.window", `person:${personId}`, PERSON_RATE);
+  if (!personWindow.ok) return personWindow;
+  const personDaily = await consumeBudgetRate("ai.gate-c.person.daily", `person:${personId}`, GATE_C_PERSON_DAILY_RATE);
+  if (!personDaily.ok) return personDaily;
+  const serviceWindow = await consumeBudgetRate("ai.gate-c.service.window", "service:gemini-free-tier", SERVICE_RATE);
+  if (!serviceWindow.ok) return serviceWindow;
+  const serviceDaily = await consumeBudgetRate("ai.gate-c.service.daily", "service:gemini-free-tier", GATE_C_SERVICE_DAILY_RATE);
+  if (!serviceDaily.ok) return serviceDaily;
+  const lease = await (concurrencyBackend ?? defaultGateCConcurrencyBackend()).acquire(personId);
   return lease.ok ? idempotentLease(lease) : lease;
 }
 
@@ -78,7 +93,7 @@ function defaultConcurrencyBackend(): AiGateBConcurrencyBackend {
   return MEMORY_CONCURRENCY_BACKEND;
 }
 
-const MEMORY_CONCURRENCY_BACKEND: AiGateBConcurrencyBackend = (() => {
+function createMemoryConcurrencyBackend(): AiGateBConcurrencyBackend {
   const activePeople = new Set<string>();
   let activeService = 0;
   return {
@@ -100,21 +115,25 @@ const MEMORY_CONCURRENCY_BACKEND: AiGateBConcurrencyBackend = (() => {
       };
     },
   };
-})();
+}
 
-const POSTGRES_CONCURRENCY_BACKEND: AiGateBConcurrencyBackend = {
-  async acquire(identifier) {
+const MEMORY_CONCURRENCY_BACKEND: AiGateBConcurrencyBackend = createMemoryConcurrencyBackend();
+const GATE_C_MEMORY_CONCURRENCY_BACKEND: AiGateBConcurrencyBackend = createMemoryConcurrencyBackend();
+
+function createPostgresConcurrencyBackend(prefix: "ai-gate-b" | "ai-gate-c"): AiGateBConcurrencyBackend {
+  return {
+    async acquire(identifier) {
     let client: PoolClient | null = null;
     let serviceLockKey: string | null = null;
     let personLocked = false;
     try {
       client = await postgresPool.connect();
-      serviceLockKey = await tryAnyServiceLock(client);
+      serviceLockKey = await tryAnyServiceLock(client, prefix);
       if (!serviceLockKey) {
         client.release();
         return { ok: false, code: "RATE_LIMITED", retryAfterSeconds: 1 };
       }
-      personLocked = await tryAdvisoryLock(client, `ai-gate-b:person:${identifier}`);
+      personLocked = await tryAdvisoryLock(client, `${prefix}:person:${identifier}`);
       if (!personLocked) {
         await safeUnlock(client, serviceLockKey);
         client.release();
@@ -128,7 +147,7 @@ const POSTGRES_CONCURRENCY_BACKEND: AiGateBConcurrencyBackend = {
           released = true;
           if (!client) return;
           try {
-            await safeUnlock(client, `ai-gate-b:person:${identifier}`);
+            await safeUnlock(client, `${prefix}:person:${identifier}`);
             if (serviceLockKey) await safeUnlock(client, serviceLockKey);
           } finally {
             client.release();
@@ -137,18 +156,29 @@ const POSTGRES_CONCURRENCY_BACKEND: AiGateBConcurrencyBackend = {
       };
     } catch {
       if (client) {
-        if (personLocked) await safeUnlock(client, `ai-gate-b:person:${identifier}`);
+        if (personLocked) await safeUnlock(client, `${prefix}:person:${identifier}`);
         if (serviceLockKey) await safeUnlock(client, serviceLockKey);
         client.release();
       }
       return { ok: false, code: "UNAVAILABLE", retryAfterSeconds: 1 };
     }
   },
-};
+  };
+}
 
-async function tryAnyServiceLock(client: PoolClient) {
+const POSTGRES_CONCURRENCY_BACKEND: AiGateBConcurrencyBackend = createPostgresConcurrencyBackend("ai-gate-b");
+const GATE_C_POSTGRES_CONCURRENCY_BACKEND: AiGateBConcurrencyBackend = createPostgresConcurrencyBackend("ai-gate-c");
+
+function defaultGateCConcurrencyBackend(): AiGateBConcurrencyBackend {
+  if (process.env.REZNO_RATE_LIMIT_BACKEND === "postgres" || process.env.NODE_ENV === "production") {
+    return GATE_C_POSTGRES_CONCURRENCY_BACKEND;
+  }
+  return GATE_C_MEMORY_CONCURRENCY_BACKEND;
+}
+
+async function tryAnyServiceLock(client: PoolClient, prefix = "ai-gate-b") {
   for (let slot = 0; slot < SERVICE_CONCURRENCY; slot += 1) {
-    const key = `ai-gate-b:service:gemini-free-tier:${slot}`;
+    const key = `${prefix}:service:gemini-free-tier:${slot}`;
     if (await tryAdvisoryLock(client, key)) return key;
   }
   return null;

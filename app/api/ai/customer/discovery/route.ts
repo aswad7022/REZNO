@@ -2,12 +2,17 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import {
   createAiGateBRefusalResponse,
-  getAiGateBCapability,
   runAiGateBCustomerDiscovery,
   shouldRefuseAiGateBQuestion,
+  toPublicAiGateBResponse,
 } from "@/features/ai/gate-b";
-import { createGeminiGateBProvider } from "@/features/ai/gemini-provider";
-import { acquireAiGateBProviderBudget } from "@/features/ai/rate-limit";
+import {
+  createAiGateCControlledGeminiProvider,
+  createAiGateCRequestCorrelationId,
+  getAiGateCClientReadiness,
+  getAiGateCProviderReadiness,
+} from "@/features/ai/provider-operations";
+import { acquireAiGateCProviderBudget } from "@/features/ai/rate-limit";
 import { requireCustomerIdentity } from "@/features/identity/server";
 import type { AiLocale } from "@/features/ai/contracts";
 import { logServerError } from "@/lib/logging/server";
@@ -18,16 +23,17 @@ const noStore = { "Cache-Control": "no-store, max-age=0" };
 
 export async function GET() {
   await requireCustomerIdentity();
-  return NextResponse.json({ capability: getAiGateBCapability() }, { headers: noStore });
+  return NextResponse.json({ capability: getAiGateCClientReadiness() }, { headers: noStore });
 }
 
 export async function POST(request: NextRequest) {
   const identity = await requireCustomerIdentity();
-  const capability = getAiGateBCapability();
+  const capability = getAiGateCProviderReadiness();
   if (!capability.enabled) {
-    return NextResponse.json({ error: { code: capability.reason, message: "REZNO AI is not available." } }, { headers: noStore, status: 503 });
+    return NextResponse.json({ error: { code: "AI_UNAVAILABLE", message: "REZNO AI is not available." } }, { headers: noStore, status: 503 });
   }
-  let budget: Awaited<ReturnType<typeof acquireAiGateBProviderBudget>> | null = null;
+  const correlationId = createAiGateCRequestCorrelationId();
+  let budget: Awaited<ReturnType<typeof acquireAiGateCProviderBudget>> | null = null;
   try {
     const body = await readBoundedJson(request);
     const question = typeof body.question === "string" ? body.question : "";
@@ -38,7 +44,7 @@ export async function POST(request: NextRequest) {
         { headers: noStore },
       );
     }
-    budget = await acquireAiGateBProviderBudget(identity.person.id);
+    budget = await acquireAiGateCProviderBudget(identity.person.id);
     if (!budget.ok) {
       return NextResponse.json(
         { data: rateLimitedResponse(locale, budget.code) },
@@ -48,10 +54,14 @@ export async function POST(request: NextRequest) {
     const response = await runAiGateBCustomerDiscovery({
       locale,
       question,
-      provider: createGeminiGateBProvider(),
+      provider: createAiGateCControlledGeminiProvider({
+        personId: identity.person.id,
+        correlationId,
+      }),
+      skipCapabilityCheck: true,
       signal: request.signal,
     });
-    return NextResponse.json({ data: response }, { headers: noStore, status: response.ok ? 200 : response.status === "RATE_LIMITED" ? 429 : response.status === "TIMEOUT" ? 504 : 200 });
+    return NextResponse.json({ data: toPublicAiGateBResponse(response) }, { headers: noStore, status: response.ok ? 200 : response.status === "RATE_LIMITED" ? 429 : response.status === "TIMEOUT" ? 504 : 200 });
   } catch (error) {
     logServerError("api.ai.customer.discovery", error);
     return NextResponse.json({ error: { code: "AI_UNAVAILABLE", message: "REZNO AI is unavailable." } }, { headers: noStore, status: 503 });

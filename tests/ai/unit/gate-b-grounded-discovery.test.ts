@@ -437,7 +437,9 @@ test("Gate B HTTP route bounds JSON before provider work", () => {
 test("Gate B HTTP route refuses unsafe input before provider budget acquisition", () => {
   const route = read("app/api/ai/customer/discovery/route.ts");
   const refusalIndex = route.indexOf("if (shouldRefuseAiGateBQuestion(question))");
-  const budgetIndex = route.indexOf("acquireAiGateBProviderBudget(identity.person.id)");
+  const budgetIndex = route.indexOf("acquireAiGateBProviderBudget(identity.person.id)") === -1
+    ? route.indexOf("acquireAiGateCProviderBudget(identity.person.id)")
+    : route.indexOf("acquireAiGateBProviderBudget(identity.person.id)");
   assert.notEqual(refusalIndex, -1);
   assert.notEqual(budgetIndex, -1);
   assert.equal(refusalIndex < budgetIndex, true);

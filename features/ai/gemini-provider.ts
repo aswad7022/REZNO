@@ -14,6 +14,11 @@ import {
   type AiGateBProviderOutput,
 } from "./gate-b";
 
+export type GeminiGateBProviderHooks = {
+  onProviderRequest?(): void;
+  onRetry?(): void;
+};
+
 const SYSTEM_INSTRUCTION = [
   "You are REZNO's grounded customer discovery assistant.",
   "You only explain and compare public marketplace results supplied in the input.",
@@ -47,20 +52,21 @@ const OUTPUT_SCHEMA = {
   },
 };
 
-export function createGeminiGateBProvider(env: AiGateBEnv = process.env): AiGateBProvider {
+export function createGeminiGateBProvider(env: AiGateBEnv = process.env, hooks: GeminiGateBProviderHooks = {}): AiGateBProvider {
   const apiKey = env.GEMINI_API_KEY;
   if (!apiKey) throw new AiGateBProviderError("INVALID_KEY");
   const model = getAiGateBModel(env);
   return {
     id: "gemini",
     async complete(input, signal) {
-      return callGemini({ apiKey, input, model, signal });
+      return callGemini({ apiKey, hooks, input, model, signal });
     },
   };
 }
 
 async function callGemini(input: {
   readonly apiKey: string;
+  readonly hooks: GeminiGateBProviderHooks;
   readonly input: AiGateBProviderInput;
   readonly model: string;
   readonly signal?: AbortSignal;
@@ -95,7 +101,10 @@ async function callGemini(input: {
     }),
   };
 
-  const response = await withGeminiRetry(() => postGeminiInteraction(input.apiKey, request, input.signal));
+  const response = await withGeminiRetry(
+    () => postGeminiInteraction(input.apiKey, request, input.signal, input.hooks),
+    input.hooks,
+  );
   const text = extractGeminiText(response);
   if (!text) throw new AiGateBProviderError("MALFORMED_OUTPUT");
   try {
@@ -109,12 +118,14 @@ async function postGeminiInteraction(
   apiKey: string,
   request: Record<string, unknown>,
   signal?: AbortSignal,
+  hooks: GeminiGateBProviderHooks = {},
 ) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), AI_GATE_B_TIMEOUT_MS);
   const onAbort = () => controller.abort();
   signal?.addEventListener("abort", onAbort, { once: true });
   try {
+    hooks.onProviderRequest?.();
     const response = await fetch(`${AI_GATE_B_GEMINI_ORIGIN}/v1beta/interactions`, {
       body: JSON.stringify(request),
       headers: {
@@ -174,7 +185,7 @@ function extractGeminiText(response: Record<string, unknown>) {
   return null;
 }
 
-async function withGeminiRetry<T>(operation: () => Promise<T>) {
+async function withGeminiRetry<T>(operation: () => Promise<T>, hooks: GeminiGateBProviderHooks = {}) {
   let lastError: unknown;
   for (let attempt = 0; attempt <= AI_GATE_B_MAX_RETRIES; attempt += 1) {
     try {
@@ -182,6 +193,7 @@ async function withGeminiRetry<T>(operation: () => Promise<T>) {
     } catch (error) {
       const mapped = mapGeminiErrorToGateB(error);
       if (mapped.code !== "UNAVAILABLE" || attempt === AI_GATE_B_MAX_RETRIES) throw mapped;
+      hooks.onRetry?.();
       lastError = mapped;
     }
   }

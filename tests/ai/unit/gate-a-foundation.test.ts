@@ -187,7 +187,7 @@ test("Gate A documentation separates product AI from coding-agent instructions a
   assert.match(combined, /No external AI provider/i);
   assert.match(combined, /coding assistant/i);
   assert.match(combined, /REZNO product AI/i);
-  assert.match(combined, /Gate B[^.\n]*not started|not start Gate B/i);
+  assert.match(combined, /Gate B[^.\n]*(?:not started|CLOSED)|not start Gate B/i);
   assert.match(combined, /Migration 52[^.\n]*not created/i);
   assert.doesNotMatch(combined, /sk-[A-Za-z0-9]/);
 });
@@ -198,8 +198,6 @@ test("No Gate A file introduces provider credentials, AI SDK calls, or Migration
     "features/ai/provider.ts",
     "features/ai/evaluation.ts",
     "features/ai/tool-registry.ts",
-    "app/customer/assistant/page.tsx",
-    "docs/ai/ai-canonical-scope.md",
     "docs/ai/gate-a-foundation.md",
     "docs/ai/gate-a-threat-model.md",
     "docs/ai/gate-a-evaluation-plan.md",
