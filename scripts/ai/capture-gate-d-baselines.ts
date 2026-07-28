@@ -264,7 +264,7 @@ async function configurePage(page: Page, baseUrl: string, sessionCookie: string,
     await route.fulfill({
       contentType: "application/json",
       body: JSON.stringify(responseFor(spec)),
-      status: spec.expectedState === "rate-limited" ? 429 : spec.expectedState === "timeout" ? 504 : 200,
+      status: 200,
     });
   });
 }
