@@ -284,12 +284,26 @@ async function visibleTextCount(page: Page, text: string) {
   return await page.evaluate((needle) => document.body.innerText.includes(needle) ? 1 : 0, text);
 }
 
+type CapturePageMetrics = {
+  readonly developmentOverlayCount: number;
+  readonly errorOverlayCount: number;
+  readonly horizontalOverflow: number;
+  readonly htmlDir: string;
+  readonly htmlLang: string;
+  readonly resolvedColorScheme: string;
+  readonly runningAnimations: number;
+  readonly skeletonCount: number;
+  readonly touchTargetFailures: readonly string[];
+  readonly unnamedInteractiveControls: number;
+  readonly undersizedTouchTargets: number;
+};
+
 async function collectDomEvidence(page: Page, spec: AiGateDCaptureSpec, errors: {
   consoleErrors: string[];
   pageErrors: string[];
   failedResources: string[];
 }): Promise<AiGateDDomEvidence> {
-  const [mainLandmarks, headingOnes, metrics] = await Promise.all([
+  const [mainLandmarks, headingOnes, rawMetrics] = await Promise.all([
     page.locator("main").count(),
     page.locator("h1").count(),
     page.evaluate(`(() => {
@@ -331,6 +345,7 @@ async function collectDomEvidence(page: Page, spec: AiGateDCaptureSpec, errors: 
       };
     })()`),
   ]);
+  const metrics = rawMetrics as CapturePageMetrics;
   return {
     route: "/customer/assistant",
     locale: spec.locale,
