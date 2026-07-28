@@ -1377,6 +1377,17 @@
         "title": "Grounded answers only",
         "description": "Future answers must cite allowed REZNO sources and never claim unsupported facts."
       }
+    },
+    "discovery": {
+      "inputLabel": "Ask about public REZNO marketplace options",
+      "inputPlaceholder": "Example: Find a family restaurant with reviews in Erbil",
+      "submit": "Ask assistant",
+      "cancel": "Cancel",
+      "retry": "Retry",
+      "loading": "Checking public REZNO results…",
+      "automated": "Automated answer. It uses only public REZNO marketplace results and cites each option.",
+      "citations": "Sources",
+      "unavailable": "The assistant is unavailable right now. Please try again later."
     }
   },
   "CustomerPayments": {

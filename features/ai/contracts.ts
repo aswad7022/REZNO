@@ -3,6 +3,9 @@ import "server-only";
 export const AI_GATE_A_POLICY_VERSION = "ai-gate-a-policy-v1" as const;
 export const AI_GATE_A_PROMPT_VERSION = "ai-gate-a-no-provider-v1" as const;
 export const AI_GATE_A_EVAL_VERSION = "ai-gate-a-evals-v1" as const;
+export const AI_GATE_B_POLICY_VERSION = "ai-gate-b-policy-v1" as const;
+export const AI_GATE_B_PROMPT_VERSION = "ai-gate-b-gemini-discovery-v1" as const;
+export const AI_GATE_B_EVAL_VERSION = "ai-gate-b-evals-v1" as const;
 
 export const AI_SUPPORTED_LOCALES = ["ar", "en", "ckb"] as const;
 export type AiLocale = (typeof AI_SUPPORTED_LOCALES)[number];
@@ -41,7 +44,7 @@ export const AI_FORBIDDEN_ACTIONS = [
 ] as const;
 export type AiForbiddenAction = (typeof AI_FORBIDDEN_ACTIONS)[number];
 
-export type AiProviderMode = "LOCAL_DETERMINISTIC" | "EXTERNAL_DISABLED";
+export type AiProviderMode = "LOCAL_DETERMINISTIC" | "GEMINI_GROUNDED" | "EXTERNAL_DISABLED";
 
 export type AiFeatureFlags = {
   readonly enabled: boolean;

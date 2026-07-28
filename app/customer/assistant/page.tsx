@@ -1,5 +1,5 @@
 import { Bot, LockKeyhole, ShieldCheck, Sparkles } from "lucide-react";
-import { getTranslations } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 
 import { DashboardEmpty } from "@/components/dashboard/dashboard-empty";
 import {
@@ -8,6 +8,9 @@ import {
 } from "@/components/dashboard/dashboard-shell";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CustomerDiscoveryAssistant } from "@/features/ai/components/customer-discovery-assistant";
+import { getAiGateBCapability } from "@/features/ai/gate-b";
+import type { AiLocale } from "@/features/ai/contracts";
 import { requireCustomerIdentity } from "@/features/identity/server";
 
 const AI_FOUNDATION_ITEMS = [
@@ -18,7 +21,11 @@ const AI_FOUNDATION_ITEMS = [
 
 export default async function CustomerAssistantPage() {
   await requireCustomerIdentity();
-  const t = await getTranslations("CustomerAssistant");
+  const [t, locale] = await Promise.all([
+    getTranslations("CustomerAssistant"),
+    getLocale(),
+  ]);
+  const capability = getAiGateBCapability();
 
   return (
     <DashboardShell>
@@ -27,11 +34,28 @@ export default async function CustomerAssistantPage() {
         description={t("description")}
         actions={<Badge variant="outline">{t("badge")}</Badge>}
       />
-      <DashboardEmpty
-        icon={Bot}
-        title={t("emptyTitle")}
-        description={t("emptyDescription")}
-      />
+      {capability.enabled ? (
+        <CustomerDiscoveryAssistant
+          locale={toAiLocale(locale)}
+          copy={{
+            inputLabel: t("discovery.inputLabel"),
+            inputPlaceholder: t("discovery.inputPlaceholder"),
+            submit: t("discovery.submit"),
+            cancel: t("discovery.cancel"),
+            retry: t("discovery.retry"),
+            loading: t("discovery.loading"),
+            automated: t("discovery.automated"),
+            citations: t("discovery.citations"),
+            unavailable: t("discovery.unavailable"),
+          }}
+        />
+      ) : (
+        <DashboardEmpty
+          icon={Bot}
+          title={t("emptyTitle")}
+          description={t("emptyDescription")}
+        />
+      )}
       <div className="grid gap-4 md:grid-cols-3">
         {AI_FOUNDATION_ITEMS.map((item) => {
           const Icon = item.icon;
@@ -52,4 +76,8 @@ export default async function CustomerAssistantPage() {
       </div>
     </DashboardShell>
   );
+}
+
+function toAiLocale(locale: string): AiLocale {
+  return locale === "ar" || locale === "ckb" ? locale : "en";
 }
