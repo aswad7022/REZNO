@@ -15,7 +15,11 @@ Author evidence is accumulated in the Gate D PR and must be independently review
 - Pre-provider refusal proof: every refusal case has `providerRequestCount=0`.
 - Web UX: single-flight generation fencing, abort, retry, cancellation, stale-response protection, offline, session-expired, and localized status copy.
 - Provider outage/rollback: deterministic drills cover readiness, quota, timeout, malformed output, circuit state, and kill switch.
-- Visual evidence: production build/server manifest plus PNG captures under `docs/ai/baselines/gate-d/`.
+- Visual evidence: `8/8` production build/server PNG captures under `docs/ai/baselines/gate-d/`.
+- Visual manifest: `docs/ai/baselines/gate-d-baselines.json`.
+- Visual source SHA: `3193799ae9937e84b6286b352eaa7e620776a471`.
+- Visual provider requests: `0`.
+- Human visual review: `8/8 PASS` in `docs/ai/gate-d-baseline-human-review.json`.
 
 ## Live provider evidence
 
