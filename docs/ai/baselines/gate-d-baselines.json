@@ -3,17 +3,17 @@
   "gate": "AI-D",
   "environment": "owned Next.js production build/server",
   "baseSha": "0374452b33cdeffe491e7f102d05ca271463adde",
-  "sourceSha": "3193799ae9937e84b6286b352eaa7e620776a471",
+  "sourceSha": "dc7cd33f82c7410bdc458bab44f5825d6414ff7a",
   "gateCMergeSha": "0374452b33cdeffe491e7f102d05ca271463adde",
   "productionAttestation": {
     "schemaVersion": 1,
-    "sourceSha": "3193799ae9937e84b6286b352eaa7e620776a471",
+    "sourceSha": "dc7cd33f82c7410bdc458bab44f5825d6414ff7a",
     "nodeEnv": "production",
     "hostname": "127.0.0.1",
     "ownedByHarness": true,
-    "buildId": "AUMcZSWjnI1UTdOs8gQrN",
+    "buildId": "DceeZ4V0YeElovJaTjbas",
     "providerRequestLimit": 3,
-    "captureScriptSha256": "d8cd145fac1b9809d23d2c7609ee32869829c0ae9b22778e6235e602b4b6cb6d",
+    "captureScriptSha256": "b40b790fac1971fe9b0d0a0d4850ca307ca1f98fdccc9804cf3fa915aaab347e",
     "harnessMode": "owned-next-production-server"
   },
   "capturePolicy": {
@@ -197,8 +197,8 @@
         "format": "png",
         "width": 390,
         "height": 844,
-        "sha256": "60eaa17145ba5a2b13d66484b6709213828e4f26d2cf924098e385927b0bffd5",
-        "entropy": 4.18045346873987,
+        "sha256": "236aa75df083447d1105f4055b54958c19660b533ba99ae381c0304b51833dad",
+        "entropy": 4.180453728578868,
         "channels": 3,
         "metadataFields": []
       },
@@ -250,8 +250,8 @@
         "format": "png",
         "width": 390,
         "height": 844,
-        "sha256": "84cbd07e94db89fceea60336d22e65ad2614848f726cf84c071669c2c4bffbb3",
-        "entropy": 4.480405524082016,
+        "sha256": "cba94c3f2a1f85b7f02ae1a34f5c22d42b49d06737d884cf53def856f46ea7d6",
+        "entropy": 4.48041025706334,
         "channels": 3,
         "metadataFields": []
       },

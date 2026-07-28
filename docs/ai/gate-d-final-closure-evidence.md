@@ -17,7 +17,7 @@ Author evidence is accumulated in the Gate D PR and must be independently review
 - Provider outage/rollback: deterministic drills cover readiness, quota, timeout, malformed output, circuit state, and kill switch.
 - Visual evidence: `8/8` production build/server PNG captures under `docs/ai/baselines/gate-d/`.
 - Visual manifest: `docs/ai/baselines/gate-d-baselines.json`.
-- Visual source SHA: `3193799ae9937e84b6286b352eaa7e620776a471`.
+- Visual source SHA: `dc7cd33f82c7410bdc458bab44f5825d6414ff7a`.
 - Visual provider requests: `0`.
 - Human visual review: `8/8 PASS` in `docs/ai/gate-d-baseline-human-review.json`.
 

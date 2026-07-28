@@ -14,7 +14,7 @@ Production evidence:
 - images under `docs/ai/baselines/gate-d/`
 - human review record: `docs/ai/gate-d-baseline-human-review.json`
 
-Captured source SHA: `3193799ae9937e84b6286b352eaa7e620776a471`.
+Captured source SHA: `dc7cd33f82c7410bdc458bab44f5825d6414ff7a`.
 
 States covered: `8/8` — disabled, loading, success with citations, refusal, no-results, timeout, quota/rate limited, provider unavailable, light/dark, compact/desktop, `ar/en/ckb`, RTL/LTR.
 
