@@ -9,7 +9,6 @@ import {
   toAiGateBMarketplaceResults,
   validateAiGateBProviderOutput,
   type AiGateBEnv,
-  type AiGateBProvider,
   type AiGateBProviderOutput,
 } from "./gate-b";
 import {
