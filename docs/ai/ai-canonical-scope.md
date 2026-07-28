@@ -1,8 +1,9 @@
 # REZNO AI Canonical Scope
 
-Status: AI Gate C provider operations control plane.
-Base: `c9182bb53b55cb1fa01104db0e92733bcd740e89`.
+Status: AI Gate D end-to-end safety and UX closure.
+Base: `0374452b33cdeffe491e7f102d05ca271463adde`.
 Gate B merge: `c9182bb53b55cb1fa01104db0e92733bcd740e89`.
+Gate C merge: `0374452b33cdeffe491e7f102d05ca271463adde`.
 Stage 6 runtime: `DEFERRED_BY_OWNER — CODE MERGED, RUNTIME NOT ACTIVATED`.
 Stage 7 external validation: `DEFERRED_BY_OWNER`.
 Migration 52: `NOT CREATED`.
@@ -21,8 +22,8 @@ The coding-agent documents instruct repository maintainers and must never be use
 
 - Gate A: `CLOSED`
 - Gate B: `CLOSED`
-- Gate C: `ACTIVE — AUTHOR IMPLEMENTATION`
-- Gate D: `NOT STARTED`
+- Gate C: `CLOSED`
+- Gate D: `ACTIVE — AUTHOR IMPLEMENTATION`
 
 ## AI Gate A
 
@@ -56,7 +57,7 @@ Gate B is closed at merge `c9182bb53b55cb1fa01104db0e92733bcd740e89`. It deliver
 
 ## AI Gate C
 
-Gate C is the active author implementation. It does not introduce a new AI feature. It hardens Gemini operations through a server-only provider control plane:
+Gate C is closed at merge `0374452b33cdeffe491e7f102d05ca271463adde`. It did not introduce a new AI feature. It hardened Gemini operations through a server-only provider control plane:
 
 - closed provider registry for Gemini only;
 - exact model allowlist with no fallback;
@@ -70,6 +71,14 @@ Gate C is the active author implementation. It does not introduce a new AI featu
 
 Gate C keeps Stage 8 historical closure intact and does not create Migration 52.
 
-## Future gate outline
+## AI Gate D
 
-- Gate D: end-to-end AI closure, red-team results, accessibility, device/browser evidence, and production readiness.
+Gate D is the active author implementation for end-to-end safety and UX closure. It does not add new assistant capabilities. AI remains:
+
+- Customer discovery only.
+- Read-only and side-effect free.
+- Grounded on public Marketplace data only.
+- Unable to create bookings, orders, payments, messages, notifications, admin changes, or platform mutations.
+- Closed by default in staging and production.
+
+Gate D owns red-team evaluation, Web/Mobile accessibility, browser/simulator evidence, provider outage and rollback drills, security/privacy closure, and production-readiness documentation.

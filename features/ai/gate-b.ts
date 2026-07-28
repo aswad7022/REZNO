@@ -202,6 +202,8 @@ const EMAIL_AT_TOKEN_PATTERN = /\s*(?:@|\[\s*at\s*\]|\(\s*at\s*\)|\{\s*at\s*\}|\
 const EMAIL_DOT_TOKEN_PATTERN = /\s*(?:\.|\[\s*dot\s*\]|\(\s*dot\s*\)|\{\s*dot\s*\}|\bdot\b)\s*/giu;
 const EMAIL_JOINER_PATTERN = /[\s‐‑‒–—―−-]+/gu;
 const ZERO_WIDTH_PATTERN = /[\u200B-\u200D\u2060\uFEFF]/gu;
+const UNSUPPORTED_AVAILABILITY_CLAIM_PATTERN =
+  /\b(?:available|availability|open now|tonight|today|tomorrow|slot|slots|bookable|reservation time|table at)\b|(?:متاح|متوفّر|متوفر|الليلة|اليوم|غدًا|غدا|موعد|مواعيد|طاولة|حجز)|(?:بەردەست|ئەمشەو|ئەمڕۆ|سبەی|کات|حجز)/iu;
 
 const FORBIDDEN_PRIVATE_PATTERNS = [
   EMAIL_ADDRESS_PATTERN,
@@ -220,6 +222,10 @@ const FORBIDDEN_PRIVATE_PATTERNS = [
 
 const INJECTION_PATTERNS = [
   /ignore (all )?(previous|system) instructions/i,
+  /ignore .*policy/i,
+  /developer prompt/i,
+  /\b(?:gemini[_\s-]*api[_\s-]*key|x-goog-api-key|provider headers?)\b/i,
+  /\b(?:show|print|display|expose|get|return)\b.*\b(?:api[_\s-]*key|secret|provider headers?)\b/i,
   /reveal (the )?(prompt|system|secret|api key)/i,
   /act as (admin|developer|system)/i,
   /tools?\s*:/i,
@@ -257,8 +263,13 @@ export function isUnsafeForFreeTier(input: string) {
 }
 
 export function shouldRefuseAiGateBQuestion(input: string) {
-  const normalizedQuestion = normalizeAiGateBQuestion(input);
-  return normalizedQuestion.length < 3 || isUnsafeForFreeTier(normalizedQuestion);
+  const canonicalQuestion = input
+    .normalize("NFKC")
+    .replace(/\p{C}/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const normalizedQuestion = normalizeAiGateBQuestion(canonicalQuestion);
+  return canonicalQuestion.length < 3 || canonicalQuestion.length > AI_GATE_B_MAX_INPUT_CHARS || isUnsafeForFreeTier(normalizedQuestion);
 }
 
 export function createAiGateBRefusalResponse(input: {
@@ -310,7 +321,7 @@ export async function runAiGateBCustomerDiscovery(input: {
       return { ok: false, status: "UNAVAILABLE", safeMessage: SAFE_MESSAGES.UNAVAILABLE, automated: true, metadata: baseMetadata() };
     }
   }
-  if (shouldRefuseAiGateBQuestion(normalizedQuestion)) {
+  if (shouldRefuseAiGateBQuestion(input.question)) {
     return createAiGateBRefusalResponse({ question: normalizedQuestion, startedAt });
   }
 
@@ -591,6 +602,7 @@ function assertProviderFreeTextIsGrounded(value: string, source: AiGateBMarketpl
   const text = scrubPublicText(value, 1_200);
   if (text === null) throw new AiGateBProviderError("MALFORMED_OUTPUT");
   if (/https?:\/\/|www\./i.test(text)) throw new AiGateBProviderError("MALFORMED_OUTPUT");
+  if (UNSUPPORTED_AVAILABILITY_CLAIM_PATTERN.test(text)) throw new AiGateBProviderError("MALFORMED_OUTPUT");
   const moneyClaims = text.match(/(?:[$€£]\s*\d+(?:[.,]\d+)?|\b\d+(?:[.,]\d+)?\s*(?:usd|iqd|دولار|دينار)\b)/gi) ?? [];
   for (const claim of moneyClaims) {
     const normalizedClaim = claim.replace(/[^\d.]/g, "");

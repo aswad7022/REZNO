@@ -62,6 +62,9 @@ jobs:
       - name: Run Stage 8 visual closure contracts
         run: npm run test:stage8d
 
+      - name: Run AI Gate D closure contracts
+        run: npm run test:ai-gate-d
+
       - name: Validate Prisma schema
         run: npx --no-install prisma validate
 

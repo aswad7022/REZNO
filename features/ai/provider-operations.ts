@@ -227,11 +227,17 @@ export function createAiGateCControlledGeminiProvider(input: {
       let outcome: AiGateCProviderTelemetry["outcome"] = "SUCCESS";
       let providerRequestCount = 0;
       let retryCount = 0;
+      let recordProviderFailure = true;
       try {
+        const currentReadiness = getAiGateCProviderReadiness(env);
+        if (!currentReadiness.enabled || !currentReadiness.modelId || !env.GEMINI_API_KEY) {
+          recordProviderFailure = false;
+          throw new AiGateBProviderError("UNAVAILABLE", currentReadiness.reason, { providerRequestCount: 0 });
+        }
         const provider = createGeminiGateBProvider({
           ...env,
           GEMINI_API_KEY: env.GEMINI_API_KEY,
-          GEMINI_MODEL: readiness.modelId,
+          GEMINI_MODEL: currentReadiness.modelId,
         }, {
           onProviderRequest() {
             providerRequestCount += 1;
@@ -247,7 +253,7 @@ export function createAiGateCControlledGeminiProvider(input: {
         const mapped = error instanceof AiGateBProviderError ? error : new AiGateBProviderError("UNAVAILABLE");
         providerRequestCount = mapped.providerRequestCount ?? providerRequestCount;
         outcome = toTelemetryOutcome(mapped.code);
-        await circuit.recordFailure({ code: mapped.code });
+        if (recordProviderFailure) await circuit.recordFailure({ code: mapped.code });
         throw mapped;
       } finally {
         await circuit.release();

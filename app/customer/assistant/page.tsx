@@ -44,9 +44,15 @@ export default async function CustomerAssistantPage() {
             cancel: t("discovery.cancel"),
             retry: t("discovery.retry"),
             loading: t("discovery.loading"),
+            cancelled: t("discovery.cancelled"),
             automated: t("discovery.automated"),
             citations: t("discovery.citations"),
             unavailable: t("discovery.unavailable"),
+            offline: t("discovery.offline"),
+            sessionExpired: t("discovery.sessionExpired"),
+            resultReady: t("discovery.resultReady"),
+            noResults: t("discovery.noResults"),
+            refusal: t("discovery.refusal"),
           }}
         />
       ) : (
