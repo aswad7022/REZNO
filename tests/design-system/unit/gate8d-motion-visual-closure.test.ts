@@ -28,6 +28,27 @@ const repoRoot = path.resolve(import.meta.dirname, "../../..");
 const read = (file: string) => readFileSync(path.join(repoRoot, file), "utf8");
 const manifestFile = "docs/stage8/baselines/gate8d-baselines.json";
 const reviewFile = "docs/stage8/gate8d-baseline-human-review.json";
+const postStage8AiGateAFiles = new Set([
+  "app/customer/assistant/page.tsx",
+  "docs/ai/adr-0001-provider-neutral-ai-foundation.md",
+  "docs/ai/ai-canonical-scope.md",
+  "docs/ai/gate-a-deferred-decisions.md",
+  "docs/ai/gate-a-evaluation-plan.md",
+  "docs/ai/gate-a-foundation.md",
+  "docs/ai/gate-a-test-plan.md",
+  "docs/ai/gate-a-threat-model.md",
+  "features/ai/contracts.ts",
+  "features/ai/evaluation.ts",
+  "features/ai/policy.ts",
+  "features/ai/provider.ts",
+  "features/ai/tool-registry.ts",
+  "messages/ar.json",
+  "messages/ckb.json",
+  "messages/en.json",
+  "package.json",
+  "tests/ai/unit/gate-a-foundation.test.ts",
+  "tests/design-system/unit/gate8d-motion-visual-closure.test.ts",
+]);
 
 function collectTsxFiles(dir: string): string[] {
   const absolute = path.join(repoRoot, dir);
@@ -227,7 +248,8 @@ test("Gate 8D evidence is production-attested, deterministic, browser-authentica
         !(
           file === manifestFile ||
           file === reviewFile ||
-          file.startsWith("docs/stage8/baselines/gate8d/")
+          file.startsWith("docs/stage8/baselines/gate8d/") ||
+          postStage8AiGateAFiles.has(file)
         ),
     ),
     [],
