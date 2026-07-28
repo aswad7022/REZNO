@@ -68,6 +68,7 @@ function validDom(overrides: Partial<AiGateDDomEvidence> = {}): AiGateDDomEviden
     runningAnimations: 0,
     resolvedColorScheme: "light",
     skeletonCount: 0,
+    touchTargetFailures: [],
     theme: "light",
     unnamedInteractiveControls: 0,
     undersizedTouchTargets: 0,

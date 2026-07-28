@@ -40,6 +40,7 @@ export type AiGateDDomEvidence = {
   readonly developmentOverlayCount: number;
   readonly errorOverlayCount: number;
   readonly skeletonCount: number;
+  readonly touchTargetFailures: readonly string[];
   readonly unnamedInteractiveControls: number;
   readonly undersizedTouchTargets: number;
   readonly runningAnimations: number;
@@ -147,6 +148,7 @@ export function validateAiGateDDomEvidence(evidence: AiGateDDomEvidence) {
   assert.equal(evidence.developmentOverlayCount, 0);
   assert.equal(evidence.errorOverlayCount, 0);
   assert.equal(evidence.skeletonCount, 0);
+  assert.deepEqual(evidence.touchTargetFailures, []);
   assert.equal(evidence.unnamedInteractiveControls, 0);
   assert.equal(evidence.undersizedTouchTargets, 0);
   assert.equal(evidence.runningAnimations, 0);

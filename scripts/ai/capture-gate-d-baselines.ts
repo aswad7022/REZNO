@@ -306,7 +306,7 @@ async function collectDomEvidence(page: Page, spec: AiGateDCaptureSpec, errors: 
       const undersized = interactive.filter((element) => {
         const rect = element.getBoundingClientRect();
         return rect.width < 44 || rect.height < 44;
-      }).length;
+      });
       return {
         developmentOverlayCount: document.querySelectorAll("[data-nextjs-dialog-overlay], nextjs-portal").length,
         errorOverlayCount: document.body.innerText.includes("Unhandled Runtime Error") || document.body.innerText.includes("Application error") ? 1 : 0,
@@ -316,8 +316,15 @@ async function collectDomEvidence(page: Page, spec: AiGateDCaptureSpec, errors: 
         runningAnimations: document.getAnimations().filter((animation) => animation.playState === "running").length,
         skeletonCount: document.querySelectorAll(".animate-pulse,[data-skeleton]").length,
         resolvedColorScheme: window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light",
+        touchTargetFailures: undersized.map((element) => {
+          const rect = element.getBoundingClientRect();
+          const label = element.getAttribute("aria-label") || element.textContent || element.value || "";
+          const tag = element.tagName.toLowerCase();
+          const href = element.getAttribute("href") || "";
+          return `${tag}${href ? `[href="${href}"]` : ""}${label ? ` "${label.trim().slice(0, 60)}"` : ""} ${Math.round(rect.width)}x${Math.round(rect.height)}`;
+        }),
         unnamedInteractiveControls: unnamed,
-        undersizedTouchTargets: undersized,
+        undersizedTouchTargets: undersized.length,
       };
     })()`),
   ]);
@@ -338,6 +345,7 @@ async function collectDomEvidence(page: Page, spec: AiGateDCaptureSpec, errors: 
     developmentOverlayCount: metrics.developmentOverlayCount,
     errorOverlayCount: metrics.errorOverlayCount,
     skeletonCount: metrics.skeletonCount,
+    touchTargetFailures: metrics.touchTargetFailures,
     unnamedInteractiveControls: metrics.unnamedInteractiveControls,
     undersizedTouchTargets: metrics.undersizedTouchTargets,
     runningAnimations: metrics.runningAnimations,
