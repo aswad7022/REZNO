@@ -19,6 +19,7 @@ import {
   __createAiGateCMemoryCircuitBackendForTests,
   __classifyAiGateCPostgresCircuitRowForTests,
   createAiGateCControlledGeminiProvider,
+  getAiGateCDeploymentPosture,
   getAiGateCClientReadiness,
   getAiGateCProviderReadiness,
   getAiGateCProviderRegistry,
@@ -105,6 +106,68 @@ test("Gate C provider registry and readiness are closed by default, posture-awar
     REZNO_AI_DEPLOYMENT_ENV: "production",
     REZNO_AI_GATE_C_PRODUCTION_APPROVED: undefined,
   }).reason, "ENVIRONMENT_NOT_APPROVED");
+});
+
+test("Gate C rejects unknown or conflicting deployment environments before provider work", async () => {
+  const invalidCases: Array<{ readonly name: string; readonly env: AiGateBEnv }> = [
+    { name: "unknown REZNO_AI_DEPLOYMENT_ENV", env: { REZNO_AI_DEPLOYMENT_ENV: "qa" } },
+    { name: "unknown REZNO_DEPLOYMENT_ENV", env: { REZNO_DEPLOYMENT_ENV: "qa" } },
+    { name: "unknown VERCEL_ENV", env: { VERCEL_ENV: "qa" } },
+    { name: "illegal casing", env: { REZNO_AI_DEPLOYMENT_ENV: "Local" } },
+    { name: "illegal whitespace", env: { REZNO_AI_DEPLOYMENT_ENV: " local " } },
+    { name: "empty explicit value", env: { REZNO_AI_DEPLOYMENT_ENV: "" } },
+    { name: "explicit conflict", env: { REZNO_AI_DEPLOYMENT_ENV: "local", REZNO_DEPLOYMENT_ENV: "production" } },
+    { name: "Vercel production cannot be downgraded", env: { REZNO_AI_DEPLOYMENT_ENV: "local", VERCEL_ENV: "production" } },
+    { name: "Vercel preview cannot be downgraded", env: { REZNO_AI_DEPLOYMENT_ENV: "local", VERCEL_ENV: "preview" } },
+  ];
+  const originalFetch = globalThis.fetch;
+  let providerCalls = 0;
+  globalThis.fetch = (async () => {
+    providerCalls += 1;
+    return successfulGeminiResponse();
+  }) as typeof fetch;
+  try {
+    for (const { name, env } of invalidCases) {
+      const readiness = getAiGateCProviderReadiness({ ...gateCEnv, ...env });
+      assert.equal(getAiGateCDeploymentPosture({ ...gateCEnv, ...env }), "invalid", name);
+      assert.equal(readiness.enabled, false, name);
+      assert.equal(readiness.reason, "INVALID_DEPLOYMENT_ENV", name);
+      const provider = createAiGateCControlledGeminiProvider({
+        personId: "person_a",
+        env: { ...gateCEnv, ...env },
+        circuitBackend: __createAiGateCMemoryCircuitBackendForTests(),
+      });
+      await assert.rejects(async () => provider.complete(providerInput()), (error) => {
+        assert.equal(error instanceof AiGateBProviderError, true, name);
+        if (error instanceof AiGateBProviderError) {
+          assert.equal(error.providerRequestCount, 0, name);
+        }
+        return true;
+      });
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+  assert.deepEqual({
+    input: "qa",
+    enabled: getAiGateCProviderReadiness({ ...gateCEnv, REZNO_AI_DEPLOYMENT_ENV: "qa" }).enabled,
+    reason: getAiGateCProviderReadiness({ ...gateCEnv, REZNO_AI_DEPLOYMENT_ENV: "qa" }).reason,
+    providerCalls,
+    providerRequestCount: 0,
+  }, {
+    input: "qa",
+    enabled: false,
+    reason: "INVALID_DEPLOYMENT_ENV",
+    providerCalls: 0,
+    providerRequestCount: 0,
+  });
+
+  assert.equal(getAiGateCDeploymentPosture({ ...gateCEnv, REZNO_AI_DEPLOYMENT_ENV: "local" }), "local");
+  assert.equal(getAiGateCDeploymentPosture({ ...gateCEnv, REZNO_AI_DEPLOYMENT_ENV: undefined, REZNO_DEPLOYMENT_ENV: "staging" }), "staging");
+  assert.equal(getAiGateCDeploymentPosture({ ...gateCEnv, REZNO_AI_DEPLOYMENT_ENV: "production" }), "production");
+  assert.equal(getAiGateCDeploymentPosture({ ...gateCEnv, VERCEL_ENV: "development" }), "local");
+  assert.equal(getAiGateCDeploymentPosture({ ...gateCEnv, REZNO_AI_DEPLOYMENT_ENV: undefined, VERCEL_ENV: "preview", REZNO_DEPLOYMENT_ENV: "staging" }), "staging");
+  assert.equal(getAiGateCDeploymentPosture({ ...gateCEnv, REZNO_AI_DEPLOYMENT_ENV: undefined, VERCEL_ENV: "production", REZNO_DEPLOYMENT_ENV: "production" }), "production");
 });
 
 test("Gate C budgets consume per-Person, daily, service, and concurrency scopes before provider work", async () => {
@@ -378,12 +441,15 @@ test("Gate C invalid key or permission errors open the circuit without retry sto
 
 test("Gate C privacy remains before budget, marketplace search, and provider work", async () => {
   const route = read("app/api/ai/customer/discovery/route.ts");
+  const capabilityIndex = route.indexOf("const capability = getAiGateCProviderReadiness()");
   const refusalIndex = route.indexOf("if (shouldRefuseAiGateBQuestion(question))");
   const budgetIndex = route.indexOf("acquireAiGateCProviderBudget(identity.person.id)");
   const providerIndex = route.indexOf("provider: createAiGateCControlledGeminiProvider");
+  assert.notEqual(capabilityIndex, -1);
   assert.notEqual(refusalIndex, -1);
   assert.notEqual(budgetIndex, -1);
   assert.notEqual(providerIndex, -1);
+  assert.equal(capabilityIndex < budgetIndex, true);
   assert.equal(refusalIndex < budgetIndex, true);
   assert.equal(budgetIndex < providerIndex, true);
 

@@ -20,13 +20,14 @@ export const AI_GATE_C_MAX_OUTPUT_TOKENS = 700;
 const AI_GATE_C_CIRCUIT_FAILURE_LIMIT = 2;
 const AI_GATE_C_CIRCUIT_OPEN_MS = 30_000;
 
-export type AiGateCDeploymentPosture = "local" | "staging" | "production";
+export type AiGateCDeploymentPosture = "local" | "staging" | "production" | "invalid";
 export type AiGateCReadinessReason =
   | "READY"
   | "FEATURE_DISABLED"
   | "KILL_SWITCH_ACTIVE"
   | "GEMINI_DISABLED"
   | "GATE_C_DISABLED"
+  | "INVALID_DEPLOYMENT_ENV"
   | "ENVIRONMENT_NOT_APPROVED"
   | "MISSING_GEMINI_KEY"
   | "MISSING_GEMINI_MODEL"
@@ -124,10 +125,16 @@ export function createAiGateCRequestCorrelationId() {
 }
 
 export function getAiGateCDeploymentPosture(env: AiGateBEnv = process.env): AiGateCDeploymentPosture {
-  const explicit = env.REZNO_AI_DEPLOYMENT_ENV ?? env.REZNO_DEPLOYMENT_ENV;
-  if (explicit === "production" || explicit === "staging" || explicit === "local") return explicit;
-  if (env.VERCEL_ENV === "production") return "production";
-  if (env.VERCEL_ENV === "preview") return "staging";
+  const signals: AiGateCDeploymentPosture[] = [];
+  const aiDeployment = parseExplicitDeploymentPosture(env.REZNO_AI_DEPLOYMENT_ENV);
+  const reznoDeployment = parseExplicitDeploymentPosture(env.REZNO_DEPLOYMENT_ENV);
+  const vercelDeployment = parseVercelDeploymentPosture(env.VERCEL_ENV);
+  if (aiDeployment === "invalid" || reznoDeployment === "invalid" || vercelDeployment === "invalid") return "invalid";
+  if (aiDeployment) signals.push(aiDeployment);
+  if (reznoDeployment) signals.push(reznoDeployment);
+  if (vercelDeployment) signals.push(vercelDeployment);
+  if (new Set(signals).size > 1) return "invalid";
+  if (signals[0]) return signals[0];
   return env.NODE_ENV === "production" ? "production" : "local";
 }
 
@@ -149,6 +156,7 @@ export function getAiGateCProviderReadiness(env: AiGateBEnv = process.env): AiGa
   if (env.REZNO_AI_ENABLED !== "true") return { ...base, enabled: false, reason: "FEATURE_DISABLED" };
   if (env.REZNO_AI_GEMINI_ENABLED !== "true") return { ...base, enabled: false, reason: "GEMINI_DISABLED" };
   if (env.REZNO_AI_GATE_C_ENABLED !== "true") return { ...base, enabled: false, reason: "GATE_C_DISABLED" };
+  if (posture === "invalid") return { ...base, enabled: false, reason: "INVALID_DEPLOYMENT_ENV" };
   if (!isPostureApproved(posture, env)) return { ...base, enabled: false, reason: "ENVIRONMENT_NOT_APPROVED" };
   if (!base.secretConfigured) return { ...base, enabled: false, reason: "MISSING_GEMINI_KEY" };
   if (!base.modelConfigured) return { ...base, enabled: false, reason: "MISSING_GEMINI_MODEL" };
@@ -312,7 +320,21 @@ function isConfiguredSecret(value: string | undefined) {
   return typeof value === "string" && value.trim().length > 0;
 }
 
-function isPostureApproved(posture: AiGateCDeploymentPosture, env: AiGateBEnv) {
+function parseExplicitDeploymentPosture(value: string | undefined): Exclude<AiGateCDeploymentPosture, "invalid"> | "invalid" | null {
+  if (value === undefined) return null;
+  if (value === "local" || value === "staging" || value === "production") return value;
+  return "invalid";
+}
+
+function parseVercelDeploymentPosture(value: string | undefined): Exclude<AiGateCDeploymentPosture, "invalid"> | "invalid" | null {
+  if (value === undefined) return null;
+  if (value === "production") return "production";
+  if (value === "preview") return "staging";
+  if (value === "development") return "local";
+  return "invalid";
+}
+
+function isPostureApproved(posture: Exclude<AiGateCDeploymentPosture, "invalid">, env: AiGateBEnv) {
   if (posture === "local") return env.REZNO_AI_GATE_C_LOCAL_PROVIDER_ENABLED === "true";
   if (posture === "staging") return env.REZNO_AI_GATE_C_STAGING_APPROVED === "true";
   return env.REZNO_AI_GATE_C_PRODUCTION_APPROVED === "true";
