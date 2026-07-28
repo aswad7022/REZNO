@@ -28,6 +28,21 @@ const repoRoot = path.resolve(import.meta.dirname, "../../..");
 const read = (file: string) => readFileSync(path.join(repoRoot, file), "utf8");
 const manifestFile = "docs/stage8/baselines/gate8d-baselines.json";
 const reviewFile = "docs/stage8/gate8d-baseline-human-review.json";
+const gate8dEvidenceSourceSha = "ad2f4d03a968f56064b97c3fe8f5d68b6ad6c7a9";
+const gate8dReviewedHead = "2567d694a93d55c8dc1378a65343cde52deed278";
+const stage8MergeCommit = "bcfbe17c3f6407a2b33b9048fd39a7648088d290";
+const gate8dEvidenceDeltaFiles = new Set([manifestFile, reviewFile]);
+const gate8dHistoricalProtectedFiles = new Set([
+  manifestFile,
+  reviewFile,
+  "tests/design-system/unit/gate8d-motion-visual-closure.test.ts",
+  "scripts/stage8/gate8d-capture-contract.ts",
+  "scripts/stage8/gate8d-visual-evidence.ts",
+  "scripts/stage8/gate8d-production-harness.ts",
+  "docs/stage8/stage8-closure.md",
+  "docs/stage8/gate8d-motion-visual-closure.md",
+  "docs/stage8/stage8-canonical-scope.md",
+]);
 
 function collectTsxFiles(dir: string): string[] {
   const absolute = path.join(repoRoot, dir);
@@ -61,6 +76,90 @@ function ensureGitCommitAvailable(sha: string) {
       stdio: "ignore",
     });
   }
+}
+
+function gitText(args: readonly string[]) {
+  return execFileSync("git", [...args], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  });
+}
+
+function gitBuffer(args: readonly string[]) {
+  return execFileSync("git", [...args], { cwd: repoRoot });
+}
+
+function readGitText(commit: string, file: string) {
+  ensureGitCommitAvailable(commit);
+  return gitText(["show", `${commit}:${file}`]);
+}
+
+function readGitBuffer(commit: string, file: string) {
+  ensureGitCommitAvailable(commit);
+  return gitBuffer(["show", `${commit}:${file}`]);
+}
+
+function assertGitAncestor(ancestor: string, descendant: string) {
+  ensureGitCommitAvailable(ancestor);
+  ensureGitCommitAvailable(descendant);
+  execFileSync("git", ["merge-base", "--is-ancestor", ancestor, descendant], {
+    cwd: repoRoot,
+  });
+}
+
+function changedFilesBetween(from: string, to: string) {
+  ensureGitCommitAvailable(from);
+  ensureGitCommitAvailable(to);
+  return gitText(["diff", "--name-only", `${from}..${to}`])
+    .split("\n")
+    .filter(Boolean);
+}
+
+function findUnexpectedGate8dEvidenceDeltaFiles(files: readonly string[]) {
+  return files.filter((file) => !gate8dEvidenceDeltaFiles.has(file));
+}
+
+function findHistoricalStage8ChangesAfterReview(files: readonly string[]) {
+  return files.filter(
+    (file) =>
+      gate8dHistoricalProtectedFiles.has(file) ||
+      file.startsWith("docs/stage8/baselines/gate8d/") ||
+      file.startsWith("scripts/stage8/gate8d-") ||
+      file.startsWith("scripts/stage8/capture-gate8d-") ||
+      file.startsWith("scripts/stage8/review-gate8d-") ||
+      file.startsWith("tests/design-system/unit/gate8d-") ||
+      file.startsWith("scripts/stage8/fixtures/"),
+  );
+}
+
+function assertGate8dHistoricalChain(input: {
+  sourceSha: string;
+  reviewedHead: string;
+  mergeCommit: string;
+  currentHead: string;
+}) {
+  assertGitAncestor(input.sourceSha, input.reviewedHead);
+  assertGitAncestor(input.reviewedHead, input.mergeCommit);
+  assertGitAncestor(input.mergeCommit, input.currentHead);
+
+  const historicalManifest = JSON.parse(
+    readGitText(input.reviewedHead, manifestFile),
+  ) as Gate8dVisualManifest;
+  assert.equal(historicalManifest.sourceSha, input.sourceSha);
+
+  assert.deepEqual(
+    findUnexpectedGate8dEvidenceDeltaFiles(
+      changedFilesBetween(input.sourceSha, input.reviewedHead),
+    ),
+    [],
+  );
+  assert.deepEqual(
+    findHistoricalStage8ChangesAfterReview(
+      changedFilesBetween(input.reviewedHead, input.mergeCommit),
+    ),
+    [],
+  );
+  return historicalManifest;
 }
 
 test("Gate 8D owns final motion, browser, accessibility, and performance closure only", () => {
@@ -193,8 +292,15 @@ test("Gate 8D cross-browser contract covers all browsers, viewports, directions,
 test("Gate 8D evidence is production-attested, deterministic, browser-authenticated, and human-reviewed", async () => {
   assert.ok(existsSync(path.join(repoRoot, manifestFile)));
   assert.ok(existsSync(path.join(repoRoot, reviewFile)));
-  const manifest = JSON.parse(read(manifestFile)) as Gate8dVisualManifest;
-  const review = JSON.parse(read(reviewFile)) as Gate8dHumanReview;
+  const manifest = assertGate8dHistoricalChain({
+    sourceSha: gate8dEvidenceSourceSha,
+    reviewedHead: gate8dReviewedHead,
+    mergeCommit: stage8MergeCommit,
+    currentHead: "HEAD",
+  });
+  const review = JSON.parse(
+    readGitText(gate8dReviewedHead, reviewFile),
+  ) as Gate8dHumanReview;
   assert.equal(manifest.environment, "owned Next.js production build/server");
   assert.equal(manifest.determinism.passes, 2);
   assert.equal(manifest.determinism.identicalCaptureCount, 24);
@@ -207,30 +313,86 @@ test("Gate 8D evidence is production-attested, deterministic, browser-authentica
   });
   validateGate8dHumanReview(manifest, review);
   for (const capture of manifest.captures) {
-    const bytes = readFileSync(path.join(repoRoot, capture.file));
+    const bytes = readGitBuffer(gate8dReviewedHead, capture.file);
     await validateGate8dCapture(capture, bytes);
   }
-  ensureGitCommitAvailable(manifest.sourceSha);
-  execFileSync("git", ["merge-base", "--is-ancestor", manifest.sourceSha, "HEAD"], {
-    cwd: repoRoot,
-  });
-  const filesAfterSource = execFileSync(
-    "git",
-    ["diff", "--name-only", `${manifest.sourceSha}..HEAD`],
-    { cwd: repoRoot, encoding: "utf8" },
-  )
-    .split("\n")
-    .filter(Boolean);
+});
+
+test("Gate 8D historical provenance rejects self-referential or later-stage evidence drift", () => {
+  const forbiddenHistoricalFiles = [
+    "tests/design-system/unit/gate8d-motion-visual-closure.test.ts",
+    "scripts/stage8/gate8d-capture-contract.ts",
+    "scripts/stage8/gate8d-visual-evidence.ts",
+    "scripts/stage8/gate8d-production-harness.ts",
+    "docs/stage8/baselines/gate8d/chromium-mobile-compact-admin-overview-compact-ar-dark.png",
+    reviewFile,
+    "docs/stage8/stage8-closure.md",
+    "scripts/stage8/fixtures/gate8d-fixture.ts",
+  ];
+
   assert.deepEqual(
-    filesAfterSource.filter(
-      (file) =>
-        !(
-          file === manifestFile ||
-          file === reviewFile ||
-          file.startsWith("docs/stage8/baselines/gate8d/")
-        ),
-    ),
+    findUnexpectedGate8dEvidenceDeltaFiles([
+      "tests/design-system/unit/gate8d-motion-visual-closure.test.ts",
+    ]),
+    ["tests/design-system/unit/gate8d-motion-visual-closure.test.ts"],
+  );
+  assert.deepEqual(
+    findUnexpectedGate8dEvidenceDeltaFiles([
+      manifestFile,
+      reviewFile,
+      "features/ai/provider.ts",
+    ]),
+    ["features/ai/provider.ts"],
+  );
+  assert.deepEqual(
+    findHistoricalStage8ChangesAfterReview(forbiddenHistoricalFiles),
+    forbiddenHistoricalFiles,
+  );
+  assert.deepEqual(
+    findHistoricalStage8ChangesAfterReview([
+      "features/ai/provider.ts",
+      "docs/ai/gate-a-foundation.md",
+      "tests/ai/unit/gate-a-foundation.test.ts",
+    ]),
     [],
+  );
+
+  assert.throws(() =>
+    assertGate8dHistoricalChain({
+      sourceSha: "171fe6be39c3d7b14c6855293f4df7df1b0cc4c2",
+      reviewedHead: gate8dReviewedHead,
+      mergeCommit: stage8MergeCommit,
+      currentHead: "HEAD",
+    }),
+  );
+  assert.throws(() =>
+    assertGate8dHistoricalChain({
+      sourceSha: gate8dEvidenceSourceSha,
+      reviewedHead: gate8dEvidenceSourceSha,
+      mergeCommit: stage8MergeCommit,
+      currentHead: "HEAD",
+    }),
+  );
+  assert.throws(() =>
+    assertGate8dHistoricalChain({
+      sourceSha: gate8dEvidenceSourceSha,
+      reviewedHead: gate8dReviewedHead,
+      mergeCommit: gate8dEvidenceSourceSha,
+      currentHead: "HEAD",
+    }),
+  );
+  assert.deepEqual(
+    findUnexpectedGate8dEvidenceDeltaFiles([manifestFile, reviewFile, "app/globals.css"]),
+    ["app/globals.css"],
+  );
+  assert.deepEqual(
+    findUnexpectedGate8dEvidenceDeltaFiles([
+      manifestFile,
+      reviewFile,
+      "scripts/stage8/fixtures/gate8d-fixture.ts",
+      "app/customer/page.tsx",
+    ]),
+    ["scripts/stage8/fixtures/gate8d-fixture.ts", "app/customer/page.tsx"],
   );
 });
 
