@@ -21,6 +21,7 @@
     "test:stage8c": "tsx --test tests/design-system/unit/gate8c-business-admin-visual-consistency.test.ts tests/design-system/unit/gate8c-visual-evidence-validator.test.ts && npm run test:stage8b",
     "test:stage8d": "tsx --test tests/design-system/unit/gate8d-motion-visual-closure.test.ts && npm run test:stage8c",
     "test:ai-gate-a": "NODE_OPTIONS=--conditions=react-server tsx --test tests/ai/unit/gate-a-foundation.test.ts",
+    "test:ai-gate-b": "NODE_OPTIONS=--conditions=react-server tsx --test tests/ai/unit/gate-a-foundation.test.ts tests/ai/unit/gate-b-grounded-discovery.test.ts",
     "visual:capture:stage8c": "tsx scripts/stage8/capture-gate8c-baselines.ts",
     "visual:review:stage8c": "tsx scripts/stage8/review-gate8c-baselines.ts",
     "visual:capture:stage8d": "tsx scripts/stage8/capture-gate8d-baselines.ts",
