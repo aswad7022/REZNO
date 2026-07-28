@@ -1,6 +1,6 @@
 # AI Gate C — Closure Evidence
 
-Status: author implementation validated locally; Draft PR publication pending.
+Status: author implementation validated locally; Draft PR published for independent review.
 
 Author scope:
 
@@ -54,6 +54,6 @@ Provider smoke:
 
 Publication evidence:
 
-- Draft PR: pending.
-- Final author SHA: pending commit.
-- GitHub Actions and Vercel on the PR head: pending publication.
+- Draft PR: https://github.com/aswad7022/REZNO/pull/139
+- Final author SHA: the current PR head.
+- GitHub Actions and Vercel on the PR head: pending remote validation.
