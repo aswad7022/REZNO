@@ -190,8 +190,14 @@ const SAFE_MESSAGES: Record<Exclude<AiGateBResponse["status"], "ANSWER">, Record
   },
 };
 
+const EMAIL_ADDRESS_PATTERN = /\b[A-Z0-9._%+-]+@[A-Z0-9-]+(?:\.[A-Z0-9-]+)+\b/i;
+const EMAIL_AT_TOKEN_PATTERN = /\s*(?:@|\[\s*at\s*\]|\(\s*at\s*\)|\{\s*at\s*\}|\bat\b)\s*/giu;
+const EMAIL_DOT_TOKEN_PATTERN = /\s*(?:\.|\[\s*dot\s*\]|\(\s*dot\s*\)|\{\s*dot\s*\}|\bdot\b)\s*/giu;
+const EMAIL_JOINER_PATTERN = /[\s‐‑‒–—―−-]+/gu;
+const ZERO_WIDTH_PATTERN = /[\u200B-\u200D\u2060\uFEFF]/gu;
+
 const FORBIDDEN_PRIVATE_PATTERNS = [
-  /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i,
+  EMAIL_ADDRESS_PATTERN,
   /(?:\+?\d[\s().-]?){8,}/,
   /\b[A-Z0-9._%+-]+\s*(?:@|\bat\b)\s*[A-Z0-9.-]+\s*(?:\.|\bdot\b)\s*[A-Z]{2,}\b/i,
   /[^\s@]{2,}\s*@\s*[A-Z0-9.-]+\s*(?:\.|\bdot\b)\s*[A-Z]{2,}/i,
@@ -234,11 +240,33 @@ export function getAiGateBModel(env: AiGateBEnv = process.env) {
 export function isUnsafeForFreeTier(input: string) {
   const normalized = normalizePrivateDetectionInput(normalizeAiInput(input, { maxInputChars: AI_GATE_B_MAX_INPUT_CHARS, maxOutputChars: 0, timeoutMs: 0, maxRetries: 0, maxEstimatedTokens: 0, maxEstimatedCostUsd: "0.00" }));
   const compact = normalized.replace(/[\s._()[\]{}<>-]+/g, "");
+  const canonicalEmailCandidate = normalizeEmailDetectionCandidate(normalized);
   return looksLikePhoneNumber(normalized)
     || looksLikePhoneNumber(compact)
+    || EMAIL_ADDRESS_PATTERN.test(canonicalEmailCandidate)
     || FORBIDDEN_PRIVATE_PATTERNS.some((pattern) => pattern.test(normalized))
     || FORBIDDEN_PRIVATE_PATTERNS.some((pattern) => pattern.test(compact))
     || INJECTION_PATTERNS.some((pattern) => pattern.test(normalized));
+}
+
+export function shouldRefuseAiGateBQuestion(input: string) {
+  const normalizedQuestion = normalizeAiGateBQuestion(input);
+  return normalizedQuestion.length < 3 || isUnsafeForFreeTier(normalizedQuestion);
+}
+
+export function createAiGateBRefusalResponse(input: {
+  readonly question: string;
+  readonly startedAt?: number;
+}): AiGateBResponse {
+  const startedAt = input.startedAt ?? Date.now();
+  const normalizedQuestion = normalizeAiGateBQuestion(input.question);
+  return {
+    ok: false,
+    status: "REFUSAL",
+    safeMessage: SAFE_MESSAGES.REFUSAL,
+    automated: true,
+    metadata: createAiGateBMetadata(normalizedQuestion, startedAt),
+  };
 }
 
 export function extractAiGateBIntent(input: string): AiGateBIntent {
@@ -266,32 +294,14 @@ export async function runAiGateBCustomerDiscovery(input: {
 }): Promise<AiGateBResponse> {
   const env = input.env ?? process.env;
   const startedAt = Date.now();
-  const normalizedQuestion = normalizeAiInput(input.question, {
-    maxInputChars: AI_GATE_B_MAX_INPUT_CHARS,
-    maxOutputChars: 0,
-    timeoutMs: 0,
-    maxRetries: 0,
-    maxEstimatedTokens: 0,
-    maxEstimatedCostUsd: "0.00",
-  });
-  const baseMetadata = (extra: Partial<AiGateBMetadata> = {}): AiGateBMetadata => ({
-    policyVersion: AI_GATE_B_POLICY_VERSION,
-    promptVersion: AI_GATE_B_PROMPT_VERSION,
-    evalVersion: AI_GATE_B_EVAL_VERSION,
-    provider: "none",
-    modelId: null,
-    inputChars: normalizedQuestion.length,
-    marketplaceResultCount: 0,
-    providerRequestCount: 0,
-    latencyMs: Date.now() - startedAt,
-    ...extra,
-  });
+  const normalizedQuestion = normalizeAiGateBQuestion(input.question);
+  const baseMetadata = (extra: Partial<AiGateBMetadata> = {}): AiGateBMetadata => createAiGateBMetadata(normalizedQuestion, startedAt, extra);
   const capability = getAiGateBCapability(env);
   if (!capability.enabled) {
     return { ok: false, status: "UNAVAILABLE", safeMessage: SAFE_MESSAGES.UNAVAILABLE, automated: true, metadata: baseMetadata() };
   }
-  if (normalizedQuestion.length < 3 || isUnsafeForFreeTier(normalizedQuestion)) {
-    return { ok: false, status: "REFUSAL", safeMessage: SAFE_MESSAGES.REFUSAL, automated: true, metadata: baseMetadata() };
+  if (shouldRefuseAiGateBQuestion(normalizedQuestion)) {
+    return createAiGateBRefusalResponse({ question: normalizedQuestion, startedAt });
   }
 
   const intent = extractAiGateBIntent(normalizedQuestion);
@@ -478,11 +488,49 @@ function scrubPublicText(value: string | null | undefined, maxChars: number) {
 function normalizePrivateDetectionInput(value: string) {
   return value
     .normalize("NFKC")
+    .replace(ZERO_WIDTH_PATTERN, "")
     .replace(/[\u0660-\u0669\u06F0-\u06F9]/g, (digit) => String(digit.charCodeAt(0) <= 0x0669 ? digit.charCodeAt(0) - 0x0660 : digit.charCodeAt(0) - 0x06F0))
     .replace(/\p{C}/gu, " ")
     .replace(/[‐‑‒–—―−]/gu, "-")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function normalizeAiGateBQuestion(input: string) {
+  return normalizeAiInput(input, {
+    maxInputChars: AI_GATE_B_MAX_INPUT_CHARS,
+    maxOutputChars: 0,
+    timeoutMs: 0,
+    maxRetries: 0,
+    maxEstimatedTokens: 0,
+    maxEstimatedCostUsd: "0.00",
+  });
+}
+
+function normalizeEmailDetectionCandidate(value: string) {
+  return normalizePrivateDetectionInput(value)
+    .replace(EMAIL_AT_TOKEN_PATTERN, "@")
+    .replace(EMAIL_DOT_TOKEN_PATTERN, ".")
+    .replace(EMAIL_JOINER_PATTERN, "");
+}
+
+function createAiGateBMetadata(
+  normalizedQuestion: string,
+  startedAt: number,
+  extra: Partial<AiGateBMetadata> = {},
+): AiGateBMetadata {
+  return {
+    policyVersion: AI_GATE_B_POLICY_VERSION,
+    promptVersion: AI_GATE_B_PROMPT_VERSION,
+    evalVersion: AI_GATE_B_EVAL_VERSION,
+    provider: "none",
+    modelId: null,
+    inputChars: normalizedQuestion.length,
+    marketplaceResultCount: 0,
+    providerRequestCount: 0,
+    latencyMs: Date.now() - startedAt,
+    ...extra,
+  };
 }
 
 function looksLikePhoneNumber(value: string) {

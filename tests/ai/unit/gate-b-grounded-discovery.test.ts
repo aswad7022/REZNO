@@ -7,11 +7,13 @@ import {
   AI_GATE_B_DEFAULT_MODEL,
   AI_GATE_B_GEMINI_ORIGIN,
   AiGateBProviderError,
+  createAiGateBRefusalResponse,
   getAiGateBCapability,
   getAiGateBModel,
   isUnsafeForFreeTier,
   mapGeminiErrorToGateB,
   runAiGateBCustomerDiscovery,
+  shouldRefuseAiGateBQuestion,
   toAiGateBMarketplaceResults,
   validateAiGateBProviderOutput,
   type AiGateBEnv,
@@ -115,6 +117,68 @@ test("Gate B refuses PII, secrets, bookings, payments, and injection before the 
     assert.equal(response.status, "REFUSAL");
     assert.equal(fake.calls, 0);
   }
+});
+
+test("Gate B canonicalizes obfuscated emails before marketplace search and provider work", async () => {
+  for (const unsafe of [
+    "dana [at] example [dot] com",
+    "dana(at)example(dot)com",
+    "dana { at } example { dot } com",
+    "dana @ example . com",
+    "dana＠example．com",
+    "DANA [AT] EXAMPLE [DOT] COM",
+    "dana​[at]​example​[dot]​com",
+    "Find a restaurant for dana [at] example [dot] com",
+  ]) {
+    assert.equal(isUnsafeForFreeTier(unsafe), true);
+    assert.equal(shouldRefuseAiGateBQuestion(unsafe), true);
+    const fake = provider();
+    let marketplaceCalls = 0;
+    const response = await runAiGateBCustomerDiscovery({
+      locale: "en",
+      question: unsafe,
+      provider: fake.fake,
+      env: enabledEnv,
+      marketplaceSearch: async () => {
+        marketplaceCalls += 1;
+        return [marketplaceBusiness];
+      },
+    });
+    assert.equal(response.ok, false);
+    assert.equal(response.status, "REFUSAL");
+    assert.equal(response.metadata.providerRequestCount, 0);
+    assert.equal(response.metadata.marketplaceResultCount, 0);
+    assert.equal(fake.calls, 0);
+    assert.equal(marketplaceCalls, 0);
+  }
+});
+
+test("Gate B obfuscated email canonicalization does not block ordinary discovery text", async () => {
+  for (const safe of [
+    "Find a restaurant at noon in Erbil",
+    "Find a cafe near Ankawa with dessert",
+    "Compare family restaurants for dinner",
+    "Find a dot-themed cafe design concept in Erbil",
+  ]) {
+    assert.equal(isUnsafeForFreeTier(safe), false);
+    assert.equal(shouldRefuseAiGateBQuestion(safe), false);
+  }
+
+  const fake = provider();
+  let marketplaceCalls = 0;
+  const response = await runAiGateBCustomerDiscovery({
+    locale: "en",
+    question: "Find a restaurant at noon in Erbil",
+    provider: fake.fake,
+    env: enabledEnv,
+    marketplaceSearch: async () => {
+      marketplaceCalls += 1;
+      return [marketplaceBusiness];
+    },
+  });
+  assert.equal(response.ok, true);
+  assert.equal(fake.calls, 1);
+  assert.equal(marketplaceCalls, 1);
 });
 
 test("Gate B sends only sanitized public marketplace data and validates citations", async () => {
@@ -368,6 +432,21 @@ test("Gate B HTTP route bounds JSON before provider work", () => {
   assert.match(route, /content-type/);
   assert.match(route, /getReader\(\)/);
   assert.doesNotMatch(route, /request\.json\(\)/);
+});
+
+test("Gate B HTTP route refuses unsafe input before provider budget acquisition", () => {
+  const route = read("app/api/ai/customer/discovery/route.ts");
+  const refusalIndex = route.indexOf("if (shouldRefuseAiGateBQuestion(question))");
+  const budgetIndex = route.indexOf("acquireAiGateBProviderBudget(identity.person.id)");
+  assert.notEqual(refusalIndex, -1);
+  assert.notEqual(budgetIndex, -1);
+  assert.equal(refusalIndex < budgetIndex, true);
+  const refusal = createAiGateBRefusalResponse({
+    question: "Find a restaurant for dana [at] example [dot] com",
+  });
+  assert.equal(refusal.status, "REFUSAL");
+  assert.equal(refusal.metadata.providerRequestCount, 0);
+  assert.equal(refusal.metadata.marketplaceResultCount, 0);
 });
 
 test("Gate B documentation records Gemini Free Tier boundaries and Migration 52 remains absent", () => {

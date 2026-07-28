@@ -1,6 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { getAiGateBCapability, runAiGateBCustomerDiscovery } from "@/features/ai/gate-b";
+import {
+  createAiGateBRefusalResponse,
+  getAiGateBCapability,
+  runAiGateBCustomerDiscovery,
+  shouldRefuseAiGateBQuestion,
+} from "@/features/ai/gate-b";
 import { createGeminiGateBProvider } from "@/features/ai/gemini-provider";
 import { acquireAiGateBProviderBudget } from "@/features/ai/rate-limit";
 import { requireCustomerIdentity } from "@/features/identity/server";
@@ -27,6 +32,12 @@ export async function POST(request: NextRequest) {
     const body = await readBoundedJson(request);
     const question = typeof body.question === "string" ? body.question : "";
     const locale = parseLocale(body.locale);
+    if (shouldRefuseAiGateBQuestion(question)) {
+      return NextResponse.json(
+        { data: createAiGateBRefusalResponse({ question }) },
+        { headers: noStore },
+      );
+    }
     budget = await acquireAiGateBProviderBudget(identity.person.id);
     if (!budget.ok) {
       return NextResponse.json(
