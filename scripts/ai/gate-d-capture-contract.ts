@@ -129,7 +129,7 @@ export const aiGateDCaptureSpecs: readonly AiGateDCaptureSpec[] = [
     direction: "rtl",
     expectedState: "unavailable",
     file: "compact-ckb-dark-unavailable.png",
-    forbiddenText: ["Gate D Family Restaurant", "سەرچاوەکان"],
+    forbiddenText: ["Gate D Family Restaurant", "ئەنجامی پشتڕاستکراوی REZNO"],
     height: 844,
     locale: "ckb",
     question: "چێشتخانەی خێزانی بدۆزەوە",
