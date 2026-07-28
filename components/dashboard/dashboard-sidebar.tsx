@@ -164,7 +164,7 @@ export function DashboardSidebar({
                         <Link
                           href={item.href}
                           onClick={(event) => event.stopPropagation()}
-                          className="flex min-w-0 flex-1 items-center gap-3 rounded-lg px-2 py-2 outline-none focus-visible:ring-3 focus-visible:ring-sidebar-ring/50"
+                          className="flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-lg px-2 outline-none focus-visible:ring-3 focus-visible:ring-sidebar-ring/50"
                         >
                           <item.icon className="size-4 shrink-0" aria-hidden="true" />
                           <span className="truncate">
