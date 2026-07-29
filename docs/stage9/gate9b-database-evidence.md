@@ -14,11 +14,15 @@ Accepted evidence shape:
 - redacted database identity;
 - healthy migrations `51/51`;
 - zero failed or rolled-back Prisma migrations;
+- schema drift status `ABSENT`;
 - Platform job enum count `23`;
 - Platform schedule enum count `13`;
 - bounded read/write probe inserted exactly once;
 - probe cleanup leaves zero Gate 9B probe rows;
 - no connection string, password, token, role name, or host name in output.
+
+`npm run test:stage9b` includes `npm run test:stage9b:diff-check`, which runs
+the PR whitespace guard before the gate can be handed back for review.
 
 ## Migration baseline
 
@@ -30,4 +34,3 @@ No Migration 52 is created in Gate 9B.
 | `20260724180000_platform_operations_closure` | `6cd6ec39cc950600002f0b36529ea08460c539b8ced0176f37fbed2980a74f0c` |
 | `20260726173000_hosted_payment_handoff_action` | `a16a9c7f2b61c12d35c154e8a4f2f655a568a508118caf46ee88ebe81fbc564d` |
 | `20260726203000_device_push_notifications` | `98fe060f7e9c2e1baa1e2a91c40bcad1a39915454f3b9445a55ef82fb86848f0` |
-

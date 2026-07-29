@@ -25,4 +25,3 @@ Gate 9B monitoring checks:
 6. Compare fingerprints.
 7. Use the documented restore point only if a proven staging incident requires
    restore. Do not perform destructive restore as a routine test.
-

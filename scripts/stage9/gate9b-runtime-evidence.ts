@@ -10,36 +10,71 @@ import {
 import { runPlatformWorkerBatch } from "../../features/platform-jobs/services/worker";
 import { prisma } from "../../lib/db/prisma";
 import {
+  assertGate9BActivationPreconditions,
+  evaluateGate9BRuntimeSnapshot,
   GATE9B_ALLOWED_STAGING_SCHEDULES,
   GATE9B_EXPECTED_JOB_TYPES,
-  evaluateGate9BRuntimeSnapshot,
+  GATE9B_LOCAL_TEST_SOURCE,
+  GATE9B_REQUIRED_ADMIN_PERMISSIONS,
+  gate9BDatabaseBindingSha256,
+  gate9BDeploymentEvidenceFromEnv,
+  gate9BRestorePointEvidenceFromEnv,
   parseGate9BStagingDatabaseIdentity,
+  type Gate9BAdminEvidence,
 } from "../../features/stage9/gate9b";
+import {
+  collectStage9BMigrationEvidence,
+  localStage9BRestorePointEvidence,
+  snapshotStage9BEnv,
+} from "./gate9b-evidence-helpers";
 
 let phase = "BOOT";
 
 async function main() {
+  const env = snapshotStage9BEnv();
+  const allowLocalTest = env.REZNO_STAGE9_GATE9B_ALLOW_LOCAL_TEST_DB === "true";
+
   phase = "IDENTITY";
-  parseGate9BStagingDatabaseIdentity(process.env.DATABASE_URL, {
-    expectedHost: process.env.REZNO_STAGE9_GATE9B_EXPECTED_DATABASE_HOST,
-    expectedRole: process.env.REZNO_STAGE9_GATE9B_EXPECTED_DATABASE_ROLE,
-    allowLocalTest: process.env.REZNO_STAGE9_GATE9B_ALLOW_LOCAL_TEST_DB === "true",
+  const identity = parseGate9BStagingDatabaseIdentity(env.DATABASE_URL, {
+    allowLocalTest,
+    expectedHost: env.REZNO_STAGE9_GATE9B_EXPECTED_DATABASE_HOST,
+    expectedIdentitySource: env.REZNO_STAGE9_GATE9B_DATABASE_IDENTITY_SOURCE,
+    expectedRole: env.REZNO_STAGE9_GATE9B_EXPECTED_DATABASE_ROLE,
   });
 
-  const context = adminContextFromEnv();
-  if (!context) {
-    console.log(JSON.stringify({
-      missing: [
-        "STAGING_ADMIN_LOGIN_OR_GATE9B_ADMIN_CONTEXT",
-        "REZNO_STAGE9_GATE9B_ADMIN_USER_ID",
-        "REZNO_STAGE9_GATE9B_ADMIN_PERSON_ID",
-        "REZNO_STAGE9_GATE9B_ADMIN_ACCESS_ID",
-      ],
-      status: "EXTERNAL_INPUT_REQUIRED",
-    }, null, 2));
-    process.exitCode = 2;
-    return;
-  }
+  phase = "MIGRATIONS";
+  const migrationEvidence = await collectStage9BMigrationEvidence(prisma, env);
+
+  phase = "ADMIN_CONTEXT";
+  const adminEvidence = await verifyAdminEvidence(env);
+
+  phase = "ACTIVATION_PRECONDITIONS";
+  const now = new Date();
+  const databaseBindingSha256 = gate9BDatabaseBindingSha256(identity);
+  const restorePointEvidence =
+    allowLocalTest
+    && env.NODE_ENV === "test"
+    && env.REZNO_STAGE9_GATE9B_RESTORE_POINT_ID?.trim()
+    && env.REZNO_STAGE9_GATE9B_RESTORE_POINT_VERIFICATION_SOURCE === GATE9B_LOCAL_TEST_SOURCE
+      ? localStage9BRestorePointEvidence({
+        createdAt: new Date(now.getTime() - 60_000),
+        databaseBindingSha256,
+        expiresAt: new Date(now.getTime() + 60 * 60_000),
+        verifiedAt: now,
+      })
+      : gate9BRestorePointEvidenceFromEnv(env);
+  assertGate9BActivationPreconditions({
+    adminEvidence,
+    databaseIdentity: identity,
+    deploymentEvidence: gate9BDeploymentEvidenceFromEnv(env) ?? undefined,
+    env,
+    migrationEvidence,
+    now,
+    requireAdmin: true,
+    restorePointEvidence,
+  });
+
+  const context = adminContextFromVerifiedEnv(env);
 
   phase = "INITIALIZE";
   let control = await prisma.platformRuntimeControl.findUnique({
@@ -142,9 +177,9 @@ async function main() {
     providerTruth: {
       ai: "DISABLED",
       communications: "NOT_CONFIGURED",
-      payment: process.env.REZNO_PAYMENT_PROVIDER === "DETERMINISTIC_TEST" ? "DETERMINISTIC_TEST" : "NOT_CONFIGURED",
+      payment: env.REZNO_PAYMENT_PROVIDER === "DETERMINISTIC_TEST" ? "DETERMINISTIC_TEST" : "NOT_CONFIGURED",
       push: "NOT_CONFIGURED",
-      storage: process.env.REZNO_STORAGE_PROVIDER === "DETERMINISTIC_TEST" ? "DETERMINISTIC_TEST" : "NOT_CONFIGURED",
+      storage: env.REZNO_STORAGE_PROVIDER === "DETERMINISTIC_TEST" ? "DETERMINISTIC_TEST" : "NOT_CONFIGURED",
     },
     scheduleKeys: enumRows.filter((row) => row.type === "PlatformJobScheduleKey").map((row) => row.label),
     stage6Runtime: "STAGING_ACTIVATED_PRODUCTION_NOT_ACTIVATED",
@@ -153,6 +188,7 @@ async function main() {
     throw new Error("Gate 9B runtime snapshot failed closed.");
   }
   console.log(JSON.stringify({
+    adminEvidence: { status: adminEvidence.status },
     jobTypes: GATE9B_EXPECTED_JOB_TYPES.length,
     manualOne,
     manualTwo,
@@ -163,11 +199,70 @@ async function main() {
   }, null, 2));
 }
 
-function adminContextFromEnv() {
-  const userId = process.env.REZNO_STAGE9_GATE9B_ADMIN_USER_ID?.trim();
-  const personId = process.env.REZNO_STAGE9_GATE9B_ADMIN_PERSON_ID?.trim();
-  const adminAccessId = process.env.REZNO_STAGE9_GATE9B_ADMIN_ACCESS_ID?.trim();
-  if (!userId || !personId || !adminAccessId) return null;
+async function verifyAdminEvidence(
+  env: Record<string, string | undefined>,
+): Promise<Gate9BAdminEvidence> {
+  const userId = env.REZNO_STAGE9_GATE9B_ADMIN_USER_ID?.trim();
+  const personId = env.REZNO_STAGE9_GATE9B_ADMIN_PERSON_ID?.trim();
+  const adminAccessId = env.REZNO_STAGE9_GATE9B_ADMIN_ACCESS_ID?.trim();
+  if (!userId || !personId || !adminAccessId) return { status: "MISSING" };
+
+  try {
+    const [user, person, adminAccess] = await Promise.all([
+      prisma.user.findUnique({ where: { id: userId }, select: { id: true } }),
+      prisma.person.findUnique({
+        where: { id: personId },
+        select: {
+          authUserId: true,
+          deletedAt: true,
+          isOnboarded: true,
+          status: true,
+        },
+      }),
+      prisma.adminAccess.findUnique({
+        where: { id: adminAccessId },
+        select: {
+          expiresAt: true,
+          permissions: true,
+          role: true,
+          status: true,
+          userId: true,
+        },
+      }),
+    ]);
+    if (
+      !user
+      || !person
+      || !adminAccess
+      || person.authUserId !== userId
+      || person.deletedAt
+      || person.status !== "ACTIVE"
+      || !person.isOnboarded
+      || adminAccess.userId !== userId
+      || adminAccess.status !== "ACTIVE"
+      || (adminAccess.expiresAt && adminAccess.expiresAt.getTime() <= Date.now())
+    ) {
+      return { status: "INVALID" };
+    }
+
+    return {
+      permissions: adminAccess.role === "SUPER_ADMIN"
+        ? GATE9B_REQUIRED_ADMIN_PERMISSIONS
+        : adminAccess.permissions,
+      status: "VERIFIED",
+    };
+  } catch {
+    return { status: "INVALID" };
+  }
+}
+
+function adminContextFromVerifiedEnv(env: Record<string, string | undefined>) {
+  const userId = env.REZNO_STAGE9_GATE9B_ADMIN_USER_ID?.trim();
+  const personId = env.REZNO_STAGE9_GATE9B_ADMIN_PERSON_ID?.trim();
+  const adminAccessId = env.REZNO_STAGE9_GATE9B_ADMIN_ACCESS_ID?.trim();
+  if (!userId || !personId || !adminAccessId) {
+    throw new Error("Gate 9B Admin context is unavailable after precondition verification.");
+  }
   return {
     adminAccessId,
     personId,

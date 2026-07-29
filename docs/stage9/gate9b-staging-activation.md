@@ -23,20 +23,28 @@ Gemini, APNs/FCM, real payment providers, app stores, or PR #100.
 ## Activation sequence
 
 The activation may proceed only after `gate9b-preflight`,
-`gate9b-database-evidence`, and backup/restore evidence all pass.
+`gate9b-database-evidence`, and backup/restore evidence all pass in the same
+process that reaches the mutation boundary. The runtime script must not trust a
+previous CLI output file as authority.
 
 1. Verify the exact source SHA is deployed to `rezno-staging`.
-2. Verify the database identity and restore point without printing secrets.
-3. Apply migrations with `prisma migrate deploy` only to healthy `51/51`.
-4. Run the bounded Gate 9B read/write probe and cleanup.
-5. Initialize the Stage 6 GitHub Actions runtime control.
-6. Bootstrap the 13 accepted schedules; they must start disabled.
-7. Run two bounded manual cycles.
-8. Enable the runtime and only the 13 accepted staging schedules.
-9. Observe one scheduled OIDC runtime cycle.
-10. Verify no duplicate jobs, stuck leases, or unsafe provider claims.
-11. Cleanup only Gate 9B fixture data and compare fingerprints.
+2. Verify the database identity from trusted expected host/role/source values,
+   not from `DATABASE_URL` alone.
+3. Verify a provider-backed restore point for the same staging database. If the
+   restore point cannot be verified by the provider, the required result is
+   `UNVERIFIED_RESTORE_POINT`.
+4. Apply migrations with `prisma migrate deploy` only to healthy `51/51`.
+5. Prove schema drift is absent before any write.
+6. Run the bounded Gate 9B read/write probe and cleanup.
+7. Re-run the activation preconditions inside `stage9b:runtime-evidence`.
+8. Initialize the Stage 6 GitHub Actions runtime control.
+9. Bootstrap the 13 accepted schedules; they must start disabled.
+10. Run two bounded manual cycles.
+11. Enable the runtime and only the 13 accepted staging schedules.
+12. Observe one scheduled OIDC runtime cycle.
+13. Verify no duplicate jobs, stuck leases, or unsafe provider claims.
+14. Cleanup only Gate 9B fixture data and compare fingerprints.
 
 If any required identity, restore, or Admin authority is unavailable, the only
-accepted result is `EXTERNAL_INPUT_REQUIRED`.
-
+accepted result is `EXTERNAL_INPUT_REQUIRED` and the executable exit code must
+be non-zero. `READY` is the only successful executable outcome.

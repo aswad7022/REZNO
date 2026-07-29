@@ -29,6 +29,11 @@ Gate 9B evidence prints names and redacted hashes only. It must never print:
 ## Fail-closed posture
 
 The scripts refuse staging writes unless the target database, restore point,
-runtime URL, origin, and Admin authority are proven first. Provider-dependent
-jobs must report `NOT_CONFIGURED` truthfully when their provider is unavailable.
-
+runtime URL, origin, deployment SHA, provider posture, migration baseline,
+schema drift, and Admin authority are proven first. `stage9b:runtime-evidence`
+re-runs the centralized activation preconditions inside the mutation process
+before `initializePlatformRuntime`, schedule bootstrap, manual cycles, runtime
+enablement, or schedule enablement. A restore point ID by itself is never proof;
+without live provider verification the result is `UNVERIFIED_RESTORE_POINT`.
+Provider-dependent jobs must report `NOT_CONFIGURED` truthfully when their
+provider is unavailable.

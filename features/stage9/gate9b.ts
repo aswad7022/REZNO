@@ -94,11 +94,32 @@ export const GATE9B_REQUIRED_EXTERNAL_INPUTS = [
   { name: "BETTER_AUTH_URL", secret: false },
   { name: "REZNO_STAGE9_GATE9B_EXPECTED_DATABASE_HOST", secret: false },
   { name: "REZNO_STAGE9_GATE9B_EXPECTED_DATABASE_ROLE", secret: false },
+  { name: "REZNO_STAGE9_GATE9B_DATABASE_IDENTITY_SOURCE", secret: false },
   { name: "REZNO_STAGE9_GATE9B_RESTORE_POINT_ID", secret: false },
+  { name: "REZNO_STAGE9_GATE9B_RESTORE_POINT_VERIFICATION_SOURCE", secret: false },
+  { name: "REZNO_STAGE9_GATE9B_RESTORE_POINT_DATABASE_BINDING_SHA256", secret: false },
+  { name: "REZNO_STAGE9_GATE9B_RESTORE_POINT_CREATED_AT", secret: false },
+  { name: "REZNO_STAGE9_GATE9B_RESTORE_POINT_VERIFIED_AT", secret: false },
+  { name: "REZNO_STAGE9_GATE9B_RESTORE_POINT_EXPIRES_AT", secret: false },
+  { name: "REZNO_STAGE9_GATE9B_SCHEMA_DRIFT_STATUS", secret: false },
+  { name: "REZNO_STAGE9_GATE9B_DEPLOYMENT_SHA", secret: false },
+  { name: "REZNO_STAGE9_GATE9B_DEPLOYMENT_SOURCE_SHA", secret: false },
+  { name: "REZNO_STAGE9_GATE9B_DEPLOYMENT_PROJECT", secret: false },
+  { name: "REZNO_STAGE9_GATE9B_DEPLOYMENT_STATUS", secret: false },
   { name: GATE9B_RUNTIME_URL_VARIABLE, secret: false },
 ] as const;
 
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "::1", "localhost"]);
+export const GATE9B_LOCAL_TEST_SOURCE = "local-disposable-test" as const;
+
+const TRUSTED_DATABASE_IDENTITY_SOURCES = new Set([
+  "neon-api",
+  "vercel-neon-integration",
+]);
+const TRUSTED_RESTORE_POINT_SOURCES = new Set([
+  "neon-api",
+]);
+const RESTORE_POINT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const SECRET_LIKE =
   /(?:postgres(?:ql)?:\/\/|password\s*[:=]|authorization\s*[:=]|bearer\s+[a-z0-9._-]+|cookie\s*[:=]|token\s*[:=]|api[_-]?key\s*[:=]|gho_[a-z0-9_]+|ghp_[a-z0-9_]+|vercel_[a-z0-9_]+|sk-[a-z0-9_-]+)/iu;
 
@@ -109,6 +130,17 @@ export type Gate9BFindingCode =
   | "INVALID_STAGING_ORIGIN"
   | "INVALID_RUNTIME_URL"
   | "PRODUCTION_TARGET_FORBIDDEN"
+  | "UNVERIFIED_DATABASE_IDENTITY"
+  | "UNVERIFIED_RESTORE_POINT"
+  | "STALE_RESTORE_POINT"
+  | "RESTORE_POINT_DATABASE_MISMATCH"
+  | "MISSING_DEPLOYMENT_EVIDENCE"
+  | "MIGRATION_BASELINE_MISMATCH"
+  | "SCHEMA_DRIFT_UNVERIFIED"
+  | "SCHEMA_DRIFT_DETECTED"
+  | "ADMIN_CONTEXT_REQUIRED"
+  | "INVALID_ADMIN_CONTEXT"
+  | "PREFLIGHT_EVIDENCE_STALE"
   | "UNSAFE_PROVIDER_CONFIGURED"
   | "AI_MUST_REMAIN_DISABLED"
   | "DEPLOYMENT_SHA_MISMATCH"
@@ -128,6 +160,7 @@ export type Gate9BValidation = {
   readonly externalInputRequired: boolean;
   readonly findings: readonly Gate9BFinding[];
   readonly ok: boolean;
+  readonly reason: Gate9BFindingCode | "READY";
 };
 
 export type Gate9BDatabaseIdentity = {
@@ -145,6 +178,49 @@ export type Gate9BDeploymentEvidence = {
   readonly projectSlug: string;
   readonly sourceSha: string;
   readonly status: "READY" | "SUCCESS" | "PENDING" | "FAILED";
+};
+
+export type Gate9BMigrationEvidence = {
+  readonly applied: number;
+  readonly criticalHashes: Readonly<Record<string, string>>;
+  readonly failed: number;
+  readonly rolledBack: number;
+  readonly schemaDrift: "ABSENT" | "PRESENT" | "UNVERIFIED";
+  readonly total: number;
+};
+
+export type Gate9BRestorePointEvidence = {
+  readonly createdAt?: string;
+  readonly databaseBindingSha256?: string;
+  readonly expiresAt?: string;
+  readonly providerVerified?: boolean;
+  readonly restorePointIdPresent: boolean;
+  readonly source?: string;
+  readonly verifiedAt?: string;
+};
+
+export type Gate9BAdminEvidence = {
+  readonly permissions?: readonly string[];
+  readonly status: "MISSING" | "INVALID" | "VERIFIED";
+};
+
+export type Gate9BActivationPreconditionInput = {
+  readonly adminEvidence?: Gate9BAdminEvidence;
+  readonly databaseIdentity?: Gate9BDatabaseIdentity;
+  readonly deploymentEvidence?: Gate9BDeploymentEvidence;
+  readonly env: Record<string, string | undefined>;
+  readonly migrationEvidence?: Gate9BMigrationEvidence;
+  readonly now?: Date;
+  readonly requireAdmin?: boolean;
+  readonly restorePointEvidence?: Gate9BRestorePointEvidence;
+};
+
+export type Gate9BActivationContext = {
+  readonly adminEvidence?: Gate9BAdminEvidence;
+  readonly databaseBindingSha256: string;
+  readonly databaseIdentity: Gate9BDatabaseIdentity;
+  readonly deploymentSha: string;
+  readonly runtimeUrl: typeof GATE9B_STAGING_ORIGIN;
 };
 
 export type Gate9BRuntimeSnapshot = {
@@ -195,15 +271,7 @@ export function validateGate9BEnvironment(
     ));
   }
 
-  const runtimeUrl = env.REZNO_PLATFORM_RUNTIME_URL?.trim();
-  if (runtimeUrl !== undefined && runtimeUrl !== GATE9B_STAGING_ORIGIN) {
-    findings.push(finding(
-      "INVALID_RUNTIME_URL",
-      "REZNO_PLATFORM_RUNTIME_URL",
-      "error",
-      "The platform runtime URL must be the approved staging origin.",
-    ));
-  }
+  findings.push(...validateGate9BRuntimeUrl(env.REZNO_PLATFORM_RUNTIME_URL).findings);
 
   for (const [name, raw] of [
     ["BETTER_AUTH_URL", env.BETTER_AUTH_URL],
@@ -232,8 +300,59 @@ export function validateGate9BEnvironment(
 
   return {
     externalInputRequired: findings.some((item) => item.code === "MISSING_EXTERNAL_INPUT"),
-    findings,
+    findings: dedupeFindings(findings),
     ok: findings.every((item) => item.severity !== "error"),
+    reason: reasonFor(findings),
+  };
+}
+
+export function validateGate9BRuntimeUrl(
+  rawRuntimeUrl: string | undefined,
+): Gate9BValidation {
+  const findings: Gate9BFinding[] = [];
+  const runtimeUrl = rawRuntimeUrl?.trim();
+  if (runtimeUrl === undefined || runtimeUrl.length === 0) {
+    findings.push(finding(
+      "MISSING_EXTERNAL_INPUT",
+      "REZNO_PLATFORM_RUNTIME_URL",
+      "error",
+      "The platform runtime URL must be configured before Gate 9B activation.",
+    ));
+  } else {
+    let parsed: URL | null = null;
+    try {
+      parsed = new URL(runtimeUrl);
+    } catch {
+      findings.push(finding(
+        "INVALID_RUNTIME_URL",
+        "REZNO_PLATFORM_RUNTIME_URL",
+        "error",
+        "The platform runtime URL must be the exact approved staging origin.",
+      ));
+    }
+    if (
+      !parsed
+      || parsed.protocol !== "https:"
+      || parsed.username.length > 0
+      || parsed.password.length > 0
+      || parsed.search.length > 0
+      || parsed.hash.length > 0
+      || parsed.origin !== GATE9B_STAGING_ORIGIN
+      || runtimeUrl !== GATE9B_STAGING_ORIGIN
+    ) {
+      findings.push(finding(
+        "INVALID_RUNTIME_URL",
+        "REZNO_PLATFORM_RUNTIME_URL",
+        "error",
+        "The platform runtime URL must be HTTPS and match the approved staging origin without credentials, query, or fragment.",
+      ));
+    }
+  }
+  return {
+    externalInputRequired: findings.some((item) => item.code === "MISSING_EXTERNAL_INPUT"),
+    findings: dedupeFindings(findings),
+    ok: findings.every((item) => item.severity !== "error"),
+    reason: reasonFor(findings),
   };
 }
 
@@ -291,6 +410,7 @@ export function validateGate9BProviderPosture(
 export function parseGate9BStagingDatabaseIdentity(
   databaseUrl: string | undefined,
   confirmations: {
+    readonly expectedIdentitySource?: string;
     readonly expectedHost?: string;
     readonly expectedRole?: string;
     readonly allowLocalTest?: boolean;
@@ -314,24 +434,79 @@ export function parseGate9BStagingDatabaseIdentity(
   const host = parsed.hostname.toLowerCase();
   const sslmode = parsed.searchParams.get("sslmode");
   const role = decodeURIComponent(parsed.username);
+  const identityMarkers = `${host}/${parsed.pathname}/${role}`.toLowerCase();
+  const hasProductionMarker = /\b(prod|production|live)\b/.test(identityMarkers)
+    || /(?:^|[-_.])(prod|production|live)(?:[-_.]|$)/.test(identityMarkers);
+  const hasStagingMarker = /stag|staging/.test(identityMarkers);
+  if (hasProductionMarker || (hasProductionMarker && hasStagingMarker)) {
+    throw new Gate9BValidationError("PRODUCTION_TARGET_FORBIDDEN", "DATABASE_URL");
+  }
   const local = confirmations.allowLocalTest === true && LOOPBACK_HOSTS.has(host);
   if (local) {
-    if (sslmode && sslmode !== "disable") {
-      throw new Gate9BValidationError("INVALID_DATABASE_IDENTITY", "DATABASE_URL");
+    if (confirmations.expectedIdentitySource !== GATE9B_LOCAL_TEST_SOURCE) {
+      throw new Gate9BValidationError(
+        "UNVERIFIED_DATABASE_IDENTITY",
+        "REZNO_STAGE9_GATE9B_DATABASE_IDENTITY_SOURCE",
+      );
     }
-  } else {
-    if (!host.endsWith(".neon.tech") || host.includes("-pooler.") || sslmode !== "verify-full") {
-      throw new Gate9BValidationError("INVALID_DATABASE_IDENTITY", "DATABASE_URL");
-    }
-    if (!confirmations.expectedHost || confirmations.expectedHost.toLowerCase() !== host) {
+    if (!confirmations.expectedHost) {
       throw new Gate9BValidationError(
         "MISSING_EXTERNAL_INPUT",
         "REZNO_STAGE9_GATE9B_EXPECTED_DATABASE_HOST",
       );
     }
-    if (!confirmations.expectedRole || confirmations.expectedRole !== role) {
+    if (confirmations.expectedHost.toLowerCase() !== host) {
+      throw new Gate9BValidationError(
+        "INVALID_DATABASE_IDENTITY",
+        "REZNO_STAGE9_GATE9B_EXPECTED_DATABASE_HOST",
+      );
+    }
+    if (!confirmations.expectedRole) {
       throw new Gate9BValidationError(
         "MISSING_EXTERNAL_INPUT",
+        "REZNO_STAGE9_GATE9B_EXPECTED_DATABASE_ROLE",
+      );
+    }
+    if (confirmations.expectedRole !== role) {
+      throw new Gate9BValidationError(
+        "INVALID_DATABASE_IDENTITY",
+        "REZNO_STAGE9_GATE9B_EXPECTED_DATABASE_ROLE",
+      );
+    }
+    if (sslmode && sslmode !== "disable") {
+      throw new Gate9BValidationError("INVALID_DATABASE_IDENTITY", "DATABASE_URL");
+    }
+  } else {
+    if (!TRUSTED_DATABASE_IDENTITY_SOURCES.has(confirmations.expectedIdentitySource ?? "")) {
+      throw new Gate9BValidationError(
+        "UNVERIFIED_DATABASE_IDENTITY",
+        "REZNO_STAGE9_GATE9B_DATABASE_IDENTITY_SOURCE",
+      );
+    }
+    if (!host.endsWith(".neon.tech") || host.includes("-pooler.") || sslmode !== "verify-full") {
+      throw new Gate9BValidationError("INVALID_DATABASE_IDENTITY", "DATABASE_URL");
+    }
+    if (!confirmations.expectedHost) {
+      throw new Gate9BValidationError(
+        "MISSING_EXTERNAL_INPUT",
+        "REZNO_STAGE9_GATE9B_EXPECTED_DATABASE_HOST",
+      );
+    }
+    if (confirmations.expectedHost.toLowerCase() !== host) {
+      throw new Gate9BValidationError(
+        "INVALID_DATABASE_IDENTITY",
+        "REZNO_STAGE9_GATE9B_EXPECTED_DATABASE_HOST",
+      );
+    }
+    if (!confirmations.expectedRole) {
+      throw new Gate9BValidationError(
+        "MISSING_EXTERNAL_INPUT",
+        "REZNO_STAGE9_GATE9B_EXPECTED_DATABASE_ROLE",
+      );
+    }
+    if (confirmations.expectedRole !== role) {
+      throw new Gate9BValidationError(
+        "INVALID_DATABASE_IDENTITY",
         "REZNO_STAGE9_GATE9B_EXPECTED_DATABASE_ROLE",
       );
     }
@@ -343,6 +518,324 @@ export function parseGate9BStagingDatabaseIdentity(
     hostSuffix: local ? "loopback-test" : host.split(".").slice(-3).join("."),
     roleSha256: sha256(role),
     sslmode: local ? "disable" : "verify-full",
+  };
+}
+
+export function gate9BDatabaseBindingSha256(identity: Gate9BDatabaseIdentity) {
+  return sha256([
+    identity.database,
+    identity.directNonPooler ? "direct" : "loopback",
+    identity.hostSha256,
+    identity.roleSha256,
+    identity.sslmode,
+  ].join(":"));
+}
+
+export function gate9BDeploymentEvidenceFromEnv(
+  env: Record<string, string | undefined>,
+): Gate9BDeploymentEvidence | null {
+  const deploymentSha = env.REZNO_STAGE9_GATE9B_DEPLOYMENT_SHA?.trim();
+  const sourceSha = env.REZNO_STAGE9_GATE9B_DEPLOYMENT_SOURCE_SHA?.trim();
+  const projectSlug = env.REZNO_STAGE9_GATE9B_DEPLOYMENT_PROJECT?.trim();
+  const status = env.REZNO_STAGE9_GATE9B_DEPLOYMENT_STATUS?.trim();
+  if (!deploymentSha || !sourceSha || !projectSlug || !status) return null;
+  if (status !== "READY" && status !== "SUCCESS" && status !== "PENDING" && status !== "FAILED") {
+    return null;
+  }
+  return {
+    deploymentSha,
+    origin: GATE9B_STAGING_ORIGIN,
+    projectSlug,
+    sourceSha,
+    status,
+  };
+}
+
+export function gate9BRestorePointEvidenceFromEnv(
+  env: Record<string, string | undefined>,
+): Gate9BRestorePointEvidence {
+  return {
+    createdAt: env.REZNO_STAGE9_GATE9B_RESTORE_POINT_CREATED_AT?.trim(),
+    databaseBindingSha256:
+      env.REZNO_STAGE9_GATE9B_RESTORE_POINT_DATABASE_BINDING_SHA256?.trim(),
+    expiresAt: env.REZNO_STAGE9_GATE9B_RESTORE_POINT_EXPIRES_AT?.trim(),
+    providerVerified: false,
+    restorePointIdPresent:
+      (env.REZNO_STAGE9_GATE9B_RESTORE_POINT_ID?.trim().length ?? 0) > 0,
+    source: env.REZNO_STAGE9_GATE9B_RESTORE_POINT_VERIFICATION_SOURCE?.trim(),
+    verifiedAt: env.REZNO_STAGE9_GATE9B_RESTORE_POINT_VERIFIED_AT?.trim(),
+  };
+}
+
+export function validateGate9BMigrationEvidence(
+  evidence: Gate9BMigrationEvidence | undefined,
+): Gate9BValidation {
+  const findings: Gate9BFinding[] = [];
+  if (!evidence) {
+    findings.push(finding(
+      "MIGRATION_BASELINE_MISMATCH",
+      "migrations",
+      "error",
+      "Gate 9B requires read-only migration evidence before any write.",
+    ));
+  } else {
+    if (
+      evidence.total !== GATE9B_EXPECTED_MIGRATION_COUNT
+      || evidence.applied !== GATE9B_EXPECTED_MIGRATION_COUNT
+      || evidence.failed !== 0
+      || evidence.rolledBack !== 0
+    ) {
+      findings.push(finding(
+        "MIGRATION_BASELINE_MISMATCH",
+        "migrations",
+        "error",
+        "Gate 9B requires exact healthy 51/51 migrations.",
+      ));
+    }
+    for (const [migration, expectedHash] of Object.entries(GATE9B_CRITICAL_MIGRATION_HASHES)) {
+      if (evidence.criticalHashes[migration] !== expectedHash) {
+        findings.push(finding(
+          "MIGRATION_BASELINE_MISMATCH",
+          "migrationHashes",
+          "error",
+          "Gate 9B requires the accepted migration hashes.",
+        ));
+        break;
+      }
+    }
+    if (evidence.schemaDrift === "PRESENT") {
+      findings.push(finding(
+        "SCHEMA_DRIFT_DETECTED",
+        "schemaDrift",
+        "error",
+        "Gate 9B refuses activation when schema drift is detected.",
+      ));
+    }
+    if (evidence.schemaDrift === "UNVERIFIED") {
+      findings.push(finding(
+        "SCHEMA_DRIFT_UNVERIFIED",
+        "schemaDrift",
+        "error",
+        "Gate 9B requires schema drift evidence before activation.",
+      ));
+    }
+  }
+  return {
+    externalInputRequired: false,
+    findings: dedupeFindings(findings),
+    ok: findings.every((item) => item.severity !== "error"),
+    reason: reasonFor(findings),
+  };
+}
+
+export function validateGate9BRestorePointEvidence(input: {
+  readonly allowLocalTest?: boolean;
+  readonly databaseBindingSha256?: string;
+  readonly evidence: Gate9BRestorePointEvidence | undefined;
+  readonly now?: Date;
+}): Gate9BValidation {
+  const findings: Gate9BFinding[] = [];
+  const now = input.now ?? new Date();
+  const evidence = input.evidence;
+  if (!evidence || !evidence.restorePointIdPresent) {
+    findings.push(finding(
+      "MISSING_EXTERNAL_INPUT",
+      "REZNO_STAGE9_GATE9B_RESTORE_POINT_ID",
+      "error",
+      "Gate 9B requires a verified restore point before any staging write.",
+    ));
+  } else {
+    const trustedSource = input.allowLocalTest
+      ? evidence.source === GATE9B_LOCAL_TEST_SOURCE && evidence.providerVerified === true
+      : TRUSTED_RESTORE_POINT_SOURCES.has(evidence.source ?? "")
+        && evidence.providerVerified === true;
+    if (!trustedSource) {
+      findings.push(finding(
+        "UNVERIFIED_RESTORE_POINT",
+        "REZNO_STAGE9_GATE9B_RESTORE_POINT_VERIFICATION_SOURCE",
+        "error",
+        "Gate 9B restore point must be verified by the provider before activation.",
+      ));
+    }
+    if (
+      !input.databaseBindingSha256
+      || evidence.databaseBindingSha256 !== input.databaseBindingSha256
+    ) {
+      findings.push(finding(
+        "RESTORE_POINT_DATABASE_MISMATCH",
+        "REZNO_STAGE9_GATE9B_RESTORE_POINT_DATABASE_BINDING_SHA256",
+        "error",
+        "Gate 9B restore point must be bound to the verified staging database.",
+      ));
+    }
+    const createdAt = parseDate(evidence.createdAt);
+    const verifiedAt = parseDate(evidence.verifiedAt);
+    const expiresAt = parseDate(evidence.expiresAt);
+    if (!createdAt || !verifiedAt || !expiresAt) {
+      findings.push(finding(
+        "UNVERIFIED_RESTORE_POINT",
+        "REZNO_STAGE9_GATE9B_RESTORE_POINT_VERIFIED_AT",
+        "error",
+        "Gate 9B restore point evidence must include valid created, verified, and expiry instants.",
+      ));
+    } else {
+      if (createdAt.getTime() > now.getTime()) {
+        findings.push(finding(
+          "UNVERIFIED_RESTORE_POINT",
+          "REZNO_STAGE9_GATE9B_RESTORE_POINT_CREATED_AT",
+          "error",
+          "Gate 9B restore point cannot be created in the future.",
+        ));
+      }
+      if (verifiedAt.getTime() < createdAt.getTime()) {
+        findings.push(finding(
+          "UNVERIFIED_RESTORE_POINT",
+          "REZNO_STAGE9_GATE9B_RESTORE_POINT_VERIFIED_AT",
+          "error",
+          "Gate 9B restore point verification must not predate creation.",
+        ));
+      }
+      if (
+        expiresAt.getTime() <= now.getTime()
+        || now.getTime() - createdAt.getTime() > RESTORE_POINT_MAX_AGE_MS
+      ) {
+        findings.push(finding(
+          "STALE_RESTORE_POINT",
+          "REZNO_STAGE9_GATE9B_RESTORE_POINT_EXPIRES_AT",
+          "error",
+          "Gate 9B restore point evidence is stale.",
+        ));
+      }
+    }
+  }
+  return {
+    externalInputRequired: findings.some((item) => item.code === "MISSING_EXTERNAL_INPUT"),
+    findings: dedupeFindings(findings),
+    ok: findings.every((item) => item.severity !== "error"),
+    reason: reasonFor(findings),
+  };
+}
+
+export function evaluateGate9BActivationPreconditions(
+  input: Gate9BActivationPreconditionInput,
+): Gate9BValidation {
+  const findings: Gate9BFinding[] = [
+    ...validateGate9BEnvironment(input.env).findings,
+  ];
+  const allowLocalTest = input.env.REZNO_STAGE9_GATE9B_ALLOW_LOCAL_TEST_DB === "true";
+  let databaseIdentity = input.databaseIdentity;
+  if (!databaseIdentity) {
+    try {
+      databaseIdentity = parseGate9BStagingDatabaseIdentity(input.env.DATABASE_URL, {
+        allowLocalTest,
+        expectedHost: input.env.REZNO_STAGE9_GATE9B_EXPECTED_DATABASE_HOST,
+        expectedIdentitySource: input.env.REZNO_STAGE9_GATE9B_DATABASE_IDENTITY_SOURCE,
+        expectedRole: input.env.REZNO_STAGE9_GATE9B_EXPECTED_DATABASE_ROLE,
+      });
+    } catch (error) {
+      const gateError = error as Partial<Gate9BValidationError>;
+      findings.push(finding(
+        gateError.code ?? "INVALID_DATABASE_IDENTITY",
+        gateError.name ?? "DATABASE_URL",
+        "error",
+        "Gate 9B database identity failed closed.",
+      ));
+    }
+  }
+  const databaseBindingSha256 = databaseIdentity
+    ? gate9BDatabaseBindingSha256(databaseIdentity)
+    : undefined;
+  findings.push(...validateGate9BMigrationEvidence(input.migrationEvidence).findings);
+  findings.push(...validateGate9BRestorePointEvidence({
+    allowLocalTest,
+    databaseBindingSha256,
+    evidence: input.restorePointEvidence ?? gate9BRestorePointEvidenceFromEnv(input.env),
+    now: input.now,
+  }).findings);
+  const deploymentEvidence =
+    input.deploymentEvidence ?? gate9BDeploymentEvidenceFromEnv(input.env);
+  if (!deploymentEvidence) {
+    findings.push(finding(
+      "MISSING_DEPLOYMENT_EVIDENCE",
+      "REZNO_STAGE9_GATE9B_DEPLOYMENT_SHA",
+      "error",
+      "Gate 9B requires deployment evidence before activation.",
+    ));
+  } else {
+    findings.push(...validateGate9BDeploymentEvidence(deploymentEvidence).findings);
+  }
+  if (input.requireAdmin) {
+    if (!input.adminEvidence || input.adminEvidence.status === "MISSING") {
+      findings.push(finding(
+        "ADMIN_CONTEXT_REQUIRED",
+        "REZNO_STAGE9_GATE9B_ADMIN_CONTEXT",
+        "error",
+        "Gate 9B runtime activation requires a verified current Admin context.",
+      ));
+    } else if (input.adminEvidence.status !== "VERIFIED") {
+      findings.push(finding(
+        "INVALID_ADMIN_CONTEXT",
+        "REZNO_STAGE9_GATE9B_ADMIN_CONTEXT",
+        "error",
+        "Gate 9B Admin context failed verification.",
+      ));
+    } else {
+      const missing = GATE9B_REQUIRED_ADMIN_PERMISSIONS.find((permission) =>
+        !input.adminEvidence?.permissions?.includes(permission)
+      );
+      if (missing) {
+        findings.push(finding(
+          "INVALID_ADMIN_CONTEXT",
+          "REZNO_STAGE9_GATE9B_ADMIN_CONTEXT",
+          "error",
+          "Gate 9B Admin context lacks required activation permissions.",
+        ));
+      }
+    }
+  }
+  return {
+    externalInputRequired: findings.some((item) => item.code === "MISSING_EXTERNAL_INPUT"),
+    findings: dedupeFindings(findings),
+    ok: findings.every((item) => item.severity !== "error"),
+    reason: reasonFor(findings),
+  };
+}
+
+export function assertGate9BActivationPreconditions(
+  input: Gate9BActivationPreconditionInput,
+): Gate9BActivationContext {
+  const validation = evaluateGate9BActivationPreconditions(input);
+  if (!validation.ok) {
+    const first = validation.findings.find((item) => item.severity === "error");
+    throw new Gate9BValidationError(
+      first?.code ?? "PREFLIGHT_EVIDENCE_STALE",
+      first?.name ?? "Gate9BActivation",
+    );
+  }
+  const allowLocalTest = input.env.REZNO_STAGE9_GATE9B_ALLOW_LOCAL_TEST_DB === "true";
+  const databaseIdentity = input.databaseIdentity ?? parseGate9BStagingDatabaseIdentity(
+    input.env.DATABASE_URL,
+    {
+      allowLocalTest,
+      expectedHost: input.env.REZNO_STAGE9_GATE9B_EXPECTED_DATABASE_HOST,
+      expectedIdentitySource: input.env.REZNO_STAGE9_GATE9B_DATABASE_IDENTITY_SOURCE,
+      expectedRole: input.env.REZNO_STAGE9_GATE9B_EXPECTED_DATABASE_ROLE,
+    },
+  );
+  const deploymentEvidence =
+    input.deploymentEvidence ?? gate9BDeploymentEvidenceFromEnv(input.env);
+  if (!deploymentEvidence) {
+    throw new Gate9BValidationError(
+      "MISSING_DEPLOYMENT_EVIDENCE",
+      "REZNO_STAGE9_GATE9B_DEPLOYMENT_SHA",
+    );
+  }
+  return {
+    adminEvidence: input.adminEvidence,
+    databaseBindingSha256: gate9BDatabaseBindingSha256(databaseIdentity),
+    databaseIdentity,
+    deploymentSha: deploymentEvidence.deploymentSha,
+    runtimeUrl: GATE9B_STAGING_ORIGIN,
   };
 }
 
@@ -384,7 +877,12 @@ export function validateGate9BDeploymentEvidence(
       "The staging deployment must be ready before activation evidence is accepted.",
     ));
   }
-  return { externalInputRequired: false, findings, ok: findings.length === 0 };
+  return {
+    externalInputRequired: false,
+    findings,
+    ok: findings.length === 0,
+    reason: reasonFor(findings),
+  };
 }
 
 export function evaluateGate9BRuntimeSnapshot(
@@ -430,7 +928,12 @@ export function evaluateGate9BRuntimeSnapshot(
       "Gate 9B runtime evidence must keep external providers unconfigured.",
     ));
   }
-  return { externalInputRequired: false, findings, ok: findings.length === 0 };
+  return {
+    externalInputRequired: false,
+    findings,
+    ok: findings.length === 0,
+    reason: reasonFor(findings),
+  };
 }
 
 export function gate9BOutputContainsSecretLikeValue(value: unknown) {
@@ -469,4 +972,24 @@ function finding(
 
 function sha256(value: string) {
   return createHash("sha256").update(value).digest("hex");
+}
+
+function parseDate(value: string | undefined) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function reasonFor(findings: readonly Gate9BFinding[]): Gate9BFindingCode | "READY" {
+  return findings.find((item) => item.severity === "error")?.code ?? "READY";
+}
+
+function dedupeFindings(findings: readonly Gate9BFinding[]) {
+  const seen = new Set<string>();
+  return findings.filter((item) => {
+    const key = `${item.code}:${item.name}:${item.message}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }

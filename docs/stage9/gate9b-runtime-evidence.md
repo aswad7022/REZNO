@@ -27,10 +27,11 @@ Gate 9B requires the accepted Stage 6 registry:
 
 Evidence must show:
 
+- `assertGate9BActivationPreconditions` passed inside
+  `stage9b:runtime-evidence` before the first mutation;
 - runtime control initialized with provider `GITHUB_ACTIONS_SCHEDULED_HTTP`;
 - two bounded manual cycles completed or were successor-safe no-ops;
 - GitHub OIDC runtime invocation observes the exact deployed SHA;
 - leases, fencing, generation, retry limits, and idempotency are preserved;
 - provider-dependent jobs report `NOT_CONFIGURED` rather than false success;
 - no duplicate jobs or stuck leases remain after the scheduled cycle.
-

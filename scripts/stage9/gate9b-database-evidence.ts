@@ -2,55 +2,37 @@ import { createHash } from "node:crypto";
 
 import { prisma } from "../../lib/db/prisma";
 import {
+  assertGate9BActivationPreconditions,
   GATE9B_ALLOWED_STAGING_SCHEDULES,
   GATE9B_EXPECTED_JOB_TYPES,
-  GATE9B_EXPECTED_MIGRATION_COUNT,
+  GATE9B_LOCAL_TEST_SOURCE,
+  gate9BDatabaseBindingSha256,
+  gate9BDeploymentEvidenceFromEnv,
+  gate9BRestorePointEvidenceFromEnv,
   parseGate9BStagingDatabaseIdentity,
 } from "../../features/stage9/gate9b";
+import {
+  collectStage9BMigrationEvidence,
+  localStage9BRestorePointEvidence,
+  snapshotStage9BEnv,
+} from "./gate9b-evidence-helpers";
 
 let phase = "BOOT";
 
 async function main() {
+  const env = snapshotStage9BEnv();
+  const allowLocalTest = env.REZNO_STAGE9_GATE9B_ALLOW_LOCAL_TEST_DB === "true";
+
   phase = "IDENTITY";
-  const identity = parseGate9BStagingDatabaseIdentity(process.env.DATABASE_URL, {
-    expectedHost: process.env.REZNO_STAGE9_GATE9B_EXPECTED_DATABASE_HOST,
-    expectedRole: process.env.REZNO_STAGE9_GATE9B_EXPECTED_DATABASE_ROLE,
-    allowLocalTest: process.env.REZNO_STAGE9_GATE9B_ALLOW_LOCAL_TEST_DB === "true",
+  const identity = parseGate9BStagingDatabaseIdentity(env.DATABASE_URL, {
+    allowLocalTest,
+    expectedHost: env.REZNO_STAGE9_GATE9B_EXPECTED_DATABASE_HOST,
+    expectedIdentitySource: env.REZNO_STAGE9_GATE9B_DATABASE_IDENTITY_SOURCE,
+    expectedRole: env.REZNO_STAGE9_GATE9B_EXPECTED_DATABASE_ROLE,
   });
 
   phase = "MIGRATIONS";
-  const migrations = await prisma.$queryRaw<Array<{
-    applied: bigint;
-    failed: bigint;
-    rolledBack: bigint;
-    total: bigint;
-  }>>`
-    SELECT count(*)::bigint AS total,
-           count(*) FILTER (
-             WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL
-           )::bigint AS applied,
-           count(*) FILTER (
-             WHERE finished_at IS NULL AND rolled_back_at IS NULL
-           )::bigint AS failed,
-           count(*) FILTER (
-             WHERE rolled_back_at IS NOT NULL
-           )::bigint AS "rolledBack"
-    FROM "_prisma_migrations"
-  `;
-  const migrationSummary = {
-    applied: Number(migrations[0]?.applied ?? -1),
-    failed: Number(migrations[0]?.failed ?? -1),
-    rolledBack: Number(migrations[0]?.rolledBack ?? -1),
-    total: Number(migrations[0]?.total ?? -1),
-  };
-  if (
-    migrationSummary.total !== GATE9B_EXPECTED_MIGRATION_COUNT
-    || migrationSummary.applied !== GATE9B_EXPECTED_MIGRATION_COUNT
-    || migrationSummary.failed !== 0
-    || migrationSummary.rolledBack !== 0
-  ) {
-    throw new Error("Gate 9B requires exact healthy 51/51 staging migrations.");
-  }
+  const migrationEvidence = await collectStage9BMigrationEvidence(prisma, env);
 
   phase = "REGISTRY";
   const enumRows = await prisma.$queryRaw<Array<{ label: string; type: string }>>`
@@ -66,10 +48,33 @@ async function main() {
     throw new Error("Gate 9B staging registry does not match the accepted Stage 6 registry.");
   }
 
+  phase = "ACTIVATION_PRECONDITIONS";
+  const now = new Date();
+  const databaseBindingSha256 = gate9BDatabaseBindingSha256(identity);
+  const restorePointEvidence =
+    allowLocalTest
+    && env.NODE_ENV === "test"
+    && env.REZNO_STAGE9_GATE9B_RESTORE_POINT_ID?.trim()
+    && env.REZNO_STAGE9_GATE9B_RESTORE_POINT_VERIFICATION_SOURCE === GATE9B_LOCAL_TEST_SOURCE
+      ? localStage9BRestorePointEvidence({
+        createdAt: new Date(now.getTime() - 60_000),
+        databaseBindingSha256,
+        expiresAt: new Date(now.getTime() + 60 * 60_000),
+        verifiedAt: now,
+      })
+      : gate9BRestorePointEvidenceFromEnv(env);
+  assertGate9BActivationPreconditions({
+    databaseIdentity: identity,
+    deploymentEvidence: gate9BDeploymentEvidenceFromEnv(env) ?? undefined,
+    env,
+    migrationEvidence,
+    now,
+    restorePointEvidence,
+  });
+
   phase = "PROBE";
   const probeKeyHash = createHash("sha256").update("gate9b:staging:read-write-probe").digest("hex");
   await prisma.distributedRateLimitBucket.deleteMany({ where: { keyHash: probeKeyHash } });
-  const now = new Date();
   await prisma.distributedRateLimitBucket.create({
     data: {
       count: 1,
@@ -90,7 +95,13 @@ async function main() {
   console.log(JSON.stringify({
     databaseIdentity: identity,
     jobTypes: jobTypes.length,
-    migrations: migrationSummary,
+    migrations: {
+      applied: migrationEvidence.applied,
+      failed: migrationEvidence.failed,
+      rolledBack: migrationEvidence.rolledBack,
+      schemaDrift: migrationEvidence.schemaDrift,
+      total: migrationEvidence.total,
+    },
     probe: { inserted: probeInserted, remaining: probeRemaining },
     scheduleKeys: scheduleKeys.length,
     status: "passed",

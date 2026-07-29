@@ -19,21 +19,33 @@ This file records only evidence that actually ran.
 ## Current external-input status
 
 Local author preflight could not prove authenticated staging database identity,
-restore point, runtime URL, or Admin authority. No real staging database write,
-migration, fixture, runtime initialization, runtime enablement, schedule
-enablement, or scheduled OIDC runtime cycle was executed from this environment.
+provider-verified restore point, runtime URL, deployment SHA, or Admin
+authority. No real staging database write, migration, fixture, runtime
+initialization, runtime enablement, schedule enablement, or scheduled OIDC
+runtime cycle was executed from this environment.
 
 Accepted status until those inputs are supplied:
 
 `EXTERNAL_INPUT_REQUIRED`
+
+Fail-closed preflight and activation scripts now share
+`assertGate9BActivationPreconditions`. The runtime activation process re-runs
+the guard inside the same process before `initializePlatformRuntime`, schedule
+bootstrap, manual scheduler/worker cycles, runtime enablement, or schedule
+enablement. A restore point identifier alone is recorded as
+`UNVERIFIED_RESTORE_POINT` and cannot authorize activation.
 
 ## Author verification actually completed
 
 The author worktree executed the following checks against local disposable
 resources only:
 
-- `npm run test:stage9b`: `21/21`, `0` failed, `0` skipped, `0` todo.
-- Full unit suite: `638/638`, `0` failed, `0` skipped, `0` todo.
+- Gate 9B unit contracts: `16/16`, `0` failed, `0` skipped, `0` todo.
+- Gate 9B PostgreSQL contracts: `9/9`, `0` failed, `0` skipped, `0` todo.
+- Gate 9B base-to-head diff check: passed with no output.
+- Stage 6 platform jobs/operations regression checks: `125/125`, `0` failed,
+  `0` skipped, `0` todo.
+- Full unit suite: `642/642`, `0` failed, `0` skipped, `0` todo.
 - Full PostgreSQL integration suite on a disposable PostgreSQL 17 database:
   `442/442`, `0` failed, `0` skipped, `0` todo.
 - HTTP/RSC/API contracts through a local production server:
@@ -44,22 +56,18 @@ resources only:
 - Next.js production build: `115/115` generated static pages.
 - Expo Doctor: `20/20`.
 - iOS and Android Hermes exports: `1016` modules each.
-- Web export: `752` modules.
+- Web export: `675` modules.
 - Root and Mobile production audits: `0` vulnerabilities.
 - Refined tracked-secret-value scan and client bundle provider/secret scan:
   `0` sensitive findings.
 
 ## Gate 9B script evidence
 
-`npm run stage9b:preflight` exited `2` with missing external input names only:
-
-- `DATABASE_URL`
-- `BETTER_AUTH_SECRET`
-- `BETTER_AUTH_URL`
-- `REZNO_STAGE9_GATE9B_EXPECTED_DATABASE_HOST`
-- `REZNO_STAGE9_GATE9B_EXPECTED_DATABASE_ROLE`
-- `REZNO_STAGE9_GATE9B_RESTORE_POINT_ID`
-- `REZNO_PLATFORM_RUNTIME_URL`
+`npm run stage9b:preflight` now exits `0` only when the complete posture is
+`READY`. Missing external inputs, production-like database targets, host/role
+mismatches, migration mismatches, unverified restore points, unsafe runtime
+URLs, malformed responses, and timeouts produce a redacted summary with
+`ready=false` and a non-zero process exit code.
 
 `npm run stage9b:database-evidence` was exercised against a local disposable
 database named `rezno_staging` using the explicit local-test override. It

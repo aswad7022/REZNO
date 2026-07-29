@@ -23,4 +23,3 @@ up by the same fingerprint.
 
 Smoke must not perform real push delivery, Gemini calls, App Store/Play Store
 actions, production writes, or real payment/storage provider calls.
-
