@@ -15,14 +15,13 @@ import {
   GATE9B_ALLOWED_STAGING_SCHEDULES,
   GATE9B_EXPECTED_JOB_TYPES,
   GATE9B_LOCAL_TEST_SOURCE,
-  GATE9B_REQUIRED_ADMIN_PERMISSIONS,
   gate9BDatabaseBindingSha256,
-  gate9BDeploymentEvidenceFromEnv,
   gate9BRestorePointEvidenceFromEnv,
   parseGate9BStagingDatabaseIdentity,
-  type Gate9BAdminEvidence,
 } from "../../features/stage9/gate9b";
 import {
+  collectStage9BAdminEvidence,
+  collectStage9BDeploymentEvidence,
   collectStage9BMigrationEvidence,
   localStage9BRestorePointEvidence,
   snapshotStage9BEnv,
@@ -46,7 +45,7 @@ async function main() {
   const migrationEvidence = await collectStage9BMigrationEvidence(prisma, env);
 
   phase = "ADMIN_CONTEXT";
-  const adminEvidence = await verifyAdminEvidence(env);
+  const adminEvidence = await collectStage9BAdminEvidence(prisma, env);
 
   phase = "ACTIVATION_PRECONDITIONS";
   const now = new Date();
@@ -66,7 +65,7 @@ async function main() {
   assertGate9BActivationPreconditions({
     adminEvidence,
     databaseIdentity: identity,
-    deploymentEvidence: gate9BDeploymentEvidenceFromEnv(env) ?? undefined,
+    deploymentEvidence: await collectStage9BDeploymentEvidence(env, { now }),
     env,
     migrationEvidence,
     now,
@@ -197,63 +196,6 @@ async function main() {
     schedulesEnabled: currentSchedules.length,
     status: "passed",
   }, null, 2));
-}
-
-async function verifyAdminEvidence(
-  env: Record<string, string | undefined>,
-): Promise<Gate9BAdminEvidence> {
-  const userId = env.REZNO_STAGE9_GATE9B_ADMIN_USER_ID?.trim();
-  const personId = env.REZNO_STAGE9_GATE9B_ADMIN_PERSON_ID?.trim();
-  const adminAccessId = env.REZNO_STAGE9_GATE9B_ADMIN_ACCESS_ID?.trim();
-  if (!userId || !personId || !adminAccessId) return { status: "MISSING" };
-
-  try {
-    const [user, person, adminAccess] = await Promise.all([
-      prisma.user.findUnique({ where: { id: userId }, select: { id: true } }),
-      prisma.person.findUnique({
-        where: { id: personId },
-        select: {
-          authUserId: true,
-          deletedAt: true,
-          isOnboarded: true,
-          status: true,
-        },
-      }),
-      prisma.adminAccess.findUnique({
-        where: { id: adminAccessId },
-        select: {
-          expiresAt: true,
-          permissions: true,
-          role: true,
-          status: true,
-          userId: true,
-        },
-      }),
-    ]);
-    if (
-      !user
-      || !person
-      || !adminAccess
-      || person.authUserId !== userId
-      || person.deletedAt
-      || person.status !== "ACTIVE"
-      || !person.isOnboarded
-      || adminAccess.userId !== userId
-      || adminAccess.status !== "ACTIVE"
-      || (adminAccess.expiresAt && adminAccess.expiresAt.getTime() <= Date.now())
-    ) {
-      return { status: "INVALID" };
-    }
-
-    return {
-      permissions: adminAccess.role === "SUPER_ADMIN"
-        ? GATE9B_REQUIRED_ADMIN_PERMISSIONS
-        : adminAccess.permissions,
-      status: "VERIFIED",
-    };
-  } catch {
-    return { status: "INVALID" };
-  }
 }
 
 function adminContextFromVerifiedEnv(env: Record<string, string | undefined>) {

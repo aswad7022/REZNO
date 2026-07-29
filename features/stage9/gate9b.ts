@@ -143,8 +143,10 @@ export type Gate9BFindingCode =
   | "PREFLIGHT_EVIDENCE_STALE"
   | "UNSAFE_PROVIDER_CONFIGURED"
   | "AI_MUST_REMAIN_DISABLED"
+  | "DEPLOYMENT_SHA_UNVERIFIED"
   | "DEPLOYMENT_SHA_MISMATCH"
   | "DEPLOYMENT_NOT_READY"
+  | "DEPLOYMENT_EVIDENCE_STALE"
   | "RUNTIME_REGISTRY_MISMATCH"
   | "SCHEDULE_REGISTRY_MISMATCH"
   | "SECRET_VALUE_REDACTION_FAILURE";
@@ -178,6 +180,17 @@ export type Gate9BDeploymentEvidence = {
   readonly projectSlug: string;
   readonly sourceSha: string;
   readonly status: "READY" | "SUCCESS" | "PENDING" | "FAILED";
+  readonly trustedVerification?: Gate9BDeploymentTrustedVerification;
+};
+
+export type Gate9BDeploymentTrustedVerification = {
+  readonly authorizedSha: string;
+  readonly githubHeadSha: string;
+  readonly localHeadSha: string;
+  readonly source: "github-vercel-api" | typeof GATE9B_LOCAL_TEST_SOURCE;
+  readonly verifiedAt?: string;
+  readonly vercelProjectSlug: string;
+  readonly vercelSourceSha: string;
 };
 
 export type Gate9BMigrationEvidence = {
@@ -762,7 +775,10 @@ export function evaluateGate9BActivationPreconditions(
       "Gate 9B requires deployment evidence before activation.",
     ));
   } else {
-    findings.push(...validateGate9BDeploymentEvidence(deploymentEvidence).findings);
+    findings.push(...validateGate9BDeploymentEvidence(deploymentEvidence, {
+      allowLocalTest,
+      now: input.now,
+    }).findings);
   }
   if (input.requireAdmin) {
     if (!input.adminEvidence || input.adminEvidence.status === "MISSING") {
@@ -794,7 +810,7 @@ export function evaluateGate9BActivationPreconditions(
     }
   }
   return {
-    externalInputRequired: findings.some((item) => item.code === "MISSING_EXTERNAL_INPUT"),
+    externalInputRequired: externalInputRequiredFor(findings),
     findings: dedupeFindings(findings),
     ok: findings.every((item) => item.severity !== "error"),
     reason: reasonFor(findings),
@@ -841,6 +857,7 @@ export function assertGate9BActivationPreconditions(
 
 export function validateGate9BDeploymentEvidence(
   evidence: Gate9BDeploymentEvidence,
+  options: { readonly allowLocalTest?: boolean; readonly now?: Date } = {},
 ): Gate9BValidation {
   const findings: Gate9BFinding[] = [];
   if (evidence.projectSlug !== GATE9B_STAGING_PROJECT) {
@@ -861,6 +878,92 @@ export function validateGate9BDeploymentEvidence(
       "Gate 9B may target only the approved staging origin.",
     ));
   }
+  const shaFields = [
+    ["deploymentSha", evidence.deploymentSha],
+    ["sourceSha", evidence.sourceSha],
+  ] as const;
+  for (const [name, value] of shaFields) {
+    if (!isFullGitSha(value)) {
+      findings.push(finding(
+        "DEPLOYMENT_SHA_UNVERIFIED",
+        name,
+        "error",
+        "Gate 9B deployment evidence must contain exact verified Git SHAs.",
+      ));
+    }
+  }
+  if (!evidence.trustedVerification) {
+    findings.push(finding(
+      "DEPLOYMENT_SHA_UNVERIFIED",
+      "deploymentVerification",
+      "error",
+      "Gate 9B deployment SHA must be verified from GitHub, local Git, and Vercel metadata.",
+    ));
+  } else {
+    const trusted = evidence.trustedVerification;
+    const trustedShaFields = [
+      ["authorizedSha", trusted.authorizedSha],
+      ["githubHeadSha", trusted.githubHeadSha],
+      ["localHeadSha", trusted.localHeadSha],
+      ["vercelSourceSha", trusted.vercelSourceSha],
+    ] as const;
+    for (const [name, value] of trustedShaFields) {
+      if (!isFullGitSha(value)) {
+        findings.push(finding(
+          "DEPLOYMENT_SHA_UNVERIFIED",
+          name,
+          "error",
+          "Gate 9B trusted deployment verification must contain exact Git SHAs.",
+        ));
+      }
+    }
+    const sourceAllowed = options.allowLocalTest
+      ? trusted.source === GATE9B_LOCAL_TEST_SOURCE
+      : trusted.source === "github-vercel-api";
+    if (!sourceAllowed) {
+      findings.push(finding(
+        "DEPLOYMENT_SHA_UNVERIFIED",
+        "deploymentVerificationSource",
+        "error",
+        "Gate 9B deployment verification source is not trusted for this environment.",
+      ));
+    }
+    if (trusted.vercelProjectSlug !== GATE9B_STAGING_PROJECT) {
+      findings.push(finding(
+        trusted.vercelProjectSlug === "rezno"
+          ? "PRODUCTION_TARGET_FORBIDDEN"
+          : "INVALID_STAGING_ORIGIN",
+        "vercelProjectSlug",
+        "error",
+        "Gate 9B Vercel deployment metadata must belong to the staging project.",
+      ));
+    }
+    const verifiedAt = parseDate(trusted.verifiedAt);
+    const now = options.now ?? new Date();
+    if (!verifiedAt || Math.abs(now.getTime() - verifiedAt.getTime()) > 15 * 60 * 1000) {
+      findings.push(finding(
+        "DEPLOYMENT_EVIDENCE_STALE",
+        "deploymentVerificationVerifiedAt",
+        "error",
+        "Gate 9B deployment verification must be fresh before activation.",
+      ));
+    }
+    const expected = trusted.authorizedSha;
+    if (
+      evidence.deploymentSha !== expected
+      || evidence.sourceSha !== expected
+      || trusted.githubHeadSha !== expected
+      || trusted.localHeadSha !== expected
+      || trusted.vercelSourceSha !== expected
+    ) {
+      findings.push(finding(
+        "DEPLOYMENT_SHA_MISMATCH",
+        "deploymentSha",
+        "error",
+        "Gate 9B requires local Git, GitHub branch, Vercel source, and authorized SHA to match exactly.",
+      ));
+    }
+  }
   if (evidence.deploymentSha !== evidence.sourceSha) {
     findings.push(finding(
       "DEPLOYMENT_SHA_MISMATCH",
@@ -878,7 +981,9 @@ export function validateGate9BDeploymentEvidence(
     ));
   }
   return {
-    externalInputRequired: false,
+    externalInputRequired: findings.some((item) =>
+      item.code === "DEPLOYMENT_SHA_UNVERIFIED"
+    ),
     findings,
     ok: findings.length === 0,
     reason: reasonFor(findings),
@@ -942,6 +1047,20 @@ export function gate9BOutputContainsSecretLikeValue(value: unknown) {
 
 function providerAllowed(value: string | undefined, allowed: readonly string[]) {
   return value === undefined || value.trim().length === 0 || allowed.includes(value);
+}
+
+function isFullGitSha(value: string) {
+  return /^[0-9a-f]{40}$/.test(value);
+}
+
+function externalInputRequiredFor(findings: readonly Gate9BFinding[]) {
+  return findings.some((item) =>
+    item.code === "MISSING_EXTERNAL_INPUT"
+    || item.code === "ADMIN_CONTEXT_REQUIRED"
+    || item.code === "DEPLOYMENT_SHA_UNVERIFIED"
+    || item.code === "UNVERIFIED_DATABASE_IDENTITY"
+    || item.code === "UNVERIFIED_RESTORE_POINT"
+  );
 }
 
 function sameSet(

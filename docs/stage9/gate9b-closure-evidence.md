@@ -35,17 +35,29 @@ bootstrap, manual scheduler/worker cycles, runtime enablement, or schedule
 enablement. A restore point identifier alone is recorded as
 `UNVERIFIED_RESTORE_POINT` and cannot authorize activation.
 
+The guard also requires a server-verified Gate 9B Admin context before `READY`.
+The three Admin IDs are treated only as lookup keys: missing values produce
+`ADMIN_CONTEXT_REQUIRED`, malformed or non-matching User/Person/AdminAccess
+tuples fail closed, and the required platform operations and platform jobs
+permissions must be present before any mutation path can run.
+
+Deployment SHA evidence is no longer self-attested. The activation guard
+requires fresh trusted verification tying together the local Git HEAD, GitHub
+branch head, Vercel `rezno-staging` deployment source SHA, and the authorized
+activation SHA. Equal operator-provided environment values alone produce
+`DEPLOYMENT_SHA_UNVERIFIED` and cannot authorize activation.
+
 ## Author verification actually completed
 
 The author worktree executed the following checks against local disposable
 resources only:
 
-- Gate 9B unit contracts: `16/16`, `0` failed, `0` skipped, `0` todo.
+- Gate 9B unit contracts: `17/17`, `0` failed, `0` skipped, `0` todo.
 - Gate 9B PostgreSQL contracts: `9/9`, `0` failed, `0` skipped, `0` todo.
 - Gate 9B base-to-head diff check: passed with no output.
 - Stage 6 platform jobs/operations regression checks: `125/125`, `0` failed,
   `0` skipped, `0` todo.
-- Full unit suite: `642/642`, `0` failed, `0` skipped, `0` todo.
+- Full unit suite: `643/643`, `0` failed, `0` skipped, `0` todo.
 - Full PostgreSQL integration suite on a disposable PostgreSQL 17 database:
   `442/442`, `0` failed, `0` skipped, `0` todo.
 - HTTP/RSC/API contracts through a local production server:

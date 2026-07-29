@@ -2,7 +2,6 @@ import { prisma } from "../../lib/db/prisma";
 import {
   evaluateGate9BActivationPreconditions,
   gate9BDatabaseBindingSha256,
-  gate9BDeploymentEvidenceFromEnv,
   gate9BRestorePointEvidenceFromEnv,
   GATE9B_LOCAL_TEST_SOURCE,
   GATE9B_STAGING_ORIGIN,
@@ -11,6 +10,8 @@ import {
   type Gate9BMigrationEvidence,
 } from "../../features/stage9/gate9b";
 import {
+  collectStage9BAdminEvidence,
+  collectStage9BDeploymentEvidence,
   collectStage9BMigrationEvidence,
   exitCodeForGate9BValidation,
   localStage9BRestorePointEvidence,
@@ -55,6 +56,9 @@ async function main() {
     }
   }
 
+  phase = "ADMIN_CONTEXT";
+  const adminEvidence = await collectStage9BAdminEvidence(prisma, env, now);
+
   const databaseBindingSha256 = databaseIdentity
     ? gate9BDatabaseBindingSha256(databaseIdentity)
     : undefined;
@@ -74,11 +78,13 @@ async function main() {
 
   phase = "PREFLIGHT";
   const preflight = evaluateGate9BActivationPreconditions({
+    adminEvidence,
     databaseIdentity: databaseIdentity ?? undefined,
-    deploymentEvidence: gate9BDeploymentEvidenceFromEnv(env) ?? undefined,
+    deploymentEvidence: await collectStage9BDeploymentEvidence(env, { now }),
     env,
     migrationEvidence,
     now,
+    requireAdmin: true,
     restorePointEvidence,
   });
   const status = preflight.ok

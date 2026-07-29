@@ -7,12 +7,13 @@ import {
   GATE9B_EXPECTED_JOB_TYPES,
   GATE9B_LOCAL_TEST_SOURCE,
   gate9BDatabaseBindingSha256,
-  gate9BDeploymentEvidenceFromEnv,
   gate9BRestorePointEvidenceFromEnv,
   parseGate9BStagingDatabaseIdentity,
 } from "../../features/stage9/gate9b";
 import {
   collectStage9BMigrationEvidence,
+  collectStage9BAdminEvidence,
+  collectStage9BDeploymentEvidence,
   localStage9BRestorePointEvidence,
   snapshotStage9BEnv,
 } from "./gate9b-evidence-helpers";
@@ -33,6 +34,9 @@ async function main() {
 
   phase = "MIGRATIONS";
   const migrationEvidence = await collectStage9BMigrationEvidence(prisma, env);
+
+  phase = "ADMIN_CONTEXT";
+  const adminEvidence = await collectStage9BAdminEvidence(prisma, env);
 
   phase = "REGISTRY";
   const enumRows = await prisma.$queryRaw<Array<{ label: string; type: string }>>`
@@ -64,11 +68,13 @@ async function main() {
       })
       : gate9BRestorePointEvidenceFromEnv(env);
   assertGate9BActivationPreconditions({
+    adminEvidence,
     databaseIdentity: identity,
-    deploymentEvidence: gate9BDeploymentEvidenceFromEnv(env) ?? undefined,
+    deploymentEvidence: await collectStage9BDeploymentEvidence(env, { now }),
     env,
     migrationEvidence,
     now,
+    requireAdmin: true,
     restorePointEvidence,
   });
 

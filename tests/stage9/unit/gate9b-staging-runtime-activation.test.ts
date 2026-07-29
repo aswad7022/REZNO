@@ -36,9 +36,13 @@ import {
   type Gate9BMigrationEvidence,
   type Gate9BRestorePointEvidence,
 } from "../../../features/stage9/gate9b";
+import { collectStage9BAdminEvidence } from "../../../scripts/stage9/gate9b-evidence-helpers";
 
 const repoRoot = path.resolve(import.meta.dirname, "../../..");
 const reviewedSha = "810fa41465c3249610ecc52e85e157241157f75e";
+const adminUserId = "gate9b-admin-user";
+const adminPersonId = "9b000000-0000-4000-8000-000000000901";
+const adminAccessId = "9b000000-0000-4000-8000-000000000902";
 const now = new Date("2026-07-29T12:00:00.000Z");
 
 test("Gate 9B records the author scope without starting Gate 9C or production", () => {
@@ -144,38 +148,59 @@ test("Gate 9B database identity is exact, redacted, and production-refusing", ()
   );
 });
 
-test("Gate 9B deployment evidence accepts only the staging project and exact source SHA", () => {
-  assert.equal(validateGate9BDeploymentEvidence({
-    deploymentSha: "a".repeat(40),
+test("Gate 9B deployment evidence requires trusted GitHub, local, Vercel, and authorized SHA agreement", () => {
+  assert.equal(
+    validateGate9BDeploymentEvidence(
+      trustedDeploymentEvidence("a".repeat(40), "github-vercel-api"),
+      { now },
+    ).ok,
+    true,
+  );
+  const selfAttested = validateGate9BDeploymentEvidence({
+    deploymentSha: "f".repeat(40),
     origin: GATE9B_STAGING_ORIGIN,
     projectSlug: GATE9B_STAGING_PROJECT,
-    sourceSha: "a".repeat(40),
+    sourceSha: "f".repeat(40),
     status: "SUCCESS",
-  }).ok, true);
+  }, { now });
+  assert.equal(selfAttested.ok, false);
+  assert.equal(selfAttested.externalInputRequired, true);
+  assert.equal(selfAttested.reason, "DEPLOYMENT_SHA_UNVERIFIED");
   const production = validateGate9BDeploymentEvidence({
     deploymentSha: "a".repeat(40),
     origin: "https://rezno.vercel.app",
     projectSlug: "rezno",
     sourceSha: "a".repeat(40),
     status: "SUCCESS",
-  });
+    trustedVerification: trustedDeploymentEvidence("a".repeat(40), "github-vercel-api").trustedVerification,
+  }, { now });
   assert.equal(production.ok, false);
   assert.equal(
     production.findings.some((finding) => finding.code === "PRODUCTION_TARGET_FORBIDDEN"),
     true,
   );
-  const mismatch = validateGate9BDeploymentEvidence({
-    deploymentSha: "b".repeat(40),
-    origin: GATE9B_STAGING_ORIGIN,
-    projectSlug: GATE9B_STAGING_PROJECT,
-    sourceSha: "a".repeat(40),
-    status: "SUCCESS",
-  });
+  const mismatch = validateGate9BDeploymentEvidence(
+    trustedDeploymentEvidence("a".repeat(40), "github-vercel-api", {
+      githubHeadSha: "b".repeat(40),
+    }),
+    { now },
+  );
   assert.equal(mismatch.ok, false);
   assert.equal(
     mismatch.findings.some((finding) => finding.code === "DEPLOYMENT_SHA_MISMATCH"),
     true,
   );
+  for (const [name, evidence] of [
+    ["malformed sha", trustedDeploymentEvidence("a".repeat(39), "github-vercel-api")],
+    ["local head mismatch", trustedDeploymentEvidence("a".repeat(40), "github-vercel-api", { localHeadSha: "b".repeat(40) })],
+    ["github head mismatch", trustedDeploymentEvidence("a".repeat(40), "github-vercel-api", { githubHeadSha: "b".repeat(40) })],
+    ["vercel source mismatch", trustedDeploymentEvidence("a".repeat(40), "github-vercel-api", { vercelSourceSha: "b".repeat(40) })],
+    ["wrong vercel project", trustedDeploymentEvidence("a".repeat(40), "github-vercel-api", { vercelProjectSlug: "rezno" })],
+    ["deployment not ready", { ...trustedDeploymentEvidence("a".repeat(40), "github-vercel-api"), status: "PENDING" as const }],
+    ["stale metadata", trustedDeploymentEvidence("a".repeat(40), "github-vercel-api", { verifiedAt: "2026-07-29T11:00:00.000Z" })],
+  ] as const) {
+    assert.equal(validateGate9BDeploymentEvidence(evidence, { now }).ok, false, name);
+  }
 });
 
 test("Gate 9B provider posture keeps Gemini, push, and real external providers disabled", () => {
@@ -286,6 +311,46 @@ test("Gate 9B runtime URL validation is exact, HTTPS-only, and credential-free",
   }
 });
 
+test("Gate 9B Admin context evidence is server-verified and tuple-bound", async () => {
+  const env = {
+    REZNO_STAGE9_GATE9B_ADMIN_ACCESS_ID: adminAccessId,
+    REZNO_STAGE9_GATE9B_ADMIN_PERSON_ID: adminPersonId,
+    REZNO_STAGE9_GATE9B_ADMIN_USER_ID: adminUserId,
+  };
+  assert.equal((await collectStage9BAdminEvidence(fakeAdminDb(), env, now)).status, "VERIFIED");
+
+  for (const [name, override, database] of [
+    ["all IDs missing", {
+      REZNO_STAGE9_GATE9B_ADMIN_ACCESS_ID: "",
+      REZNO_STAGE9_GATE9B_ADMIN_PERSON_ID: "",
+      REZNO_STAGE9_GATE9B_ADMIN_USER_ID: "",
+    }, fakeAdminDb()],
+    ["user ID missing", { REZNO_STAGE9_GATE9B_ADMIN_USER_ID: "" }, fakeAdminDb()],
+    ["person ID missing", { REZNO_STAGE9_GATE9B_ADMIN_PERSON_ID: "" }, fakeAdminDb()],
+    ["access ID missing", { REZNO_STAGE9_GATE9B_ADMIN_ACCESS_ID: "" }, fakeAdminDb()],
+    ["malformed person ID", { REZNO_STAGE9_GATE9B_ADMIN_PERSON_ID: "not-a-uuid" }, fakeAdminDb()],
+    ["malformed access ID", { REZNO_STAGE9_GATE9B_ADMIN_ACCESS_ID: "not-a-uuid" }, fakeAdminDb()],
+    ["user missing", {}, fakeAdminDb({ user: null })],
+    ["person missing", {}, fakeAdminDb({ person: null })],
+    ["person inactive", {}, fakeAdminDb({ person: { status: "SUSPENDED" } })],
+    ["person deleted", {}, fakeAdminDb({ person: { deletedAt: now } })],
+    ["access missing", {}, fakeAdminDb({ adminAccess: null })],
+    ["access inactive", {}, fakeAdminDb({ adminAccess: { status: "REVOKED" } })],
+    ["access expired", {}, fakeAdminDb({ adminAccess: { expiresAt: new Date("2026-07-29T11:00:00.000Z") } })],
+    ["account switch", {}, fakeAdminDb({ person: { authUserId: "other-user" } })],
+    ["tuple mismatch", {}, fakeAdminDb({ adminAccess: { userId: "other-user" } })],
+    ["permission missing", {}, fakeAdminDb({ adminAccess: { permissions: GATE9B_REQUIRED_ADMIN_PERMISSIONS.slice(1) } })],
+  ] as const) {
+    const evidence = await collectStage9BAdminEvidence(database, { ...env, ...override }, now);
+    const preflight = evaluateGate9BActivationPreconditions({
+      ...healthyPreconditions(),
+      adminEvidence: evidence,
+    });
+    assert.equal(preflight.ok, false, name);
+    assert.equal(preflight.reason === "ADMIN_CONTEXT_REQUIRED" || preflight.reason === "INVALID_ADMIN_CONTEXT", true, name);
+  }
+});
+
 test("Gate 9B activation preconditions fail closed until every independent proof is present", () => {
   const healthy = healthyPreconditions();
   assert.equal(evaluateGate9BActivationPreconditions(healthy).ok, true);
@@ -346,6 +411,24 @@ test("Gate 9B preflight CLI exits non-zero for fail-closed and external-input st
   assert.equal(runPreflight(legal).status, 0);
 
   const cases = [
+    ["all Admin IDs missing", {
+      REZNO_STAGE9_GATE9B_ADMIN_ACCESS_ID: "",
+      REZNO_STAGE9_GATE9B_ADMIN_PERSON_ID: "",
+      REZNO_STAGE9_GATE9B_ADMIN_USER_ID: "",
+    }],
+    ["Admin user ID missing", { REZNO_STAGE9_GATE9B_ADMIN_USER_ID: "" }],
+    ["Admin person ID missing", { REZNO_STAGE9_GATE9B_ADMIN_PERSON_ID: "" }],
+    ["Admin access ID missing", { REZNO_STAGE9_GATE9B_ADMIN_ACCESS_ID: "" }],
+    ["Admin person ID malformed", { REZNO_STAGE9_GATE9B_ADMIN_PERSON_ID: "not-a-uuid" }],
+    ["arbitrary self-equal deployment SHA", {
+      REZNO_STAGE9_GATE9B_AUTHORIZED_SHA: "f".repeat(40),
+      REZNO_STAGE9_GATE9B_DEPLOYMENT_SHA: "f".repeat(40),
+      REZNO_STAGE9_GATE9B_DEPLOYMENT_SOURCE_SHA: "f".repeat(40),
+      REZNO_STAGE9_GATE9B_GITHUB_HEAD_SHA: "f".repeat(40),
+      REZNO_STAGE9_GATE9B_LOCAL_TEST_DEPLOYMENT_EVIDENCE: "",
+      REZNO_STAGE9_GATE9B_LOCAL_HEAD_SHA: "f".repeat(40),
+      REZNO_STAGE9_GATE9B_VERCEL_SOURCE_SHA: "f".repeat(40),
+    }],
     ["production-like database", {
       DATABASE_URL: "postgresql://prod:secret@prod.us-east-1.aws.neon.tech/rezno_production?sslmode=verify-full",
       REZNO_STAGE9_GATE9B_ALLOW_LOCAL_TEST_DB: "false",
@@ -366,6 +449,10 @@ test("Gate 9B preflight CLI exits non-zero for fail-closed and external-input st
     assert.notEqual(result.status, 0, name);
     assert.equal(result.stdout.includes("super-secret"), false, name);
     assert.equal(result.stderr.includes("super-secret"), false, name);
+    if (name === "arbitrary self-equal deployment SHA") {
+      const parsed = JSON.parse(result.stdout) as { preflight: { reason: string } };
+      assert.equal(parsed.preflight.reason, "DEPLOYMENT_SHA_UNVERIFIED");
+    }
   }
 });
 
@@ -409,6 +496,10 @@ function healthyPreconditions() {
     projectSlug: GATE9B_STAGING_PROJECT,
     sourceSha: reviewedSha,
     status: "READY",
+    trustedVerification: trustedDeploymentEvidence(
+      reviewedSha,
+      GATE9B_LOCAL_TEST_SOURCE,
+    ).trustedVerification,
   };
   const adminEvidence: Gate9BAdminEvidence = {
     permissions: GATE9B_REQUIRED_ADMIN_PERMISSIONS,
@@ -446,7 +537,11 @@ function legalLocalPreflightEnv(): Record<string, string> {
     REZNO_PAYMENT_PROVIDER: "NOT_CONFIGURED",
     REZNO_PLATFORM_RUNTIME_URL: GATE9B_STAGING_ORIGIN,
     REZNO_PUSH_RECEIPT_PROVIDERS: "NOT_CONFIGURED",
+    REZNO_STAGE9_GATE9B_ADMIN_ACCESS_ID: adminAccessId,
+    REZNO_STAGE9_GATE9B_ADMIN_PERSON_ID: adminPersonId,
+    REZNO_STAGE9_GATE9B_ADMIN_USER_ID: adminUserId,
     REZNO_STAGE9_GATE9B_ALLOW_LOCAL_TEST_DB: "true",
+    REZNO_STAGE9_GATE9B_AUTHORIZED_SHA: reviewedSha,
     REZNO_STAGE9_GATE9B_DATABASE_IDENTITY_SOURCE: GATE9B_LOCAL_TEST_SOURCE,
     REZNO_STAGE9_GATE9B_DEPLOYMENT_PROJECT: GATE9B_STAGING_PROJECT,
     REZNO_STAGE9_GATE9B_DEPLOYMENT_SHA: reviewedSha,
@@ -454,6 +549,10 @@ function legalLocalPreflightEnv(): Record<string, string> {
     REZNO_STAGE9_GATE9B_DEPLOYMENT_STATUS: "READY",
     REZNO_STAGE9_GATE9B_EXPECTED_DATABASE_HOST: "127.0.0.1",
     REZNO_STAGE9_GATE9B_EXPECTED_DATABASE_ROLE: "rezno_test",
+    REZNO_STAGE9_GATE9B_GITHUB_HEAD_SHA: reviewedSha,
+    REZNO_STAGE9_GATE9B_LOCAL_HEAD_SHA: reviewedSha,
+    REZNO_STAGE9_GATE9B_LOCAL_TEST_ADMIN_EVIDENCE: "verified",
+    REZNO_STAGE9_GATE9B_LOCAL_TEST_DEPLOYMENT_EVIDENCE: "verified",
     REZNO_STAGE9_GATE9B_LOCAL_TEST_MIGRATION_EVIDENCE: "accepted-51-51",
     REZNO_STAGE9_GATE9B_RESTORE_POINT_CREATED_AT: "2026-07-29T11:59:00.000Z",
     REZNO_STAGE9_GATE9B_RESTORE_POINT_DATABASE_BINDING_SHA256:
@@ -463,7 +562,97 @@ function legalLocalPreflightEnv(): Record<string, string> {
     REZNO_STAGE9_GATE9B_RESTORE_POINT_VERIFICATION_SOURCE: GATE9B_LOCAL_TEST_SOURCE,
     REZNO_STAGE9_GATE9B_RESTORE_POINT_VERIFIED_AT: "2026-07-29T12:00:00.000Z",
     REZNO_STAGE9_GATE9B_SCHEMA_DRIFT_STATUS: "ABSENT",
+    REZNO_STAGE9_GATE9B_VERCEL_PROJECT: GATE9B_STAGING_PROJECT,
+    REZNO_STAGE9_GATE9B_VERCEL_SOURCE_SHA: reviewedSha,
     REZNO_STORAGE_PROVIDER: "NOT_CONFIGURED",
+  };
+}
+
+function trustedDeploymentEvidence(
+  sha: string,
+  source: "github-vercel-api" | typeof GATE9B_LOCAL_TEST_SOURCE,
+  override: Partial<NonNullable<Gate9BDeploymentEvidence["trustedVerification"]>> = {},
+): Gate9BDeploymentEvidence {
+  return {
+    deploymentSha: sha,
+    origin: GATE9B_STAGING_ORIGIN,
+    projectSlug: GATE9B_STAGING_PROJECT,
+    sourceSha: sha,
+    status: "SUCCESS",
+    trustedVerification: {
+      authorizedSha: sha,
+      githubHeadSha: sha,
+      localHeadSha: sha,
+      source,
+      vercelProjectSlug: GATE9B_STAGING_PROJECT,
+      vercelSourceSha: sha,
+      verifiedAt: "2026-07-29T12:00:00.000Z",
+      ...override,
+    },
+  };
+}
+
+function fakeAdminDb(override: {
+  readonly adminAccess?: null | Partial<{
+    expiresAt: Date | null;
+    permissions: readonly string[];
+    role: "ADMIN" | "SUPER_ADMIN";
+    status: string;
+    userId: string;
+  }>;
+  readonly person?: null | Partial<{
+    authUserId: string | null;
+    deletedAt: Date | null;
+    isOnboarded: boolean;
+    status: string;
+  }>;
+  readonly user?: null | { id: string };
+} = {}) {
+  const user = override.user === undefined ? { id: adminUserId } : override.user;
+  const person = override.person === undefined
+    ? {
+      authUserId: adminUserId,
+      deletedAt: null,
+      isOnboarded: true,
+      status: "ACTIVE",
+    }
+    : override.person === null
+      ? null
+      : {
+        authUserId: adminUserId,
+        deletedAt: null,
+        isOnboarded: true,
+        status: "ACTIVE",
+        ...override.person,
+      };
+  const adminAccess = override.adminAccess === undefined
+    ? {
+      expiresAt: null,
+      permissions: GATE9B_REQUIRED_ADMIN_PERMISSIONS,
+      role: "ADMIN" as const,
+      status: "ACTIVE",
+      userId: adminUserId,
+    }
+    : override.adminAccess === null
+      ? null
+      : {
+        expiresAt: null,
+        permissions: GATE9B_REQUIRED_ADMIN_PERMISSIONS,
+        role: "ADMIN" as const,
+        status: "ACTIVE",
+        userId: adminUserId,
+        ...override.adminAccess,
+      };
+  return {
+    adminAccess: {
+      findUnique: async () => adminAccess,
+    },
+    person: {
+      findUnique: async () => person,
+    },
+    user: {
+      findUnique: async () => user,
+    },
   };
 }
 
