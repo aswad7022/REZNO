@@ -438,10 +438,14 @@ function legalLocalPreflightEnv(): Record<string, string> {
     BETTER_AUTH_SECRET: "test-secret-not-production",
     BETTER_AUTH_URL: GATE9B_STAGING_ORIGIN,
     DATABASE_URL: databaseUrl,
+    GEMINI_API_KEY: "",
     NEXT_PUBLIC_APP_URL: GATE9B_STAGING_ORIGIN,
     NODE_ENV: "test",
+    REZNO_AI_ENABLED: "false",
+    REZNO_AI_GEMINI_ENABLED: "false",
     REZNO_PAYMENT_PROVIDER: "NOT_CONFIGURED",
     REZNO_PLATFORM_RUNTIME_URL: GATE9B_STAGING_ORIGIN,
+    REZNO_PUSH_RECEIPT_PROVIDERS: "NOT_CONFIGURED",
     REZNO_STAGE9_GATE9B_ALLOW_LOCAL_TEST_DB: "true",
     REZNO_STAGE9_GATE9B_DATABASE_IDENTITY_SOURCE: GATE9B_LOCAL_TEST_SOURCE,
     REZNO_STAGE9_GATE9B_DEPLOYMENT_PROJECT: GATE9B_STAGING_PROJECT,
@@ -464,15 +468,22 @@ function legalLocalPreflightEnv(): Record<string, string> {
 }
 
 function runPreflight(env: Record<string, string>) {
+  const nodeEnv = env.NODE_ENV === "development" || env.NODE_ENV === "production" || env.NODE_ENV === "test"
+    ? env.NODE_ENV
+    : "test";
+  const childEnv: NodeJS.ProcessEnv = {
+    HOME: process.env.HOME,
+    PATH: process.env.PATH,
+    TMPDIR: process.env.TMPDIR,
+    ...env,
+    NODE_ENV: nodeEnv,
+    NODE_OPTIONS: "--conditions=react-server",
+  };
   return spawnSync(path.join(repoRoot, "node_modules/.bin/tsx"), [
     "scripts/stage9/gate9b-preflight.ts",
   ], {
     cwd: repoRoot,
     encoding: "utf8",
-    env: {
-      ...process.env,
-      ...env,
-      NODE_OPTIONS: "--conditions=react-server",
-    },
+    env: childEnv,
   });
 }
