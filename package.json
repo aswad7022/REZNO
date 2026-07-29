@@ -133,9 +133,16 @@
     "smoke:staging:commerce-admin-stage3d": "NODE_OPTIONS=--conditions=react-server tsx scripts/staging/smoke-commerce-admin-stage3d.ts",
     "test:commerce-stage3d": "tsx --test tests/commerce/unit/stage3d-admin-closure.test.ts tests/commerce/unit/commerce-admin-stage3d-seed.test.ts tests/commerce/unit/admin-commerce-pagination.test.ts && NODE_OPTIONS=--conditions=react-server tsx --test --test-concurrency=1 tests/commerce/integration/stage3d-admin-closure-e2e.test.ts",
     "postinstall": "prisma generate",
-    "test:stage9a:unit": "NODE_OPTIONS=--conditions=react-server tsx --test tests/stage9/unit/*.test.ts",
-    "test:stage9a:postgres": "NODE_ENV=test NODE_OPTIONS=--conditions=react-server tsx --test --test-concurrency=1 tests/stage9/integration/*.test.ts",
-    "test:stage9a": "npm run test:stage9a:unit && npm run test:stage9a:postgres"
+    "test:stage9a:unit": "NODE_OPTIONS=--conditions=react-server tsx --test tests/stage9/unit/gate9a-final-integration-baseline.test.ts",
+    "test:stage9a:postgres": "NODE_ENV=test NODE_OPTIONS=--conditions=react-server tsx --test --test-concurrency=1 tests/stage9/integration/gate9a-final-integration-baseline-e2e.test.ts",
+    "test:stage9a": "npm run test:stage9a:unit && npm run test:stage9a:postgres",
+    "test:stage9b:unit": "NODE_OPTIONS=--conditions=react-server tsx --test tests/stage9/unit/gate9a-final-integration-baseline.test.ts tests/stage9/unit/gate9b-staging-runtime-activation.test.ts",
+    "test:stage9b:postgres": "NODE_ENV=test NODE_OPTIONS=--conditions=react-server tsx --test --test-concurrency=1 tests/stage9/integration/gate9a-final-integration-baseline-e2e.test.ts tests/stage9/integration/gate9b-staging-runtime-activation-e2e.test.ts",
+    "test:stage9b:diff-check": "git diff --check 032e8fe756d5ffbc67f079a2d53cb47e2f3b782d...HEAD",
+    "test:stage9b": "npm run test:stage9b:unit && npm run test:stage9b:postgres && npm run test:stage9b:diff-check",
+    "stage9b:preflight": "NODE_OPTIONS=--conditions=react-server tsx scripts/stage9/gate9b-preflight.ts",
+    "stage9b:database-evidence": "NODE_OPTIONS=--conditions=react-server tsx scripts/stage9/gate9b-database-evidence.ts",
+    "stage9b:runtime-evidence": "NODE_OPTIONS=--conditions=react-server tsx scripts/stage9/gate9b-runtime-evidence.ts"
   },
   "dependencies": {
     "@better-auth/expo": "^1.6.23",
