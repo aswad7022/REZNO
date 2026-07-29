@@ -437,23 +437,43 @@ async function readVercelDeploymentMetadata(input: {
   readonly status: "READY" | "SUCCESS" | "PENDING" | "FAILED";
 } | null> {
   try {
-    const url = new URL(`https://api.vercel.com/v13/deployments/${encodeURIComponent(input.deploymentId)}`);
-    if (input.teamId) url.searchParams.set("teamId", input.teamId);
+    const deploymentUrl = new URL(
+      `https://api.vercel.com/v13/deployments/${encodeURIComponent(input.deploymentId)}`,
+    );
+    const aliasesUrl = new URL(
+      `https://api.vercel.com/v2/deployments/${encodeURIComponent(input.deploymentId)}/aliases`,
+    );
+    if (input.teamId) {
+      deploymentUrl.searchParams.set("teamId", input.teamId);
+      aliasesUrl.searchParams.set("teamId", input.teamId);
+    }
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10_000);
     try {
-      const response = await fetch(url, {
-        headers: {
-          Accept: "application/json",
-          Authorization: `Bearer ${input.token}`,
-        },
-        signal: controller.signal,
-      });
-      const contentType = response.headers.get("content-type") ?? "";
-      if (!response.ok || !contentType.includes("application/json")) return null;
-      const text = await response.text();
-      if (text.length > 64_000) return null;
-      const data = JSON.parse(text) as {
+      const headers = {
+        Accept: "application/json",
+        Authorization: `Bearer ${input.token}`,
+      };
+      const [deploymentResponse, aliasesResponse] = await Promise.all([
+        fetch(deploymentUrl, { headers, signal: controller.signal }),
+        fetch(aliasesUrl, { headers, signal: controller.signal }),
+      ]);
+      const deploymentContentType = deploymentResponse.headers.get("content-type") ?? "";
+      const aliasesContentType = aliasesResponse.headers.get("content-type") ?? "";
+      if (
+        !deploymentResponse.ok
+        || !aliasesResponse.ok
+        || !deploymentContentType.includes("application/json")
+        || !aliasesContentType.includes("application/json")
+      ) {
+        return null;
+      }
+      const [deploymentText, aliasesText] = await Promise.all([
+        deploymentResponse.text(),
+        aliasesResponse.text(),
+      ]);
+      if (deploymentText.length > 64_000 || aliasesText.length > 64_000) return null;
+      const data = JSON.parse(deploymentText) as {
         alias?: unknown;
         aliases?: unknown;
         gitSource?: { sha?: unknown };
@@ -463,6 +483,7 @@ async function readVercelDeploymentMetadata(input: {
         readyState?: unknown;
         url?: unknown;
       };
+      const aliasesData = JSON.parse(aliasesText) as unknown;
       const projectSlug = typeof data.project?.name === "string"
         ? data.project.name
         : typeof data.name === "string"
@@ -473,19 +494,7 @@ async function readVercelDeploymentMetadata(input: {
         data.meta?.githubCommitSha,
         data.meta?.githubCommitRefSha,
       ].find((value): value is string => typeof value === "string" && SHA_RE.test(value));
-      const aliases = [
-        ...(Array.isArray(data.aliases) ? data.aliases : []),
-        ...(Array.isArray(data.alias) ? data.alias : []),
-        data.url,
-      ].filter((value): value is string => typeof value === "string");
-      const hasStagingAlias = aliases.some((alias) => {
-        const normalized = alias.startsWith("http") ? alias : `https://${alias}`;
-        try {
-          return new URL(normalized).origin === GATE9B_STAGING_ORIGIN;
-        } catch {
-          return false;
-        }
-      });
+      const hasStagingAlias = vercelDeploymentHasStagingAlias(data, aliasesData);
       const status = data.readyState === "READY"
         ? "READY"
         : data.readyState === "SUCCESS"
@@ -506,6 +515,38 @@ async function readVercelDeploymentMetadata(input: {
   } catch {
     return null;
   }
+}
+
+export function vercelDeploymentHasStagingAlias(
+  deployment: {
+    readonly alias?: unknown;
+    readonly aliases?: unknown;
+    readonly url?: unknown;
+  },
+  aliasesResponse: unknown,
+) {
+  const apiAliases = isRecord(aliasesResponse) && Array.isArray(aliasesResponse.aliases)
+    ? aliasesResponse.aliases.flatMap((item) => {
+        if (typeof item === "string") return [item];
+        if (!isRecord(item)) return [];
+        const alias = stringField(item, "alias");
+        return alias ? [alias] : [];
+      })
+    : [];
+  const aliases = [
+    ...(Array.isArray(deployment.aliases) ? deployment.aliases : []),
+    ...(Array.isArray(deployment.alias) ? deployment.alias : []),
+    ...apiAliases,
+    deployment.url,
+  ].filter((value): value is string => typeof value === "string");
+  return aliases.some((alias) => {
+    const normalized = alias.startsWith("http") ? alias : `https://${alias}`;
+    try {
+      return new URL(normalized).origin === GATE9B_STAGING_ORIGIN;
+    } catch {
+      return false;
+    }
+  });
 }
 
 async function readNeonRestorePointEvidence(input: {

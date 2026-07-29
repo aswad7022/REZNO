@@ -9,6 +9,9 @@ Gate 9B preflight must prove all of the following without printing values:
 - `origin/main` is `032e8fe756d5ffbc67f079a2d53cb47e2f3b782d`.
 - Vercel deployment target is project `rezno-staging`, not `rezno`.
 - The active staging origin is `https://rezno-staging.vercel.app`.
+- The staging origin binding is read from Vercel's deployment aliases API,
+  because the deployment-details response does not include manually assigned
+  aliases consistently.
 - `REZNO_PLATFORM_RUNTIME_URL` points to the same staging origin.
 - Database URL parses as PostgreSQL database `rezno_staging`.
 - The staging database is a direct non-pooler Neon endpoint with

@@ -41,6 +41,7 @@ import {
 import {
   collectStage9BAdminEvidence,
   collectStage9BRestorePointEvidence,
+  vercelDeploymentHasStagingAlias,
 } from "../../../scripts/stage9/gate9b-evidence-helpers";
 
 const repoRoot = path.resolve(import.meta.dirname, "../../..");
@@ -206,6 +207,36 @@ test("Gate 9B deployment evidence requires trusted GitHub, local, Vercel, and au
   ] as const) {
     assert.equal(validateGate9BDeploymentEvidence(evidence, { now }).ok, false, name);
   }
+});
+
+test("Gate 9B verifies the staging alias through Vercel deployment aliases metadata", () => {
+  assert.equal(
+    vercelDeploymentHasStagingAlias(
+      {
+        alias: ["rezno-staging-git-feature-rafidedu.vercel.app"],
+        url: "rezno-staging-preview-rafidedu.vercel.app",
+      },
+      {
+        aliases: [
+          { alias: "rezno-staging-git-feature-rafidedu.vercel.app" },
+          { alias: "rezno-staging.vercel.app" },
+        ],
+      },
+    ),
+    true,
+  );
+  assert.equal(
+    vercelDeploymentHasStagingAlias(
+      {
+        alias: ["rezno-staging-git-feature-rafidedu.vercel.app"],
+        url: "rezno-staging-preview-rafidedu.vercel.app",
+      },
+      {
+        aliases: [{ alias: "rezno.vercel.app" }],
+      },
+    ),
+    false,
+  );
 });
 
 test("Gate 9B provider posture keeps Gemini, push, and real external providers disabled", () => {
