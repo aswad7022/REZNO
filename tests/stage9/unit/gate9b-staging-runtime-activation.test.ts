@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import type { AddressInfo } from "node:net";
 import path from "node:path";
 import test from "node:test";
 
@@ -36,7 +38,10 @@ import {
   type Gate9BMigrationEvidence,
   type Gate9BRestorePointEvidence,
 } from "../../../features/stage9/gate9b";
-import { collectStage9BAdminEvidence } from "../../../scripts/stage9/gate9b-evidence-helpers";
+import {
+  collectStage9BAdminEvidence,
+  collectStage9BRestorePointEvidence,
+} from "../../../scripts/stage9/gate9b-evidence-helpers";
 
 const repoRoot = path.resolve(import.meta.dirname, "../../..");
 const reviewedSha = "810fa41465c3249610ecc52e85e157241157f75e";
@@ -351,6 +356,159 @@ test("Gate 9B Admin context evidence is server-verified and tuple-bound", async 
   }
 });
 
+test("Gate 9B restore point evidence is provider-verified from Neon metadata", async () => {
+  const server = await startMockNeonApi();
+  try {
+    const { env, identity } = neonRestoreContext(server.baseUrl);
+    const evidence = await collectStage9BRestorePointEvidence(env, identity, now);
+    assert.equal(evidence.providerVerified, true);
+    assert.equal(evidence.source, "neon-api");
+    assert.equal(evidence.databaseBindingSha256, gate9BDatabaseBindingSha256(identity));
+    assert.equal(evidence.restorePointIdPresent, true);
+    assert.equal(JSON.stringify(evidence).includes("snap-gate9b"), false);
+    assert.equal(server.requests.length, 4);
+  } finally {
+    await server.close();
+  }
+});
+
+test("Gate 9B restore point verifier fails closed for provider mismatch states", async () => {
+  const cases = [
+    ["not found", { snapshots: [] }],
+    ["not ready", { snapshot: { status: "creating" } }],
+    ["old", {
+      snapshot: {
+        created_at: "2026-07-27T12:00:00.000Z",
+        expires_at: "2026-07-28T12:00:00.000Z",
+      },
+    }],
+    ["wrong project", { snapshot: { project_id: "neon-production-project" } }],
+    ["wrong branch", { snapshot: { branch_id: "br-other" } }],
+    ["wrong database", { snapshot: { database_name: "other_db" } }],
+    ["wrong endpoint host", { endpoint: { host: "other.us-east-1.aws.neon.tech" } }],
+    ["production restore point", { snapshot: { name: "production-before-gate9b" } }],
+    ["provider error", { statusCode: 500 }],
+  ] as const;
+  for (const [name, options] of cases) {
+    const server = await startMockNeonApi(options);
+    try {
+      const { env, identity } = neonRestoreContext(server.baseUrl);
+      const evidence = await collectStage9BRestorePointEvidence(env, identity, now);
+      if (name !== "old") {
+        assert.equal(evidence.providerVerified, false, name);
+      }
+      const validation = evaluateGate9BActivationPreconditions({
+        ...healthyPreconditions(),
+        databaseIdentity: identity,
+        deploymentEvidence: trustedDeploymentEvidence(reviewedSha, "github-vercel-api"),
+        env: neonActivationEnv(env),
+        restorePointEvidence: evidence,
+      });
+      assert.equal(validation.ok, false, name);
+    } finally {
+      await server.close();
+    }
+  }
+});
+
+test("Gate 9B restore point verifier treats missing token, timeout, and forged env as unverified", async () => {
+  {
+    const server = await startMockNeonApi();
+    try {
+      const { env, identity } = neonRestoreContext(server.baseUrl, { NEON_API_KEY: "" });
+      const evidence = await collectStage9BRestorePointEvidence(env, identity, now);
+      assert.equal(evidence.providerVerified, false, "missing token");
+    } finally {
+      await server.close();
+    }
+  }
+
+  {
+    const server = await startMockNeonApi({ delayMs: 100 });
+    try {
+      const { env, identity } = neonRestoreContext(server.baseUrl, {
+        REZNO_STAGE9_GATE9B_NEON_API_TIMEOUT_MS: "25",
+      });
+      const evidence = await collectStage9BRestorePointEvidence(env, identity, now);
+      assert.equal(evidence.providerVerified, false, "timeout");
+    } finally {
+      await server.close();
+    }
+  }
+
+  {
+    const { env, identity } = neonRestoreContext("http://127.0.0.1:9", {
+      NEON_API_KEY: "",
+      REZNO_STAGE9_GATE9B_RESTORE_POINT_CREATED_AT: "2026-07-29T11:59:00.000Z",
+      REZNO_STAGE9_GATE9B_RESTORE_POINT_DATABASE_BINDING_SHA256: gate9BDatabaseBindingSha256(
+        neonRestoreContext("http://127.0.0.1:9").identity,
+      ),
+      REZNO_STAGE9_GATE9B_RESTORE_POINT_EXPIRES_AT: "2026-07-29T13:00:00.000Z",
+      REZNO_STAGE9_GATE9B_RESTORE_POINT_VERIFIED_AT: "2026-07-29T12:00:00.000Z",
+    });
+    const evidence = await collectStage9BRestorePointEvidence(env, identity, now);
+    assert.equal(evidence.providerVerified, false, "operator-forged env cannot set provider verification");
+  }
+});
+
+test("Gate 9B restore point test doubles are unavailable outside NODE_ENV=test", async () => {
+  for (const nodeEnv of ["development", "production"] as const) {
+    const env: Record<string, string> = {
+      ...legalLocalPreflightEnv(),
+      NODE_ENV: nodeEnv,
+    };
+    const identity = parseGate9BStagingDatabaseIdentity(env.DATABASE_URL, {
+      allowLocalTest: true,
+      expectedHost: env.REZNO_STAGE9_GATE9B_EXPECTED_DATABASE_HOST,
+      expectedIdentitySource: env.REZNO_STAGE9_GATE9B_DATABASE_IDENTITY_SOURCE,
+      expectedRole: env.REZNO_STAGE9_GATE9B_EXPECTED_DATABASE_ROLE,
+    });
+    const evidence = await collectStage9BRestorePointEvidence(env, identity, now);
+    assert.equal(evidence.providerVerified, false, nodeEnv);
+  }
+});
+
+test("Gate 9B re-verifies restore point before mutation boundary", async () => {
+  const readyServer = await startMockNeonApi();
+  const staleServer = await startMockNeonApi({
+    snapshot: {
+      created_at: "2026-07-27T12:00:00.000Z",
+      expires_at: "2026-07-28T12:00:00.000Z",
+    },
+  });
+  try {
+    const ready = neonRestoreContext(readyServer.baseUrl);
+    const readyEvidence = await collectStage9BRestorePointEvidence(ready.env, ready.identity, now);
+    let mutations = 0;
+    assertGate9BActivationPreconditions({
+      ...healthyPreconditions(),
+      databaseIdentity: ready.identity,
+      deploymentEvidence: trustedDeploymentEvidence(reviewedSha, "github-vercel-api"),
+      env: neonActivationEnv(ready.env),
+      restorePointEvidence: readyEvidence,
+    });
+    mutations += 1;
+    assert.equal(mutations, 1);
+
+    const stale = neonRestoreContext(staleServer.baseUrl);
+    const staleEvidence = await collectStage9BRestorePointEvidence(stale.env, stale.identity, now);
+    assert.throws(() => {
+      assertGate9BActivationPreconditions({
+        ...healthyPreconditions(),
+        databaseIdentity: stale.identity,
+        deploymentEvidence: trustedDeploymentEvidence(reviewedSha, "github-vercel-api"),
+        env: neonActivationEnv(stale.env),
+        restorePointEvidence: staleEvidence,
+      });
+      mutations += 1;
+    }, /Gate 9B validation failed closed/);
+    assert.equal(mutations, 1);
+  } finally {
+    await readyServer.close();
+    await staleServer.close();
+  }
+});
+
 test("Gate 9B activation preconditions fail closed until every independent proof is present", () => {
   const healthy = healthyPreconditions();
   assert.equal(evaluateGate9BActivationPreconditions(healthy).ok, true);
@@ -654,6 +812,129 @@ function fakeAdminDb(override: {
       findUnique: async () => user,
     },
   };
+}
+
+function neonRestoreContext(
+  baseUrl: string,
+  override: Record<string, string | undefined> = {},
+) {
+  const databaseUrl =
+    "postgresql://rezno_stage9b:super-secret@staging-branch.us-east-1.aws.neon.tech/rezno_staging?sslmode=verify-full";
+  const env = {
+    ...legalLocalPreflightEnv(),
+    DATABASE_URL: databaseUrl,
+    NEON_API_KEY: "test-neon-token",
+    NODE_ENV: "test",
+    REZNO_STAGE9_GATE9B_ALLOW_LOCAL_TEST_DB: "false",
+    REZNO_STAGE9_GATE9B_DATABASE_IDENTITY_SOURCE: "neon-api",
+    REZNO_STAGE9_GATE9B_EXPECTED_DATABASE_HOST: "staging-branch.us-east-1.aws.neon.tech",
+    REZNO_STAGE9_GATE9B_EXPECTED_DATABASE_ROLE: "rezno_stage9b",
+    REZNO_STAGE9_GATE9B_NEON_API_BASE_URL: baseUrl,
+    REZNO_STAGE9_GATE9B_NEON_BRANCH_ID: "br-staging",
+    REZNO_STAGE9_GATE9B_NEON_PROJECT_ID: "silent-smoke-123456",
+    REZNO_STAGE9_GATE9B_RESTORE_POINT_ID: "snap-gate9b",
+    REZNO_STAGE9_GATE9B_RESTORE_POINT_VERIFICATION_SOURCE: "neon-api",
+    ...override,
+  };
+  const identity = parseGate9BStagingDatabaseIdentity(env.DATABASE_URL, {
+    allowLocalTest: false,
+    expectedHost: env.REZNO_STAGE9_GATE9B_EXPECTED_DATABASE_HOST,
+    expectedIdentitySource: env.REZNO_STAGE9_GATE9B_DATABASE_IDENTITY_SOURCE,
+    expectedRole: env.REZNO_STAGE9_GATE9B_EXPECTED_DATABASE_ROLE,
+  });
+  return { env, identity };
+}
+
+function neonActivationEnv(env: Record<string, string | undefined>) {
+  return {
+    ...env,
+    REZNO_STAGE9_GATE9B_ALLOW_LOCAL_TEST_DB: "false",
+    REZNO_STAGE9_GATE9B_LOCAL_TEST_DEPLOYMENT_EVIDENCE: "",
+    REZNO_STAGE9_GATE9B_LOCAL_TEST_MIGRATION_EVIDENCE: "",
+  };
+}
+
+async function startMockNeonApi(options: {
+  readonly branch?: Record<string, unknown>;
+  readonly database?: Record<string, unknown>;
+  readonly delayMs?: number;
+  readonly endpoint?: Record<string, unknown>;
+  readonly snapshot?: Record<string, unknown>;
+  readonly snapshots?: readonly Record<string, unknown>[];
+  readonly statusCode?: number;
+} = {}) {
+  const requests: string[] = [];
+  const branch = {
+    current_state: "ready",
+    id: "br-staging",
+    name: "staging",
+    ...options.branch,
+  };
+  const database = {
+    branch_id: "br-staging",
+    name: "rezno_staging",
+    ...options.database,
+  };
+  const endpoint = {
+    branch_id: "br-staging",
+    current_state: "ready",
+    host: "staging-branch.us-east-1.aws.neon.tech",
+    ...options.endpoint,
+  };
+  const snapshot = {
+    branch_id: "br-staging",
+    created_at: "2026-07-29T11:59:00.000Z",
+    database_name: "rezno_staging",
+    expires_at: "2026-07-29T13:00:00.000Z",
+    id: "snap-gate9b",
+    name: "stage9b-before-activation",
+    project_id: "silent-smoke-123456",
+    status: "ready",
+    ...options.snapshot,
+  };
+  const server = createServer(async (request: IncomingMessage, response: ServerResponse) => {
+    requests.push(request.url ?? "");
+    if (options.delayMs) {
+      await new Promise((resolve) => setTimeout(resolve, options.delayMs));
+    }
+    if (options.statusCode) {
+      writeJson(response, options.statusCode, { error: "provider unavailable" });
+      return;
+    }
+    const pathname = new URL(request.url ?? "/", "http://127.0.0.1").pathname;
+    if (pathname === "/projects/silent-smoke-123456/branches/br-staging") {
+      writeJson(response, 200, { branch });
+      return;
+    }
+    if (pathname === "/projects/silent-smoke-123456/branches/br-staging/databases/rezno_staging") {
+      writeJson(response, 200, { database });
+      return;
+    }
+    if (pathname === "/projects/silent-smoke-123456/branches/br-staging/endpoints") {
+      writeJson(response, 200, { endpoints: [endpoint] });
+      return;
+    }
+    if (pathname === "/projects/silent-smoke-123456/snapshots") {
+      writeJson(response, 200, { snapshots: options.snapshots ?? [snapshot] });
+      return;
+    }
+    writeJson(response, 404, { error: "not found" });
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address() as AddressInfo | null;
+  assert.notEqual(address, null);
+  return {
+    baseUrl: `http://127.0.0.1:${address!.port}`,
+    close: () => new Promise<void>((resolve, reject) => {
+      server.close((error) => error ? reject(error) : resolve());
+    }),
+    requests,
+  };
+}
+
+function writeJson(response: ServerResponse, statusCode: number, body: unknown) {
+  response.writeHead(statusCode, { "content-type": "application/json" });
+  response.end(JSON.stringify(body));
 }
 
 function runPreflight(env: Record<string, string>) {

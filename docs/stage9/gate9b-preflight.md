@@ -14,7 +14,9 @@ Gate 9B preflight must prove all of the following without printing values:
 - The staging database is a direct non-pooler Neon endpoint with
   `sslmode=verify-full`.
 - Authenticated expected host and role confirmations match the database URL.
-- A restore point or branch/snapshot identifier is recorded before writes.
+- A restore point is verified from provider metadata before writes. For Neon,
+  this means the snapshot is fetched from Neon API metadata for the approved
+  staging project and branch, not trusted from environment values.
 - Gemini, APNs/FCM, real storage, and real payment providers remain disabled.
 
 ## Current local author preflight
@@ -33,6 +35,9 @@ Missing names only:
 - `REZNO_STAGE9_GATE9B_EXPECTED_DATABASE_HOST`
 - `REZNO_STAGE9_GATE9B_EXPECTED_DATABASE_ROLE`
 - `REZNO_STAGE9_GATE9B_RESTORE_POINT_ID`
+- `REZNO_STAGE9_GATE9B_NEON_PROJECT_ID`
+- `REZNO_STAGE9_GATE9B_NEON_BRANCH_ID`
+- Neon API authentication available to the operator environment
 - `REZNO_PLATFORM_RUNTIME_URL`
 - staging Admin login or scoped Gate 9B Admin context
 

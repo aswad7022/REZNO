@@ -1,9 +1,6 @@
 import { prisma } from "../../lib/db/prisma";
 import {
   evaluateGate9BActivationPreconditions,
-  gate9BDatabaseBindingSha256,
-  gate9BRestorePointEvidenceFromEnv,
-  GATE9B_LOCAL_TEST_SOURCE,
   GATE9B_STAGING_ORIGIN,
   parseGate9BStagingDatabaseIdentity,
   type Gate9BDatabaseIdentity,
@@ -13,8 +10,8 @@ import {
   collectStage9BAdminEvidence,
   collectStage9BDeploymentEvidence,
   collectStage9BMigrationEvidence,
+  collectStage9BRestorePointEvidence,
   exitCodeForGate9BValidation,
-  localStage9BRestorePointEvidence,
   snapshotStage9BEnv,
 } from "./gate9b-evidence-helpers";
 
@@ -59,22 +56,11 @@ async function main() {
   phase = "ADMIN_CONTEXT";
   const adminEvidence = await collectStage9BAdminEvidence(prisma, env, now);
 
-  const databaseBindingSha256 = databaseIdentity
-    ? gate9BDatabaseBindingSha256(databaseIdentity)
-    : undefined;
-  const restorePointEvidence =
-    allowLocalTest
-    && env.NODE_ENV === "test"
-    && env.REZNO_STAGE9_GATE9B_RESTORE_POINT_ID?.trim()
-    && env.REZNO_STAGE9_GATE9B_RESTORE_POINT_VERIFICATION_SOURCE === GATE9B_LOCAL_TEST_SOURCE
-    && databaseBindingSha256
-      ? localStage9BRestorePointEvidence({
-        createdAt: new Date(now.getTime() - 60_000),
-        databaseBindingSha256,
-        expiresAt: new Date(now.getTime() + 60 * 60_000),
-        verifiedAt: now,
-      })
-      : gate9BRestorePointEvidenceFromEnv(env);
+  const restorePointEvidence = await collectStage9BRestorePointEvidence(
+    env,
+    databaseIdentity ?? undefined,
+    now,
+  );
 
   phase = "PREFLIGHT";
   const preflight = evaluateGate9BActivationPreconditions({

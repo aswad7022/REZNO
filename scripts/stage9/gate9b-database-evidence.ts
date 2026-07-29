@@ -5,16 +5,13 @@ import {
   assertGate9BActivationPreconditions,
   GATE9B_ALLOWED_STAGING_SCHEDULES,
   GATE9B_EXPECTED_JOB_TYPES,
-  GATE9B_LOCAL_TEST_SOURCE,
-  gate9BDatabaseBindingSha256,
-  gate9BRestorePointEvidenceFromEnv,
   parseGate9BStagingDatabaseIdentity,
 } from "../../features/stage9/gate9b";
 import {
   collectStage9BMigrationEvidence,
   collectStage9BAdminEvidence,
   collectStage9BDeploymentEvidence,
-  localStage9BRestorePointEvidence,
+  collectStage9BRestorePointEvidence,
   snapshotStage9BEnv,
 } from "./gate9b-evidence-helpers";
 
@@ -54,19 +51,7 @@ async function main() {
 
   phase = "ACTIVATION_PRECONDITIONS";
   const now = new Date();
-  const databaseBindingSha256 = gate9BDatabaseBindingSha256(identity);
-  const restorePointEvidence =
-    allowLocalTest
-    && env.NODE_ENV === "test"
-    && env.REZNO_STAGE9_GATE9B_RESTORE_POINT_ID?.trim()
-    && env.REZNO_STAGE9_GATE9B_RESTORE_POINT_VERIFICATION_SOURCE === GATE9B_LOCAL_TEST_SOURCE
-      ? localStage9BRestorePointEvidence({
-        createdAt: new Date(now.getTime() - 60_000),
-        databaseBindingSha256,
-        expiresAt: new Date(now.getTime() + 60 * 60_000),
-        verifiedAt: now,
-      })
-      : gate9BRestorePointEvidenceFromEnv(env);
+  const restorePointEvidence = await collectStage9BRestorePointEvidence(env, identity, now);
   assertGate9BActivationPreconditions({
     adminEvidence,
     databaseIdentity: identity,

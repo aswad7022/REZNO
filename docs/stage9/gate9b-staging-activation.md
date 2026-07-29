@@ -30,8 +30,14 @@ previous CLI output file as authority.
 1. Verify the exact source SHA is deployed to `rezno-staging`.
 2. Verify the database identity from trusted expected host/role/source values,
    not from `DATABASE_URL` alone.
-3. Verify a provider-backed restore point for the same staging database. If the
-   restore point cannot be verified by the provider, the required result is
+3. Verify a provider-backed restore point for the same staging database. For
+   Neon staging databases, `stage9b:preflight` and `stage9b:runtime-evidence`
+   fetch branch, database, endpoint, and snapshot metadata through the Neon API.
+   The snapshot must belong to the approved staging project and branch, match
+   database `rezno_staging`, be ready, be temporally valid, and bind to the
+   verified database host/role hash. Environment values can name the candidate
+   restore point, project, and branch, but cannot set `providerVerified=true`.
+   If the provider cannot verify the restore point, the required result is
    `UNVERIFIED_RESTORE_POINT`.
 4. Apply migrations with `prisma migrate deploy` only to healthy `51/51`.
 5. Prove schema drift is absent before any write.
