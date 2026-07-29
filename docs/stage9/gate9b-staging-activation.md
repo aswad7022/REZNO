@@ -37,6 +37,10 @@ previous CLI output file as authority.
    database `rezno_staging`, be ready, be temporally valid, and bind to the
    verified database host/role hash. Environment values can name the candidate
    restore point, project, and branch, but cannot set `providerVerified=true`.
+   Neon's real list-snapshots response proves a completed snapshot by listing
+   its immutable ID, source branch, creation time, and optional expiry; it does
+   not currently include a status field. If Neon supplies a status field, only
+   a completed/ready value is accepted.
    If the provider cannot verify the restore point, the required result is
    `UNVERIFIED_RESTORE_POINT`.
 4. Apply migrations with `prisma migrate deploy` only to healthy `51/51`.

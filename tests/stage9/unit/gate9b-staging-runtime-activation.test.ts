@@ -882,14 +882,12 @@ async function startMockNeonApi(options: {
     ...options.endpoint,
   };
   const snapshot = {
-    branch_id: "br-staging",
     created_at: "2026-07-29T11:59:00.000Z",
-    database_name: "rezno_staging",
     expires_at: "2026-07-29T13:00:00.000Z",
     id: "snap-gate9b",
+    manual: true,
     name: "stage9b-before-activation",
-    project_id: "silent-smoke-123456",
-    status: "ready",
+    source_branch_id: "br-staging",
     ...options.snapshot,
   };
   const server = createServer(async (request: IncomingMessage, response: ServerResponse) => {

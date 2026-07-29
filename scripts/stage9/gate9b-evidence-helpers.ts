@@ -605,7 +605,10 @@ async function readNeonRestorePointEvidence(input: {
     ?? stringField(snapshot, "state")
     ?? stringField(snapshot, "current_state")
     ?? stringField(snapshot, "currentState");
-  if (!snapshotStatus || !["ready", "success", "completed", "available"].includes(snapshotStatus.toLowerCase())) {
+  if (
+    snapshotStatus
+    && !["ready", "success", "completed", "available"].includes(snapshotStatus.toLowerCase())
+  ) {
     return null;
   }
   const createdAt =
