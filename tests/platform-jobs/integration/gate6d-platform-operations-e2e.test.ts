@@ -4,9 +4,11 @@ import test from "node:test";
 
 import { Prisma } from "@prisma/client";
 
+import { PLATFORM_JOB_LIMITS } from "../../../features/platform-jobs/domain/contracts";
 import { PlatformJobDomainError } from "../../../features/platform-jobs/domain/errors";
 import { platformHealthPayload } from "../../../features/platform-jobs/domain/registry";
 import type { PlatformJobAdminContext } from "../../../features/platform-jobs/services/admin-context";
+import { setPlatformJobHandlerForTests } from "../../../features/platform-jobs/services/handlers";
 import { enqueuePlatformJob } from "../../../features/platform-jobs/services/jobs";
 import {
   runAutomaticPlatformSchedulerTick,
@@ -288,22 +290,17 @@ test("automatic runtime records a truthful monitor phase and rejects token repla
     data: { nextRunAt: new Date(Date.now() - 1_000) },
   });
 
-  await prisma.$transaction(async (transaction) => {
-    for (let index = 0; index < 6; index += 1) {
-      await enqueuePlatformJob(transaction, {
-        availableAt: new Date(Date.now() - 10 * 60_000),
-        createdByAdminUserId: fixture.userId,
-        createdByPersonId: fixture.personId,
-        deduplicationKey: `gate6d-overdue:${randomUUID()}`,
-        jobType: "PLATFORM_HEALTH_PROBE",
-        payload: platformHealthPayload(),
-        payloadVersion: 1,
-        source: "ADMIN_MANUAL",
-      });
-    }
-  });
+  await enqueueHealthJobs(
+    PLATFORM_JOB_LIMITS.maxWorkerBatch * 3 + 1,
+    {
+      availableAt: new Date(Date.now() - 10 * 60_000),
+      prefix: "gate6d-overdue-overflow",
+    },
+  );
   const monitored = await runPlatformRuntimeCycle(runtimeIdentity("monitor"));
   assert.equal(monitored.monitor.state, "SUCCEEDED");
+  assert.equal(monitored.worker.claimed, PLATFORM_JOB_LIMITS.maxWorkerBatch * 3);
+  assert.equal(monitored.worker.remainingAvailable, 2);
   assert.equal(
     await prisma.platformJob.count({
       where: {
@@ -335,20 +332,13 @@ test("automatic runtime drains the steady-state scheduled burst without leaving 
     idempotencyKey: randomUUID(),
   });
 
-  const scheduledBurst = 8;
-  await prisma.$transaction(async (transaction) => {
-    for (let index = 0; index < scheduledBurst; index += 1) {
-      await enqueuePlatformJob(transaction, {
-        availableAt: new Date(Date.now() - 60_000),
-        createdByAdminUserId: fixture.userId,
-        createdByPersonId: fixture.personId,
-        deduplicationKey: `gate6d-runtime-burst:${randomUUID()}`,
-        jobType: "PLATFORM_HEALTH_PROBE",
-        payload: platformHealthPayload(),
-        payloadVersion: 1,
-        source: "SCHEDULE",
-      });
-    }
+  const scheduledBurst = 17;
+  const schedule = await createHealthScheduleFixture();
+  await enqueueHealthJobs(scheduledBurst, {
+    availableAt: new Date(Date.now() - 60_000),
+    prefix: "gate6d-runtime-burst",
+    scheduleId: schedule.id,
+    source: "SCHEDULE",
   });
 
   const result = await runPlatformRuntimeCycle(runtimeIdentity("steady-burst"));
@@ -356,11 +346,265 @@ test("automatic runtime drains the steady-state scheduled burst without leaving 
   assert.equal(result.state, "SUCCEEDED");
   assert.equal(result.worker.claimed, scheduledBurst);
   assert.equal(result.worker.succeeded, scheduledBurst);
+  assert.equal(result.worker.batchesRun, 2);
+  assert.equal(result.worker.remainingAvailable, 0);
   assert.equal(
     await prisma.platformJob.count({
       where: { jobType: "PLATFORM_HEALTH_PROBE", status: "AVAILABLE" },
     }),
     0,
+  );
+  assert.equal(
+    await prisma.platformAlert.count({ where: { state: "OPEN" } }),
+    0,
+  );
+});
+
+test("automatic runtime drains bounded worker batches across boundary counts", async (t) => {
+  const cases = [
+    { batches: 1, count: 5, label: "baseline-five" },
+    { batches: 1, count: 8, label: "old-fixed-limit-regression" },
+    {
+      batches: 1,
+      count: PLATFORM_JOB_LIMITS.maxWorkerBatch,
+      label: "max-worker-batch",
+    },
+    {
+      batches: 2,
+      count: PLATFORM_JOB_LIMITS.maxWorkerBatch + 1,
+      label: "max-worker-batch-plus-one",
+    },
+    { batches: 2, count: 17, label: "stage9b-real-burst" },
+  ];
+
+  for (const item of cases) {
+    await t.test(item.label, async () => {
+      await cleanupGate6D();
+      await ensureRuntimeEnabled();
+      const schedule = await createHealthScheduleFixture();
+      await enqueueHealthJobs(item.count, {
+        availableAt: new Date(Date.now() - 60_000),
+        prefix: item.label,
+        scheduleId: schedule.id,
+        source: "SCHEDULE",
+      });
+
+      const result = await runPlatformRuntimeCycle(runtimeIdentity(item.label));
+
+      assert.equal(result.worker.claimed, item.count);
+      assert.equal(result.worker.succeeded, item.count);
+      assert.equal(result.worker.failed, 0);
+      assert.equal(result.worker.retryWait, 0);
+      assert.equal(result.worker.deadLettered, 0);
+      assert.equal(result.worker.batchesRun, item.batches);
+      assert.equal(result.worker.remainingAvailable, 0);
+      assert.equal(result.worker.stopReason, "DRAINED");
+      assert.equal(
+        await prisma.platformJob.count({ where: { status: "AVAILABLE" } }),
+        0,
+      );
+      assert.equal(
+        await prisma.platformJobAttempt.count(),
+        item.count,
+      );
+    });
+  }
+});
+
+test("automatic runtime leaves explicit overflow for the next bounded cycle and reconciles alerts after drain", async () => {
+  await ensureRuntimeEnabled();
+  const total = PLATFORM_JOB_LIMITS.maxWorkerBatch * 3 + 4;
+  await enqueueHealthJobs(total, {
+    availableAt: new Date(Date.now() - 10 * 60_000),
+    prefix: "gate6d-overflow-drain",
+  });
+
+  const first = await runPlatformRuntimeCycle(runtimeIdentity("overflow-one"));
+  assert.equal(first.worker.claimed, PLATFORM_JOB_LIMITS.maxWorkerBatch * 3);
+  assert.equal(first.worker.remainingAvailable, 4);
+  assert.equal(first.worker.stopReason, "MAX_JOBS_REACHED");
+  assert.equal(
+    await prisma.platformJob.count({ where: { status: "AVAILABLE" } }),
+    4,
+  );
+  const alert = await prisma.platformAlert.findUniqueOrThrow({
+    where: { deduplicationKey: "platform:overdue_jobs" },
+  });
+  assert.equal(alert.state, "OPEN");
+
+  const second = await runPlatformRuntimeCycle(runtimeIdentity("overflow-two"));
+  assert.equal(second.worker.claimed, 4);
+  assert.equal(second.worker.succeeded, 4);
+  assert.equal(second.worker.remainingAvailable, 0);
+  assert.equal(second.worker.stopReason, "DRAINED");
+  assert.equal(
+    await prisma.platformJob.count({ where: { status: "AVAILABLE" } }),
+    0,
+  );
+  const resolved = await prisma.platformAlert.findUniqueOrThrow({
+    where: { deduplicationKey: "platform:overdue_jobs" },
+  });
+  assert.equal(resolved.state, "RESOLVED");
+});
+
+test("automatic runtime records retryable and terminal failures without losing the rest of the drain", async () => {
+  await ensureRuntimeEnabled();
+  const ids = await enqueueHealthJobs(8, {
+    availableAt: new Date(Date.now() - 60_000),
+    prefix: "gate6d-failure-drain",
+  });
+  const retryableJobId = ids[1]!;
+  const terminalJobId = ids[4]!;
+  setPlatformJobHandlerForTests("PLATFORM_HEALTH_PROBE", async (_payload, handlerContext) => {
+    if (handlerContext.jobId === retryableJobId) {
+      return {
+        errorCode: "TRANSIENT_FAILURE",
+        outcome: "FAILED",
+        retryable: true,
+      };
+    }
+    if (handlerContext.jobId === terminalJobId) {
+      return {
+        errorCode: "PERMANENT_FAILURE",
+        outcome: "FAILED",
+        retryable: false,
+      };
+    }
+    return {
+      metadata: healthResult(handlerContext.fencingToken),
+      outcome: "SUCCEEDED",
+    };
+  });
+  try {
+    const result = await runPlatformRuntimeCycle(runtimeIdentity("failure-drain"));
+    assert.equal(result.worker.claimed, 8);
+    assert.equal(result.worker.succeeded, 6);
+    assert.equal(result.worker.retryWait, 1);
+    assert.equal(result.worker.failed, 1);
+    assert.equal(
+      await prisma.platformJob.count({ where: { status: "SUCCEEDED" } }),
+      6,
+    );
+    assert.equal(
+      await prisma.platformJob.count({ where: { status: "RETRY_WAIT" } }),
+      1,
+    );
+    assert.equal(
+      await prisma.platformJob.count({ where: { status: "FAILED" } }),
+      1,
+    );
+  } finally {
+    setPlatformJobHandlerForTests("PLATFORM_HEALTH_PROBE", undefined);
+  }
+});
+
+test("automatic runtime refuses overlapping invocation ownership without duplicate job effects", async () => {
+  await ensureRuntimeEnabled();
+  await enqueueHealthJobs(12, {
+    availableAt: new Date(Date.now() - 60_000),
+    prefix: "gate6d-runtime-contention",
+  });
+  let releaseHandler!: () => void;
+  let startedHandler!: () => void;
+  const started = new Promise<void>((resolve) => {
+    startedHandler = resolve;
+  });
+  const release = new Promise<void>((resolve) => {
+    releaseHandler = resolve;
+  });
+  let held = false;
+  setPlatformJobHandlerForTests("PLATFORM_HEALTH_PROBE", async (_payload, handlerContext) => {
+    if (!held) {
+      held = true;
+      startedHandler();
+      await release;
+    }
+    return {
+      metadata: healthResult(handlerContext.fencingToken),
+      outcome: "SUCCEEDED",
+    };
+  });
+  try {
+    const first = runPlatformRuntimeCycle(runtimeIdentity("contention-a"));
+    await started;
+    await assert.rejects(
+      runPlatformRuntimeCycle(runtimeIdentity("contention-b")),
+      runtimeCode("RUNTIME_BUSY"),
+    );
+    releaseHandler();
+    const result = await first;
+    assert.equal(result.worker.claimed, 12);
+    assert.equal(result.worker.succeeded, 12);
+    assert.equal(
+      await prisma.platformJobAttempt.count(),
+      12,
+    );
+  } finally {
+    releaseHandler();
+    setPlatformJobHandlerForTests("PLATFORM_HEALTH_PROBE", undefined);
+  }
+});
+
+test("automatic runtime honors the explicit cycle batch bound and preserves remaining work for the next pass", async () => {
+  await ensureRuntimeEnabled();
+  await enqueueHealthJobs(PLATFORM_JOB_LIMITS.maxWorkerBatch + 1, {
+    availableAt: new Date(Date.now() - 10 * 60_000),
+    prefix: "gate6d-batch-bound",
+  });
+
+  const first = await runPlatformRuntimeCycle(
+    runtimeIdentity("bounded-one"),
+    { maxWorkerBatches: 1 },
+  );
+  assert.equal(first.worker.claimed, PLATFORM_JOB_LIMITS.maxWorkerBatch);
+  assert.equal(first.worker.batchesRun, 1);
+  assert.equal(first.worker.stopReason, "MAX_JOBS_REACHED");
+  assert.equal(first.worker.remainingAvailable, 1);
+  assert.equal(
+    await prisma.platformAlert.count({
+      where: {
+        deduplicationKey: "platform:overdue_jobs",
+        state: "OPEN",
+      },
+    }),
+    1,
+  );
+
+  const second = await runPlatformRuntimeCycle(runtimeIdentity("bounded-two"));
+  assert.equal(second.worker.claimed, 1);
+  assert.equal(second.worker.remainingAvailable, 0);
+  const alert = await prisma.platformAlert.findUniqueOrThrow({
+    where: { deduplicationKey: "platform:overdue_jobs" },
+  });
+  assert.equal(alert.state, "RESOLVED");
+});
+
+test("automatic runtime stops before claiming jobs when the cycle deadline is already unsafe", async () => {
+  await ensureRuntimeEnabled();
+  await enqueueHealthJobs(5, {
+    availableAt: new Date(Date.now() - 10 * 60_000),
+    prefix: "gate6d-deadline-bound",
+  });
+
+  const result = await runPlatformRuntimeCycle(
+    runtimeIdentity("deadline-bound"),
+    {
+      deadlineAt: new Date(Date.now()),
+      nowMs: () => Date.now(),
+    },
+  );
+
+  assert.equal(result.worker.claimed, 0);
+  assert.equal(result.worker.batchesRun, 0);
+  assert.equal(result.worker.stopReason, "DEADLINE_APPROACHING");
+  assert.equal(result.worker.remainingAvailable, 5);
+  assert.equal(
+    await prisma.platformJobAttempt.count(),
+    0,
+  );
+  assert.equal(
+    await prisma.platformJob.count({ where: { status: "AVAILABLE" } }),
+    5,
   );
 });
 
@@ -702,6 +946,60 @@ async function createAlert(label: string) {
     },
   });
   return alert;
+}
+
+async function ensureRuntimeEnabled() {
+  await initializePlatformRuntime(context, randomUUID());
+  const initialized = await currentRuntimeControl();
+  await setPlatformRuntimeEnabled(context, {
+    enabled: true,
+    expectedVersion: initialized.version,
+    idempotencyKey: randomUUID(),
+  });
+}
+
+async function createHealthScheduleFixture() {
+  await bootstrapPlatformSchedules(context, randomUUID());
+  return prisma.platformJobSchedule.findFirstOrThrow({
+    where: { scheduleKey: "PLATFORM_HEALTH_PROBE" },
+  });
+}
+
+async function enqueueHealthJobs(
+  count: number,
+  input: {
+    availableAt: Date;
+    prefix: string;
+    scheduleId?: string;
+    source?: "ADMIN_MANUAL" | "SCHEDULE";
+  },
+) {
+  const ids: string[] = [];
+  await prisma.$transaction(async (transaction) => {
+    for (let index = 0; index < count; index += 1) {
+      const created = await enqueuePlatformJob(transaction, {
+        availableAt: input.availableAt,
+        createdByAdminUserId: fixture.userId,
+        createdByPersonId: fixture.personId,
+        deduplicationKey: `${input.prefix}:${index}:${randomUUID()}`,
+        jobType: "PLATFORM_HEALTH_PROBE",
+        payload: platformHealthPayload(),
+        payloadVersion: 1,
+        scheduleId: input.scheduleId,
+        source: input.source ?? "ADMIN_MANUAL",
+      });
+      ids.push(created.job.id);
+    }
+  });
+  return ids;
+}
+
+function healthResult(fencingToken: bigint) {
+  return {
+    executionGeneration: fencingToken.toString(),
+    kind: "PLATFORM_HEALTHY" as const,
+    payloadVersion: 1 as const,
+  };
 }
 
 async function createRuntimeAuthority(

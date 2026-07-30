@@ -4,11 +4,14 @@ import { randomUUID } from "node:crypto";
 
 import { Prisma } from "@prisma/client";
 
+import { PLATFORM_JOB_LIMITS } from "@/features/platform-jobs/domain/contracts";
 import { platformJobError } from "@/features/platform-jobs/domain/errors";
 import { runAutomaticPlatformSchedulerTick } from "@/features/platform-jobs/services/schedules";
 import { runAutomaticPlatformWorkerBatch } from "@/features/platform-jobs/services/worker";
 import type { VerifiedGitHubRuntimeIdentity } from "@/features/platform-operations/services/github-oidc";
+import { reconcilePlatformOperationAlerts } from "@/features/platform-operations/services/monitor";
 import {
+  assertPlatformRuntimeAuthorityCurrent,
   assertPlatformRuntimeInvocationOwned,
   type PlatformRuntimeAuthority,
 } from "@/features/platform-operations/services/runtime-authority";
@@ -16,6 +19,48 @@ import { prisma } from "@/lib/db/prisma";
 
 export const PLATFORM_RUNTIME_CONTROL_ID = "github-actions-runtime";
 const INVOCATION_LEASE_SECONDS = 240;
+const RUNTIME_WORKER_DRAIN_LIMITS = {
+  maxBatches: 3,
+  maxDurationMs: 210_000,
+  maxJobs: PLATFORM_JOB_LIMITS.maxWorkerBatch * 3,
+  minRemainingMs: 15_000,
+} as const;
+
+type RuntimeMonitorResult =
+  | { result: Prisma.InputJsonValue; state: "SUCCEEDED" }
+  | { errorCode: string; state: "FAILED" }
+  | { state: "NOT_CLAIMED" };
+
+type RuntimeWorkerBatchResult = {
+  claimed: number;
+  deadLettered: number;
+  failed: number;
+  monitor: RuntimeMonitorResult;
+  recovered: number;
+  retryWait: number;
+  succeeded: number;
+};
+
+type RuntimeWorkerDrainResult = RuntimeWorkerBatchResult & {
+  batches: Array<RuntimeWorkerBatchResult & { batchNumber: number }>;
+  batchesRun: number;
+  maxBatches: number;
+  maxJobs: number;
+  maxWorkerBatch: number;
+  remainingAvailable: number;
+  state: "COMPLETE";
+  stopReason:
+    | "DRAINED"
+    | "DEADLINE_APPROACHING"
+    | "MAX_BATCHES_REACHED"
+    | "MAX_JOBS_REACHED";
+};
+
+type PlatformRuntimeCycleOptions = {
+  deadlineAt?: Date;
+  maxWorkerBatches?: number;
+  nowMs?: () => number;
+};
 
 export class PlatformRuntimeError extends Error {
   constructor(
@@ -34,11 +79,12 @@ export class PlatformRuntimeError extends Error {
 
 export async function runPlatformRuntimeCycle(
   identity: VerifiedGitHubRuntimeIdentity,
+  options: PlatformRuntimeCycleOptions = {},
 ) {
   const authority = await acquireRuntimeInvocation(identity);
   try {
     const scheduler = await runAutomaticPlatformSchedulerTick(authority);
-    const worker = await runAutomaticPlatformWorkerBatch(authority);
+    const worker = await drainRuntimeWorkerBatches(authority, options);
     const result = await completeRuntimeInvocation(
       authority,
       scheduler,
@@ -48,6 +94,196 @@ export async function runPlatformRuntimeCycle(
   } catch (error) {
     await failRuntimeInvocation(authority);
     throw error;
+  }
+}
+
+async function drainRuntimeWorkerBatches(
+  authority: PlatformRuntimeAuthority,
+  options: PlatformRuntimeCycleOptions,
+): Promise<RuntimeWorkerDrainResult> {
+  const maxBatches = runtimeWorkerBatchLimit(options.maxWorkerBatches);
+  const maxJobs = Math.min(
+    RUNTIME_WORKER_DRAIN_LIMITS.maxJobs,
+    maxBatches * PLATFORM_JOB_LIMITS.maxWorkerBatch,
+  );
+  const nowMs = options.nowMs ?? Date.now;
+  const deadlineAtMs = runtimeWorkerDeadline(nowMs(), options.deadlineAt);
+  const aggregate = emptyRuntimeWorkerDrain(maxBatches, maxJobs);
+  while (
+    aggregate.batchesRun < maxBatches
+    && aggregate.claimed < maxJobs
+  ) {
+    if (runtimeDeadlineApproaching(nowMs(), deadlineAtMs)) {
+      aggregate.stopReason = "DEADLINE_APPROACHING";
+      break;
+    }
+    const batchNumber = aggregate.batchesRun + 1;
+    const batch = await runAutomaticPlatformWorkerBatch(
+      authority,
+      PLATFORM_JOB_LIMITS.maxWorkerBatch,
+    );
+    aggregateBatch(aggregate, batch, batchNumber);
+
+    if (batch.claimed < PLATFORM_JOB_LIMITS.maxWorkerBatch) {
+      aggregate.stopReason = "DRAINED";
+      break;
+    }
+    if (aggregate.claimed >= maxJobs) {
+      aggregate.stopReason = "MAX_JOBS_REACHED";
+      break;
+    }
+    if (runtimeDeadlineApproaching(nowMs(), deadlineAtMs)) {
+      aggregate.stopReason = "DEADLINE_APPROACHING";
+      break;
+    }
+    const remaining = await countAvailableRuntimeJobs(authority);
+    if (remaining === 0) {
+      aggregate.stopReason = "DRAINED";
+      break;
+    }
+  }
+  if (!aggregate.stopReason) {
+    aggregate.stopReason = "MAX_BATCHES_REACHED";
+  }
+  aggregate.remainingAvailable = await countAvailableRuntimeJobs(authority);
+  if (aggregate.claimed > 0) {
+    aggregate.monitor = await reconcileRuntimeMonitor(authority);
+  }
+  return aggregate;
+}
+
+function runtimeWorkerBatchLimit(value: number | undefined) {
+  const maxBatches = value ?? RUNTIME_WORKER_DRAIN_LIMITS.maxBatches;
+  if (
+    !Number.isInteger(maxBatches)
+    || maxBatches < 1
+    || maxBatches > RUNTIME_WORKER_DRAIN_LIMITS.maxBatches
+  ) {
+    platformJobError(
+      "VALIDATION_ERROR",
+      "The runtime worker drain batch count is outside the accepted bound.",
+    );
+  }
+  return maxBatches;
+}
+
+function runtimeWorkerDeadline(nowMs: number, deadlineAt: Date | undefined) {
+  const defaultDeadlineAt = nowMs + RUNTIME_WORKER_DRAIN_LIMITS.maxDurationMs;
+  if (!deadlineAt) return defaultDeadlineAt;
+  const requested = deadlineAt.getTime();
+  if (!Number.isFinite(requested)) {
+    platformJobError(
+      "VALIDATION_ERROR",
+      "The runtime worker drain deadline is invalid.",
+    );
+  }
+  return Math.min(defaultDeadlineAt, requested);
+}
+
+function runtimeDeadlineApproaching(nowMs: number, deadlineAtMs: number) {
+  return nowMs + RUNTIME_WORKER_DRAIN_LIMITS.minRemainingMs >= deadlineAtMs;
+}
+
+function emptyRuntimeWorkerDrain(
+  maxBatches: number,
+  maxJobs: number,
+): RuntimeWorkerDrainResult {
+  return {
+    batches: [],
+    batchesRun: 0,
+    claimed: 0,
+    deadLettered: 0,
+    failed: 0,
+    maxBatches,
+    maxJobs,
+    maxWorkerBatch: PLATFORM_JOB_LIMITS.maxWorkerBatch,
+    monitor: { state: "NOT_CLAIMED" },
+    recovered: 0,
+    remainingAvailable: 0,
+    retryWait: 0,
+    state: "COMPLETE",
+    stopReason: "DRAINED",
+    succeeded: 0,
+  };
+}
+
+function aggregateBatch(
+  aggregate: RuntimeWorkerDrainResult,
+  batch: RuntimeWorkerBatchResult,
+  batchNumber: number,
+) {
+  aggregate.batches.push({ ...batch, batchNumber });
+  aggregate.batchesRun += 1;
+  aggregate.claimed += batch.claimed;
+  aggregate.deadLettered += batch.deadLettered;
+  aggregate.failed += batch.failed;
+  aggregate.recovered += batch.recovered;
+  aggregate.retryWait += batch.retryWait;
+  aggregate.succeeded += batch.succeeded;
+  if (batch.monitor.state !== "NOT_CLAIMED") {
+    aggregate.monitor = batch.monitor;
+  }
+}
+
+async function countAvailableRuntimeJobs(
+  authority: PlatformRuntimeAuthority,
+) {
+  return prisma.$transaction(async (transaction) => {
+    await assertPlatformRuntimeInvocationOwned(transaction, authority);
+    const [clock] = await transaction.$queryRaw<Array<{ now: Date }>>(
+      Prisma.sql`SELECT clock_timestamp() AS now`,
+    );
+    if (!clock?.now) {
+      platformJobError("PLATFORM_JOB_FAILURE", "The database clock is unavailable.");
+    }
+    const [row] = await transaction.$queryRaw<Array<{ count: number }>>(
+      Prisma.sql`
+        SELECT COUNT(*)::int AS "count"
+        FROM "PlatformJob" AS job
+        WHERE job."status" IN ('SCHEDULED', 'AVAILABLE', 'RETRY_WAIT')
+          AND job."availableAt" <= ${clock.now}
+          AND job."attemptCount" < job."maxAttempts"
+      `,
+    );
+    return row?.count ?? 0;
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted });
+}
+
+async function reconcileRuntimeMonitor(
+  authority: PlatformRuntimeAuthority,
+): Promise<RuntimeMonitorResult> {
+  try {
+    return await prisma.$transaction(async (transaction) => {
+      const monitorAuthority: PlatformRuntimeAuthority = {
+        ...authority,
+        jobType: "PLATFORM_OPERATIONS_MONITOR",
+      };
+      const [clock] = await transaction.$queryRaw<Array<{ now: Date }>>(
+        Prisma.sql`SELECT clock_timestamp() AS now`,
+      );
+      if (!clock?.now) {
+        platformJobError("PLATFORM_JOB_FAILURE", "The database clock is unavailable.");
+      }
+      const actor = await assertPlatformRuntimeAuthorityCurrent(
+        transaction,
+        monitorAuthority,
+        "PLATFORM_OPERATIONS_MANAGE",
+      );
+      const result = await reconcilePlatformOperationAlerts(
+        transaction,
+        actor,
+        clock.now,
+      );
+      return {
+        result: {
+          ...result,
+          kind: "PLATFORM_OPERATIONS_OBSERVED",
+        },
+        state: "SUCCEEDED" as const,
+      };
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  } catch {
+    return { errorCode: "TRANSIENT_FAILURE", state: "FAILED" };
   }
 }
 
@@ -169,18 +405,7 @@ async function completeRuntimeInvocation(
     jobsCreated: number;
     schedulesProcessed: number;
   },
-  worker: {
-    claimed: number;
-    deadLettered: number;
-    failed: number;
-    monitor:
-      | { result: Prisma.InputJsonValue; state: "SUCCEEDED" }
-      | { errorCode: string; state: "FAILED" }
-      | { state: "NOT_CLAIMED" };
-    recovered: number;
-    retryWait: number;
-    succeeded: number;
-  },
+  worker: RuntimeWorkerDrainResult,
 ) {
   return prisma.$transaction(async (transaction) => {
     await assertPlatformRuntimeInvocationOwned(transaction, authority);
@@ -204,7 +429,11 @@ async function completeRuntimeInvocation(
         completedAt: clock.now,
         leaseExpiresAt: null,
         leaseToken: null,
+        monitorCompletedAt: clock.now,
+        monitorResult: worker.monitor,
         state: "SUCCEEDED",
+        workerCompletedAt: clock.now,
+        workerResult: worker,
       },
     });
     if (completed.count !== 1) {
