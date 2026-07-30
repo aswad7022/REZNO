@@ -76,6 +76,14 @@ async function collectMetrics(
         SELECT 1
         FROM "PlatformRuntimeControl" AS control
         WHERE control."state" = 'ENABLED'
+          AND NOT EXISTS (
+            SELECT 1
+            FROM "PlatformRuntimeInvocation" AS invocation
+            WHERE invocation."controlId" = control."id"
+              AND invocation."state" = 'RUNNING'
+              AND invocation."leaseExpiresAt" > clock_timestamp()
+            LIMIT 1
+          )
           AND (
             control."lastSucceededAt" IS NULL
             OR control."lastSucceededAt"

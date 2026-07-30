@@ -32,7 +32,7 @@ import {
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ACTIVE_ATTEMPTS = new Set<PlatformJobAttemptStatus>(["CLAIMED", "RUNNING"]);
-const AUTOMATIC_WORKER_BATCH_SIZE = 5;
+const AUTOMATIC_WORKER_BATCH_SIZE = PLATFORM_JOB_LIMITS.maxWorkerBatch;
 
 type WorkerCompleteResult = {
   claimed: number;
