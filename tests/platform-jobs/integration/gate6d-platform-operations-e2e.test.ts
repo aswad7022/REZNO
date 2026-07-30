@@ -326,6 +326,44 @@ test("automatic runtime records a truthful monitor phase and rejects token repla
   );
 });
 
+test("automatic runtime drains the steady-state scheduled burst without leaving backlog", async () => {
+  await initializePlatformRuntime(context, randomUUID());
+  const initialized = await currentRuntimeControl();
+  await setPlatformRuntimeEnabled(context, {
+    enabled: true,
+    expectedVersion: initialized.version,
+    idempotencyKey: randomUUID(),
+  });
+
+  const scheduledBurst = 8;
+  await prisma.$transaction(async (transaction) => {
+    for (let index = 0; index < scheduledBurst; index += 1) {
+      await enqueuePlatformJob(transaction, {
+        availableAt: new Date(Date.now() - 60_000),
+        createdByAdminUserId: fixture.userId,
+        createdByPersonId: fixture.personId,
+        deduplicationKey: `gate6d-runtime-burst:${randomUUID()}`,
+        jobType: "PLATFORM_HEALTH_PROBE",
+        payload: platformHealthPayload(),
+        payloadVersion: 1,
+        source: "SCHEDULE",
+      });
+    }
+  });
+
+  const result = await runPlatformRuntimeCycle(runtimeIdentity("steady-burst"));
+
+  assert.equal(result.state, "SUCCEEDED");
+  assert.equal(result.worker.claimed, scheduledBurst);
+  assert.equal(result.worker.succeeded, scheduledBurst);
+  assert.equal(
+    await prisma.platformJob.count({
+      where: { jobType: "PLATFORM_HEALTH_PROBE", status: "AVAILABLE" },
+    }),
+    0,
+  );
+});
+
 test("runtime generation fences stale scheduler and worker authority after disable", async () => {
   await initializePlatformRuntime(context, randomUUID());
   const initialized = await currentRuntimeControl();
