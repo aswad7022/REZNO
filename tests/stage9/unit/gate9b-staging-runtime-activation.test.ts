@@ -245,6 +245,104 @@ test("Gate 9B deployment evidence requires trusted GitHub, local, Vercel, and au
   }
 });
 
+test("Gate 9B activation boundary requires post-merge deployment evidence", () => {
+  const healthy = healthyPreconditions();
+  const staleDefaultBranchHead = "b".repeat(40);
+  const preMergeEvidence = trustedDeploymentEvidence(reviewedSha, "github-vercel-api", {
+    githubDefaultBranch: STAGE9_GATE9B_POST_MERGE_BRANCH,
+    githubDefaultBranchHeadSha: staleDefaultBranchHead,
+    githubHeadSha: reviewedSha,
+    mode: "pre-merge-branch",
+    vercelSourceRef: STAGE9_GATE9B_BRANCH,
+  });
+
+  const readOnlyReview = validateGate9BDeploymentEvidence(preMergeEvidence, { now });
+  assert.equal(
+    readOnlyReview.ok,
+    true,
+    "pre-merge evidence may still be validated for read-only PR review",
+  );
+
+  const activation = evaluateGate9BActivationPreconditions({
+    ...healthy,
+    deploymentEvidence: preMergeEvidence,
+  });
+  assert.equal(activation.ok, false);
+  assert.equal(activation.reason, "POST_MERGE_DEPLOYMENT_REQUIRED");
+  assert.equal(
+    activation.findings.some((finding) =>
+      finding.code === "POST_MERGE_DEPLOYMENT_REQUIRED"
+    ),
+    true,
+  );
+
+  let mutationCount = 0;
+  assert.throws(() => {
+    assertGate9BActivationPreconditions({
+      ...healthy,
+      deploymentEvidence: preMergeEvidence,
+    });
+    mutationCount += 1;
+  }, /Gate 9B validation failed closed/);
+  assert.equal(mutationCount, 0);
+});
+
+test("Gate 9B activation rejects missing and malformed deployment modes before mutation", () => {
+  const healthy = healthyPreconditions();
+  for (const [name, deploymentEvidence] of [
+    ["missing mode", trustedDeploymentEvidence(reviewedSha, "github-vercel-api", {
+      mode: undefined,
+    })],
+    ["unknown mode", trustedDeploymentEvidence(reviewedSha, "github-vercel-api", {
+      mode: "preview-main" as never,
+    })],
+  ] as const) {
+    const activation = evaluateGate9BActivationPreconditions({
+      ...healthy,
+      deploymentEvidence,
+    });
+    assert.equal(activation.ok, false, name);
+    assert.equal(activation.reason, "POST_MERGE_DEPLOYMENT_REQUIRED", name);
+    let mutationCount = 0;
+    assert.throws(() => {
+      assertGate9BActivationPreconditions({
+        ...healthy,
+        deploymentEvidence,
+      });
+      mutationCount += 1;
+    }, /Gate 9B validation failed closed/, name);
+    assert.equal(mutationCount, 0, name);
+  }
+});
+
+test("Gate 9B database and runtime evidence scripts guard before mutation calls", () => {
+  for (const [script, mutationNeedles] of [
+    ["scripts/stage9/gate9b-database-evidence.ts", [
+      "prisma.distributedRateLimitBucket.deleteMany",
+      "prisma.distributedRateLimitBucket.create",
+    ]],
+    ["scripts/stage9/gate9b-runtime-evidence.ts", [
+      "initializePlatformRuntime(",
+      "bootstrapPlatformSchedules(",
+      "runPlatformSchedulerTick(",
+      "runPlatformWorkerBatch(",
+      "setPlatformRuntimeEnabled(",
+    ]],
+  ] as const) {
+    const source = readFileSync(path.join(repoRoot, script), "utf8");
+    const guardIndex = source.indexOf("assertGate9BActivationPreconditions({");
+    assert.notEqual(guardIndex, -1, script);
+    for (const needle of mutationNeedles) {
+      const mutationIndex = source.indexOf(needle);
+      assert.notEqual(mutationIndex, -1, `${script}:${needle}`);
+      assert.ok(
+        guardIndex < mutationIndex,
+        `${script} must assert activation preconditions before ${needle}`,
+      );
+    }
+  }
+});
+
 test("Gate 9B verifies the staging alias through Vercel deployment aliases metadata", () => {
   assert.equal(
     vercelDeploymentHasStagingAlias(
@@ -710,6 +808,13 @@ test("Gate 9B preflight CLI exits non-zero for fail-closed and external-input st
     ["restore point unverified", { REZNO_STAGE9_GATE9B_RESTORE_POINT_VERIFICATION_SOURCE: "neon-api" }],
     ["runtime URL missing", { REZNO_PLATFORM_RUNTIME_URL: "" }],
     ["runtime URL unsafe", { REZNO_PLATFORM_RUNTIME_URL: "https://rezno-staging.vercel.app?leak=1" }],
+    ["pre-merge evidence cannot authorize activation", {
+      REZNO_STAGE9_GATE9B_DEPLOYMENT_VERIFICATION_MODE: "pre-merge-branch",
+      REZNO_STAGE9_GATE9B_GITHUB_DEFAULT_BRANCH: STAGE9_GATE9B_POST_MERGE_BRANCH,
+      REZNO_STAGE9_GATE9B_GITHUB_DEFAULT_BRANCH_HEAD_SHA: "b".repeat(40),
+      REZNO_STAGE9_GATE9B_GITHUB_HEAD_SHA: reviewedSha,
+      REZNO_STAGE9_GATE9B_VERCEL_SOURCE_REF: STAGE9_GATE9B_BRANCH,
+    }],
   ] as const;
 
   for (const [name, override] of cases) {
@@ -720,6 +825,10 @@ test("Gate 9B preflight CLI exits non-zero for fail-closed and external-input st
     if (name === "arbitrary self-equal deployment SHA") {
       const parsed = JSON.parse(result.stdout) as { preflight: { reason: string } };
       assert.equal(parsed.preflight.reason, "DEPLOYMENT_SHA_UNVERIFIED");
+    }
+    if (name === "pre-merge evidence cannot authorize activation") {
+      const parsed = JSON.parse(result.stdout) as { preflight: { reason: string } };
+      assert.equal(parsed.preflight.reason, "POST_MERGE_DEPLOYMENT_REQUIRED");
     }
   }
 });

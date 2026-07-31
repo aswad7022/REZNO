@@ -146,6 +146,7 @@ export type Gate9BFindingCode =
   | "AI_MUST_REMAIN_DISABLED"
   | "DEPLOYMENT_SHA_UNVERIFIED"
   | "DEPLOYMENT_SHA_MISMATCH"
+  | "POST_MERGE_DEPLOYMENT_REQUIRED"
   | "DEPLOYMENT_NOT_READY"
   | "DEPLOYMENT_EVIDENCE_STALE"
   | "RUNTIME_REGISTRY_MISMATCH"
@@ -197,6 +198,16 @@ export type Gate9BDeploymentTrustedVerification = {
   readonly vercelSourceRef?: string;
   readonly vercelSourceSha: string;
 };
+
+export type Gate9BPostMergeDeploymentTrustedVerification =
+  Gate9BDeploymentTrustedVerification & {
+    readonly mode: "post-merge-default-branch";
+  };
+
+export type Gate9BPostMergeActivationDeploymentEvidence =
+  Gate9BDeploymentEvidence & {
+    readonly trustedVerification: Gate9BPostMergeDeploymentTrustedVerification;
+  };
 
 export type Gate9BMigrationEvidence = {
   readonly applied: number;
@@ -780,10 +791,17 @@ export function evaluateGate9BActivationPreconditions(
       "Gate 9B requires deployment evidence before activation.",
     ));
   } else {
-    findings.push(...validateGate9BDeploymentEvidence(deploymentEvidence, {
+    const postMergeFindings = validateGate9BPostMergeActivationDeploymentEvidence(
+      deploymentEvidence,
+    ).findings;
+    const deploymentFindings = validateGate9BDeploymentEvidence(deploymentEvidence, {
       allowLocalTest,
       now: input.now,
-    }).findings);
+    }).findings;
+    findings.push(
+      ...(deploymentEvidence.trustedVerification ? postMergeFindings : deploymentFindings),
+      ...(deploymentEvidence.trustedVerification ? deploymentFindings : postMergeFindings),
+    );
   }
   if (input.requireAdmin) {
     if (!input.adminEvidence || input.adminEvidence.status === "MISSING") {
@@ -851,6 +869,7 @@ export function assertGate9BActivationPreconditions(
       "REZNO_STAGE9_GATE9B_DEPLOYMENT_SHA",
     );
   }
+  assertGate9BPostMergeActivationDeploymentEvidence(deploymentEvidence);
   return {
     adminEvidence: input.adminEvidence,
     databaseBindingSha256: gate9BDatabaseBindingSha256(databaseIdentity),
@@ -858,6 +877,41 @@ export function assertGate9BActivationPreconditions(
     deploymentSha: deploymentEvidence.deploymentSha,
     runtimeUrl: GATE9B_STAGING_ORIGIN,
   };
+}
+
+export function validateGate9BPostMergeActivationDeploymentEvidence(
+  evidence: Gate9BDeploymentEvidence,
+): Gate9BValidation {
+  const findings: Gate9BFinding[] = [];
+  if (
+    !evidence.trustedVerification
+    || evidence.trustedVerification.mode !== "post-merge-default-branch"
+  ) {
+    findings.push(finding(
+      "POST_MERGE_DEPLOYMENT_REQUIRED",
+      "deploymentVerificationMode",
+      "error",
+      "Gate 9B activation requires post-merge default-branch deployment evidence.",
+    ));
+  }
+  return {
+    externalInputRequired: false,
+    findings,
+    ok: findings.length === 0,
+    reason: reasonFor(findings),
+  };
+}
+
+export function assertGate9BPostMergeActivationDeploymentEvidence(
+  evidence: Gate9BDeploymentEvidence,
+): asserts evidence is Gate9BPostMergeActivationDeploymentEvidence {
+  const validation = validateGate9BPostMergeActivationDeploymentEvidence(evidence);
+  if (!validation.ok) {
+    throw new Gate9BValidationError(
+      "POST_MERGE_DEPLOYMENT_REQUIRED",
+      "deploymentVerificationMode",
+    );
+  }
 }
 
 export function validateGate9BDeploymentEvidence(
