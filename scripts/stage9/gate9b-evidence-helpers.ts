@@ -9,6 +9,7 @@ import {
   GATE9B_STAGING_ORIGIN,
   GATE9B_STAGING_PROJECT,
   STAGE9_GATE9B_BRANCH,
+  STAGE9_GATE9B_POST_MERGE_BRANCH,
   gate9BDatabaseBindingSha256,
   gate9BDeploymentEvidenceFromEnv,
   gate9BRestorePointEvidenceFromEnv,
@@ -76,6 +77,8 @@ const PRODUCTION_MARKER_RE = /(?:^|[-_.\s])(prod|production|live)(?:[-_.\s]|$)/i
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const SHA_RE = /^[0-9a-f]{40}$/;
+const SAFE_BRANCH_RE =
+  /^(?!-)(?!.*(?:\.\.|\/\/|@\{|\\))(?!.*(?:^|\/)\.)(?!.*(?:^|\/)\.\.)(?!.*\/$)[A-Za-z0-9._/-]{1,120}$/;
 
 export function snapshotStage9BEnv(env = process.env): Record<string, string | undefined> {
   return { ...env };
@@ -172,6 +175,18 @@ export function localStage9BDeploymentEvidenceFromEnv(
   const githubHeadSha = env.REZNO_STAGE9_GATE9B_GITHUB_HEAD_SHA?.trim() ?? deploymentSha;
   const localHeadSha = env.REZNO_STAGE9_GATE9B_LOCAL_HEAD_SHA?.trim() ?? deploymentSha;
   const vercelSourceSha = env.REZNO_STAGE9_GATE9B_VERCEL_SOURCE_SHA?.trim() ?? deploymentSha;
+  const githubDefaultBranch = env.REZNO_STAGE9_GATE9B_GITHUB_DEFAULT_BRANCH?.trim()
+    ?? STAGE9_GATE9B_POST_MERGE_BRANCH;
+  const githubDefaultBranchHeadSha =
+    env.REZNO_STAGE9_GATE9B_GITHUB_DEFAULT_BRANCH_HEAD_SHA?.trim() ?? deploymentSha;
+  const verificationMode =
+    env.REZNO_STAGE9_GATE9B_DEPLOYMENT_VERIFICATION_MODE === "pre-merge-branch"
+      ? "pre-merge-branch"
+      : "post-merge-default-branch";
+  const vercelSourceRef = env.REZNO_STAGE9_GATE9B_VERCEL_SOURCE_REF?.trim()
+    ?? (verificationMode === "pre-merge-branch"
+      ? STAGE9_GATE9B_BRANCH
+      : githubDefaultBranch);
   if (
     !SHA_RE.test(deploymentSha)
     || !SHA_RE.test(sourceSha)
@@ -179,6 +194,9 @@ export function localStage9BDeploymentEvidenceFromEnv(
     || !SHA_RE.test(githubHeadSha)
     || !SHA_RE.test(localHeadSha)
     || !SHA_RE.test(vercelSourceSha)
+    || !SHA_RE.test(githubDefaultBranchHeadSha)
+    || !SAFE_BRANCH_RE.test(githubDefaultBranch)
+    || !SAFE_BRANCH_RE.test(vercelSourceRef)
   ) {
     return undefined;
   }
@@ -194,11 +212,15 @@ export function localStage9BDeploymentEvidenceFromEnv(
       : "READY",
     trustedVerification: {
       authorizedSha,
+      githubDefaultBranch,
+      githubDefaultBranchHeadSha,
       githubHeadSha,
       localHeadSha,
+      mode: verificationMode,
       source: GATE9B_LOCAL_TEST_SOURCE,
       vercelProjectSlug: env.REZNO_STAGE9_GATE9B_VERCEL_PROJECT?.trim()
         ?? GATE9B_STAGING_PROJECT,
+      vercelSourceRef,
       vercelSourceSha,
       verifiedAt: env.REZNO_STAGE9_GATE9B_DEPLOYMENT_VERIFIED_AT?.trim()
         ?? now.toISOString(),
@@ -230,13 +252,25 @@ export async function collectStage9BDeploymentEvidence(
   }
 
   const localHeadSha = readLocalGitHead(options.repoRoot ?? process.cwd());
-  const githubHeadSha = readGitHubBranchHead();
+  const github = await readGitHubRepositoryMetadata({
+    token: env.GITHUB_TOKEN?.trim() || env.GH_TOKEN?.trim(),
+  });
   const vercel = await readVercelDeploymentMetadata({
     deploymentId,
     teamId: env.VERCEL_TEAM_ID?.trim(),
     token: vercelToken,
   });
-  if (!localHeadSha || !githubHeadSha || !vercel) return base;
+  if (!localHeadSha || !github || !vercel) return base;
+  const mode = vercel.sourceRef === github.defaultBranch
+    ? "post-merge-default-branch"
+    : vercel.sourceRef === STAGE9_GATE9B_BRANCH
+      ? "pre-merge-branch"
+      : null;
+  if (!mode) return base;
+  const githubHeadSha = mode === "post-merge-default-branch"
+    ? github.defaultBranchHeadSha
+    : readGitHubBranchHead(STAGE9_GATE9B_BRANCH);
+  if (!githubHeadSha) return base;
 
   const deploymentSha = base?.deploymentSha ?? vercel.sourceSha;
   return {
@@ -247,10 +281,14 @@ export async function collectStage9BDeploymentEvidence(
     status: vercel.status,
     trustedVerification: {
       authorizedSha,
+      githubDefaultBranch: github.defaultBranch,
+      githubDefaultBranchHeadSha: github.defaultBranchHeadSha,
       githubHeadSha,
       localHeadSha,
+      mode,
       source: "github-vercel-api",
       vercelProjectSlug: vercel.projectSlug,
+      vercelSourceRef: vercel.sourceRef,
       vercelSourceSha: vercel.sourceSha,
       verifiedAt: now.toISOString(),
     },
@@ -410,17 +448,61 @@ function readLocalGitHead(repoRoot: string) {
   }
 }
 
-function readGitHubBranchHead() {
+function readGitHubBranchHead(branch: string) {
+  if (!SAFE_BRANCH_RE.test(branch)) return null;
   try {
     const value = execFileSync("git", [
       "ls-remote",
       "https://github.com/aswad7022/REZNO.git",
-      `refs/heads/${STAGE9_GATE9B_BRANCH}`,
+      `refs/heads/${branch}`,
     ], {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
     }).trim().split(/\s+/)[0] ?? "";
     return SHA_RE.test(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+async function readGitHubRepositoryMetadata(input: {
+  readonly token?: string;
+}): Promise<{
+  readonly defaultBranch: string;
+  readonly defaultBranchHeadSha: string;
+} | null> {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10_000);
+    try {
+      const headers: Record<string, string> = {
+        Accept: "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+      };
+      if (input.token) headers.Authorization = `Bearer ${input.token}`;
+      const repoResponse = await fetch("https://api.github.com/repos/aswad7022/REZNO", {
+        headers,
+        signal: controller.signal,
+      });
+      const contentType = repoResponse.headers.get("content-type") ?? "";
+      if (!repoResponse.ok || !contentType.includes("application/json")) return null;
+      const text = await repoResponse.text();
+      if (text.length > 32_000) return null;
+      const data = JSON.parse(text) as unknown;
+      const defaultBranch = isRecord(data) ? stringField(data, "default_branch") : null;
+      if (
+        !defaultBranch
+        || defaultBranch !== STAGE9_GATE9B_POST_MERGE_BRANCH
+        || !SAFE_BRANCH_RE.test(defaultBranch)
+      ) {
+        return null;
+      }
+      const defaultBranchHeadSha = readGitHubBranchHead(defaultBranch);
+      if (!defaultBranchHeadSha) return null;
+      return { defaultBranch, defaultBranchHeadSha };
+    } finally {
+      clearTimeout(timeout);
+    }
   } catch {
     return null;
   }
@@ -433,6 +515,7 @@ async function readVercelDeploymentMetadata(input: {
 }): Promise<{
   readonly origin: string;
   readonly projectSlug: string;
+  readonly sourceRef: string;
   readonly sourceSha: string;
   readonly status: "READY" | "SUCCESS" | "PENDING" | "FAILED";
 } | null> {
@@ -476,7 +559,7 @@ async function readVercelDeploymentMetadata(input: {
       const data = JSON.parse(deploymentText) as {
         alias?: unknown;
         aliases?: unknown;
-        gitSource?: { sha?: unknown };
+        gitSource?: { ref?: unknown; sha?: unknown };
         meta?: Record<string, unknown>;
         name?: unknown;
         project?: { name?: unknown };
@@ -494,6 +577,13 @@ async function readVercelDeploymentMetadata(input: {
         data.meta?.githubCommitSha,
         data.meta?.githubCommitRefSha,
       ].find((value): value is string => typeof value === "string" && SHA_RE.test(value));
+      const sourceRef = [
+        data.gitSource?.ref,
+        data.meta?.githubCommitRef,
+        data.meta?.githubCommitBranch,
+      ]
+        .map((value) => typeof value === "string" ? normalizeGitSourceRef(value) : null)
+        .find((value): value is string => typeof value === "string" && SAFE_BRANCH_RE.test(value));
       const hasStagingAlias = vercelDeploymentHasStagingAlias(data, aliasesData);
       const status = data.readyState === "READY"
         ? "READY"
@@ -502,10 +592,11 @@ async function readVercelDeploymentMetadata(input: {
           : data.readyState === "ERROR" || data.readyState === "CANCELED"
             ? "FAILED"
             : "PENDING";
-      if (!sourceSha || !hasStagingAlias) return null;
+      if (!sourceSha || !sourceRef || !hasStagingAlias) return null;
       return {
         origin: GATE9B_STAGING_ORIGIN,
         projectSlug,
+        sourceRef,
         sourceSha,
         status,
       };
@@ -515,6 +606,11 @@ async function readVercelDeploymentMetadata(input: {
   } catch {
     return null;
   }
+}
+
+function normalizeGitSourceRef(value: string) {
+  const trimmed = value.trim();
+  return trimmed.startsWith("refs/heads/") ? trimmed.slice("refs/heads/".length) : trimmed;
 }
 
 export function vercelDeploymentHasStagingAlias(
