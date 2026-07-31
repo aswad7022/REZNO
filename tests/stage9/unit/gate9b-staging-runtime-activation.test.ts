@@ -21,6 +21,7 @@ import {
   GATE9B_STAGING_PROJECT,
   STAGE9_GATE9B_BASE_SHA,
   STAGE9_GATE9B_BRANCH,
+  STAGE9_GATE9B_POST_MERGE_BRANCH,
   STAGE9_GATE9B_VERSION,
   assertGate9BActivationPreconditions,
   evaluateGate9BRuntimeSnapshot,
@@ -54,6 +55,7 @@ const now = new Date("2026-07-29T12:00:00.000Z");
 test("Gate 9B records the author scope without starting Gate 9C or production", () => {
   assert.equal(STAGE9_GATE9B_BASE_SHA, "032e8fe756d5ffbc67f079a2d53cb47e2f3b782d");
   assert.equal(STAGE9_GATE9B_BRANCH, "feat/stage9-staging-runtime-activation");
+  assert.equal(STAGE9_GATE9B_POST_MERGE_BRANCH, "main");
   assert.equal(STAGE9_GATE9B_VERSION, "stage9-gate9b-staging-runtime-activation-v1");
   assert.equal(GATE9B_STAGING_PROJECT, "rezno-staging");
   assert.equal(GATE9B_STAGING_ORIGIN, "https://rezno-staging.vercel.app");
@@ -196,12 +198,46 @@ test("Gate 9B deployment evidence requires trusted GitHub, local, Vercel, and au
     mismatch.findings.some((finding) => finding.code === "DEPLOYMENT_SHA_MISMATCH"),
     true,
   );
+  const staleHistoricalBranchIsIrrelevantPostMerge = validateGate9BDeploymentEvidence(
+    trustedDeploymentEvidence("a".repeat(40), "github-vercel-api", {
+      githubDefaultBranch: STAGE9_GATE9B_POST_MERGE_BRANCH,
+      githubDefaultBranchHeadSha: "a".repeat(40),
+      githubHeadSha: "a".repeat(40),
+      mode: "post-merge-default-branch",
+      vercelSourceRef: STAGE9_GATE9B_POST_MERGE_BRANCH,
+    }),
+    { now },
+  );
+  assert.equal(staleHistoricalBranchIsIrrelevantPostMerge.ok, true);
+  const preMergeBranchStillValid = validateGate9BDeploymentEvidence(
+    trustedDeploymentEvidence("a".repeat(40), "github-vercel-api", {
+      githubDefaultBranchHeadSha: "b".repeat(40),
+      mode: "pre-merge-branch",
+      vercelSourceRef: STAGE9_GATE9B_BRANCH,
+    }),
+    { now },
+  );
+  assert.equal(preMergeBranchStillValid.ok, true);
   for (const [name, evidence] of [
     ["malformed sha", trustedDeploymentEvidence("a".repeat(39), "github-vercel-api")],
     ["local head mismatch", trustedDeploymentEvidence("a".repeat(40), "github-vercel-api", { localHeadSha: "b".repeat(40) })],
     ["github head mismatch", trustedDeploymentEvidence("a".repeat(40), "github-vercel-api", { githubHeadSha: "b".repeat(40) })],
     ["vercel source mismatch", trustedDeploymentEvidence("a".repeat(40), "github-vercel-api", { vercelSourceSha: "b".repeat(40) })],
+    ["authorized SHA mismatch", trustedDeploymentEvidence("a".repeat(40), "github-vercel-api", { authorizedSha: "b".repeat(40) })],
+    ["default branch head mismatch", trustedDeploymentEvidence("a".repeat(40), "github-vercel-api", { githubDefaultBranchHeadSha: "b".repeat(40) })],
+    ["vercel source ref is not default branch", trustedDeploymentEvidence("a".repeat(40), "github-vercel-api", { vercelSourceRef: STAGE9_GATE9B_BRANCH })],
+    ["github default branch metadata missing", trustedDeploymentEvidence("a".repeat(40), "github-vercel-api", { githubDefaultBranch: undefined })],
+    ["malformed source ref", trustedDeploymentEvidence("a".repeat(40), "github-vercel-api", { vercelSourceRef: "main branch" })],
+    ["wrong pre-merge source ref", trustedDeploymentEvidence("a".repeat(40), "github-vercel-api", { mode: "pre-merge-branch", vercelSourceRef: STAGE9_GATE9B_POST_MERGE_BRANCH })],
     ["wrong vercel project", trustedDeploymentEvidence("a".repeat(40), "github-vercel-api", { vercelProjectSlug: "rezno" })],
+    ["wrong deployment project", {
+      ...trustedDeploymentEvidence("a".repeat(40), "github-vercel-api"),
+      projectSlug: "rezno-preview",
+    }],
+    ["wrong staging origin", {
+      ...trustedDeploymentEvidence("a".repeat(40), "github-vercel-api"),
+      origin: "https://preview.rezno-staging.vercel.app",
+    }],
     ["deployment not ready", { ...trustedDeploymentEvidence("a".repeat(40), "github-vercel-api"), status: "PENDING" as const }],
     ["stale metadata", trustedDeploymentEvidence("a".repeat(40), "github-vercel-api", { verifiedAt: "2026-07-29T11:00:00.000Z" })],
   ] as const) {
@@ -559,6 +595,36 @@ test("Gate 9B activation preconditions fail closed until every independent proof
     ["runtime URL missing", { env: { ...healthy.env, REZNO_PLATFORM_RUNTIME_URL: "" } }],
     ["runtime URL unsafe", { env: { ...healthy.env, REZNO_PLATFORM_RUNTIME_URL: "https://rezno-staging.vercel.app?x=1" } }],
     ["deployed SHA mismatch", { deploymentEvidence: { ...healthy.deploymentEvidence, deploymentSha: "b".repeat(40) } }],
+    ["vercel source ref not default branch", {
+      deploymentEvidence: trustedDeploymentEvidence(reviewedSha, GATE9B_LOCAL_TEST_SOURCE, {
+        vercelSourceRef: STAGE9_GATE9B_BRANCH,
+      }),
+    }],
+    ["GitHub default branch head mismatch", {
+      deploymentEvidence: trustedDeploymentEvidence(reviewedSha, GATE9B_LOCAL_TEST_SOURCE, {
+        githubDefaultBranchHeadSha: "b".repeat(40),
+      }),
+    }],
+    ["local HEAD mismatch", {
+      deploymentEvidence: trustedDeploymentEvidence(reviewedSha, GATE9B_LOCAL_TEST_SOURCE, {
+        localHeadSha: "b".repeat(40),
+      }),
+    }],
+    ["Vercel source SHA mismatch", {
+      deploymentEvidence: trustedDeploymentEvidence(reviewedSha, GATE9B_LOCAL_TEST_SOURCE, {
+        vercelSourceSha: "b".repeat(40),
+      }),
+    }],
+    ["authorized SHA mismatch", {
+      deploymentEvidence: trustedDeploymentEvidence(reviewedSha, GATE9B_LOCAL_TEST_SOURCE, {
+        authorizedSha: "b".repeat(40),
+      }),
+    }],
+    ["malformed branch metadata", {
+      deploymentEvidence: trustedDeploymentEvidence(reviewedSha, GATE9B_LOCAL_TEST_SOURCE, {
+        vercelSourceRef: "main branch",
+      }),
+    }],
     ["DB host mismatch", { env: { ...healthy.env, REZNO_STAGE9_GATE9B_EXPECTED_DATABASE_HOST: "wrong.us-east-1.aws.neon.tech" }, databaseIdentity: undefined }],
     ["DB role mismatch", { env: { ...healthy.env, REZNO_STAGE9_GATE9B_EXPECTED_DATABASE_ROLE: "wrong_role" }, databaseIdentity: undefined }],
     ["production-like DB", {
@@ -593,6 +659,19 @@ test("Gate 9B activation preconditions fail closed until every independent proof
   assertGate9BActivationPreconditions(healthy);
   mutationCount += 1;
   assert.equal(mutationCount, 1);
+
+  const snapshot = healthyPreconditions();
+  snapshot.env.REZNO_STAGE9_GATE9B_DEPLOYMENT_SHA = "b".repeat(40);
+  snapshot.env.REZNO_STAGE9_GATE9B_GITHUB_HEAD_SHA = "b".repeat(40);
+  snapshot.env.REZNO_STAGE9_GATE9B_VERCEL_SOURCE_SHA = "b".repeat(40);
+  mutationCount = 0;
+  assertGate9BActivationPreconditions(snapshot);
+  mutationCount += 1;
+  assert.equal(
+    mutationCount,
+    1,
+    "activation boundary must use the verified deployment evidence snapshot, not reread mutable env SHA fields",
+  );
 });
 
 test("Gate 9B preflight CLI exits non-zero for fail-closed and external-input states", () => {
@@ -770,10 +849,14 @@ function trustedDeploymentEvidence(
     status: "SUCCESS",
     trustedVerification: {
       authorizedSha: sha,
+      githubDefaultBranch: STAGE9_GATE9B_POST_MERGE_BRANCH,
+      githubDefaultBranchHeadSha: sha,
       githubHeadSha: sha,
       localHeadSha: sha,
+      mode: "post-merge-default-branch",
       source,
       vercelProjectSlug: GATE9B_STAGING_PROJECT,
+      vercelSourceRef: STAGE9_GATE9B_POST_MERGE_BRANCH,
       vercelSourceSha: sha,
       verifiedAt: "2026-07-29T12:00:00.000Z",
       ...override,

@@ -10,6 +10,7 @@ export const STAGE9_GATE9B_BASE_SHA =
 
 export const STAGE9_GATE9B_BRANCH =
   "feat/stage9-staging-runtime-activation" as const;
+export const STAGE9_GATE9B_POST_MERGE_BRANCH = "main" as const;
 
 export const STAGE9_GATE9B_VERSION =
   "stage9-gate9b-staging-runtime-activation-v1" as const;
@@ -185,11 +186,15 @@ export type Gate9BDeploymentEvidence = {
 
 export type Gate9BDeploymentTrustedVerification = {
   readonly authorizedSha: string;
+  readonly githubDefaultBranch?: string;
+  readonly githubDefaultBranchHeadSha?: string;
   readonly githubHeadSha: string;
   readonly localHeadSha: string;
+  readonly mode?: "pre-merge-branch" | "post-merge-default-branch";
   readonly source: "github-vercel-api" | typeof GATE9B_LOCAL_TEST_SOURCE;
   readonly verifiedAt?: string;
   readonly vercelProjectSlug: string;
+  readonly vercelSourceRef?: string;
   readonly vercelSourceSha: string;
 };
 
@@ -917,6 +922,17 @@ export function validateGate9BDeploymentEvidence(
         ));
       }
     }
+    if (
+      trusted.githubDefaultBranchHeadSha !== undefined
+      && !isFullGitSha(trusted.githubDefaultBranchHeadSha)
+    ) {
+      findings.push(finding(
+        "DEPLOYMENT_SHA_UNVERIFIED",
+        "githubDefaultBranchHeadSha",
+        "error",
+        "Gate 9B GitHub default-branch verification must contain an exact Git SHA.",
+      ));
+    }
     const sourceAllowed = options.allowLocalTest
       ? trusted.source === GATE9B_LOCAL_TEST_SOURCE
       : trusted.source === "github-vercel-api";
@@ -938,6 +954,37 @@ export function validateGate9BDeploymentEvidence(
         "Gate 9B Vercel deployment metadata must belong to the staging project.",
       ));
     }
+    const mode = trusted.mode;
+    if (mode !== "pre-merge-branch" && mode !== "post-merge-default-branch") {
+      findings.push(finding(
+        "DEPLOYMENT_SHA_UNVERIFIED",
+        "deploymentVerificationMode",
+        "error",
+        "Gate 9B deployment verification must declare pre-merge or post-merge mode.",
+      ));
+    }
+    if (
+      trusted.source === "github-vercel-api"
+      && (!trusted.vercelSourceRef || !isSafeGitBranchName(trusted.vercelSourceRef))
+    ) {
+      findings.push(finding(
+        "DEPLOYMENT_SHA_UNVERIFIED",
+        "vercelSourceRef",
+        "error",
+        "Gate 9B Vercel deployment metadata must include a safe Git source ref.",
+      ));
+    }
+    if (
+      trusted.githubDefaultBranch !== undefined
+      && !isSafeGitBranchName(trusted.githubDefaultBranch)
+    ) {
+      findings.push(finding(
+        "DEPLOYMENT_SHA_UNVERIFIED",
+        "githubDefaultBranch",
+        "error",
+        "Gate 9B GitHub repository metadata must include a safe default branch name.",
+      ));
+    }
     const verifiedAt = parseDate(trusted.verifiedAt);
     const now = options.now ?? new Date();
     if (!verifiedAt || Math.abs(now.getTime() - verifiedAt.getTime()) > 15 * 60 * 1000) {
@@ -949,6 +996,30 @@ export function validateGate9BDeploymentEvidence(
       ));
     }
     const expected = trusted.authorizedSha;
+    if (mode === "post-merge-default-branch") {
+      if (
+        trusted.githubDefaultBranch !== STAGE9_GATE9B_POST_MERGE_BRANCH
+        || trusted.vercelSourceRef !== trusted.githubDefaultBranch
+        || trusted.githubDefaultBranchHeadSha !== expected
+        || trusted.githubHeadSha !== trusted.githubDefaultBranchHeadSha
+      ) {
+        findings.push(finding(
+          "DEPLOYMENT_SHA_MISMATCH",
+          "defaultBranchDeploymentBinding",
+          "error",
+          "Gate 9B post-merge activation requires GitHub default branch, local Git, Vercel source ref, Vercel source SHA, and authorized SHA to match.",
+        ));
+      }
+    } else if (mode === "pre-merge-branch" && trusted.source === "github-vercel-api") {
+      if (trusted.vercelSourceRef !== STAGE9_GATE9B_BRANCH) {
+        findings.push(finding(
+          "DEPLOYMENT_SHA_MISMATCH",
+          "prBranchDeploymentBinding",
+          "error",
+          "Gate 9B pre-merge verification must remain bound to the reviewed PR branch.",
+        ));
+      }
+    }
     if (
       evidence.deploymentSha !== expected
       || evidence.sourceSha !== expected
@@ -960,7 +1031,7 @@ export function validateGate9BDeploymentEvidence(
         "DEPLOYMENT_SHA_MISMATCH",
         "deploymentSha",
         "error",
-        "Gate 9B requires local Git, GitHub branch, Vercel source, and authorized SHA to match exactly.",
+        "Gate 9B requires local Git, GitHub, Vercel source, and authorized SHA to match exactly.",
       ));
     }
   }
@@ -1051,6 +1122,10 @@ function providerAllowed(value: string | undefined, allowed: readonly string[]) 
 
 function isFullGitSha(value: string) {
   return /^[0-9a-f]{40}$/.test(value);
+}
+
+function isSafeGitBranchName(value: string) {
+  return /^(?!-)(?!.*(?:\.\.|\/\/|@\{|\\))(?!.*(?:^|\/)\.)(?!.*(?:^|\/)\.\.)(?!.*\/$)[A-Za-z0-9._/-]{1,120}$/.test(value);
 }
 
 function externalInputRequiredFor(findings: readonly Gate9BFinding[]) {
