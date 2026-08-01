@@ -1,6 +1,23 @@
 # Gate 9B Closure Evidence
 
-Status: `AUTHOR IMPLEMENTATION — NOT CLOSED`
+Status: `PASS — STAGE 9 GATE 9B CLOSED`
+
+Official closing merge: `c20ba5720e55bdb8676c29cd901ab83916da88fb`
+
+The author-era sections below are retained as historical evidence. Gate 9B
+subsequently completed authenticated staging activation, runtime backlog and
+scheduler stabilization, controlled rollback, and final independent review.
+The accepted final state was:
+
+- runtime `ENABLED` on staging and not activated on production;
+- schedules `13/13`;
+- active/overdue jobs `0/0`;
+- running attempts/invocations `0/0`;
+- stale leases and open alerts `0/0`;
+- temporary Gate 9B AdminAccess `0`;
+- two consecutive scheduled OIDC runs succeeded from `main`;
+- migrations `51/51`, no Migration 52;
+- PRs #142, #143, #144, and #145 merged with zero unresolved threads.
 
 This file records only evidence that actually ran.
 
@@ -16,7 +33,7 @@ This file records only evidence that actually ran.
   - `npm run stage9b:database-evidence`
   - `npm run stage9b:runtime-evidence`
 
-## Current external-input status
+## Historical author external-input status
 
 Local author preflight could not prove authenticated staging database identity,
 provider-verified restore point, runtime URL, deployment SHA, or Admin
@@ -111,7 +128,7 @@ author environment lacked staging Admin login or a scoped Gate 9B Admin context:
 - `REZNO_STAGE9_GATE9B_ADMIN_PERSON_ID`
 - `REZNO_STAGE9_GATE9B_ADMIN_ACCESS_ID`
 
-## Closure rule
+## Closure rule (satisfied)
 
 Gate 9B may be marked closed only after:
 
@@ -124,3 +141,6 @@ Gate 9B may be marked closed only after:
 - fixture smoke and cleanup;
 - zero unresolved review threads;
 - independent review and merge.
+
+All listed closure conditions were satisfied before the independent
+`PASS — STAGE 9 GATE 9B CLOSED` decision.
