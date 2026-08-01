@@ -25,6 +25,10 @@ const RUNTIME_WORKER_DRAIN_LIMITS = {
   maxJobs: PLATFORM_JOB_LIMITS.maxWorkerBatch * 3,
   minRemainingMs: 15_000,
 } as const;
+const RUNTIME_SCHEDULER_DRAIN_LIMITS = {
+  maxBatches: 3,
+  maxSchedules: PLATFORM_JOB_LIMITS.maxSchedulerBatch * 3,
+} as const;
 
 type RuntimeMonitorResult =
   | { result: Prisma.InputJsonValue; state: "SUCCEEDED" }
@@ -39,6 +43,25 @@ type RuntimeWorkerBatchResult = {
   recovered: number;
   retryWait: number;
   succeeded: number;
+};
+
+type RuntimeSchedulerBatchResult = {
+  intervalsSkipped: number;
+  jobsCreated: number;
+  schedulesProcessed: number;
+};
+
+type RuntimeSchedulerDrainResult = RuntimeSchedulerBatchResult & {
+  batches: Array<RuntimeSchedulerBatchResult & { batchNumber: number }>;
+  batchesRun: number;
+  maxBatches: number;
+  maxSchedulerBatch: number;
+  maxSchedules: number;
+  state: "COMPLETE";
+  stopReason:
+    | "DRAINED"
+    | "MAX_BATCHES_REACHED"
+    | "MAX_SCHEDULES_REACHED";
 };
 
 type RuntimeWorkerDrainResult = RuntimeWorkerBatchResult & {
@@ -83,7 +106,7 @@ export async function runPlatformRuntimeCycle(
 ) {
   const authority = await acquireRuntimeInvocation(identity);
   try {
-    const scheduler = await runAutomaticPlatformSchedulerTick(authority);
+    const scheduler = await drainRuntimeSchedulerBatches(authority);
     const worker = await drainRuntimeWorkerBatches(authority, options);
     const result = await completeRuntimeInvocation(
       authority,
@@ -95,6 +118,99 @@ export async function runPlatformRuntimeCycle(
     await failRuntimeInvocation(authority);
     throw error;
   }
+}
+
+async function drainRuntimeSchedulerBatches(
+  authority: PlatformRuntimeAuthority,
+): Promise<RuntimeSchedulerDrainResult> {
+  const aggregate = emptyRuntimeSchedulerDrain();
+  while (
+    aggregate.batchesRun < RUNTIME_SCHEDULER_DRAIN_LIMITS.maxBatches
+    && aggregate.schedulesProcessed < RUNTIME_SCHEDULER_DRAIN_LIMITS.maxSchedules
+  ) {
+    const batchNumber = aggregate.batchesRun + 1;
+    const batch = await runAutomaticPlatformSchedulerTick(
+      authority,
+      PLATFORM_JOB_LIMITS.maxSchedulerBatch,
+    );
+    aggregateSchedulerBatch(aggregate, batch, batchNumber);
+
+    if (batch.schedulesProcessed < PLATFORM_JOB_LIMITS.maxSchedulerBatch) {
+      aggregate.stopReason = "DRAINED";
+      break;
+    }
+    if (aggregate.schedulesProcessed >= RUNTIME_SCHEDULER_DRAIN_LIMITS.maxSchedules) {
+      aggregate.stopReason = "MAX_SCHEDULES_REACHED";
+      break;
+    }
+  }
+  if (!aggregate.stopReason) {
+    aggregate.stopReason = "MAX_BATCHES_REACHED";
+  }
+  await recordRuntimeSchedulerDrain(authority, aggregate);
+  return aggregate;
+}
+
+function emptyRuntimeSchedulerDrain(): RuntimeSchedulerDrainResult {
+  return {
+    batches: [],
+    batchesRun: 0,
+    intervalsSkipped: 0,
+    jobsCreated: 0,
+    maxBatches: RUNTIME_SCHEDULER_DRAIN_LIMITS.maxBatches,
+    maxSchedulerBatch: PLATFORM_JOB_LIMITS.maxSchedulerBatch,
+    maxSchedules: RUNTIME_SCHEDULER_DRAIN_LIMITS.maxSchedules,
+    schedulesProcessed: 0,
+    state: "COMPLETE",
+    stopReason: "DRAINED",
+  };
+}
+
+function aggregateSchedulerBatch(
+  aggregate: RuntimeSchedulerDrainResult,
+  batch: RuntimeSchedulerBatchResult,
+  batchNumber: number,
+) {
+  aggregate.batches.push({ ...batch, batchNumber });
+  aggregate.batchesRun += 1;
+  aggregate.intervalsSkipped += batch.intervalsSkipped;
+  aggregate.jobsCreated += batch.jobsCreated;
+  aggregate.schedulesProcessed += batch.schedulesProcessed;
+}
+
+async function recordRuntimeSchedulerDrain(
+  authority: PlatformRuntimeAuthority,
+  result: RuntimeSchedulerDrainResult,
+) {
+  await prisma.$transaction(async (transaction) => {
+    await assertPlatformRuntimeInvocationOwned(transaction, authority);
+    const [clock] = await transaction.$queryRaw<Array<{ now: Date }>>(
+      Prisma.sql`SELECT clock_timestamp() AS now`,
+    );
+    if (!clock?.now) {
+      platformJobError("PLATFORM_JOB_FAILURE", "The database clock is unavailable.");
+    }
+    const updated = await transaction.platformRuntimeInvocation.updateMany({
+      where: {
+        controlGeneration: authority.controlGeneration,
+        fencingToken: authority.fencingToken,
+        id: authority.invocationId,
+        leaseToken: authority.leaseToken,
+        state: "RUNNING",
+        workerId: authority.workerId,
+      },
+      data: {
+        schedulerCompletedAt: clock.now,
+        schedulerResult: result,
+      },
+    });
+    if (updated.count !== 1) {
+      platformJobError(
+        "STALE_LEASE",
+        "The automatic scheduler lost its runtime fence.",
+      );
+    }
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }
 
 async function drainRuntimeWorkerBatches(
@@ -400,11 +516,7 @@ async function acquireRuntimeInvocation(
 
 async function completeRuntimeInvocation(
   authority: PlatformRuntimeAuthority,
-  scheduler: {
-    intervalsSkipped: number;
-    jobsCreated: number;
-    schedulesProcessed: number;
-  },
+  scheduler: RuntimeSchedulerDrainResult,
   worker: RuntimeWorkerDrainResult,
 ) {
   return prisma.$transaction(async (transaction) => {

@@ -360,6 +360,63 @@ test("automatic runtime drains the steady-state scheduled burst without leaving 
   );
 });
 
+test("automatic runtime drains all thirteen platform schedules before monitor reconciliation", async () => {
+  await ensureRuntimeEnabled();
+  await bootstrapPlatformSchedules(context, randomUUID());
+  const schedules = await prisma.platformJobSchedule.findMany({
+    orderBy: { scheduleKey: "asc" },
+  });
+  assert.equal(schedules.length, 13);
+  const now = new Date();
+  for (const schedule of schedules) {
+    await setPlatformJobScheduleEnabled(context, {
+      enabled: true,
+      expectedVersion: schedule.version,
+      idempotencyKey: randomUUID(),
+      scheduleId: schedule.id,
+    });
+    await prisma.platformJobSchedule.update({
+      where: { id: schedule.id },
+      data: {
+        nextRunAt: new Date(
+          now.getTime() - schedule.cadenceSeconds * 1_000 - 1_000,
+        ),
+      },
+    });
+  }
+
+  const result = await runPlatformRuntimeCycle(runtimeIdentity("scheduler-drain"));
+
+  assert.equal(result.state, "SUCCEEDED");
+  assert.equal(result.scheduler.batchesRun, 2);
+  assert.equal(result.scheduler.schedulesProcessed, schedules.length);
+  assert.equal(
+    result.scheduler.batches.every(
+      (batch) => batch.schedulesProcessed <= PLATFORM_JOB_LIMITS.maxSchedulerBatch,
+    ),
+    true,
+  );
+  assert.equal(result.worker.claimed, result.scheduler.jobsCreated);
+  assert.equal(result.worker.remainingAvailable, 0);
+  assert.equal(
+    await prisma.platformJobSchedule.count({
+      where: {
+        enabled: true,
+        nextRunAt: { lte: new Date(Date.now() - 60_000) },
+      },
+    }),
+    0,
+  );
+  assert.equal(
+    await prisma.platformAlert.count({ where: { state: "OPEN" } }),
+    0,
+  );
+  const stored = await prisma.platformRuntimeInvocation.findUniqueOrThrow({
+    where: { id: result.invocationId },
+  });
+  assert.deepEqual(stored.schedulerResult, result.scheduler);
+});
+
 test("automatic runtime drains bounded worker batches across boundary counts", async (t) => {
   const cases = [
     { batches: 1, count: 5, label: "baseline-five" },
