@@ -73,6 +73,7 @@ const permissions = [
   "PAYMENTS_RECONCILE",
   "SETTLEMENTS_VIEW",
   "SETTLEMENTS_MANAGE",
+  "COMMERCE_ORDERS_VIEW",
   "COMMERCE_ORDERS_MANAGE",
 ] as const;
 const rateSecret =
