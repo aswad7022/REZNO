@@ -176,7 +176,7 @@ test("Gate 7D native config, documentation, and source keep external truth expli
   ]);
   const appConfig = JSON.parse(appConfigRaw);
   const mobilePackage = JSON.parse(packageRaw);
-  assert.equal(mobilePackage.dependencies["expo-notifications"], "~57.0.7");
+  assert.equal(mobilePackage.dependencies["expo-notifications"], "~57.0.8");
   assert.deepEqual(
     appConfig.expo.plugins.find(
       (plugin: unknown) => Array.isArray(plugin) && plugin[0] === "expo-notifications",

@@ -134,11 +134,15 @@ export function validateReleaseConfiguration(
     dependencies.react,
     "React DOM must exactly match React for Expo Web.",
   );
+  assert.equal(dependencies.expo, "~57.0.9");
+  assert.equal(dependencies["expo-constants"], "~57.0.7");
+  assert.equal(dependencies["expo-dev-client"], "~57.0.10");
   assert.equal(dependencies["react-native-web"], "^0.21.2");
+  assert.equal(dependencies["react-native"], "0.86.2");
   assert.equal(dependencies["expo-file-system"], "~57.0.1");
-  assert.equal(dependencies["expo-image-manipulator"], "~57.0.6");
-  assert.equal(dependencies["expo-image-picker"], "~57.0.6");
-  assert.equal(dependencies["expo-notifications"], "~57.0.7");
+  assert.equal(dependencies["expo-image-manipulator"], "~57.0.7");
+  assert.equal(dependencies["expo-image-picker"], "~57.0.7");
+  assert.equal(dependencies["expo-notifications"], "~57.0.8");
   assert.equal(dependencies["expo-web-browser"], "~57.0.2");
   assert.equal(scripts.web, "expo start --web");
 
