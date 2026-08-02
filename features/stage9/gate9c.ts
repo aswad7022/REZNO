@@ -38,6 +38,7 @@ export const GATE9C_DEFERRED_PRODUCTION_BLOCKERS = [
 
 export type Gate9CFindingCode =
   | "MISSING_RELEASE_INPUT"
+  | "EVIDENCE_SHAPE_INVALID"
   | "INVALID_RELEASE_ENVIRONMENT"
   | "INVALID_RELEASE_ORIGIN"
   | "UNSAFE_PROVIDER_POSTURE"
@@ -161,6 +162,139 @@ export function containsGate9CSecretLikeEvidence(value: unknown): boolean {
   }
 
   return inspect(value);
+}
+
+const RELEASE_INPUT_KEYS = new Set([
+  "build",
+  "database",
+  "deployment",
+  "environment",
+  "now",
+  "secretConfiguration",
+]);
+const BUILD_EVIDENCE_KEYS = new Set([
+  "auditFindings",
+  "buildPassed",
+  "cancelledTests",
+  "eslintPassed",
+  "mobileAndroidModules",
+  "mobileIosModules",
+  "mobileProductionOriginConfigured",
+  "mobileWebModules",
+  "nextRouteCount",
+  "prismaSchemaDiff",
+  "secretFindings",
+  "skippedTests",
+  "sourceSha",
+  "testsPassed",
+  "todoTests",
+  "typeScriptPassed",
+]);
+const DATABASE_EVIDENCE_KEYS = new Set([
+  "activeJobs",
+  "appliedMigrations",
+  "criticalMigrationHashes",
+  "enabledSchedules",
+  "failedMigrations",
+  "jobTypes",
+  "openAlerts",
+  "overdueJobs",
+  "rolledBackMigrations",
+  "runningAttempts",
+  "runningInvocations",
+  "runtime",
+  "schemaDrift",
+  "staleLeases",
+  "totalMigrations",
+  "totalSchedules",
+  "verifiedAt",
+]);
+const DEPLOYMENT_EVIDENCE_KEYS = new Set([
+  "authorizedSha",
+  "githubDefaultBranch",
+  "githubDefaultBranchHeadSha",
+  "localHeadSha",
+  "origin",
+  "projectSlug",
+  "sourceRef",
+  "sourceSha",
+  "status",
+  "verifiedAt",
+]);
+const ENVIRONMENT_EVIDENCE_KEYS = new Set([
+  "BETTER_AUTH_URL",
+  "NEXT_PUBLIC_APP_URL",
+  "NODE_ENV",
+  "REZNO_AI_ENABLED",
+  "REZNO_AI_GEMINI_ENABLED",
+  "REZNO_AI_KILL_SWITCH",
+  "REZNO_DEPLOYMENT_ENV",
+  "REZNO_PAYMENT_PROVIDER",
+  "REZNO_PLATFORM_RUNTIME_URL",
+  "REZNO_PUSH_RECEIPT_PROVIDERS",
+  "REZNO_STORAGE_PROVIDER",
+  "VERCEL_ENV",
+]);
+const SECRET_CONFIGURATION_KEYS = new Set([
+  "authSecretConfigured",
+  "databaseUrlConfigured",
+  "geminiCredentialConfigured",
+]);
+const CRITICAL_MIGRATION_KEYS = new Set(
+  Object.keys(GATE9C_CRITICAL_MIGRATION_HASHES),
+);
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
+function hasOnlyKnownKeys(value: unknown, knownKeys: ReadonlySet<string>) {
+  return isPlainRecord(value)
+    && Object.keys(value).every((key) => knownKeys.has(key));
+}
+
+export function hasExactGate9CEvidenceShape(value: unknown): boolean {
+  if (!hasOnlyKnownKeys(value, RELEASE_INPUT_KEYS)) return false;
+  const input = value as Record<string, unknown>;
+  if (!hasOnlyKnownKeys(input.environment, ENVIRONMENT_EVIDENCE_KEYS)) {
+    return false;
+  }
+  if (
+    input.now !== undefined
+    && (!(input.now instanceof Date) || !Number.isFinite(input.now.getTime()))
+  ) {
+    return false;
+  }
+  if (
+    input.build !== undefined
+    && !hasOnlyKnownKeys(input.build, BUILD_EVIDENCE_KEYS)
+  ) {
+    return false;
+  }
+  if (
+    input.deployment !== undefined
+    && !hasOnlyKnownKeys(input.deployment, DEPLOYMENT_EVIDENCE_KEYS)
+  ) {
+    return false;
+  }
+  if (input.database !== undefined) {
+    if (!hasOnlyKnownKeys(input.database, DATABASE_EVIDENCE_KEYS)) return false;
+    const database = input.database as Record<string, unknown>;
+    if (
+      !hasOnlyKnownKeys(
+        database.criticalMigrationHashes,
+        CRITICAL_MIGRATION_KEYS,
+      )
+    ) {
+      return false;
+    }
+  }
+  return input.secretConfiguration === undefined
+    || hasOnlyKnownKeys(input.secretConfiguration, SECRET_CONFIGURATION_KEYS);
 }
 
 function finding(
@@ -452,12 +586,36 @@ export function validateGate9CBuildEvidence(
 export function evaluateGate9CReleaseCandidate(
   input: Gate9CReleaseCandidateInput,
 ): Gate9CReleaseCandidateResult {
-  const now = input.now ?? new Date();
+  const runtimeInput = (
+    isPlainRecord(input) ? input : {}
+  ) as Partial<Gate9CReleaseCandidateInput>;
+  const now = runtimeInput.now instanceof Date
+    && Number.isFinite(runtimeInput.now.getTime())
+    ? runtimeInput.now
+    : new Date();
+  const environment = isPlainRecord(runtimeInput.environment)
+    ? runtimeInput.environment as Readonly<Record<string, string | undefined>>
+    : {};
   const findings = uniqueFindings([
-    ...validateGate9CEnvironment(input.environment, input.secretConfiguration),
-    ...validateGate9CDeploymentEvidence(input.deployment, now),
-    ...validateGate9CDatabaseEvidence(input.database, now),
-    ...validateGate9CBuildEvidence(input.build, input.deployment?.sourceSha),
+    ...(hasExactGate9CEvidenceShape(input) ? [] : [finding(
+      "EVIDENCE_SHAPE_INVALID",
+      "evidenceShape",
+      "Release evidence contains an unknown field or invalid object shape.",
+    )]),
+    ...validateGate9CEnvironment(
+      environment,
+      isPlainRecord(runtimeInput.secretConfiguration)
+        ? runtimeInput.secretConfiguration as NonNullable<
+          Gate9CReleaseCandidateInput["secretConfiguration"]
+        >
+        : undefined,
+    ),
+    ...validateGate9CDeploymentEvidence(runtimeInput.deployment, now),
+    ...validateGate9CDatabaseEvidence(runtimeInput.database, now),
+    ...validateGate9CBuildEvidence(
+      runtimeInput.build,
+      runtimeInput.deployment?.sourceSha,
+    ),
   ]);
   if (containsGate9CSecretLikeEvidence(input)) {
     findings.push(finding(

@@ -13,6 +13,7 @@ Status: `AUTHOR IMPLEMENTATION`
 | Dirty runtime accepted | Runtime must be enabled with 13/13 schedules and zero backlog, alerts, running work, or stale leases. |
 | Database drift or hidden migration | Exact 51/51 baseline, the four exact-keyed critical hashes with no additional fields, and explicit `ABSENT` drift required. |
 | Secret leakage through evidence | The complete raw evidence tree is recursively scanned before schema parsing; secret-bearing keys or values fail closed. Evidence types carry booleans/hashes/counters, and the CLI prints codes only—never file paths, SHAs, connection strings, tokens, prompts, or IDs. |
+| Unknown runtime evidence bypasses the CLI schema | The direct evaluator independently enforces the exact top-level, environment, deployment, database, build, secret-configuration, and critical-migration key allowlists before it can return `READY`. |
 | Mobile release silently points to staging/localhost | Preview origin is explicit; store profile remains without a production origin and release code fails closed when absent. |
 
 ## Remaining external risk

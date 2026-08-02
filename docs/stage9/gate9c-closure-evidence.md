@@ -14,14 +14,16 @@ Base: `c20ba5720e55bdb8676c29cd901ab83916da88fb`
 - CI includes Gate 9A–9C contracts on pull requests and pushes to `main`;
 - release evidence rejects unknown critical-migration keys and recursively
   rejects secret-like keys or values before returning `READY`;
+- the direct evaluator rejects unknown non-secret fields at the top level and
+  in every nested evidence object, independently of the CLI schema;
 - no Prisma schema change and no Migration 52.
 
 ## Author verification
 
 The complete author tree passed the following local gates before publication:
 
-- Gate 9A–9C unit: `34/34`;
-- all unit tests: `660/660` (`417 + 243`);
+- Gate 9A–9C unit: `35/35`;
+- all unit tests: `661/661` (`417 + 244`);
 - Gate 9A–9C PostgreSQL: `10/10` on a disposable PostgreSQL 17 database with
   all `51/51` migrations applied;
 - all PostgreSQL integration tests: `456/456`;

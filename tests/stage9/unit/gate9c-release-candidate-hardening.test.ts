@@ -147,6 +147,43 @@ test("Gate 9C accepts a clean staging release candidate but keeps production ext
   assert.deepEqual(assertGate9CReleaseCandidate(healthyInput()), result);
 });
 
+test("Gate 9C direct evaluator rejects unknown top-level and nested evidence fields", () => {
+  const cases: Array<[string, (input: MutableGate9CInput) => void]> = [
+    ["top level", (input) => {
+      Object.assign(input, { extraField: "not-secret" });
+    }],
+    ["environment", (input) => {
+      input.environment.EXTRA_FIELD = "not-secret";
+    }],
+    ["deployment", (input) => {
+      Object.assign(input.deployment, { extraField: "not-secret" });
+    }],
+    ["database", (input) => {
+      Object.assign(input.database, { extraField: "not-secret" });
+    }],
+    ["build", (input) => {
+      Object.assign(input.build, { extraField: "not-secret" });
+    }],
+    ["secret configuration", (input) => {
+      Object.assign(input.secretConfiguration, { extraField: "not-secret" });
+    }],
+  ];
+
+  for (const [label, mutate] of cases) {
+    const input = structuredClone(healthyInput());
+    mutate(input);
+    const result = evaluateGate9CReleaseCandidate(input);
+    assert.equal(result.ok, false, label);
+    assert.equal(result.status, "BLOCKED", label);
+    assert.equal(result.reason, "EVIDENCE_SHAPE_INVALID", label);
+    assert.equal(
+      result.findings.some((item) => item.code === "EVIDENCE_SHAPE_INVALID"),
+      true,
+      label,
+    );
+  }
+});
+
 test("Gate 9C origin and environment posture fail closed", () => {
   const cases: Array<[string, (input: MutableGate9CInput) => void, string]> = [
     ["development runtime", (input) => { input.environment.NODE_ENV = "development"; }, "INVALID_RELEASE_ENVIRONMENT"],
