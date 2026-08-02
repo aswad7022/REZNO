@@ -12,6 +12,8 @@ Base: `c20ba5720e55bdb8676c29cd901ab83916da88fb`
 - PostgreSQL read-only suite:
   `tests/stage9/integration/gate9c-release-candidate-hardening-e2e.test.ts`;
 - CI includes Gate 9A–9C contracts on pull requests and pushes to `main`;
+- release evidence rejects unknown critical-migration keys and recursively
+  rejects secret-like keys or values before returning `READY`;
 - no Prisma schema change and no Migration 52.
 
 ## Author verification

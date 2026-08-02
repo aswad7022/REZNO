@@ -2,11 +2,30 @@ import { readFile } from "node:fs/promises";
 import { z } from "zod";
 
 import {
+  GATE9C_CRITICAL_MIGRATION_HASHES,
+  containsGate9CSecretLikeEvidence,
   evaluateGate9CReleaseCandidate,
   type Gate9CReleaseCandidateInput,
 } from "../../features/stage9/gate9c";
 
 const nonnegativeInteger = z.number().int().nonnegative();
+const criticalMigrationHashesSchema = z
+  .record(z.string(), z.string())
+  .superRefine((value, context) => {
+    const expected = GATE9C_CRITICAL_MIGRATION_HASHES as Readonly<
+      Record<string, string>
+    >;
+    const expectedKeys = Object.keys(expected);
+    if (
+      Object.keys(value).length !== expectedKeys.length
+      || expectedKeys.some((key) => value[key] !== expected[key])
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Critical migration evidence must match the exact baseline.",
+      });
+    }
+  });
 const releaseEvidenceSchema = z.strictObject({
   build: z.strictObject({
     auditFindings: nonnegativeInteger,
@@ -29,7 +48,7 @@ const releaseEvidenceSchema = z.strictObject({
   database: z.strictObject({
     activeJobs: nonnegativeInteger,
     appliedMigrations: nonnegativeInteger,
-    criticalMigrationHashes: z.record(z.string(), z.string()),
+    criticalMigrationHashes: criticalMigrationHashesSchema,
     enabledSchedules: nonnegativeInteger,
     failedMigrations: nonnegativeInteger,
     jobTypes: nonnegativeInteger,
@@ -91,8 +110,18 @@ async function main() {
   }
 
   try {
+    const rawEvidence: unknown = JSON.parse(await readFile(evidenceFile, "utf8"));
+    if (containsGate9CSecretLikeEvidence(rawEvidence)) {
+      process.stdout.write(`${JSON.stringify({
+        findings: ["SECRET_REDACTION_FAILURE"],
+        ok: false,
+        status: "BLOCKED",
+      })}\n`);
+      process.exitCode = 2;
+      return;
+    }
     const input = releaseEvidenceSchema.parse(
-      JSON.parse(await readFile(evidenceFile, "utf8")),
+      rawEvidence,
     ) as Gate9CReleaseCandidateInput;
     const result = evaluateGate9CReleaseCandidate({
       ...input,

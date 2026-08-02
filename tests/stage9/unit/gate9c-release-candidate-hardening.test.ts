@@ -318,6 +318,72 @@ test("Gate 9C release evidence CLI is non-mutating, redacted, and fail-closed", 
     assert.equal(JSON.parse(unknownField.stdout).ok, false);
     assert.equal(unknownField.stdout.includes("DATABASE_URL"), false);
 
+    const unknownMigrationHash = healthyInput();
+    delete (unknownMigrationHash as { now?: Date }).now;
+    unknownMigrationHash.deployment.verifiedAt = fresh;
+    unknownMigrationHash.database.verifiedAt = fresh;
+    unknownMigrationHash.database.criticalMigrationHashes = {
+      ...GATE9C_CRITICAL_MIGRATION_HASHES,
+      UNEXPECTED_MIGRATION: "0".repeat(64),
+    };
+    writeFileSync(evidenceFile, JSON.stringify(unknownMigrationHash), { mode: 0o600 });
+    const extraMigrationKey = spawnSync(
+      process.execPath,
+      [
+        path.join(repoRoot, "node_modules/tsx/dist/cli.mjs"),
+        path.join(repoRoot, "scripts/stage9/gate9c-release-evidence.ts"),
+      ],
+      {
+        cwd: repoRoot,
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          REZNO_STAGE9_GATE9C_EVIDENCE_FILE: evidenceFile,
+        },
+      },
+    );
+    assert.equal(extraMigrationKey.status, 2);
+    assert.equal(JSON.parse(extraMigrationKey.stdout).ok, false);
+    assert.equal(extraMigrationKey.stdout.includes("UNEXPECTED_MIGRATION"), false);
+
+    const secretBearingMigrationHash = healthyInput();
+    delete (secretBearingMigrationHash as { now?: Date }).now;
+    secretBearingMigrationHash.deployment.verifiedAt = fresh;
+    secretBearingMigrationHash.database.verifiedAt = fresh;
+    secretBearingMigrationHash.database.criticalMigrationHashes = {
+      ...GATE9C_CRITICAL_MIGRATION_HASHES,
+      DATABASE_URL: [
+        "postgresql:/",
+        "/fake-user:fake-password@fake.invalid/fake",
+      ].join(""),
+    };
+    writeFileSync(evidenceFile, JSON.stringify(secretBearingMigrationHash), {
+      mode: 0o600,
+    });
+    const secretBearingEvidence = spawnSync(
+      process.execPath,
+      [
+        path.join(repoRoot, "node_modules/tsx/dist/cli.mjs"),
+        path.join(repoRoot, "scripts/stage9/gate9c-release-evidence.ts"),
+      ],
+      {
+        cwd: repoRoot,
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          REZNO_STAGE9_GATE9C_EVIDENCE_FILE: evidenceFile,
+        },
+      },
+    );
+    assert.equal(secretBearingEvidence.status, 2);
+    assert.deepEqual(JSON.parse(secretBearingEvidence.stdout).findings, [
+      "SECRET_REDACTION_FAILURE",
+    ]);
+    assert.equal(secretBearingEvidence.stdout.includes("DATABASE_URL"), false);
+    assert.equal(secretBearingEvidence.stdout.includes("fake-user"), false);
+    assert.equal(secretBearingEvidence.stdout.includes("fake-password"), false);
+    assert.equal(secretBearingEvidence.stdout.includes("postgresql"), false);
+
     const missingEnvironment = { ...process.env };
     delete missingEnvironment.REZNO_STAGE9_GATE9C_EVIDENCE_FILE;
     const missing = spawnSync(

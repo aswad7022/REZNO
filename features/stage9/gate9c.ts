@@ -139,6 +139,29 @@ const SHA_PATTERN = /^[0-9a-f]{40}$/;
 const MAX_EVIDENCE_AGE_MS = 30 * 60 * 1000;
 const SECRET_LIKE =
   /(?:postgres(?:ql)?:\/\/|password\s*[:=]|authorization\s*[:=]|bearer\s+[a-z0-9._-]+|cookie\s*[:=]|token\s*[:=]|api[_-]?key\s*[:=]|gh[op]_[a-z0-9_]+|vercel_[a-z0-9_]+|sk-[a-z0-9_-]+)/iu;
+const SECRET_LIKE_EVIDENCE_KEY =
+  /(?:^|[_-])(?:api[_-]?key|auth[_-]?secret|authorization|client[_-]?secret|cookie|database[_-]?url|password|passwd|private[_-]?key|session|token)(?:$|[_-])/iu;
+const SECRET_LIKE_EVIDENCE_VALUE =
+  /(?:postgres(?:ql)?:\/\/[^\s:/]+:[^@\s]+@|mysql:\/\/[^\s:/]+:[^@\s]+@|mongodb(?:\+srv)?:\/\/[^\s:/]+:[^@\s]+@|-----BEGIN [A-Z ]*PRIVATE KEY-----|(?:api[_-]?key|authorization|client[_-]?secret|cookie|database[_-]?url|password|session|token)\s*[:=]\s*\S+|bearer\s+\S+|(?:gh[opurs]_|vercel_|sk-|AIza)[a-z0-9._-]{8,}|eyJ[a-z0-9_-]+\.[a-z0-9_-]+\.[a-z0-9_-]+)/iu;
+
+export function containsGate9CSecretLikeEvidence(value: unknown): boolean {
+  const visited = new WeakSet<object>();
+
+  function inspect(candidate: unknown): boolean {
+    if (typeof candidate === "string") {
+      return SECRET_LIKE_EVIDENCE_VALUE.test(candidate);
+    }
+    if (candidate === null || typeof candidate !== "object") return false;
+    if (visited.has(candidate)) return false;
+    visited.add(candidate);
+    if (Array.isArray(candidate)) return candidate.some(inspect);
+    return Object.entries(candidate).some(
+      ([key, nested]) => SECRET_LIKE_EVIDENCE_KEY.test(key) || inspect(nested),
+    );
+  }
+
+  return inspect(value);
+}
 
 function finding(
   code: Gate9CFindingCode,
@@ -318,13 +341,18 @@ export function validateGate9CDatabaseEvidence(
     )];
   }
   const findings: Gate9CFinding[] = [];
+  const expectedMigrationHashes = Object.entries(
+    GATE9C_CRITICAL_MIGRATION_HASHES,
+  );
   if (
     evidence.totalMigrations !== GATE9C_EXPECTED_MIGRATION_COUNT
     || evidence.appliedMigrations !== GATE9C_EXPECTED_MIGRATION_COUNT
     || evidence.failedMigrations !== 0
     || evidence.rolledBackMigrations !== 0
     || evidence.schemaDrift !== "ABSENT"
-    || Object.entries(GATE9C_CRITICAL_MIGRATION_HASHES).some(
+    || Object.keys(evidence.criticalMigrationHashes).length
+      !== expectedMigrationHashes.length
+    || expectedMigrationHashes.some(
       ([migration, hash]) => evidence.criticalMigrationHashes[migration] !== hash,
     )
   ) {
@@ -431,6 +459,13 @@ export function evaluateGate9CReleaseCandidate(
     ...validateGate9CDatabaseEvidence(input.database, now),
     ...validateGate9CBuildEvidence(input.build, input.deployment?.sourceSha),
   ]);
+  if (containsGate9CSecretLikeEvidence(input)) {
+    findings.push(finding(
+      "SECRET_REDACTION_FAILURE",
+      "evidence",
+      "Release evidence contains secret-like material and must be rejected.",
+    ));
+  }
   if (findings.some((item) => SECRET_LIKE.test(item.message))) {
     findings.push(finding(
       "SECRET_REDACTION_FAILURE",
