@@ -68,8 +68,8 @@ jobs:
       - name: Run AI Gate D closure contracts
         run: npm run test:ai-gate-d
 
-      - name: Run Stage 9 Gate 9A through 9C release-candidate contracts
-        run: npm run test:stage9c:unit
+      - name: Run Stage 9 Gate 9A through 9D final-release contracts
+        run: npm run test:stage9d:unit
 
       - name: Validate Prisma schema
         run: npx --no-install prisma validate
@@ -154,8 +154,8 @@ jobs:
       - name: Run focused Gate 5D cross-gate PostgreSQL closure
         run: npm run test:stage5-closure:postgres
 
-      - name: Run focused Stage 9 Gate 9A through 9C PostgreSQL baselines
-        run: npm run test:stage9c:postgres
+      - name: Run focused Stage 9 Gate 9A through 9D PostgreSQL baselines
+        run: npm run test:stage9d:postgres
 
       - name: Run focused Stage 6 durable jobs and automation PostgreSQL integrity
         run: npm run test:platform-jobs:postgres

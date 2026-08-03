@@ -1,8 +1,9 @@
 # Gate 9C Closure Evidence
 
-Status: `AUTHOR IMPLEMENTATION — NOT CLOSED`
+Status: `PASS — STAGE 9 GATE 9C CLOSED`
 
 Base: `c20ba5720e55bdb8676c29cd901ab83916da88fb`
+Closing merge: `d5a01deafeb19dbc72529dc15d20bc9ef7df9377`
 
 ## Implemented evidence
 
@@ -53,12 +54,15 @@ Two preliminary HTTP attempts were not counted: one omitted
 `REZNO_ENV=local-test` marker. Both failed closed. The complete CI-equivalent
 environment was then used for the authoritative `133/133` run.
 
-Remote GitHub Actions and Vercel evidence must be recorded on the exact Draft
-PR head before independent review.
+Gate 9C was independently reviewed, merged, and verified on staging before Gate
+9D began. Staging remained on the accepted release-candidate posture: runtime
+`ENABLED`, schedules `13/13`, active/overdue jobs `0/0`, open alerts `0`,
+running attempts/invocations `0/0`, stale leases `0`, migrations `51/51`, and
+schema drift `ABSENT`.
 
 ## Closure rule
 
-Gate 9C closes only after:
+Gate 9C closed only after:
 
 - exact-head author evidence is complete;
 - independent review reports zero P0/P1/P2;
