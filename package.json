@@ -147,7 +147,12 @@
     "test:stage9c:postgres": "NODE_ENV=test NODE_OPTIONS=--conditions=react-server tsx --test --test-concurrency=1 tests/stage9/integration/gate9a-final-integration-baseline-e2e.test.ts tests/stage9/integration/gate9b-staging-runtime-activation-e2e.test.ts tests/stage9/integration/gate9c-release-candidate-hardening-e2e.test.ts",
     "test:stage9c:diff-check": "git diff --check c20ba5720e55bdb8676c29cd901ab83916da88fb...HEAD",
     "test:stage9c": "npm run test:stage9c:unit && npm run test:stage9c:postgres && npm run test:stage9c:diff-check",
-    "stage9c:release-evidence": "NODE_OPTIONS=--conditions=react-server tsx scripts/stage9/gate9c-release-evidence.ts"
+    "stage9c:release-evidence": "NODE_OPTIONS=--conditions=react-server tsx scripts/stage9/gate9c-release-evidence.ts",
+    "test:stage9d:unit": "NODE_OPTIONS=--conditions=react-server tsx --test tests/stage9/unit/gate9a-final-integration-baseline.test.ts tests/stage9/unit/gate9b-staging-runtime-activation.test.ts tests/stage9/unit/gate9c-release-candidate-hardening.test.ts tests/stage9/unit/gate9d-final-release-closure.test.ts",
+    "test:stage9d:postgres": "NODE_ENV=test NODE_OPTIONS=--conditions=react-server tsx --test --test-concurrency=1 tests/stage9/integration/gate9a-final-integration-baseline-e2e.test.ts tests/stage9/integration/gate9b-staging-runtime-activation-e2e.test.ts tests/stage9/integration/gate9c-release-candidate-hardening-e2e.test.ts tests/stage9/integration/gate9d-final-release-closure-e2e.test.ts",
+    "test:stage9d:diff-check": "git diff --check d5a01deafeb19dbc72529dc15d20bc9ef7df9377...HEAD",
+    "test:stage9d": "npm run test:stage9d:unit && npm run test:stage9d:postgres && npm run test:stage9d:diff-check",
+    "stage9d:final-release-evidence": "NODE_OPTIONS=--conditions=react-server tsx scripts/stage9/gate9d-final-release-evidence.ts"
   },
   "dependencies": {
     "@better-auth/expo": "^1.6.23",
